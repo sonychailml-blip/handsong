@@ -8,15 +8,16 @@
    - floorPlaces(counts, trunks, ferns, seed): every plant { sp, x, z, s, rot } — never in the water (sedges only on the bank), never within
      3 m of the eye's ground point, nettles near a trunk, fine ferns away from today's ferns. */
 import { seeded } from '../../../../../core/pure/dsp.js';
-import { streamNear, STREAM } from './forestlife.js';
+import { streamNear, streamAt, STREAM } from './forestlife.js';
 
 const F=Object.freeze, clamp=(v,a,b)=>Math.max(a,Math.min(b,v)), smooth=(a,b,x)=>{ const t=clamp((x-a)/(b-a),0,1); return t*t*(3-2*t); };
 /* the sheet: master 2048²; tall cells 512×1024 on top, square 512² below. w, h — the plant's card size in world units (h its height) */
 export const FLOOR_ATLAS=F({ size:2048, derived:F([1024, 512]),
   cells:F({ fern2:F([0,0,512,1024]), nettle:F([512,0,512,1024]), sedge:F([1024,0,512,1024]),
-    sorrel:F([0,1024,512,512]), forb:F([512,1024,512,512]), bilberry:F([1024,1024,512,512]), anemone:F([1536,1024,512,512]) }),
+    sorrel:F([0,1024,512,512]), forb:F([512,1024,512,512]), bilberry:F([1024,1024,512,512]), anemone:F([1536,1024,512,512]),
+    leaf0:F([0,1536,512,512]), leaf1:F([512,1536,512,512]), leaf2:F([1024,1536,512,512]), leaf3:F([1536,1536,512,512]) }),   // NIGHT-6 slice 4: fallen leaves (they drift on the stream)
   world:F({ fern2:F({ w:0.36, h:1.0 }), nettle:F({ w:0.42, h:0.85 }), sedge:F({ w:0.42, h:0.62 }), sorrel:F({ w:0.32, h:0.2 }), forb:F({ w:0.4, h:0.4 }),
-    bilberry:F({ w:0.8, h:0.62 }), anemone:F({ w:0.34, h:0.3 }) }) });
+    bilberry:F({ w:0.8, h:0.62 }), anemone:F({ w:0.34, h:0.3 }), leaf:F({ w:0.13, h:0.13 }) }) });
 export const HERBS=F(['sorrel','forb','bilberry','anemone','nettle','sedge']);
 /* a cell → [u0, v0, du, dv] (uv with the image's top at v 1, as three.js flips an image) */
 export function cellUv(sp){ const [x,y,w,h]=FLOOR_ATLAS.cells[sp], S=FLOOR_ATLAS.size; return [x/S, 1-(y+h)/S, w/S, h/S]; }
@@ -59,7 +60,8 @@ export function floorPlaces(counts, trunks=[], ferns=[], seed=FLOOR.seed){
   const nearTrunk=(x,z)=>{ let b=1e9; for(const [tx,tz,r] of trunks){ const d=Math.hypot(tx-x, tz-z)-r; if(d<b) b=d; } return b; };
   const ok=(x,z)=>Math.hypot(x-L.eye[0], z-L.eye[1])>=L.eyeR && Math.abs(x)<=L.x && z<=L.zNear && z>=L.zFar;
   for(const sp of [...HERBS, 'fern2']){ const n=Math.max(0, counts[sp]|0); let k=0, tries=0;
-    while(k<n && tries++<n*30){ const x=(R()*2-1)*L.x, z=L.zFar+Math.pow(R(),0.85)*(L.zNear-L.zFar), a=R(), b=R(), rot=R()*6.283;
+    while(k<n && tries++<n*30){ let x=(R()*2-1)*L.x, z=L.zFar+Math.pow(R(),0.85)*(L.zNear-L.zFar); const a=R(), b=R(), rot=R()*6.283;
+      if(sp==='sedge'){ const P=streamAt((x/L.x+1)/2), o=((z-L.zFar)/(L.zNear-L.zFar)<0.5 ? -1 : 1)*(STREAM.half+L.sedgeBank[0]+((z-L.zFar)/(L.zNear-L.zFar)*2%1)*(L.sedgeBank[1]-L.sedgeBank[0])); x=P.x-P.tz*o; z=P.z+P.tx*o; }   // NIGHT-6 slice 4: sedges sampled along the bank (the same two draws, read as along / across)
       if(!ok(x,z)) continue; const q=streamD(x,z);
       let p; if(sp==='fern2'){ if(bankD(q)<0.25 || ferns.some(([fx,fz])=>Math.hypot(fx-x, fz-z)<L.fernGap)) continue; p=lightAt(x,z,q)*0.55*(1-0.5*moistAt(x,z,q)); }
       else p=DENS[sp](x, z, q, sp==='nettle' ? nearTrunk(x,z) : 0);

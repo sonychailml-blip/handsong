@@ -1086,6 +1086,49 @@ async function forestFloorCore(){
     if(rs.some(([sp])=>{ const u=Fp.cellUv(sp); return u[0]<0||u[1]<0||u[0]+u[2]>1+1e-12||u[1]+u[3]>1+1e-12; })) miss('a cell\'s uv leaves 0…1'); }
   return { cases:n, total:d.length, differences:d, notes };
 }
+/* NIGHT-6 slice 4: THE STREAM (apps/night/rooms/forest/pure/forestlife.js, stream.js). It flows towards the eye (its last stretch nears the eye,
+   its end is the nearest point); the moon's reflection from the eye (the moon at its base place) lands on the water — CONTROL a reflection
+   computed for a moon on the other side lands off it; the bed: never above the floor, the floor itself a bank away, deepest at the centre, smooth;
+   the water below the bank's top; outOfWater moves a point exactly to its clearance and leaves a clear one alone; the rocks, pebbles, drifting
+   leaves and mist strips: their counts, places (none under the eye; wet rocks in the water, the others on the bank), the leaves ride
+   downstream and start again upstream; repeatable. */
+async function forestStreamCore(){
+  const d=[], notes=[]; let n=0; const miss=s=>d.push(s);
+  const L=await import(new URL('../apps/night/rooms/forest/pure/forestlife.js', import.meta.url).href), S=await import(new URL('../apps/night/rooms/forest/pure/stream.js', import.meta.url).href);
+  const Fl=await import(new URL('../apps/night/rooms/forest/pure/fireflies.js', import.meta.url).href), N=await import(new URL('../apps/night/pure/cycle.js', import.meta.url).href), FR=(await import(new URL('../apps/night/rooms/forest/pure/room.js', import.meta.url).href)).FOREST_ROOM;
+  const E=[0, 1.55, 5.5], eye=(x,z)=>Math.hypot(x-E[0], z-E[2]), H=L.STREAM.half, SL=L.STREAM_LINE;
+  { const a=eye(SL[Math.round(SL.length*0.6)].x, SL[Math.round(SL.length*0.6)].z), b=eye(SL[SL.length-1].x, SL[SL.length-1].z), m=Math.min(...SL.map(p=>eye(p.x,p.z))); n+=2;
+    if(!(b<a)) miss(`the stream does not flow towards the eye: ${a.toFixed(2)} m at 60 %, ${b.toFixed(2)} m at its end`); if(!(m<2.5)) miss('the stream never comes within 2.5 m of the eye ('+m.toFixed(2)+' m)'); }
+  const glint=M=>{ const wy=-0.04, t=(E[1]-wy)/(E[1]-wy+(M[1]-wy)); return [E[0]+(M[0]-E[0])*t, E[2]+(M[2]-E[2])*t]; };
+  { const Mo=N.NIGHT.moon, g=glint([Mo.x, Mo.y, Mo.z]), q=L.streamNear(g[0], g[1]), c=glint([-Mo.x, Mo.y, Mo.z]), qc=L.streamNear(c[0], c[1]); n+=2;
+    if(!(q.d<H)) miss(`the moon's reflection (${g.map(v=>v.toFixed(2)).join(', ')}) falls ${q.d.toFixed(2)} m from the stream's centre (on the water: < ${H})`);
+    if(qc.d<H) miss('CONTROL: a moon on the other side also reflects on the water — the check cannot fail');
+    notes.push(`the moon's reflection at ${g.map(v=>v.toFixed(2)).join(', ')}, ${q.d.toFixed(2)} m from the centre line; a mirrored moon's ${qc.d.toFixed(2)} m`); }
+  { let above=0, far=0, jump=0, deep=1e9; const C=L.CARVE;
+    for(let k=0;k<400;k++){ const x=-6+(k%20)*0.6, z=-20+Math.floor(k/20)*1.25, q=L.streamNear(x,z), g=L.bankGround(x,z,q.d), f=Fl.forestGround(x,z);
+      if(g>f+1e-12) above++; if(q.d>=H+C.to && Math.abs(g-f)>1e-12) far++; }
+    for(let u=0.2;u<0.95;u+=0.05){ const p=L.streamAt(u); let prev=null; for(let o=-2;o<=2;o+=0.02){ const x=p.x-p.tz*o, z=p.z+p.tx*o, g=L.bankGround(x,z)-Fl.forestGround(x,z); if(prev!=null) jump=Math.max(jump, Math.abs(g-prev)); prev=g; }
+      deep=Math.min(deep, L.bankGround(p.x,p.z)-Fl.forestGround(p.x,p.z)); }
+    n+=4; if(above) miss(above+' points of the bed above the floor'); if(far) miss(far+' points a bank away not on the floor itself'); if(jump>0.02) miss('the carve jumps '+jump.toFixed(3)+' m between two points 2 cm apart'); notes.push('the carve (bed − floor) changes at most '+(jump*1000).toFixed(1)+' mm per 2 cm');
+    if(Math.abs(deep+C.depth)>0.02) miss('the bed\'s deepest '+deep.toFixed(3)+' (−'+C.depth+' expected)'); }
+  { let over=0; for(let u=0.05;u<1;u+=0.05){ const p=L.streamAt(u), x=p.x-p.tz*(H+L.CARVE.to), z=p.z+p.tx*(H+L.CARVE.to); if(!(p.y<Fl.forestGround(x,z)+0.02)) over++; } n++; if(over) miss(over+' places where the water stands above the bank\'s top'); }
+  { let short=0, far=0, moved=0, pushed=0; for(let k=0;k<300;k++){ const u=0.02+k/300*0.96, p=L.streamAt(u), o=((k*37)%100/100-0.5)*1.8, c=0.4+(k%7)*0.2, x0=p.x-p.tz*o, z0=p.z+p.tx*o, d0=L.streamNear(x0,z0).d, [x,z]=S.outOfWater(x0, z0, c), d=L.streamNear(x,z).d;
+      if(d0>=c){ if(x!==x0 || z!==z0) moved++; continue; } pushed++; if(d<c-1e-6) short++; else if(d>c+0.15) far++; const [x2,z2]=S.outOfWater(x, z, c); if(x2!==x || z2!==z) moved++; }
+    const [x3,z3]=S.outOfWater(8, 0, 1.2); n+=3; if(short) miss(short+' of '+pushed+' pushed points left closer than their clearance'); if(far) miss(far+' of '+pushed+' pushed points over 15 cm beyond it'); if(pushed<200) miss('only '+pushed+' of 300 test points started in the water');
+    if(moved || x3!==8 || z3!==0) miss('outOfWater moved a clear point'); }
+  for(const lv of ['full','reduced']){ const Lv=FR.levels[lv], R=S.streamRocks(Lv.rocks), P=S.streamPebbles(Lv.pebbles), M=S.mistStrips(Lv.mistStrips); n+=5;
+    if(R.length!==Lv.rocks || P.length!==Lv.pebbles || M.length!==Lv.mistStrips) miss(`${lv}: rocks ${R.length}, pebbles ${P.length}, mist ${M.length}`);
+    if(R.some(r=>eye(r.x,r.z)<S.STREAM_LIFE.eyeR) || P.some(r=>eye(r.x,r.z)<S.STREAM_LIFE.eyeR-0.5)) miss(lv+': a stone under the eye');
+    if(R.some(r=>r.wet ? L.streamNear(r.x,r.z).d>=H : L.streamNear(r.x,r.z).d<H)) miss(lv+': a wet rock out of the water or a dry one in it');
+    const w=R.filter(r=>r.wet).length/Math.max(1,R.length); if(Math.abs(w-S.STREAM_LIFE.rocks.inWater)>0.25) miss(lv+': '+(w*100).toFixed(0)+' % of the rocks in the water');
+    if(M.some(m=>eye(m.x,m.z)<4)) miss(lv+': a mist strip within 4 m of the eye');
+    if(lv==='full') notes.push(`high: ${R.length} rocks (${R.filter(r=>r.wet).length} in the water), ${P.length} pebbles, ${M.length} mist strips`); }
+  { const F=S.floatersInit(28), Lu=S.STREAM_LIFE; let off=0, back=0, loops=0; n+=3;
+    for(const f of F){ let pu=null; for(let t=0;t<120;t+=0.5){ const p=S.floatAt(f,t), q=L.streamNear(p.x,p.z); if(q.d>H*(Lu.float.across+0.05)) off++; if(pu!=null){ if(p.u<pu-0.5) loops++; else if(p.u<pu-1e-9) back++; } pu=p.u; } }
+    if(off) miss(off+' leaf positions off the water'); if(back) miss(back+' steps where a leaf went upstream'); if(!loops) miss('no leaf started again upstream in two minutes'); notes.push(`28 leaves over 2 minutes: ${loops} starts again upstream`); }
+  { const a=JSON.stringify(S.streamRocks(20)), b=JSON.stringify(S.streamRocks(20)), c=JSON.stringify(S.streamRocks(20, 7)); n+=2; if(a!==b) miss('rocks: one seed gave two sets'); if(a===c) miss('CONTROL rocks: another seed gave the same set'); }
+  return { cases:n, total:d.length, differences:d, notes };
+}
 /* NIGHT-6: THE FOREST'S FILES (tools/forest-bake.mjs). Every prepared file matches what the tool draws now, pixel for pixel (CONTROL a changed
    pixel is caught); the PNG writer and reader round-trip; the forest's files stay inside the user's budget (CONTROL 16 MB is over it). The
    sizes are printed every run (the user's rule: report the size in every slice). */
@@ -1244,6 +1287,7 @@ const ROWS=[
   ['FOREST answers (app)',      ()=>forestAnswersCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 1
   ['FOREST melody (app)',       ()=>forestMelodyCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 2
   ['FOREST floor (app)',        ()=>forestFloorCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 3
+  ['FOREST stream (app)',       ()=>forestStreamCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 4
   ['NIGHT forest files (app)',  ()=>nightForestFiles(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 (the files rule, the size budget)
   ['OLD NAME gone',             ()=>oldNameGone(),  r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // SPLIT-2
   ['NIGHT rare events (core)',  ()=>rareCore(),     r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // RUN 9 (slice 4)

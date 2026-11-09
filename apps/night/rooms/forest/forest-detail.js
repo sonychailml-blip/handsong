@@ -10,8 +10,8 @@
    Colours: tokens (--cv-forest-grass*, -leaf, -moth, -sil); counts per quality level (forest.js FOREST_LEVELS). No sound, no song here. */
 import { seeded } from '../../../../core/pure/dsp.js';
 import { forestGround } from './pure/fireflies.js';
-import { streamNear, STREAM } from './pure/forestlife.js';
-import { patchSway } from './forest-life.js';
+import { streamNear, STREAM, bankGround } from './pure/forestlife.js';
+import { patchSway, patchSoftEdges } from './forest-life.js';
 
 export const DETAIL=Object.freeze({ seed:0x44455441, leafH:5.3, beamLen:17, beams:Object.freeze([[-2.6,-7.5,2.2],[1.9,-10.5,2.6],[-0.7,-15,3.2],[3.7,-5.6,1.8]]),
   sil:Object.freeze([ Object.freeze({ kind:'fern', nx:-0.86, ny:-0.82, d:1.7, h:0.5, flip:false }), Object.freeze({ kind:'fern', nx:0.9, ny:-0.86, d:2.0, h:0.42, flip:true }),
@@ -44,8 +44,8 @@ export function buildDetail(ctx){
   let gn=0, guard=0;
   while(gn<lv.grass && guard++<lv.grass*20){ const cx=(R()*2-1)*9, cz=2.2-R()*18.2, k=8+Math.floor(R()*16);
     for(let j=0;j<k && gn<lv.grass;j++){ const x=cx+(R()-0.5)*1.4, z=cz+(R()-0.5)*1.4;
-      if(streamNear(x,z).d<STREAM.half+0.08 || Math.hypot(x, z-5.5)<3.2) continue;
-      const sc=0.16+R()*0.26; d.position.set(x, forestGround(x,z)-0.01, z); d.rotation.set((R()-0.5)*0.35, R()*6.283, (R()-0.5)*0.35); d.scale.set(1, sc, 1); d.updateMatrix(); grass.setMatrixAt(gn, d.matrix);
+      const qd=streamNear(x,z).d; if(qd<STREAM.half+0.08 || Math.hypot(x, z-5.5)<3.2) continue;
+      const sc=0.16+R()*0.26; d.position.set(x, bankGround(x,z,qd)-0.01, z);   // NIGHT-6 slice 4: on the carved bank d.rotation.set((R()-0.5)*0.35, R()*6.283, (R()-0.5)*0.35); d.scale.set(1, sc, 1); d.updateMatrix(); grass.setMatrixAt(gn, d.matrix);
       gc.copy(G1).lerp(G2, R()*0.6).multiplyScalar(0.75+R()*0.5); grass.setColorAt(gn, gc); gn++; } }
   grass.count=gn; if(grass.instanceColor) grass.instanceColor.needsUpdate=true; s.add(grass);
   /* falling leaves */
@@ -72,6 +72,7 @@ export function buildDetail(ctx){
   for(let i=0;i<16;i++){ const t2=i/16, x=10+t2*100+Math.sin(t2*3)*8, y=10+t2*225; sx.save(); sx.translate(x,y); sx.rotate(-0.9+R()*0.4); sx.beginPath(); sx.ellipse(10,0,13,5,0,0,6.283); sx.fill(); sx.restore(); }
   const branchT=tex(sc2,true); branchT.wrapS=branchT.wrapT=T.ClampToEdgeWrapping;
   const silC=new T.Color(C('forest-sil')), sils=DETAIL.sil.map(o=>{ const m=new T.MeshBasicMaterial({ map:o.kind==='fern' ? fernT : branchT, color:silC, alphaTest:0.45, side:T.DoubleSide, fog:false });
+    if(ctx.soft) patchSoftEdges(m);   // NIGHT-6: soft edges at medium
     const g=new T.PlaneGeometry(o.kind==='fern' ? 0.36 : 0.5, 1); own.push(m, g); const p=new T.Mesh(g, m); p.userData=o; p.renderOrder=10; s.add(p); return p; });
   const tv=new T.Vector3(), up=new T.Vector3(), zz=new T.Vector3(), xx=new T.Vector3(), mx=new T.Matrix4(), ray=new T.Raycaster(), ndc=new T.Vector2(), fwd=new T.Vector3();
   /* the silhouettes' places on the camera's frustum at rest (resize only): anchor (nx, ny) in device coordinates, d units away, h of the view's height */

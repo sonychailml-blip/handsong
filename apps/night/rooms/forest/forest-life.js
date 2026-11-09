@@ -38,25 +38,59 @@ export function patchSway(mat, U, amp=1){
     transformed.z+=h2*(uSway*0.05*sin(uNow*0.9+ph*1.4)+uShimmer*0.02*cos(uNow*28.274+ph*2.0)); }`); };
   mat.customProgramCacheKey=()=>'handsong.sway'+amp;
 }
-const WATER_V=`varying vec3 vW; varying vec2 vUv;
-void main(){ vUv=uv; vec4 w=modelMatrix*vec4(position,1.0); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }`;
-const WATER_F=W=>`uniform float uNow, uMoonK, uLightK, uFogD, uAlpha; uniform vec3 uDeep, uSky, uMoonCol, uMoonPos, uLightPos, uLightCol, uRingCol, uFogCol; uniform vec4 uWR[${W.n}];
-varying vec3 vW; varying vec2 vUv;
+/* NIGHT-6 slice 4: WET BANKS — the ground's material gains a per-vertex wetness (aWet: 1 at the water, 0 0.7 m beyond the bank): darker
+   (mud), and a little glossier, so the moon and the light glint on it. Chained after the ground waves' patch */
+export function patchWetGround(mat){ const prev=mat.onBeforeCompile, k=mat.customProgramCacheKey.call(mat);
+  mat.onBeforeCompile=(sh, r)=>{ if(prev) prev.call(mat, sh, r);
+    sh.vertexShader='attribute float aWet;\nvarying float vWet;\n'+sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vWet=aWet;');
+    sh.fragmentShader='varying float vWet;\n'+sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n  diffuseColor.rgb*=mix(vec3(1.0), vec3(0.3,0.27,0.24), smoothstep(0.0,1.0,vWet));')
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  roughnessFactor=mix(roughnessFactor, 0.62, smoothstep(0.5,1.0,vWet));'); };
+  mat.customProgramCacheKey=()=>k+'.wet'; return mat; }
+/* NIGHT-6: SOFT CUT-OUT EDGES (the user's choice: the cheapest way at medium, which has no antialiasing). A cut-out's alpha is sharpened to
+   a one-pixel ramp by its own screen-space rate (fwidth) and blended, instead of cut hard at 0.45 — one derivative a pixel, no extra pass.
+   GLSL 3 (WebGL2) has fwidth built in. The material turns transparent but still writes depth; the caller sets its draw order (after the
+   water, before the mist). Without it (absent, or no WebGL2) the cut stays hard, exactly as before. */
+export function patchSoftEdges(mat){
+  const prev=mat.onBeforeCompile, key=mat.customProgramCacheKey.bind(mat);
+  mat.transparent=true; mat.depthWrite=true; mat.alphaTest=0.02;
+  mat.onBeforeCompile=(sh, r)=>{ if(prev) prev.call(mat, sh, r);
+    sh.fragmentShader=sh.fragmentShader.replace('#include <alphatest_fragment>', 'diffuseColor.a=clamp((diffuseColor.a-0.45)/max(fwidth(diffuseColor.a),1e-4)+0.5,0.0,1.0);\n#include <alphatest_fragment>'); };
+  const k=key(); mat.customProgramCacheKey=()=>k+'.soft';
+  return mat;
+}
+/* NIGHT-6 slice 4: THE WATER (after the sketch «Живой лес», our own shader): two layers of noise flow towards the viewer along the stream
+   (its own along / across coordinates, turned to the world by each vertex's tangent) and bend the surface; nearer the banks it stirs more and
+   soft foam lines run; the sky by the Fresnel law; the moon's sharp reflection and a glitter streak the ripples break up; the playing light's
+   sparkle and glow; Echo's and the notes' rings as real ripples; a soft edge where it meets the carved bank. */
+const WATER_V=`attribute vec2 aTan; varying vec3 vW; varying vec2 vUv; varying vec2 vTan;
+void main(){ vUv=uv; vTan=aTan; vec4 w=modelMatrix*vec4(position,1.0); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }`;
+const WATER_F=W=>`uniform float uNow, uMoonK, uLightK, uFogD, uAlpha, uLen, uHalf, uWide; uniform vec3 uDeep, uSky, uMoonCol, uMoonPos, uLightPos, uLightCol, uRingCol, uFogCol; uniform vec4 uWR[${W.n}];
+varying vec3 vW; varying vec2 vUv; varying vec2 vTan;
+float h21(vec2 p){ p=fract(p*vec2(123.34,456.21)); p+=dot(p,p+45.32); return fract(p.x*p.y); }
+float vn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(h21(i),h21(i+vec2(1.0,0.0)),f.x), mix(h21(i+vec2(0.0,1.0)),h21(i+vec2(1.0,1.0)),f.x), f.y); }
+float hgt(vec2 q, float t){ return vn(q*vec2(0.9,2.4)-vec2(t*0.55,0.0))*0.65+vn(q*vec2(2.3,4.8)-vec2(t*1.1,t*0.05))*0.35; }
 void main(){
-  vec3 V=normalize(vW-cameraPosition); vec2 p=vW.xz; float t=uNow;
-  vec2 n2=vec2(sin(vUv.x*170.0-t*1.6)*0.05+sin(p.x*3.1+p.y*2.3+t*0.7)*0.03, cos(vUv.x*120.0+vUv.y*9.0-t*1.2)*0.04);
+  float t=uNow, acr=(vUv.y-0.5)*2.0*uWide, eD=abs(acr)/uHalf; vec2 q=vec2(vUv.x*uLen, acr), p=vW.xz;
+  vec3 V=normalize(vW-cameraPosition); float dist=length(vW-cameraPosition);
+  float e=0.05, h0=hgt(q,t), hx=hgt(q+vec2(e,0.0),t), hy=hgt(q+vec2(0.0,e),t), str=(0.55+0.7*smoothstep(0.5,1.0,eD))/(1.0+dist*0.1);
+  vec2 g=vec2(hx-h0, hy-h0)/e*str*0.09, Tn=normalize(vTan), Bn=vec2(-Tn.y, Tn.x), gw=g.x*Tn+g.y*Bn;
   float ring=0.0;
-  for(int i=0;i<${W.n};i++){ vec4 r=uWR[i]; float age=t-r.z; if(r.z>=0.0 && age>0.0 && age<${f(W.life)}){ vec2 dv=p-r.xy; float d=length(dv); float x=(d-age*${f(W.speed)})/${f(W.width)}; float k=1.0-age/${f(W.life)}; float g=r.w*exp(-x*x)*k*k; ring+=g; n2+=dv/(d+1e-4)*g*0.25; } }
-  vec3 N=normalize(vec3(n2.x,1.0,n2.y)), R=reflect(V,N);
-  float fres=0.2+0.8*pow(1.0-max(dot(-V,N),0.0),3.0);
-  float rip=0.8+0.4*sin(vUv.x*230.0+p.y*6.0-t*1.9)*sin(vUv.y*7.0+p.x*4.0+t*0.8);
-  vec3 col=mix(uDeep, mix(uFogCol, uSky, clamp(R.y*2.0,0.0,1.0))*0.22*rip, fres);   // dark water: the scene's output is sRGB-encoded (a linear 0.1 already reads as 0.35)
-  vec3 M=normalize(uMoonPos-vW); float mk=max(dot(R,M),0.0); col+=uMoonCol*uMoonK*(pow(mk,300.0)*1.6+pow(mk,24.0)*0.07);
-  vec3 Ld=uLightPos-vW; float ld=length(Ld); float lk=max(dot(R,Ld/ld),0.0); col+=uLightCol*uLightK*(pow(lk,90.0)*1.0+pow(lk,8.0)*0.05)/(1.0+ld*ld*0.08);
+  for(int i=0;i<${W.n};i++){ vec4 r=uWR[i]; float age=t-r.z; if(r.z>=0.0 && age>0.0 && age<${f(W.life)}){ vec2 dv=p-r.xy; float d=length(dv); float x=(d-age*${f(W.speed)})/${f(W.width)}; float k=1.0-age/${f(W.life)}; float a=r.w*exp(-x*x)*k*k; ring+=a; gw+=dv/(d+1e-4)*a*0.25; } }
+  vec3 N=normalize(vec3(-gw.x,1.0,-gw.y)), R=reflect(V,N);
+  float fres=0.04+0.96*pow(1.0-max(dot(-V,N),0.0),5.0);
+  vec3 body=mix(uDeep*0.7, uDeep*1.5+vec3(0.003,0.006,0.003), smoothstep(0.35,1.0,eD)*0.6+0.15*vn(q*1.7));   // darker than the banks: night water
+  vec3 sky=mix(uFogCol, uSky, clamp(R.y*2.0,0.0,1.0))*0.16;
+  vec3 col=mix(body, sky, fres);   // dark water: the scene's output is sRGB-encoded (a linear 0.1 already reads as 0.35)
+  vec3 M=normalize(uMoonPos-vW); float mk=max(dot(R,M),0.0), gl=smoothstep(0.55,0.82,vn(q*vec2(3.0,7.0)-vec2(t*1.4,0.0)));
+  float sp=smoothstep(0.62,0.95,vn(q*vec2(5.0,11.0)-vec2(t*2.0,0.0)));   // the moon path as separate sparkles, not a sheet
+  col+=uMoonCol*uMoonK*(pow(mk,600.0)*1.8*sp+pow(mk,90.0)*0.01+pow(mk,160.0)*0.25*gl*gl*sp);   // the moon, and its glitter broken by the ripples
+  vec3 Ld=uLightPos-vW; float ld=length(Ld); float lk=max(dot(R,Ld/ld),0.0); col+=uLightCol*uLightK*(pow(lk,90.0)*1.2+pow(lk,10.0)*0.08)/(1.0+ld*ld*0.08)+uLightCol*uLightK*0.025/(1.0+ld*ld*0.6);
   col+=uRingCol*ring*0.55;
-  float edge=smoothstep(0.0,0.2,vUv.y)*smoothstep(1.0,0.8,vUv.y)*smoothstep(0.0,0.03,vUv.x)*smoothstep(1.0,0.97,vUv.x);
-  float fd=length(vW-cameraPosition); col=mix(col,uFogCol,1.0-exp(-uFogD*uFogD*fd*fd));
-  gl_FragColor=vec4(col, edge*uAlpha);
+  float fe=smoothstep(0.6,1.0,eD)*(1.0-smoothstep(1.0,1.3,eD)), fn=smoothstep(0.62,0.9,vn(q*vec2(1.6,6.0)-vec2(t*0.9,0.0)));
+  col+=uMoonCol*fe*fn*(0.05+0.12*uMoonK)+uLightCol*fe*fn*uLightK*0.05/(1.0+ld*ld*0.3);   // foam at the edges
+  float a=(1.0-smoothstep(1.05,1.45,eD))*smoothstep(0.0,0.03,vUv.x);
+  col=mix(col,uFogCol,1.0-exp(-uFogD*uFogD*dist*dist));
+  gl_FragColor=vec4(col, a*uAlpha);
   #include <tonemapping_fragment>
   #include <encodings_fragment>
 }`;
@@ -100,12 +134,15 @@ export function buildLife(ctx){
   const gm=new T.ShaderMaterial({ uniforms:{ uSize:{ value:0.5 }, uScale:{ value:500 } }, vertexShader:GV, fragmentShader:GF, transparent:true, depthWrite:false, blending:T.AdditiveBlending });
   const gp=new T.Points(gg, gm); gp.frustumCulled=false; s.add(gp); own.push(gg, gm);
   /* the stream: a ribbon over the ground along the core's line */
-  const L=STREAM_LINE, pos=new Float32Array(L.length*2*3), uv=new Float32Array(L.length*2*2), idx=[];
-  L.forEach((p,i)=>{ const u=i/(L.length-1), w=STREAM.half*(0.7+0.3*Math.sin(u*9.0+1.3))*Math.min(1, u*12, (1-u)*12+0.15), nx=-p.tz, nz=p.tx;
-    for(const [k,sd] of [[0,-1],[1,1]]){ const x=p.x+nx*w*sd, z=p.z+nz*w*sd; pos.set([x, p.y, z], (i*2+k)*3); uv.set([u, k], (i*2+k)*2); }
-    if(i) idx.push(i*2-2, i*2-1, i*2, i*2-1, i*2+1, i*2); });
-  const wg=new T.BufferGeometry(); wg.setAttribute('position', new T.BufferAttribute(pos,3)); wg.setAttribute('uv', new T.BufferAttribute(uv,2)); wg.setIndex(idx);
-  const WU={ uNow:U.uNow, uMoonK:{ value:1 }, uLightK:{ value:0 }, uFogD:{ value:0.06 }, uAlpha:{ value:0.92 }, uDeep:{ value:new T.Color(C('forest-water')) }, uSky:{ value:pal.sky }, uMoonCol:{ value:pal.moonhalo },
+  /* NIGHT-6 slice 4: the ribbon a little wider than the water (it fades out over the carved bank), u along by length, a tangent per vertex,
+     three strips across (the middle line carries the flow's detail); tapered only at its far end */
+  const L=STREAM_LINE, WIDE=STREAM.half+0.2, AC=[0, 0.5, 1], pos=new Float32Array(L.length*3*3), uv=new Float32Array(L.length*3*2), tan=new Float32Array(L.length*3*2), idx=[]; let len=0;
+  L.forEach((p,i)=>{ if(i) len+=Math.hypot(p.x-L[i-1].x, p.z-L[i-1].z); }); let acc=0;
+  L.forEach((p,i)=>{ if(i) acc+=Math.hypot(p.x-L[i-1].x, p.z-L[i-1].z); const u=acc/len, w=WIDE*Math.min(1, u*14+0.1), nx=-p.tz, nz=p.tx;
+    AC.forEach((a,k)=>{ const o=(a-0.5)*2*w, j=i*3+k; pos.set([p.x+nx*o, p.y, p.z+nz*o], j*3); uv.set([u, 0.5+(a-0.5)*w/WIDE], j*2); tan.set([p.tx, p.tz], j*2); });
+    if(i) for(let k=0;k<2;k++){ const a=(i-1)*3+k, b=i*3+k; idx.push(a, a+1, b, a+1, b+1, b); } });
+  const wg=new T.BufferGeometry(); wg.setAttribute('position', new T.BufferAttribute(pos,3)); wg.setAttribute('uv', new T.BufferAttribute(uv,2)); wg.setAttribute('aTan', new T.BufferAttribute(tan,2)); wg.setIndex(idx);
+  const WU={ uNow:U.uNow, uMoonK:{ value:1 }, uLightK:{ value:0 }, uFogD:{ value:0.06 }, uAlpha:{ value:0.95 }, uLen:{ value:len }, uHalf:{ value:STREAM.half }, uWide:{ value:WIDE }, uDeep:{ value:new T.Color(C('forest-water')) }, uSky:{ value:pal.sky }, uMoonCol:{ value:pal.moonhalo },
     uMoonPos:{ value:V(-14,23,-55) }, uLightPos:{ value:V(0,1,0) }, uLightCol:{ value:new T.Color(C('forest-light')) }, uRingCol:{ value:new T.Color(C('forest-light')) }, uFogCol:{ value:pal.fog },
     uWR:{ value:Array.from({ length:RINGS.water.n }, ()=>new T.Vector4(0,0,-1,0)) } };
   const wm=new T.ShaderMaterial({ uniforms:WU, vertexShader:WATER_V, fragmentShader:WATER_F(RINGS.water), transparent:true, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2 });

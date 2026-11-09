@@ -1861,6 +1861,12 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
     2. Move the light low over the floor: the plants catch its colour; with the wind (Звуки комнаты up) they sway with the grass.
     3. ⓘ → «Картинка комнаты» → high (the masters, 2048²): sharper plants up close. Tell me if high is worth what it costs (about 38 % of hand detection on this laptop).
     4. Open the picture from Dark to Room once after a fresh page load: the first opening takes a few seconds (about 2–4.5 s on this laptop) — acceptable, or does it need the «waking» moment?
+137. The stream, the soft edges and the early fetch (NIGHT-6 slice 4), at most five checks; the rest is in the rows «FOREST stream (app)» (the stream nears the eye at its end, the moon's reflection lands on it — CONTROL a mirrored moon's does not; the carved bed below the floor, smooth, the floor itself a bank away; outOfWater exact; the rocks, pebbles, leaves and mist by count and place; leaves ride downstream and start again), «FOREST stream» (no trunk or fern of today's forest in the water; the counts per level, none in the baseline; the leaves drift; the water, rocks and mist render — CONTROL one frame twice differs by 0), «FOREST floor» and «NIGHT forest files (app)». Laptop: Live Server; `http://127.0.0.1:5500/apps/night/`, the room's picture on (medium, the default).
+    1. Soft edges at medium: compare `tools/.ui-snap/n6-soft/hard-zoom.png` with `soft-zoom.png` (and the full frames `hard.png`, `soft.png`), then look at the ferns and plants in the app. Keep the soft edges, or go back?
+    2. The stream, portrait and landscape: it now runs towards you into the foreground. Dark moving water, pale foam lines along the edges, darker wet banks, mossy rocks (wet and glossy at the waterline), pebbles, leaves drifting towards you. Is it easy to see, and beautiful enough?
+    3. The moon on the water: a broken line of glints that moves with the ripples (stronger in a clear sky, weaker under a cloud).
+    4. Move the light low over the water: its glints and warm glow on the surface; play notes: rings run on the water.
+    5. Everything else as before: the fireflies, the mushrooms' glow per Mood and the floor plants; nothing stands in the water.
 
 ## Superseded at DOC1 (old lines verbatim, replaced in place above by a later slice)
 - NIGHT-2 stage 3 (2026-11-03, the rule of at most five manual checks) updated this line of CLAUDE.md's report format:

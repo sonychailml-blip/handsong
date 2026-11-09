@@ -2,7 +2,7 @@
 import './migrate.js';   // first: the shell reads its settings while it loads
 import { boot } from '../../core/legacy-ui/boot.js';
 import { shellDoors, setFaceHook } from '../../core/legacy-ui/ui.js';
-import { sceneRoomAdd, setBackground, backgroundOf, sceneInfo, scenePausing } from './scene/host.js';
+import { sceneRoomAdd, setBackground, backgroundOf, sceneInfo, scenePausing, sceneRoom, sceneLevel } from './scene/host.js';
 import { hooks } from '../../core/hooks.js';
 import { handFn } from '../../core/state.js';
 import { nightShellWire, nightShellFace } from './shell.js';
@@ -14,6 +14,8 @@ import { natureModule, roomRestore } from './roomswitch.js';
 
 for(const R of ROOMS) sceneRoomAdd(R.record.id, { load:R.load, standIn:R.standIn, three:()=>import('./vendor/three-r128/three.min.js') });   // NIGHT-3: the rooms, by id
 roomRestore();   // NIGHT-3 stage 5 part 2: the room remembered on this device, before the first picture
+/* NIGHT-6 (the user): the current room's code and the files of its level are fetched while the start card shows, so the first opening finds them ready */
+setTimeout(()=>{ const R=ROOMS.find(r=>r.record.id===sceneRoom()); if(R && R.prefetch && sceneLevel()!=='minimal') R.prefetch({ level:sceneLevel() }).catch(()=>{}); }, 0);
 hooks.scene={ set:setBackground, of:backgroundOf, info:sceneInfo };   // CORE-8: the shared UI (backgrounds, the latency meter's scene line) reaches the host through this door
 /* CORE-7: the ambience enters the engine through the core door (both engine instances find it); NIGHT-3: built from the room's nature recipe.
    NIGHT-3 stage 5 part 2: two nature slots (the second parked); each set plays the CURRENT room's recipe — after a switch the slots crossfade */

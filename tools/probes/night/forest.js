@@ -506,3 +506,37 @@ export async function checkForestFloor(){
   return { cases:n, total:d.length, differences:d, notes };
 }
 row({ night:true, at:1008.637, name:'FOREST floor', drawn:true, run:()=>checkForestFloor(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });
+/* NIGHT-6 slice 4: row «FOREST stream» — the room built without a renderer: no trunk and no fern of today's forest stands in the new stream
+   (each clear by its own clearance); the rocks, pebbles, drifting leaves and mist strips at each level's counts, none in the baseline; the
+   leaves drift downstream over 3 s; drawn (the opened forest at medium): the water, the rocks and the mist RENDER (one frame drawn twice, each
+   hidden the second time) — CONTROL the same frame twice differs by 0. */
+export async function checkForestStream(){
+  const d=[], notes=[]; let n=0; const miss=s=>d.push(s);
+  const was=profileCurrent(), keepLevel=sceneLevel();
+  try{
+    const T=await loadThree(); await forestAssets('full'); await forestAssets('reduced'); const w=844, h=390, rooms=[], mk=(lv, o={})=>{ const r=buildForest(T,{ C:cv, level:lv, w, h, ...o }); rooms.push(r); return r; };
+    const NIN={ mood:'major-penta', sleep:0 }, H=0.42;
+    try{
+      for(const lv of ['full','reduced']){ const r=mk(lv), st=r.state(), L=FOREST_LEVELS[lv]; n+=3;
+        const wet=st.trunks.filter(([x,z,rr])=>streamNear(x,z).d<H+rr+0.35-1e-6), wf=st.fernsAt.filter(([x,z,sc])=>streamNear(x,z).d<H+0.3+sc*0.25-1e-6);
+        if(wet.length || wf.length) miss(`${lv}: ${wet.length} trunks and ${wf.length} ferns stand in the stream`);
+        const S=st.stream; if(S.rocks!==L.rocks || S.pebbles!==L.pebbles || S.floaters.length!==0 && S.floaters.length!==L.floaters || S.mistStrips!==L.mistStrips) miss(`${lv}: ${JSON.stringify({ rocks:S.rocks, pebbles:S.pebbles, mist:S.mistStrips })}`);
+        r.update(1/60, 1, [], null, NIN); const a=r.state().stream.floaters; for(let i=0;i<180;i++) r.update(1/60, 1+i/60, [], null, NIN); const b=r.state().stream.floaters;
+        if(a.length!==L.floaters || a.some((p,i)=>!(b[i].u>p.u || b[i].u<p.u-0.3))) miss(`${lv}: the leaves did not drift downstream (${a.length} of ${L.floaters})`);
+        notes.push(`${lv}: ${S.rocks} rocks (${S.wetRocks} in the water), ${S.pebbles} pebbles, ${a.length} leaves, ${S.mistStrips} mist strips; trunks and ferns all clear of the water`); }
+      { const S=mk('reduced', { lv:{ rocks:0, pebbles:0, floaters:0, mistStrips:0 } }).state().stream; n++; if(S.rocks || S.pebbles || S.mistStrips) miss('the baseline override still builds '+JSON.stringify(S)); }
+    } finally { for(const r of rooms) r.dispose(); }
+    const why=profileApply('profile.night'); n++; if(why){ miss('Night refused: '+why); return { cases:n, total:d.length, differences:d, notes }; }
+    await setSceneLevel('reduced'); await setBackground('forest'); await frames(6);
+    const room=sceneRoomDbg(); if(!room || !sceneInfo().webgl){ notes.push('no WebGL room — the drawn checks do not apply'); return { cases:n, total:d.length, differences:d, notes }; }
+    const P=room.streamDbg.parts;
+    for(const [name, objs] of [['the water', [room.lifeDbg.stream]], ['the rocks', [P.rocks, P.pebbles]], ['the mist', [P.mist]]]){
+      const ab=await sceneSnapDbg(on=>{ for(const o of objs) o.visible=!on; }, true), cc=await sceneSnapDbg(()=>{}, true); n+=2;
+      if(!ab || !cc){ notes.push(name+': no frame rendered'); continue; }
+      notes.push(`${name} add ${(ab[0]-ab[1]).toFixed(3)} to the mean RGB sum of one frame (CONTROL ${(cc[0]-cc[1]).toFixed(4)})`);
+      if(!(Math.abs(ab[0]-ab[1])>0)) miss(name+' do not show in the picture'); if(cc[0]!==cc[1]) miss('CONTROL: one frame rendered twice differs by '+(cc[0]-cc[1])); }
+  } catch(e){ miss('error: '+(e&&e.stack||e)); }
+  finally{ try{ await setSceneLevel(keepLevel); }catch(e){} if(profileCurrent()!==was) profileApply(was); await setBackground('camera'); await sleep(30); }
+  return { cases:n, total:d.length, differences:d, notes };
+}
+row({ night:true, at:1008.639, name:'FOREST stream', drawn:true, run:()=>checkForestStream(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });

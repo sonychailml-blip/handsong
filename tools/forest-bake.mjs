@@ -127,6 +127,14 @@ function drawSedge(r, w, h, R){
     for(let k=0;k<=n;k++){ const t=k/n; pts.push([x0+bend*t*t, h-hh*t]); }
     for(let k=1;k<=n;k++){ const t=(k-0.5)/n, c= dry ? hsl(44,0.3,0.15+t*0.3) : hsl(82+R()*16, 0.36+R()*0.16, 0.08+t*0.2+R()*0.04); r.stroke([pts[k-1], pts[k]], bw*(1-(k-1)/n)+0.4, c, bw*(1-k/n)+0.4); } }
 }
+/* a fallen leaf (NIGHT-6 slice 4: they drift on the stream): an ovate leaf, finely toothed, its stalk, veins, a darker rim and a few blotches;
+   k picks its autumn colour */
+function drawLeaf(r, w, h, R, k){
+  const base=[[38,0.55,0.36],[16,0.55,0.3],[28,0.42,0.22],[62,0.42,0.34]][k], col=hsl(base[0]+(R()-0.5)*8, base[1], base[2]), a=-0.65+(R()-0.5)*0.3, L=w*0.74, x0=w/2-Math.cos(a)*L/2, y0=h/2-Math.sin(a)*L/2;
+  r.stroke([[x0-Math.cos(a)*w*0.09, y0-Math.sin(a)*w*0.09], [x0, y0]], w*0.012, shade(col, 0.55), w*0.009);   // the stalk
+  leaf(r, x0, y0, L*1.02, L*0.4, a, shade(col, 0.6), null, 0.5); leaf(r, x0+Math.cos(a)*L*0.01, y0+Math.sin(a)*L*0.01, L, L*0.37, a, col, shade(col, 1.25, -0.35), 0.5);
+  for(let i=0;i<5;i++){ const u=0.2+R()*0.6, o=(R()-0.5)*L*0.25, bx=x0+Math.cos(a)*L*u-Math.sin(a)*o, by=y0+Math.sin(a)*L*u+Math.cos(a)*o, br=w*(0.015+R()*0.03); r.ellipse(bx, by, br, br*(0.6+R()*0.4), R()*3, shade(col, 0.65, -0.7)); }
+}
 /* the fine fern from an iterated-function system (the «mutant» fern), coloured by height and density, directly at master size */
 function drawFern2(w, h, seed=9){
   const maps=[[0,0,0,0.25,0,-0.4,0.02],[0.95,0.005,-0.005,0.93,-0.002,0.5,0.84],[0.035,-0.2,0.16,0.04,-0.09,0.02,0.07],[-0.04,0.2,0.16,0.04,0.083,0.12,0.07]];
@@ -146,7 +154,8 @@ function drawFern2(w, h, seed=9){
 function floorMaster(){
   const A=FLOOR_ATLAS, S=A.size, sheet=new Float32Array(S*S*4), R=seeded(0x464C5231), SS=3;
   const put=(c, X, Y)=>{ for(let y=0;y<c.h;y++) sheet.set(c.p.subarray(y*c.w*4, (y+1)*c.w*4), ((Y+y)*S+X)*4); };
-  const draw={ sorrel:drawSorrel, forb:drawForb, bilberry:drawBilberry, anemone:drawAnemone, nettle:drawNettle, sedge:drawSedge };
+  const draw={ sorrel:drawSorrel, forb:drawForb, bilberry:drawBilberry, anemone:drawAnemone, nettle:drawNettle, sedge:drawSedge,
+    leaf0:(r,w,h,R)=>drawLeaf(r,w,h,R,0), leaf1:(r,w,h,R)=>drawLeaf(r,w,h,R,1), leaf2:(r,w,h,R)=>drawLeaf(r,w,h,R,2), leaf3:(r,w,h,R)=>drawLeaf(r,w,h,R,3) };   // the leaves last: every earlier cell stays as it was
   for(const [sp,[x,y,w,h]] of Object.entries(A.cells)){ if(sp==='fern2'){ put(drawFern2(w,h), x, y); continue; } const r=new Ras(w, h, SS); draw[sp](r, w, h, R); put(r.down(), x, y); }
   return sheet;
 }

@@ -4,6 +4,16 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`, `archive/NIGHT-RUN-LOG-2026-10.md`. New runs start at `NIGHT-1`.
 
+# NIGHT-6 — slice 4 (2026-11-10): the stream towards the viewer; soft edges at medium; the early fetch
+Tree hashes before: core 2b6fc141521883a3 · apps/full d6b90cf2cb4be6da · apps/night f019a39aadeb647b. After: core 2b6fc141521883a3 (unchanged) · apps/full d6b90cf2cb4be6da (unchanged) · apps/night fbaf10ee97528d92.
+- Step 136 checked by the user. Decisions: soft edges at medium tried and measured (the user decides by eye); KTX2 stays PNG; the room's files fetched while the start card shows; the stream may change its path towards the viewer.
+- Soft edges: `forest-life.js patchSoftEdges` (alpha sharpened by `fwidth`, transparent, depth written, alpha test 0.02, its own program key), record flag `softEdges` (high false, medium true; WebGL2 only); applied to the floor plants, today's ferns, the grass silhouettes. Shots `tools/.ui-snap/n6-soft/{hard,soft,hard-zoom,soft-zoom}.png`.
+- The early fetch: `rooms/index.js` `prefetch({ level })`, `main.js` calls it after the first frame (not at minimal); measured: Dark stays, nothing opens, the level's files are loaded.
+- The stream: `pure/forestlife.js` new `STREAM` path (ends 1.5 m from the eye), `CARVE` + `bankGround` (the bed; the fireflies keep `forestGround`); the ground 160² with `aWet` (`patchWetGround`); the water shader rewritten (flow by the stream's own coordinates, foam, Fresnel sky, the moon's glints gated by the ripples, the light, rings); new `pure/stream.js` (`outOfWater` — repeated inside bends —, rocks, pebbles, leaves, mist) and `forest-stream.js` (one instanced draw each for rocks and pebbles, the leaves with the floor's material, one mist draw); record counts rocks / pebbles / floaters / mistStrips (high 30 / 260 / 28 / 5, medium 18 / 120 / 14 / 3); `shell.js` BEFORE_N6 and the budget eval's baseline zero them.
+- Rows: data «FOREST stream (app)» (27 cases; fix rounds: 3 — the moon record is {x,y,z}; the bed check measured today's floor step at |x| = 6 instead of the carve, now the carve alone; `outOfWater` missed by 0.7 mm inside a bend — the law now repeats the push; the push check counted points that started clear); browser «FOREST stream» (14; first run PASS).
+- Checks: static PASS · `[probe-data] PASS — 44 checks, 0 differences` · `P.night: PASS — 43 checks, 0 differences` · `P.quick: PASS — 93 checks, 0 differences` · smoke paths with builds PASS. Budget (laptop, medium): −1.8 / 0.0 % detections vs Dark; hard edges −1.1 / −5.3 %; before NIGHT-6 −1.7 / −9.4 % (noise); draws 59–60, programs 25, textures 13.6 MB; high −43.7 / −37.9 %.
+- Files per level: high 1.46 MB, medium 0.67 MB, low 0.34 MB (2.21 MB of 30).
+
 # NIGHT-6 — slice 3 (2026-11-09): the forest floor (laptop numbers only)
 Tree hashes before: core 2b6fc141521883a3 · apps/full d6b90cf2cb4be6da · apps/night 05eb10d8566965cd. After: core 2b6fc141521883a3 (unchanged) · apps/full d6b90cf2cb4be6da (unchanged) · apps/night f019a39aadeb647b.
 - Step 135 checked by the user: the fireflies look right as they are. The Poco run comes later. The user's texture rule (masters, derived copies, sizes per level, warn before 30 MB): PLAN.md.

@@ -108,7 +108,7 @@ export async function sceneOpen(id=roomId, opt={}){
   if(level!=='minimal' && !renderer) renderer=makeRenderer();
   if(!renderer) level='minimal';
   if(renderer){ const tb=performance.now();
-    try{ room=build(THREE, { C:cv, level, w:innerWidth, h:innerHeight, reduce:REDUCE, mood:(READ.get('nightSky')||{}).mood, shadow:shadowOn(), lv:optOver && optOver.lv }); resize(); }
+    try{ room=build(THREE, { C:cv, level, w:innerWidth, h:innerHeight, reduce:REDUCE, mood:(READ.get('nightSky')||{}).mood, shadow:shadowOn(), lv:optOver && optOver.lv, gl2:renderer.capabilities.isWebGL2 }); resize(); }   // NIGHT-6: gl2 — soft edges need WebGL2
     catch(e){ openFail(op, e); return sceneInfo(); }   // a failed build: the renderer goes, the room's 2D stand-in shows (never black)
     last=0; info.t0=0; info.frames=0;
     /* RUN 9 (slice 5): compile every shader NOW (inside the opening, not inside a frame later: a 1–4-s frame) */
@@ -216,6 +216,9 @@ export function sceneSnapDbg(alt, full=false){
     const px=g.getImageData(0,0,gw,gh).data; let sum=0; for(let i=0;i<px.length;i+=4) sum+=px[i]+px[i+1]+px[i+2]; return sum/(px.length/4); };
   return new Promise(res=>{ const to=setTimeout(()=>{ snapWant=null; res(null); }, 2000);
     snapWant=()=>{ clearTimeout(to); const a=grab(); if(!alt){ res(a); return; } try{ alt(true); renderer.render(room.scene, room.camera); res([a, grab()]); } finally { alt(false); } }; }); }
+/* NIGHT-6, capture only: the next rendered frame at full size as a PNG data URL (null without WebGL; after 2 s) */
+export function sceneShotDbg(){ if(!renderer || !glCanvas) return Promise.resolve(null);
+  return new Promise(res=>{ const to=setTimeout(()=>{ snapWant=null; res(null); }, 2000); snapWant=()=>{ clearTimeout(to); res(glCanvas.toDataURL('image/png')); }; }); }
 export const sceneLevelDbg=v=>{ if(LV[v]) level=v; return level; };
 /* RUN 9 probe only: how long a playing note (by owner) has been held, as the host sees it (null: not held) */
 export const sceneHeldDbg=owner=>heldAt.has(owner) ? (performance.now()-heldAt.get(owner))/1000 : null;

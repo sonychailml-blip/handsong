@@ -95,16 +95,20 @@ NIGHT-6 slice 3 — THE FOREST FLOOR (parts of the night forest room; forest.js 
 
 ## apps/night/rooms/forest/forest-life.js
 RUN 9 (slice 2) — THE FOREST ANSWERS THE PLAYING, softly (never busy).
-- fn (3): `patchGroundWaves`, `patchSway`, `buildLife`
+- fn (5): `patchGroundWaves`, `patchSway`, `patchWetGround`, `patchSoftEdges`, `buildLife`
 
 ## apps/night/rooms/forest/forest-rare.js
 RUN 9 (slice 4) — THE FOREST'S RARE EVENTS (every few minutes, never the same kind twice in a row; the schedule is apps/night/pure/cycle.js rareStep, seeded): a FALLING STAR streaks across the sky …
 - const (1): `RARE_LOOK`
 - fn (1): `buildRare`
 
+## apps/night/rooms/forest/forest-stream.js
+NIGHT-6 slice 4 — THE STREAM'S SURROUNDINGS (parts of the night forest room; forest.js builds them; the water's own shader is in forest-life.js; the numbers are ./pure/stream.js): - WET MOSSY ROCKS…
+- fn (1): `buildStream`
+
 ## apps/night/rooms/forest/forest.js
 VIS1c (RUN 6, Night plan §3) — THE NIGHT FOREST ROOM's picture: a scene module built with three.js r128 (vendored, loaded by the scene host apps/night/scene/host.js).
-- const (4): `FOREST_SEED`, `FOREST_LEVELS`, `FOREST_BOUNDS`, `FOREST_TEX`
+- const (5): `FOREST_SEED`, `FOREST_LEVELS`, `FOREST_BOUNDS`, `FOREST_TEX`, `forestAssetsDbg`
 - fn (2): `forestAssets`, `buildForest`
 
 ## apps/night/rooms/forest/pure/answers.js
@@ -124,12 +128,17 @@ NIGHT-6 slice 3 — THE FOREST FLOOR, as numbers.
 
 ## apps/night/rooms/forest/pure/forestlife.js
 RUN 9 — THE FOREST'S LIFE, as numbers.
-- const (6): `STREAM`, `STREAM_LINE`, `LIFE`, `pulseOf`, `RINGS`, `ringsNew`
-- fn (5): `streamAt`, `streamNear`, `lifePlaces`, `ringAdd`, `ringsAge`
+- const (7): `STREAM`, `STREAM_LINE`, `CARVE`, `LIFE`, `pulseOf`, `RINGS`, `ringsNew`
+- fn (6): `streamAt`, `streamNear`, `bankGround`, `lifePlaces`, `ringAdd`, `ringsAge`
 
 ## apps/night/rooms/forest/pure/room.js
 NIGHT-3: THE FOREST ROOM'S RECORD — what the room is, as data (pure, rule #36; checked by apps/night/pure/room.js, data row «NIGHT room records»).
 - const (1): `FOREST_ROOM`
+
+## apps/night/rooms/forest/pure/stream.js
+NIGHT-6 slice 4 — THE STREAM'S LIFE, as numbers.
+- const (2): `STREAM_LIFE`, `streamLength`
+- fn (6): `outOfWater`, `streamRocks`, `streamPebbles`, `floatersInit`, `floatAt`, `mistStrips`
 
 ## apps/night/rooms/forest/standin.js
 NIGHT-3: the forest's 2D STAND-IN — the «low» level and the fallback without WebGL (or after a lost context): the night's two colours and a soft glow at each hand (the playing hand lime, the effect…
@@ -147,7 +156,7 @@ NIGHT-3 stage 5 part 2: THE ROOM SWITCH — one door for everything a room chang
 ## apps/night/scene/host.js
 THE SCENE HOST and Night's BACKGROUNDS (VIS1b, RUN 6; Night's own since CORE-8 — the shared UI reaches it through hooks.scene).
 - const (21): `BACKGROUNDS`, `sceneRoomAdd`, `sceneRoomRemove`, `sceneRooms`, `sceneRoom`, `sceneRoomSet`, `SCENE_LEVEL_DEFAULT`, `SCENE_FADE`, `scenePausing`, `backgroundOf`, `sceneLevel`, `sceneShadowDbg`, `sceneOptDbg`, `sceneInfo`, `sceneRoomDbg`, `sceneLevelDbg`, `sceneHeldDbg`, `sceneProgramsDbg`, `sceneClockDbg`, `sceneBedDbg`, `sceneOpenDbg`
-- fn (7): `loadThree`, `sceneOpen`, `sceneSwitch`, `sceneClose`, `setBackground`, `setSceneLevel`, `sceneSnapDbg`
+- fn (8): `loadThree`, `sceneOpen`, `sceneSwitch`, `sceneClose`, `setBackground`, `setSceneLevel`, `sceneSnapDbg`, `sceneShotDbg`
 
 ## apps/night/shell.js
 RUN 7 (C6 + C11, Night plan §5; docs/night/QUALITY.md points 4, 5, 6, 9, 10) — THE NIGHT SHELL (DOM side; the logic is core/nightui.js).
@@ -1006,7 +1015,7 @@ NIGHT-2 stage 2: row «NIGHT calibration screens» (quick; the probe clock throu
 
 ## tools/probes/night/forest.js
 VIS1c (RUN 6, Night plan §10, review 2026-10-17): two rows (quick and all).
-- fn (11): `checkForestRoom`, `checkBackgrounds`, `checkForestPicture`, `checkNightCycle`, `checkForestResponse`, `checkForestDetail`, `checkForestRare`, `checkForestLevels`, `checkForestAnswers`, `checkForestMelody`, `checkForestFloor`
+- fn (12): `checkForestRoom`, `checkBackgrounds`, `checkForestPicture`, `checkNightCycle`, `checkForestResponse`, `checkForestDetail`, `checkForestRare`, `checkForestLevels`, `checkForestAnswers`, `checkForestMelody`, `checkForestFloor`, `checkForestStream`
 
 ## tools/probes/night/headroom-calc.js
 NIGHT-1: the headroom page's sums, pure (runs in node: tools/probe-data.mjs, row «NIGHT-1 headroom sums»).
@@ -1056,7 +1065,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 - const (5): `TEST_ROOM_ID`, `TEST_ROOM`, `testRoomMode`, `testRoomInfo`, `testRoomFreeLeaks`
 - fn (2): `testRoomInstall`, `testRoomRemove`
 
-_205 modules, 2436 exported names._
+_207 modules, 2452 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

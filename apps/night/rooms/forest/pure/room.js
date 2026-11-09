@@ -11,9 +11,11 @@ export const FOREST_ROOM=F({
   /* full: real shadows (hand light 1024², 512² on small screens), 70 wild fireflies, 16-step trails, moving mist; reduced: no shadow, 35 fireflies,
      8-step trails, still mist; «minimal» has no WebGL (the room's 2D stand-in) */
   levels:F({ full:F({ flies:70, trail:16, shadow:1024, shadowSmall:512, mist:true, shrooms:28, blooms:10, grass:3500, leaves:60, moths:6, beams:4, dew:1100, webs:9,
-      sorrel:1500, forb:600, bilberry:260, anemone:500, nettle:140, sedge:700, fern2:110 }),   // NIGHT-6 slice 3: the floor (fern2: rosettes)
+      sorrel:1500, forb:600, bilberry:260, anemone:500, nettle:140, sedge:580, fern2:110, softEdges:false,
+      rocks:30, pebbles:260, floaters:28, mistStrips:5 }),   // NIGHT-6 slice 4: the stream's surroundings   // NIGHT-6 slice 3: the floor (fern2: rosettes)
     reduced:F({ flies:35, trail:8, shadow:0, shadowSmall:0, mist:false, shrooms:14, blooms:5, grass:1400, leaves:24, moths:3, beams:2, dew:500, webs:5,
-      sorrel:600, forb:240, bilberry:100, anemone:200, nettle:50, sedge:280, fern2:45 }) }),   // NIGHT-6 slice 1: dew, webs
+      sorrel:600, forb:240, bilberry:100, anemone:200, nettle:50, sedge:230, fern2:45, softEdges:true,
+      rocks:18, pebbles:120, floaters:14, mistStrips:3 }) }),   // NIGHT-6: soft cut-out edges at medium (no antialiasing there)   // NIGHT-6 slice 1: dew, webs
   looks:F({
     glow:LOOK('forest-', 0.06, 1, 1),            // Glow: the base tokens
     dusk:LOOK('forest-dusk-', 0.052, 0.8, 0.9),  // Dusk: violet sky, a warm low moon, less mist

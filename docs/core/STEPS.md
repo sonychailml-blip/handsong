@@ -40,6 +40,7 @@ THERE in full and here as one index entry):
   134 The forest answers notes (stream rings, webs, dew, the music bed in the mushrooms) and the Poco measured (NIGHT-6 slices 0 + 1)
   135 The fireflies follow the melody: a long note gathers and breathes, a fast run widens and darts (NIGHT-6 slice 2)
   136 The forest floor: the herb layer by damp and light, the fine fern (NIGHT-6 slice 3)
+  137 The stream towards the viewer, soft edges at medium, the early fetch (NIGHT-6 slice 4)
 
 ## Moved to `archive/CLAUDE-history.md` at DOC1 (grep by title; read only what the slice needs)
 - «Module map (full, moved at DOC1)» — every module's detailed paragraph (AUD1a … IDS1, SONG1, AUTOSAVE1, PACK1 …).

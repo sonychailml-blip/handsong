@@ -13,11 +13,14 @@ import { fliesInit, fliesStep, forestGround, depthDistance, FOREST_FLIES, holdK,
 import { CLOUD_PASSES, NIGHT, nightAt, nightDeep, MOOD_TC } from '../../pure/cycle.js';   // RUN 9: the night's cycle, sleep, the moods' easing
 import { FOREST_ROOM } from './pure/room.js';   // NIGHT-3: the record — levels and the moods' looks
 import { roomLook } from '../../pure/room.js';
-import { buildLife, patchGroundWaves, patchSway } from './forest-life.js';   // RUN 9 (slice 2): the forest answers the playing
+import { buildLife, patchGroundWaves, patchSway, patchSoftEdges, patchWetGround } from './forest-life.js';   // RUN 9 (slice 2): the forest answers the playing
 import { buildDetail } from './forest-detail.js';   // RUN 9 (slice 3): grass, leaves, moths, moonbeams, silhouettes
 import { buildRare } from './forest-rare.js';   // RUN 9 (slice 4): the falling star, the flower, the emblem
 import { buildAnswers } from './forest-answers.js';   // NIGHT-6 slice 1: dew and webs
 import { buildFloor } from './forest-floor.js';   // NIGHT-6 slice 3: the herb layer and the fine fern
+import { buildStream } from './forest-stream.js';   // NIGHT-6 slice 4: rocks, pebbles, drifting leaves, the mist over the water
+import { STREAM, STREAM_LINE, streamNear, bankGround } from './pure/forestlife.js';
+import { outOfWater } from './pure/stream.js';
 import { ANSWERS, swellAt } from './pure/answers.js';
 
 export const FOREST_SEED=0x464F5231;
@@ -39,6 +42,8 @@ async function fileImage(url){ const r=await fetch(url); if(!r.ok) throw new Err
 /* the files of `level` ('full' | 'reduced'), once per session → a promise of the loaded images by name */
 export function forestAssets(level='full'){ const want=FOREST_TEX[level]||FOREST_TEX.full;
   return Promise.all(Object.values(want).map(n=>LOADING[n] || (LOADING[n]=fileImage(TEX[n]).then(img=>{ IMG[n]=img; }, e=>{ assetErr.push(n+': '+String(e&&e.message||e)); })))).then(()=>IMG); }
+/* probes only: the prepared files loaded so far (the prefetch's proof) */
+export const forestAssetsDbg=()=>Object.keys(IMG).sort();
 /* colour helpers: a token's text → [r, g, b, a]; jittered variants in HSL (texture painting only) */
 function rgbOf(s){ s=String(s||'').trim(); let m=s.match(/^#([0-9a-f]{6})$/i); if(m){ const n=parseInt(m[1],16); return [n>>16&255, n>>8&255, n&255, 1]; }
   m=s.match(/^#([0-9a-f]{3})$/i); if(m){ const q=m[1]; return [0,1,2].map(i=>parseInt(q[i]+q[i],16)).concat(1); }
@@ -81,7 +86,14 @@ export function buildForest(T, opt){
   for(let i=0;i<800;i++){ const x=R()*512, y=R()*512, a=R()*6.28, l=2+R()*4, dh=(R()-0.5)*30, ds=(R()-0.5)*20, dl=(R()-0.5)*9;
     w9((dx,dy)=>{ g.fillStyle=jit(LEAF,dh,ds,dl); g.beginPath(); g.ellipse(x+dx,y+dy,l,l*0.42,a,0,6.28); g.fill();
       b.fillStyle=rgba([255,255,255],0.18); b.beginPath(); b.ellipse(x+dx,y+dy,l,l*0.42,a,0,6.28); b.fill(); }); }
-  const gg=new T.PlaneGeometry(90,90,90,90); gg.rotateX(-Math.PI/2); { const pa=gg.attributes.position; for(let i=0;i<pa.count;i++) pa.setY(i,gy(pa.getX(i),pa.getZ(i))); gg.computeVertexNormals(); }
+  /* NIGHT-6 slice 4: a finer ground (160², 0.56 m) with the stream's bed carved in (bankGround) and its wetness per vertex (aWet: 1 at the water,
+     0 0.7 m beyond the bank) — far from the stream exactly today's floor */
+  const gg=new T.PlaneGeometry(90,90,160,160); gg.rotateX(-Math.PI/2);
+  { const pa=gg.attributes.position, wet=new Float32Array(pa.count), bx=[Infinity,-Infinity], bz=[Infinity,-Infinity];
+    for(const q of STREAM_LINE){ bx[0]=Math.min(bx[0],q.x-3); bx[1]=Math.max(bx[1],q.x+3); bz[0]=Math.min(bz[0],q.z-3); bz[1]=Math.max(bz[1],q.z+3); }
+    for(let i=0;i<pa.count;i++){ const x=pa.getX(i), z=pa.getZ(i); if(x<bx[0] || x>bx[1] || z<bz[0] || z>bz[1]){ pa.setY(i, gy(x,z)); continue; }
+      const dd=streamNear(x,z).d; pa.setY(i, bankGround(x, z, dd)); const u=Math.max(0, Math.min(1, (dd-STREAM.half)/0.7)); wet[i]=1-u*u*(3-2*u); }
+    gg.setAttribute('aWet', new T.BufferAttribute(wet, 1)); gg.computeVertexNormals(); }
   const groundM=new T.MeshStandardMaterial({ map:tex(gc,true,24,24), bumpMap:tex(gb,false,24,24), bumpScale:0.05, roughness:0.95 });
   const ground=new T.Mesh(gg, groundM); ground.receiveShadow=true; s.add(ground); own.push(gg, groundM);
   /* bark */
@@ -92,6 +104,7 @@ export function buildForest(T, opt){
   const barkM=new T.MeshStandardMaterial({ map:tex(kc,true,2,5), bumpMap:tex(kb,false,2,5), bumpScale:0.035, roughness:0.95 }); own.push(barkM);
   const spots=[[-2.1,-2.2,0.34],[2.5,-4.6,0.42],[-1.3,-8.2,0.3],[3.6,0.4,0.28],[-4.2,-5,0.5],[1.1,-11.5,0.36],[-3.3,1.2,0.22],[4.6,-9,0.46]];
   while(spots.length<95){ const x=(R()*2-1)*22, z=4-R()*44; if(Math.hypot(x,z-5.5)<3.2 || (Math.abs(x)<1.1 && z>-7)) continue; spots.push([x,z,0.14+R()*0.42]); }
+  for(const sp of spots){ const [x,z]=outOfWater(sp[0], sp[1], STREAM.half+sp[2]+0.35); sp[0]=x; sp[1]=z; }   // NIGHT-6 slice 4: none stands in the new stream (no random draw changes)
   const trunkG=new T.CylinderGeometry(0.72,1,16,14), trunks=new T.InstancedMesh(trunkG, barkM, spots.length); own.push(trunkG);
   const brs=[], d=new T.Object3D();
   spots.forEach(([x,z,r],i)=>{ d.position.set(x,gy(x,z)+7.8,z); d.rotation.set((R()-0.5)*0.06,R()*6.28,(R()-0.5)*0.06); d.scale.set(r,1,r); d.updateMatrix(); trunks.setMatrixAt(i,d.matrix);
@@ -107,13 +120,14 @@ export function buildForest(T, opt){
   const fernT=tex(fc,true); fernT.wrapS=fernT.wrapT=T.ClampToEdgeWrapping;
   const frondG=new T.PlaneGeometry(0.42,1.15); frondG.translate(0,0.575,0); own.push(frondG);
   const ferns=[]; while(ferns.length<80){ const x=(R()*2-1)*12, z=4-R()*26; if(Math.hypot(x,z-5.5)<2.2) continue; ferns.push([x,z,0.6+R()*0.9]); }
+  for(const f of ferns){ const [x,z]=outOfWater(f[0], f[1], STREAM.half+0.3+f[2]*0.25); f[0]=x; f[1]=z; }   // NIGHT-6 slice 4: out of the water
   const frondM=new T.MeshStandardMaterial({ map:fernT, alphaTest:0.45, side:T.DoubleSide, roughness:0.85 }), frondD=new T.MeshDistanceMaterial({ map:fernT, alphaTest:0.45, side:T.DoubleSide });
   const fronds=new T.InstancedMesh(frondG, frondM, ferns.length*7); fronds.customDistanceMaterial=frondD; own.push(frondM, frondD);
   let fi=0; for(const [x,z,sc] of ferns){ const a0=R()*6.28; for(let j=0;j<7;j++){ d.position.set(x,gy(x,z)-0.02,z); d.rotation.set(0.75+R()*0.5,a0+j*0.9+R()*0.3,0,'YXZ'); d.scale.set(sc,sc*(0.8+R()*0.4),sc); d.updateMatrix(); fronds.setMatrixAt(fi++,d.matrix); } }
   fronds.castShadow=fronds.receiveShadow=true; s.add(fronds);
   /* mossy rocks */
   const rockM=new T.MeshStandardMaterial({ color:col('rock'), roughness:0.96, bumpMap:tex(gb,false,2,2), bumpScale:0.06 }); own.push(rockM);
-  for(const [x,z,sz] of [[-1.6,-1,0.5],[1.9,-2.8,0.35],[-2.8,-6.5,0.7],[2.2,-8,0.45],[0.6,-5.4,0.25],[-0.8,-12,0.6],[3.4,-12.5,0.5]]){
+  for(const [x0,z0,sz] of [[-1.6,-1,0.5],[1.9,-2.8,0.35],[-2.8,-6.5,0.7],[2.2,-8,0.45],[0.6,-5.4,0.25],[-0.8,-12,0.6],[3.4,-12.5,0.5]]){ const [x,z]=outOfWater(x0, z0, STREAM.half+sz*1.1);   // NIGHT-6 slice 4: out of the water
     const ig=new T.IcosahedronGeometry(1,2), pa=ig.attributes.position; own.push(ig);
     for(let i=0;i<pa.count;i++){ const v=V(pa.getX(i),pa.getY(i),pa.getZ(i)); v.multiplyScalar(1+0.18*Math.sin(v.x*4+v.z*3)+0.1*Math.sin(v.y*7)); pa.setXYZ(i,v.x,v.y,v.z); }
     ig.computeVertexNormals(); const m=new T.Mesh(ig,rockM); m.scale.set(sz*1.3,sz*0.6,sz); m.position.set(x,gy(x,z)+sz*0.12,z); m.rotation.y=R()*6; m.castShadow=m.receiveShadow=true; s.add(m); }
@@ -157,12 +171,14 @@ export function buildForest(T, opt){
   let music=0;
   /* RUN 9 (slice 2): THE LIFE — ground waves, mushrooms and flowers, the stream (Echo's rings), the ferns' sway / Wave's shimmer
      (./forest-life.js); the wild fireflies GATHER to the playing light while notes come (call) and scatter slowly when they stop */
-  const life=buildLife({ T, s, C, pal, own, canvas2, tex, lv:Lv }); patchGroundWaves(groundM, life.U); patchSway(frondM, life.U); patchSway(frondD, life.U);
-  const detail=buildDetail({ T, s, C, pal, own, canvas2, tex, lv:Lv, U:life.U, fernT, reduce });   // RUN 9 (slice 3)
+  const life=buildLife({ T, s, C, pal, own, canvas2, tex, lv:Lv }); patchGroundWaves(groundM, life.U); patchWetGround(groundM);   // NIGHT-6 slice 4: wet banks patchSway(frondM, life.U); patchSway(frondD, life.U);
+  const soft=!!Lv.softEdges && opt.gl2!==false; if(soft){ patchSoftEdges(frondM); fronds.renderOrder=-0.5; }   // NIGHT-6: soft cut-out edges (the level's switch; WebGL2)
+  const detail=buildDetail({ T, s, C, pal, own, canvas2, tex, lv:Lv, U:life.U, fernT, reduce, soft });   // RUN 9 (slice 3)
   /* NIGHT-6 slice 3: the forest floor — the herb layer and the fine fern, placed around today's trunks and ferns */
   let floorTex=null; if(files.floor && Object.keys(Lv).some(k=>['sorrel','forb','bilberry','anemone','nettle','sedge','fern2'].includes(k) && Lv[k]>0)){
     floorTex=new T.Texture(files.floor); floorTex.encoding=T.sRGBEncoding; floorTex.anisotropy=4; floorTex.needsUpdate=true; own.push(floorTex); }
-  const floor=buildFloor({ T, s, own, lv:Lv, trunks:spots, ferns, tex:floorTex, U:life.U });
+  const floor=buildFloor({ T, s, own, lv:Lv, trunks:spots, ferns, tex:floorTex, U:life.U, soft });
+  const stream=buildStream({ T, s, C, pal, own, lv:Lv, floorMat:floorTex ? floor.parts.material : null });   // NIGHT-6 slice 4
   const rare=buildRare({ T, s, C, pal, own, canvas2, tex, halo:HALO });   // RUN 9 (slice 4)
   let gather=0, playing=false, rel=0;
   /* NIGHT-6 slice 2: THE MELODY — the held seconds of the playing note (the host), the note-on times of the last window, and their eased
@@ -268,6 +284,7 @@ export function buildForest(T, opt){
     life.update(dt, t, { light:rigs[0].cur, lightOn:rigs[0].on, lightCol:rigs[0].light.color, moon:nt.moon, moonK:nt.moonLight*deep.light, fogD:s.fog.density,
       sway, shimmer:reduce ? 0 : fxv.wave, dim:deep.light });   // RUN 9 (slice 2)
     detail.update(dt, t, { light:rigs[0].cur, lightOn:rigs[0].on, moon:nt.moon, moonK:nt.moonLight*deep.light, mist:nt.mist.reduce((a,b)=>a+b,0)/nt.mist.length, wind:sway, cam:camera.position });
+    stream.update(dt, t, { moonK:nt.moonLight*deep.light, mist:nt.mist.reduce((a,b)=>a+b,0)/nt.mist.length, deepMist:deep.mist, motion:kk });   // NIGHT-6 slice 4
     answers.update(dt, t, { light:rigs[0].cur, on:rigs[0].on, light1:rigs[1].cur, on1:rigs[1].on, lightCol:rigs[0].light.color, fxCol:rigs[1].light.color, moonCol:pal.moonhalo,
       moonK:nt.moonLight*deep.light, dim:deep.light, fogD:s.fog.density, cam:camera.position });   // NIGHT-6 slice 1
     /* parallax: the camera leans a little towards the playing light (near and far things slide past each other) */
@@ -293,6 +310,7 @@ export function buildForest(T, opt){
       fogHex:pal.fog.getHexString(), flies:fkNow }, life:{ ...life.state(), gather, playing, release:rel }, detail:detail.state(), rare:rare.state(flies),   // RUN 9 (slice 2)
     melody:{ hold:holdE, rate:rateE, held:heldNow, darts },   // NIGHT-6 slice 2
     floor:(({ places, ...x })=>x)(floor.state()),   // NIGHT-6 slice 3
+    stream:stream.state(), trunks:spots.map(x=>x.slice()), fernsAt:ferns.map(x=>x.slice()),   // NIGHT-6 slice 4
     answers:answers.state(), bed:{ queued:bedQ.length, fired:fired.map(x=>({ ...x })), twinkles:twinkles.map(w=>({ ...w, glow:glow1[w.i] })) }, files:{ web:!!files.web, floor:!!files.floor, errors:assetErr.slice() } });   // NIGHT-6 slice 1
   function dispose(){ for(const o of own) try{ o.dispose(); }catch(e){} own.length=0; }
   /* NIGHT-6 slice 1: a music bed event `it` ({ kind 'chord' | 'loop' | 'glass', lv, a, h, r, amp }) heard at room time `at` (the host maps it) */
@@ -301,6 +319,6 @@ export function buildForest(T, opt){
   function texBytes(){ let b=0; for(const o of own){ if(!o || !o.isTexture) continue; const im=o.image||{}, w=im.width||0, h=im.height||0, pot=!(w&(w-1)) && !(h&(h-1));
     b+=w*h*4*(o.generateMipmaps!==false && pot ? 4/3 : 1); } return Math.round(b); }
   resize(W,H);
-  return { id:FOREST_ROOM.id, scene:s, camera, update, resize, place, glint, project, state, dispose, lightsOf, lifeDbg:life, detailDbg:detail, bed, texBytes, answersDbg:answers, floorDbg:floor,
+  return { id:FOREST_ROOM.id, scene:s, camera, update, resize, place, glint, project, state, dispose, lightsOf, lifeDbg:life, detailDbg:detail, bed, texBytes, answersDbg:answers, floorDbg:floor, streamDbg:stream,
     held:sec=>{ heldNow= sec>0 ? sec : 0; rare.held(sec); }, rareDbg:kind=>rare.force(kind, now, { light:rigs[0].cur, flies }) };   // RUN 9 (slice 4): held — how long the playing note is held (host); rareDbg — probes / captures   // RUN 9: lifeDbg / detailDbg — probes only (uniforms, silhouette boxes)
 }

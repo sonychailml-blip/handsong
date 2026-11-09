@@ -21,9 +21,9 @@ let k=0, run=true, t0=performance.now();
   await new Promise(r=>requestAnimationFrame(r)); } })();
 /* RUN 9 (slice 5): + high without the light's shadow (H.sceneShadowDbg — measurement only), and the longest frame gap while the forest opens */
 const SH=H.sceneShadowDbg||(()=>null);
-const BEFORE={ dew:0, webs:0, sorrel:0, forb:0, bilberry:0, anemone:0, nettle:0, sedge:0, fern2:0 };   // NIGHT-6: the counts its slices added
-const steps=[['dark',null],['forest high','full',null],['dark',null],['forest medium','reduced',null],['dark',null],['forest medium before NIGHT-6','reduced',null,BEFORE],['dark',null],
-  ['forest medium','reduced',null],['dark',null],['forest medium before NIGHT-6','reduced',null,BEFORE],['dark',null],['forest high','full',null],['dark',null]];
+const BEFORE={ dew:0, webs:0, sorrel:0, forb:0, bilberry:0, anemone:0, nettle:0, sedge:0, fern2:0, softEdges:false, rocks:0, pebbles:0, floaters:0, mistStrips:0 }, HARD={ softEdges:false };   // NIGHT-6: soft edges' cost   // NIGHT-6: the counts its slices added
+const steps=[['dark',null],['forest high','full',null],['dark',null],['forest medium','reduced',null],['dark',null],['forest medium hard edges','reduced',null,HARD],['dark',null],['forest medium before NIGHT-6','reduced',null,BEFORE],['dark',null],
+  ['forest medium','reduced',null],['dark',null],['forest medium hard edges','reduced',null,HARD],['dark',null],['forest medium before NIGHT-6','reduced',null,BEFORE],['dark',null],['forest high','full',null],['dark',null]];
 let gapMax=0, lastF=0, watch=false; (function raf(t){ if(watch && lastF) gapMax=Math.max(gapMax, t-lastF); lastF=t; if(run) requestAnimationFrame(raf); })(performance.now());
 const rows=[];
 try{

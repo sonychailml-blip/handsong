@@ -8397,3 +8397,13 @@ not a control · run a "random" failure many times and print WHERE and HOW MUCH 
 ### NIGHT-2 stage 2 (2026-11-03): calibration screens and settings, built. Log: `docs/night/WORK-LOG.md`; decisions: `docs/night/design/NIGHT-2-calibration/DESIGN.md`
 - `apps/night/calib.js` + the settings card: the offer once per camera, then the ghost; the step on the camera picture with every point; «Играть» saves, «Ещё раз» repeats; the side of the calibrated hand sets the roles (voted over the hold) and is saved; reset clears all. Five main buttons + settings; background, Forest slider, hand points in settings. Landscape low-light hint fixed.
 - Core part CORE-5 (texts, icon). Row «NIGHT calibration screens». Waiting for step 128 (laptop + Poco, covers 125 for Night).
+
+# Moved from docs/night/HANDOFF.md at NIGHT-6 slice 4 (2026-11-10)
+### NIGHT-6 slices 0 + 1 (2026-11-09): the yardstick and the forest answers. Log: `docs/night/WORK-LOG.md`; as built: `docs/night/design/NIGHT-6-forest/PLAN.md` top
+- The plan is approved with the user's eight answers and one rule for the run: what never changes during play is prepared ahead and shipped as files, rendered by a tool, registered, about 10–15 MB for the forest (PLAN.md top).
+- Slice 0: «Измерить это устройство» adds a step «forest medium as before NIGHT-6» and, per step, the room's frame time, draw calls, triangles, programs and texture memory; then every opening (the first is the cold one) and the device. `tools/forest-budget.eval.js` the same on the laptop. The Poco steps: step 134, item 4.
+- Slice 1: dew (1,100 / 500 points) twinkling near the light; webs (9 / 5) beside the near trunks catching the light; each note rings the stream; the music bed's chords swell the mushrooms, each loop voice glows in its own far cluster, glass notes make a far firefly twinkle, each at the moment it is heard (bus `bed` and `audioClock`, `pure/heard.js`).
+- The first prepared file: `rooms/forest/tex/web.png` (21 KB), drawn by `tools/forest-bake.mjs`, register entry `forest-files`. The forest's files: 0.11 MB of 15 MB (row «NIGHT forest files (app)»).
+- Laptop, an undisturbed run: medium −1.2 / −1.7 % hand detections vs Dark with the additions, −2.9 / 0.0 % without (noise); draws 53 vs 51–52, programs 22 vs 20; 0 dropouts; the first opening at high 3.2–3.6 s, later about 0.4 s. A second run was disturbed (Dark itself swung) and is not used.
+- Probes at 48 kHz: P.night PASS 40 / 0, P.quick PASS 93 / 0. At 44.1 kHz (a headset) three rows that render at the live rate failed with no code of theirs changed: CORE-13 pins them at 48 kHz (WORK-LOG).
+- Waiting for step 134: the user's look and the Poco text.

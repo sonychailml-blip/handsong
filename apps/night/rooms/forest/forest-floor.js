@@ -4,8 +4,8 @@
    tools/forest-bake.mjs: the master at high, a smaller copy at medium) and swaying with the forest's wind (the shared sway of forest-life.js).
    No shadows cast; per plant a small brightness jitter. Without the sheet nothing is added (the counts stay for the probes). */
 import { HERBS, FLOOR_ATLAS, cellUv, floorPlaces } from './pure/floor.js';
-import { forestGround } from './pure/fireflies.js';
-import { patchSway } from './forest-life.js';
+import { bankGround } from './pure/forestlife.js';   // NIGHT-6 slice 4: the carved bed (the sedges stand on the bank)
+import { patchSway, patchSoftEdges } from './forest-life.js';
 import { seeded } from '../../../../core/pure/dsp.js';
 
 const MEMO=new Map();   // the places per counts: pure and seeded, so worked out once per session
@@ -28,22 +28,23 @@ export function buildFloor(ctx){
   const mat=new T.MeshStandardMaterial({ map:tex||null, alphaTest:0.45, side:T.DoubleSide, roughness:0.85 }); patchSway(mat, U, 1);
   const sway=mat.onBeforeCompile;
   mat.onBeforeCompile=sh=>{ sway(sh); sh.vertexShader='attribute vec4 aCell;\n'+sh.vertexShader.replace('#include <uv_vertex>', '#include <uv_vertex>\n  vUv=vUv*aCell.zw+aCell.xy;'); };
-  mat.customProgramCacheKey=()=>'handsong.sway1.cell'; own.push(mat);
+  mat.customProgramCacheKey=()=>'handsong.sway1.cell'; own.push(mat); if(ctx.soft) patchSoftEdges(mat);   // NIGHT-6: soft edges at medium
   const cells=(n, sp)=>{ const a=new Float32Array(Math.max(1,n)*4); for(let i=0;i<n;i++) a.set(cellUv(typeof sp==='function' ? sp(i) : sp), i*4); return new T.InstancedBufferAttribute(a, 4); };
   /* the herbs */
   const hg=crossGeo(T); hg.setAttribute('aCell', cells(herbs.length, i=>herbs[i].sp)); own.push(hg);
   const hm=new T.InstancedMesh(hg, mat, Math.max(1, herbs.length));
-  herbs.forEach((p,i)=>{ const W=FLOOR_ATLAS.world[p.sp], j=0.85+R()*0.3; d.position.set(p.x, forestGround(p.x,p.z)-0.02, p.z); d.rotation.set((R()-0.5)*0.15, p.rot, (R()-0.5)*0.15);
+  herbs.forEach((p,i)=>{ const W=FLOOR_ATLAS.world[p.sp], j=0.85+R()*0.3; d.position.set(p.x, bankGround(p.x,p.z)-0.02, p.z); d.rotation.set((R()-0.5)*0.15, p.rot, (R()-0.5)*0.15);
     d.scale.set(W.w*p.s, W.h*p.s*j, W.w*p.s); d.updateMatrix(); hm.setMatrixAt(i, d.matrix); hm.setColorAt(i, c.setScalar(0.78+R()*0.32)); });
   hm.count=herbs.length; hm.receiveShadow=true; hm.frustumCulled=false;
   /* the fine fern: 5–7 fronds a rosette */
   const fronds=[]; for(const p of fern2){ const n=5+Math.floor(R()*3), a0=R()*6.283; for(let k=0;k<n;k++) fronds.push({ x:p.x, z:p.z, a:a0+k*(6.283/n)+R()*0.3, tilt:0.95+R()*0.4, s:p.s*(0.75+R()*0.4) }); }
   const W2=FLOOR_ATLAS.world.fern2, fg=frondGeo(T, W2.w, W2.h); fg.setAttribute('aCell', cells(fronds.length, 'fern2')); own.push(fg);
   const fm=new T.InstancedMesh(fg, mat, Math.max(1, fronds.length));
-  fronds.forEach((f,i)=>{ d.position.set(f.x, forestGround(f.x,f.z)-0.03, f.z); d.rotation.set(f.tilt, f.a, 0, 'YXZ'); d.scale.set(f.s, f.s, f.s); d.updateMatrix(); fm.setMatrixAt(i, d.matrix); fm.setColorAt(i, c.setScalar(0.8+R()*0.3)); });
+  fronds.forEach((f,i)=>{ d.position.set(f.x, bankGround(f.x,f.z)-0.03, f.z); d.rotation.set(f.tilt, f.a, 0, 'YXZ'); d.scale.set(f.s, f.s, f.s); d.updateMatrix(); fm.setMatrixAt(i, d.matrix); fm.setColorAt(i, c.setScalar(0.8+R()*0.3)); });
   fm.count=fronds.length; fm.receiveShadow=true; fm.frustumCulled=false;
+  if(ctx.soft) hm.renderOrder=fm.renderOrder=-0.5;   // blended: after the stream (−1), before the mist (0)
   if(tex){ if(herbs.length) s.add(hm); if(fronds.length) s.add(fm); }
   const by={}; for(const p of P) by[p.sp]=(by[p.sp]||0)+1;
   const state=()=>({ counts:by, herbs:herbs.length, rosettes:fern2.length, fronds:fronds.length, tex:!!tex, places:P });
-  return { state, parts:{ herbs:hm, fronds:fm } };   // parts: probes only
+  return { state, parts:{ herbs:hm, fronds:fm, material:mat } };   // parts: probes (the material: the drifting leaves share it)
 }

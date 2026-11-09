@@ -35,6 +35,15 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 5. The falling star passes in front of the trees. Natural?
 
 ## Records (English, at most about 15 lines each; older ones go to `archive/HANDOFF-history.md`)
+### NIGHT-6 slice 4 (2026-11-10): the stream towards the viewer; soft edges at medium; the early fetch. Log: `docs/night/WORK-LOG.md`; as built: `docs/night/design/NIGHT-6-forest/PLAN.md` top
+- Step 136 checked by the user: the floor looks right and beautiful; the first opening is fine. KTX2: keep PNG, no CSP change (our own transcoder later if the Poco runs short of GPU memory).
+- Soft cut-out edges at medium (`patchSoftEdges`: alpha sharpened by its screen derivative, blended): plants, ferns, grass silhouettes. Cost within the noise (soft −1.8 / 0.0 %, hard −1.1 / −5.3 % detections vs Dark; same draws and programs). Shots: `tools/.ui-snap/n6-soft/`. The user decides by eye.
+- The early fetch: `main.js` asks the room for its level's files while the start card shows (`rooms/index.js prefetch`); at minimal nothing.
+- The stream (the user's change to the plan): a new path that ends in the foreground, a carved bed (`CARVE`, `bankGround`), a wet darker glossy bank; the water's own shader (flow towards the viewer, foam at the edges, the moon's broken glints, the light's glints and glow, the note rings); wet mossy rocks, pebbles, drifting leaves, mist strips (`forest-stream.js`, `pure/stream.js`). Trunks, ferns and today's rocks in the water move out sideways (`outOfWater`); fireflies, mushrooms and floor as before.
+- Laptop medium: draws 59–60 (before NIGHT-6 51–52), programs 25 (20), triangles 94 k (71 k), textures 13.6 MB (as slice 3); detections −1.8 / 0.0 % (noise). High −43.7 / −37.9 %. First opening: high 4.9 s, medium 3.2 s (in a page that had opened high), later 0.4–1 s.
+- Files per level unchanged by this slice: high 1.46 MB, medium 0.67 MB, low 0.34 MB (all 2.21 MB of 30).
+- Rows: data «FOREST stream (app)» 27; browser «FOREST stream» 14. Waiting for step 137.
+
 ### NIGHT-6 slice 3 (2026-11-09): the forest floor. Log: `docs/night/WORK-LOG.md`; as built and the KTX2 lab: `docs/night/design/NIGHT-6-forest/PLAN.md` top
 - Step 135 checked by the user: the fireflies look right. The user's texture rule: one master per texture at the highest quality (high), smaller copies derived for medium and low; sizes per level reported every slice; warn before 30 MB.
 - The plant sheet `rooms/forest/tex/floor-2048.png` (master) → 1024 / 512, and the web now a 1024 master → 512 / 256, drawn by `tools/forest-bake.mjs`: fine fern, nettle, sedge, wood sorrel, broad-leaved herb, bilberry with berries, wood anemone.
@@ -48,15 +57,6 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 - The firefly law takes `hold` (a long note: they close in, circle slower, breathe together, brighter) and `rate` (fast playing: wider rings, a quicker swirl); `fliesDart` sends the three nearest out on a note of fast playing. Both 0 = exactly the old step. The room eases them from the held seconds and its note times; a held note now keeps the flies gathered.
 - Rows: data «FOREST melody (app)» 21 cases (a long note 2.19 → 1.01 from the light; fast 3.87; CONTROL the old law meets neither); browser «FOREST melody» 8 (a held note 46 flies within 2 m against 4 released; fast playing 4.35 vs 2.50, darts 51 vs 0).
 - Checks: static PASS; [probe-data] PASS 42 / 0; P.night PASS 41 / 0; P.quick PASS 93 / 0. No GPU change. Waiting for step 135 (three checks by eye).
-### NIGHT-6 slices 0 + 1 (2026-11-09): the yardstick and the forest answers. Log: `docs/night/WORK-LOG.md`; as built: `docs/night/design/NIGHT-6-forest/PLAN.md` top
-- The plan is approved with the user's eight answers and one rule for the run: what never changes during play is prepared ahead and shipped as files, rendered by a tool, registered, about 10–15 MB for the forest (PLAN.md top).
-- Slice 0: «Измерить это устройство» adds a step «forest medium as before NIGHT-6» and, per step, the room's frame time, draw calls, triangles, programs and texture memory; then every opening (the first is the cold one) and the device. `tools/forest-budget.eval.js` the same on the laptop. The Poco steps: step 134, item 4.
-- Slice 1: dew (1,100 / 500 points) twinkling near the light; webs (9 / 5) beside the near trunks catching the light; each note rings the stream; the music bed's chords swell the mushrooms, each loop voice glows in its own far cluster, glass notes make a far firefly twinkle, each at the moment it is heard (bus `bed` and `audioClock`, `pure/heard.js`).
-- The first prepared file: `rooms/forest/tex/web.png` (21 KB), drawn by `tools/forest-bake.mjs`, register entry `forest-files`. The forest's files: 0.11 MB of 15 MB (row «NIGHT forest files (app)»).
-- Laptop, an undisturbed run: medium −1.2 / −1.7 % hand detections vs Dark with the additions, −2.9 / 0.0 % without (noise); draws 53 vs 51–52, programs 22 vs 20; 0 dropouts; the first opening at high 3.2–3.6 s, later about 0.4 s. A second run was disturbed (Dark itself swung) and is not used.
-- Probes at 48 kHz: P.night PASS 40 / 0, P.quick PASS 93 / 0. At 44.1 kHz (a headset) three rows that render at the live rate failed with no code of theirs changed: CORE-13 pins them at 48 kHz (WORK-LOG).
-- Waiting for step 134: the user's look and the Poco text.
-
 ### NIGHT-6 stage 1 (2026-11-09): the forest, polished and alive — the comparison and the plan only. `docs/night/design/NIGHT-6-forest/PLAN.md`
 - No app code; tree hashes unchanged (core 14bd513ae15aa87e · apps/full d6b90cf2cb4be6da · apps/night 3279ec88c1f91059).
 - Compared item by item with the sketch «Живой лес»: the forest lacks most of the sketch's plant life (no leaves anywhere, no herb layer, one fern), the fallen wood, moss, the stream's banks and life, webs, dew, the moon's gap and stars, the painted distance, film. Today is ahead on the night cycle, moods, response, rare events.
