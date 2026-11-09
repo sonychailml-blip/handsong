@@ -1828,6 +1828,12 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
     3. «Мерцание»: brighter, with soft, distant glass now and then and a very quiet high air; still restful.
     4. A/B: while «Течение» plays, tap «Bed: v2» → v1 (stage 4) and back; tap «Loop voices» → horns and back. Which bed, and which palette for the loop voices?
     5. A Mood change while «Течение» plays: the melodies go on in the new mood with no jump or crackle; then Settings → «Лёгкий лес» on: fewer voices (two loops), still pleasant; «Громкость музыки» sets its level; off again.
+132. Night's own storage, the whole depth range, «Глубина», v1 after a hidden tab (NIGHT-5, with CORE-11), at most five checks; the rest is in the runner's storage census and the rows «NIGHT shell», «NIGHT depth loudness», «NIGHT music bed». Laptop, Live Server, headphones.
+    1. Open Full (`http://127.0.0.1:5500/apps/full/`), play a little so it autosaves, reload: Full still offers «Продолжить с того места…». Then open Night (`…/apps/night/`) and press «Начать»: no such offer, ever. (Night now keeps its own language choice: on this address it may start once in the browser's language — pick it again on the start card.)
+    2. Play with the right hand and move it from near the camera to as far as you can: the bar on its side, now labelled «Глубина», fills from empty to full (0 → 100 %), with no mark across it; the light goes deep into the forest all the way. Then the same after a calibration (Settings → Рука) and with «Лёгкий лес» on.
+    3. By ear, the far end: a note played with the hand far away is wetter and darker than near, about as loud, and still a note in the forest, not a wash. (It used to stop at 60 % of the effect; the far end now is the old slider's maximum: about 3.4 dB more room than the old stop, the room's cut-off 2.2 kHz instead of 3.9 kHz.) If it is too wet, say so: the effect's top is tuned, the hand's travel stays whole.
+    4. Portrait and landscape, Russian and English: the label «Глубина» / «Depth» fits under its bar, nothing overlaps.
+    5. v1 after a hidden tab: `…/apps/night/?probe&bed`, pill «Bed: v1», Music on «Течение»; switch to another tab for a minute or more, come back: the bed goes on softly — no burst of notes.
 
 ## Superseded at DOC1 (old lines verbatim, replaced in place above by a later slice)
 - NIGHT-2 stage 3 (2026-11-03, the rule of at most five manual checks) updated this line of CLAUDE.md's report format:

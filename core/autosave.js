@@ -1,5 +1,5 @@
 /* AUTOSAVE1 (RUN 3, 2026-10-16) — THE CURRENT SONG KEPT ON THIS DEVICE BY ITSELF. No DOM (ui.js shows the offer, the list, the setting).
-   ⛳ Local only (rule #33): IndexedDB database 'handsong-songs' (separate from the user tunings, so the scale loader never sees it), store
+   ⛳ Local only (rule #33): IndexedDB database 'handsong-songs' (+ the page's namespace, CORE-11; separate from the user tunings, so the scale loader never sees it), store
    'auto', one entry per SONG (key = the song record's id), value { id, name, at, tracks, events, ms, text } — `text` is exactly what
    Save writes (song/file.js songData → JSON), so a restore is an Open of that text with every check of SAVE1. The newest AS_KEEP 5 songs
    are kept (trimmed in the same transaction as the write — a crash leaves the previous version readable). Frozen audio is not stored.
@@ -17,10 +17,11 @@ import { events, recording, loop, histHash } from './recorder.js';
 import { songData } from './song/file.js';
 import { ENV } from './song/env.js';
 import { newUserId } from './pure/registry.js';
+import { nsKey, nsDb } from './storens.js';   // CORE-11: the page's own names (absent: as before)
 
 const AS={ pollMs:1000, settleMs:2500, gapMs:8000, playMs:40, idleMs:3000 };
-const AS_KEEP=5, OS='auto', SET_KEY='handsong.autosave';
-let DB_NAME='handsong-songs';
+const AS_KEEP=5, OS='auto', SET_KEY=nsKey('handsong.autosave'), DB_HOME=nsDb('handsong-songs');
+let DB_NAME=DB_HOME;
 /* ui wiring: the song's id and name as the Song file section knows them, and a status callback (status, info) */
 let W={ meta:()=>({ id:null, name:'' }), setId:()=>{}, said:()=>{} };
 const asWire=o=>{ W={ ...W, ...o }; };
@@ -124,7 +125,7 @@ function asStart(){ if(timer) return; timer=setInterval(()=>{ try{ asTick(); }ca
   addEventListener('pagehide', asFlush); document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') asFlush(); }); }
 /* probe only: faults and a separate database (the person's own autosaves are never touched by a probe) */
 async function asDbg(o){
-  const next=o||{}, db=next.db||'handsong-songs';
+  const next=o||{}, db=next.db||DB_HOME;
   if(db!==DB_NAME){ if(dbP){ try{ (await dbP).close(); }catch(e){} } dbP=null; DB_NAME=db;   // another store: its scheduler state starts over
     Object.assign(st,{ key:null, keyT:0, savedKey:null, lastT:-1e9, lastAt:null, slot:null, n:0 }); }
   DBG=next; if(!next.keep){ st.status=asEnabled()?'idle':'off'; st.err=null; }

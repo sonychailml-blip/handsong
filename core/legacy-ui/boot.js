@@ -10,7 +10,7 @@ import { loadReport } from '../scales.js';   // F5: итог загрузки ф
 import { rollOpen, arrOpen } from '../state.js';   // S5.0: редактор дорожки открыт — камеру не читаем, игровое поле не рисуем. AR1: и окно аранжировки — та же ветка
 import { latStart, latFrame, latHands, latIdle } from './latmeter.js';   // LAT1: latency per stage (Sound panel → «Latency meter», R.latency())
 import { asStart } from '../autosave.js';   // AUTOSAVE1: the song kept on this device by itself
-import { profileApply } from '../profile.js';
+import { profileApply, profileOf } from '../profile.js';
 
 /* =====================================================================
    HANDSONG — жестовый синтезатор + интерактивный учебник ладов
@@ -108,6 +108,8 @@ if(loadReport.emergency || loadReport.problems.length){ const el=$('loadmsg'), n
     : [nB ? t('data.skipped',{n:nB}) : '', nU ? t('data.userSkipped',{n:nU}) : ''].filter(Boolean).join(' '); }   // F6: файлы пользователя — отдельной фразой
 /* 0b: the start is staged — sound and the hand model are built ONCE; a failed camera leaves the card usable («Try again» retries only the
    camera; a second press never builds a second AudioContext or reloads the model). */
+/* CORE-11: a page whose profile records nothing keeps no song — no autosave poll, no «Continue where you left off?» (no profile: as before) */
+const keepsSongs=()=>{ const p=OPT.profile ? profileOf(OPT.profile) : null; return !p || p.recording!==false; };
 let started=false, starting=false;
 const stage={ audio:false, det:false };
 /* the start card after a failure: a message by its kind (core camErrKind: busy / notfound / denied, else the generic one) + «Try again» */
@@ -138,7 +140,7 @@ async function startApp(){
     started=true;
     loop();
     latStart();                              // LAT1: the latency meter starts with the camera and the audio
-    asStart();                               // AUTOSAVE1: the autosave poll (writes only after a change has settled)
+    if(keepsSongs()) asStart();              // AUTOSAVE1: the autosave poll (writes only after a change has settled); CORE-11: not in a profile that records nothing
     import('../render.js').catch(e=>console.warn('[autoFreeze] render.js failed to load', e));   // AF3: auto-freeze (watcher + queue) lives behind render.js — loaded once the engine runs
     return true;
   }catch(err){
@@ -153,8 +155,8 @@ export function boot(opt={}){
   OPT=opt; setHandsSink(onHands, studio);
   if(new URLSearchParams(location.search).has('probe')){ const l=document.querySelector('link[rel="handsong-probes"]');
     if(l) import(l.href).then(m=>m.install()).catch(e=>console.warn('[probe] the probes failed to load', e)); }
-  $('startBtn').onclick=()=>{ startApp().then(ok=>{ if(ok) songResumeOffer(); }); };   // AUTOSAVE1: «Continue where you left off?» (Play only, not a lesson)
-  { const r=$('camRetry'); if(r) r.onclick=()=>{ startApp().then(ok=>{ if(ok) songResumeOffer(); }); }; }   // 0b: «Try again» after a failed start
+  $('startBtn').onclick=()=>{ startApp().then(ok=>{ if(ok && keepsSongs()) songResumeOffer(); }); };   // AUTOSAVE1: «Continue where you left off?» (Play only, not a lesson)
+  { const r=$('camRetry'); if(r) r.onclick=()=>{ startApp().then(ok=>{ if(ok && keepsSongs()) songResumeOffer(); }); }; }   // 0b: «Try again» after a failed start
   return startApp;
 }
 

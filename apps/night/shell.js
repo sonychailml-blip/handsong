@@ -34,13 +34,13 @@ let D=null, on=false, st=null, raf=0, info=false, sleep={ mins:0, t0:0 }, asleep
 let begun=false, firstRun=false, startDue=false, defHand='right';   // NIGHT-2: a person's Begin, its first start, the offer due on the next frame, the profile's playing hand
 const GHOST_WAIT=10000;   // after the calibration the ghost waits this long for the hand to leave the frame
 /* «Room sounds» (Music section; was «Forest» under View) — the room's own sounds (the ambience's level), remembered on this device under the old
-   key. NIGHT-3 stage 5: it no longer sets the hand's reach (RUN 8 had coupled them); the reach is fixed at the slider's old default, so at the
-   default position nothing changed. */
+   key. NIGHT-3 stage 5: it no longer sets the hand's reach (RUN 8 had coupled them). NIGHT-5: the reach is the whole range (it was the slider's
+   old default 0.6, which stopped the hand at 60 % of its bar). */
 const room=()=>(roomById(sceneRoom())||ROOMS[0]).record, nature=()=>room().nature;
 const roomSound=()=>{ const v=parseFloat(load(KEY.roomSound)); return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : nature().level; };
 /* NIGHT-4: a weak device (≤ 2 GB or ≤ 2 cores, as the browser reports) gets the music bed's lighter variant whatever the setting */
 const WEAK=!!((navigator.deviceMemory && navigator.deviceMemory<=2) || (navigator.hardwareConcurrency && navigator.hardwareConcurrency<=2));
-export const REACH=0.6;   // the hand's reach in the room (Forest depth's `reach`): the old «Forest» slider's default
+export const REACH=1;   // the hand's reach in the room (Forest depth's `reach`): always the whole range, whatever the calibration and settings (user, NIGHT-5)
 
 /* the doors (ui.js): timbres() / timbre() / setTimbre(id) / timbreName(id); moods() / mood() / setMood(id); hand() 'right'|'left' /
    setHand(v); noteMode() 'note'|'hold' / setNoteMode(v); backgrounds() / bg() / setBg(m); plain() (no glass blur);
@@ -62,7 +62,7 @@ export function nightShellFace(p){
   defHand= p && p.handFn && p.handFn.ld && p.handFn.ld.R==='fx' ? 'left' : 'right';
   if(on){ calSideApply(); if(begun){ begun=false; startDue=true; } }   // NIGHT-2: a calibrated side sets the roles; the offer follows a person's own Begin
   else calAbort();   // RUN 8: Night's gentler left-to-right volume (Full: its own curve)   // RUN 8: Night's strike caps and cheaper strikes (Full: RUN 7's strike exactly)
-  if(on){ reachSet(REACH); lightApply(load(KEY.light)==='1', true); }   // the hand's reach (fixed since NIGHT-3 stage 5); C8 the person's «Lighter forest»
+  if(on){ reachSet(REACH); lightApply(load(KEY.light)==='1', true); }   // the hand's reach: the whole range (NIGHT-5); C8 the person's «Lighter forest»
   else setLowPower(false);
   if(on){ st=null; render(); if(!raf) raf=requestAnimationFrame(tick); }
   else { if(raf) cancelAnimationFrame(raf); raf=0; infoShow(false); sleepSet(0); }
@@ -149,7 +149,7 @@ $('nightBegin').onclick=()=>{ const go=$('startBtn').onclick; begun=true; if(loa
 /* NIGHT-2: once the camera runs after a Begin: the calibration offer for a camera not offered yet, then (a first start) the ghost; without an offer the ghost comes at once, as before */
 function startFlow(){ const first=firstRun; firstRun=false;
   if(!calOfferIfNew(()=>{ if(first) ghostArm({ wait:GHOST_WAIT }); }) && first) ghostArm(); }
-/* RUN 8 (slice 3): THE BARS while the hands play — the forest's depth (depth × reach, the reach as a mark) on the playing hand's side, the
+/* RUN 8 (slice 3): THE BARS while the hands play — the hand's depth («Глубина»: the room and the light; NIGHT-5 no mark) on the playing hand's side, the
    three effects (Echo · Warmth ↔ Brightness from the middle · Wave) on the effects hand's side; the bar of the finger in use glows; each set
    fades in with its hand and out when it leaves; a set's side follows where its hand is on the screen (40 / 60 % of the width, hysteresis),
    so «Play with: left hand» (settings) moves them. The effects hand's one-line hint shows the first time it appears on this device (7 s). */
@@ -165,7 +165,7 @@ const forestNow=()=>{ const I=fxInstance(chainKeyOf('ld'),'fdepth'); return I ? 
 function bars(now, hv, fxv){
   const W=($('canvas')||{}).width||innerWidth, play=hv.find(h=>h.play), fx=hv.find(h=>!h.play), F=$('nightForestBar'), X=$('nightFxBars');
   const fo=forestNow(), fb=F.querySelector('[data-bar="forest"]');
-  fill(fb, fo.depth*fo.reach); fb.querySelector('.night-bar-max').style.bottom=(fo.reach*100)+'%';
+  fill(fb, fo.depth*fo.reach);   // NIGHT-5: the reach is the whole range, so the hand fills the bar 0…100 % (no mark)
   F.classList.toggle('on', !!play); if(play) place(F, sideOf('play', play.x, W));
   X.classList.toggle('on', !!fx);
   if(fx){ let sd=sideOf('fx', fx.x, W); if(play && sd===SIDE.play) sd= SIDE.play==='left' ? 'right' : 'left'; place(X, sd);

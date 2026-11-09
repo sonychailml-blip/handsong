@@ -174,6 +174,8 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
 - **A lesson** = a record in `tutor.LESSONS` + step records + `tutor.<key>.prompt`/`.detail` keys; its `setup` must make its own steps
   completable from any previous lesson. Don't touch the engine.
 - **A user-facing string** = a key in `DICTS.en` AND `DICTS.ru` (chrome), or an inline `L()`-shaped name next to the data.
+- **A stored name in shared code** (CORE-11) = through `nsKey` / `nsDb` (`core/storens.js`), so two apps on one origin never read each other's
+  settings or songs; only a device fact stays shared (camera restore record, engine benchmark). The runner's storage census checks it.
 - ⛳ **Design work** (user decisions, DAY run 2026-10-16; BACKLOG §7.19): ALL design — visual identity, interface, colours, fonts, icons,
   every design system — is done by Claude Code as our own authored work; fonts only under OFL or a similarly allowed licence (rule #32);
   icons drawn by us, NO icon libraries. Today's look stays (UI1b tokens + icon component); the new design comes later through the user's
@@ -452,7 +454,8 @@ detail: `archive/CLAUDE-history.md` «Module map (full, moved at DOC1)», under 
 - `core/pure/` (PURE, rule #36; runs in node): `format.js` (file envelope, migrations), `registry.js` (id spaces, `createRegistry`),
   `songfile.js` (song file parse/upgrade/check), `pack.js` (packs + offline licence keys, PACK1), `profile.js` (profile record, C0), `bus.js` (VIS1a; the visuals' event bus `BUS`: state `hands`, `handsView`, `picture`; ring `notes` from the LIVE engine contract), `engclass.js` (provisional power class, dropout rate — ENG2), `timbre.js` (the timbre record + T5 bounds — TIM3a), `latency.js`, `handsched.js` (search
   schedule), `camlight.js` (low light, camera restore), `dsp.js` (seeded, forest IR, dynamics curves), `canon.js` (canonical JSON + FNV — CMD1a), `nightui.js` (shell logic).
-- `core/autosave.js` — the song kept on the device (IndexedDB, last 5, `asTick`, `asFlush`).
+- `core/autosave.js` — the song kept on the device (IndexedDB, last 5, `asTick`, `asFlush`); off in a profile that records nothing (boot, CORE-11).
+- `core/storens.js` (CORE-11) — the page's storage namespace (`<meta name="handsong-store">`; `nsKey`, `nsDb`); absent (Full) = every name as before.
 - `core/pure/profile.js` (C0) — PROFILES, checked by `core/pure/profile.js`; `profileApply(id)` called once at the start by `boot` with the page's profile; writes through ui.js doors `profileWire`. Full's face stays embedded on Night's page for probes only (`core/DEBT.md`). `core/edition.js` — `EDITION` ('dev' here; `tools/build.mjs` writes 'release').
 - `core/legacy-ui/` (temporary, only shrinks; rule 2 of «Two apps, one core»): `boot.js` the shared start and loop (`onHands`, `loop()`, `startApp()`, the one start path; options `profile`, `frameFilter`, `afterDraw` — CORE-6), `ui.js` menus, buttons, handlers, panels, editor shell, window, song Save/Open (`songSaveText`/`songOpenText`), tutorial helpers; `draw.js` FACADE over `views/` (`common.js`, `camera.js`, `strip.js` strip/window/mixer + `loopView`, `roll.js` editor +
   `rollView`, `play.js` overlays + play screen + Night's fingertip fireflies and row glow, `stack.js` the compositor: layers scene · background · instrument · overlay; the scene host moved to `apps/night/scene/host.js` at CORE-8); `latmeter.js` latency meter UI (LAT1–LAT3).
@@ -550,6 +553,7 @@ THERE in full and here as one index entry):
   125 Hand calibration (CORE-1; on the panel `?probe&calpanel`) · 126 Sound headroom (NIGHT-1; the page `?probe&headroom`) · 127 The quiet floor by ear (NIGHT-1; `?probe&tails=on|off`)
   128 Night's calibration screens and settings, laptop + Poco (NIGHT-2; covers 125 for Night) · 129 Night's hand setup, five checks (NIGHT-2 stage 3; replaces 128)
   130 The music bed, five checks (NIGHT-3 stage 4) · 131 The music bed v2, five checks by ear (NIGHT-4)
+  132 Night's own storage, the whole depth range, «Глубина», v1 after a hidden tab (NIGHT-5)
 
 ## Language
 - **Code comments:** existing ones are Russian; new and edited ones are short English (standing rule). Never translate en masse.

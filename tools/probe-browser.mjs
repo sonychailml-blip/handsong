@@ -22,6 +22,8 @@
    PRIV1: every Content-Security-Policy violation of the session fails the run; CONTROL — a fetch to https://example.com must be refused
    by connect-src (every session). LAT2: every request of the session — the page's and its workers' (a worker has no page CSP of its own)
    — must go to the own origin or the MediaPipe paths of the register; anything else fails the run.
+   CORE-11: the storage census — every localStorage key and IndexedDB name the page touches; Night only its own names and two device facts,
+   Full its names as before (each with a control); anything else fails the run.
    ⛳ УСТРОЙСТВО (почему так):
    • Свой статический сервер на свободном порту 127.0.0.1 (не Live Server, не 5500) — поднимается и гасится скриптом; файлы с диска
      как есть, без кэша (Cache-Control: no-store), запрос (?render…) отбрасывается — так же, как его видит любой статический сервер.
@@ -385,6 +387,10 @@ async function session(port, plan, label){
       if(!NET_OK.some(p=>u.startsWith(p)) && !/handsong-csp-control/.test(u)) res.net.bad.push(u); });
     /* PRIV1: every Content-Security-Policy violation of the whole session is collected (an init script runs before the page's own) */
     await ctx.addInitScript(()=>{ window.__csp=[]; document.addEventListener('securitypolicyviolation', e=>window.__csp.push({ dir:e.effectiveDirective||e.violatedDirective, uri:e.blockedURI, src:e.sourceFile, line:e.lineNumber })); });
+    /* CORE-11: the storage census — every localStorage key and IndexedDB name the page touches, recorded from before its first read */
+    await ctx.addInitScript(()=>{ const S=window.__store=new Set(), add=x=>{ try{ S.add(x); }catch(e){} };
+      const SP=Storage.prototype; for(const m of ['getItem','setItem','removeItem']){ const f=SP[m]; SP[m]=function(k,...a){ add('ls:'+String(k)); return f.call(this,k,...a); }; }
+      const IP=IDBFactory.prototype; for(const m of ['open','deleteDatabase']){ const f=IP[m]; IP[m]=function(n,...a){ add('idb:'+String(n)); return f.call(this,n,...a); }; } });
     if(has('--stress-not-judged')) await ctx.addInitScript(()=>{ globalThis.__stressNotJudged=true; });
     /* SPLIT-2: this page's session rests on the Dark background (software WebGL in headless Chrome starves a small machine between rows); the forest rows choose the forest themselves */
     if(NIGHT_PAGE) await ctx.addInitScript(()=>{ try{ if(!localStorage.getItem('handsong.nightBg')) localStorage.setItem('handsong.nightBg','dark'); }catch(e){} });
@@ -503,6 +509,18 @@ async function session(port, plan, label){
       const v=window.__csp.slice(before.length);
       return { meta, list:before, blocked, err, ctl:v.some(x=>/connect-src/.test(x.dir)&&/example\.com/.test(x.uri)) };
     }), 30e3, 'the CSP check');
+    /* CORE-11: THE STORAGE CENSUS, judged — Night touches only its own names: the namespace («handsong.night.…», «….night»), its own
+       «handsong.night…» keys and the old ones migrate.js moves, the scene level, its calibration scopes, and the two device facts shared on purpose
+       (camera restore record, engine benchmark); never a songs database (the offer is gated off). CONTROLS: Night's census holds its namespaced
+       language key and user-file database (the hook saw core's first reads at module load); Full's holds «handsong.lang», «handsong-user» and
+       «handsong-songs» (its names as before; the songs = the offer at ▶ that Night skips) and nothing of the namespace. */
+    { const L=await within(page.evaluate(()=>[...(window.__store||[])].sort()), 15e3, 'the storage census');
+      const OK=[/^ls:handsong\.night/, new RegExp('^ls:handsong[.]ca'+'lm'), /^ls:handsong\.sceneLevel$/, /^ls:handsong\.handCal\.((dev-)?night|probe)$/, /^ls:handsong\.(camTest|engBench)$/, /^idb:handsong-user\.night$/];
+      const bad= NIGHT_PAGE ? L.filter(x=>!OK.some(r=>r.test(x))) : L.filter(x=>/^ls:handsong\.night\.|\.night$/.test(x));
+      const need= NIGHT_PAGE ? ['ls:handsong.night.lang','idb:handsong-user.night'] : ['ls:handsong.lang','idb:handsong-user','idb:handsong-songs'], miss=need.filter(x=>!L.includes(x));
+      res.store={ list:L, bad, miss, pass:!bad.length && !miss.length };
+      out(`[${label}] storage (CORE-11): ${L.length} name(s) touched — ${bad.length?bad.length+(NIGHT_PAGE?' NOT OF THIS APP: ':' IN THE NIGHT NAMESPACE: ')+bad.join(', '):(NIGHT_PAGE?'all its own or device facts':'none in the Night namespace')} · control (${need.join(', ')}) ${miss.length?'MISSING: '+miss.join(', '):'seen'} → ${res.store.pass?'PASS':'NOT A PASS'}`);
+      await log('[storage census] '+L.join(' | ')); }
     /* CONTROL of the network check: a worker of ours asks an unlisted host (intercepted here and aborted — nothing leaves the machine);
        the check must see it, then that one request is set aside */
     { const CTL='https://example.com/handsong-net-control', f=path.join(LOGDIR,'net-control-worker.js');
@@ -588,7 +606,8 @@ for(const s of sessions){
   if(!s.runs.length && !s.error && !EVAL && !LEAK && !s.dumped) pass=false;
   if(s.ui){ out(`[${s.label}] UI checks (section rename, bend drag, song file, autosave): ${s.ui.pass?'PASS':'NOT A PASS'}`); if(!s.ui.pass) pass=false; }
   if(!s.error){ out(`[${s.label}] CSP (PRIV1): ${s.csp&&s.csp.pass?'PASS — no violation, the control fetch refused':'NOT A PASS'}`); if(!(s.csp&&s.csp.pass)) pass=false;
-    out(`[${s.label}] network (PRIV1, LAT2): ${s.net&&s.net.pass?`PASS — ${s.net.n} requests, all to the own origin or the MediaPipe paths`:'NOT A PASS'}`); if(!(s.net&&s.net.pass)) pass=false; }
+    out(`[${s.label}] network (PRIV1, LAT2): ${s.net&&s.net.pass?`PASS — ${s.net.n} requests, all to the own origin or the MediaPipe paths`:'NOT A PASS'}`); if(!(s.net&&s.net.pass)) pass=false;
+    out(`[${s.label}] storage (CORE-11): ${s.store&&s.store.pass?`PASS — ${s.store.list.length} names, ${NIGHT_PAGE?'all of this app or device facts':'the Full names as before'}, the control seen`:'NOT A PASS'}`); if(!(s.store&&s.store.pass)) pass=false; }
   if(EVAL && !(s.evalResult&&s.evalResult.ok)) pass=false;
   if(LEAK){ if(!s.leakPass) pass=false; const L=s.leak; out(`[${s.label}] --leak: ${L&&L.ok?`${L.pass?'PASS':'NOT A PASS'} — ${L.n} renders: +${L.fixMB} MB with the fix (margin ${LEAK_MARGIN_MB} MB), control +${L.ctrlMB} MB`:'ERROR '+(L&&L.why)}`); }
 }

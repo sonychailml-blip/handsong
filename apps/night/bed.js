@@ -4,7 +4,7 @@
    parked a while after Off. With the bed on it takes over the forest's low drone (main.js asks bedTakesDrone). A Mood change: the next chord
    comes from the new scale at once, the ground glides. bedPlan() lays a whole timeline into any engine context (the probes' and the cost
    measurement's offline renders): the live tick and it share one event path (applyEv).
-   NIGHT-4: v2 (apps/night/bed2.js, one worklet) plays by default; v1 stays here unchanged — the A/B switch (dev, bedSetEngine) and the
+   NIGHT-4: v2 (apps/night/bed2.js, one worklet) plays by default; v1 stays here (NIGHT-5: with v2's gap rule) — the A/B switch (dev, bedSetEngine) and the
    fallback when AudioWorklet is missing. The door also keeps the palette of v2's loop voices (dev switch) and Lighter (the «Lighter forest»
    setting, or a weak device: fewer loops and layers). */
 import { AC, engineCtx } from '../../core/audio.js';
@@ -18,7 +18,7 @@ import { bed2On, bed2Off, bed2Volume, bed2Tick, bed2Failed, bed2Dbg } from './be
 export const BED_SEED=0x42454431, BED_AHEAD=0.5, BED_PARK_S=9, BED_QUIET_TC=8;   // a released voice parks after 8 time constants (−70 dB)
 export const BED_ENGINES=Object.freeze(['v2','v1']), BED_PALETTES=Object.freeze(['a','b']);
 let mode=BED_OFF, vol=null, answer=false, recipe=null, bed=null, st=null, origin=0, view=null, parkAt=0, ons=0, notesSeq=0;
-let engine='v2', palette='a', light=false, recipe2=null, v2want=false, v1on=false;   // NIGHT-4: v1on — v1 is the one playing (chosen, or the fallback)
+let engine='v2', palette='a', light=false, recipe2=null, v2want=false, v1on=false, v1tick=null;   // NIGHT-4: v1on — v1 is the one playing (chosen, or the fallback)
 const played=[];   // { pc, t } of your recent notes (AC time) — read only with the response on
 const READ=BUS.reader();
 /* a bed object with its seeded per-voice detunes and its two sides' filter positions (× the chord's middle pitch) */
@@ -113,7 +113,11 @@ export function bedTick(at){
   if(v!==view){ view=v; const [r,s2]=groundOf(v); bedGround(E, bed, r, s2, true, now); bedSoon(st, now-origin); }
   parkQuiet(E, bed, now);
   const P=recipe.presets[mode];
-  for(const ev of bedStep(st, recipe, P, n, now-origin+BED_AHEAD, played.map(p=>p.pc), answer)) applyEv(E, bed, ev, Math.max(origin+ev.t, now+0.02), P, v);
+  /* NIGHT-5: after a gap (a hidden tab stops the frames, not the audio clock) — as v2: events more than 1 s late are skipped and only the
+     latest missed chord comes, so v1 never plays a burst of everything it missed */
+  const evs=bedStep(st, recipe, P, n, now-origin+BED_AHEAD, played.map(p=>p.pc), answer), late=now-1-origin;
+  const last=evs.filter(e=>e.kind==='chord' && e.t<late).pop(), T=v1tick={ law:evs.length, chord:0, glim:0, drift:0 };
+  for(const ev of evs){ if(ev.t<late && ev!==last) continue; T[ev.kind]=(T[ev.kind]||0)+1; applyEv(E, bed, ev, Math.max(origin+ev.t, now+0.02), P, v); }
 }
 /* a whole timeline into an engine context E (offline renders): the preset `preset` of recipe B for `sec` s from 0 → { bed, events }. o.at(t, fn)
    given (an offline context's timed callback, the cost measurement): each event is applied just before its time and the quiet voices park, as
@@ -130,4 +134,4 @@ export function bedPlan(E, dest, B, preset, sec, o={}){
 /* probe only */
 export const bedDbg=()=>({ mode, vol:bedVolumeOf(), answer, built:!!bed, parked:bed ? bed.parked : null, slots:bed ? bed.slots.slice() : [], played:played.length,
   voices:bed ? bed.voices.map(x=>({ hz:x.hz, step:x.step })) : [], ground:bed ? bed.ground.hz.slice() : null, origin, view:view ? view.mode && view.mode.id : null,
-  engine:bedEngineOf(), palette, light, v1on, v2want, v2:bed2Dbg() });   // NIGHT-4
+  engine:bedEngineOf(), palette, light, v1on, v2want, v2:bed2Dbg(), tick:v1tick });   // NIGHT-4; NIGHT-5 v1's last tick (the law's events, those that went out)

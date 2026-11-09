@@ -9,6 +9,8 @@
      the user's decision, a register entry and a line here. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net/npm/@mediapipe/ 'wasm-unsafe-eval'; connect-src 'self' https://cdn.jsdelivr.net/npm/@mediapipe/ https://storage.googleapis.com/mediapipe-models/; img-src 'self' data: blob:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+<!-- CORE-11: this app's own names in the shared stores (core/storens.js): on one origin with Full it never reads Full's settings or songs -->
+<meta name="handsong-store" content="night">
 <title data-i18n="night.title">Handsong Night</title>
 <!-- PWA: манифест + светлый theme-color под стартовый экран. start_url/scope в манифесте ОТНОСИТЕЛЬНЫЕ
      ("."), чтобы работало и на GitHub Pages в подпапке, и позже на своём домене (камера/звук/ворклет не
@@ -569,7 +571,7 @@
   <!-- RUN 8 (slice 3): while the hands play — the forest's depth on the playing hand's side, the three effects on the effects hand's side
        (apps/night/shell.js sets each bar's value, its side and which one glows); the effects hand's one-line hint, shown once on this device -->
   <div id="nightForestBar" class="night-bars" aria-hidden="true">
-    <div class="night-bar" data-bar="forest"><span class="night-bar-ico" data-svg="forest"></span><span class="night-bar-track"><span class="night-bar-fill"></span><span class="night-bar-max"></span></span><span class="night-bar-lab" data-i18n="night.forest">Forest</span></div>
+    <div class="night-bar" data-bar="forest"><span class="night-bar-ico" data-svg="forest"></span><span class="night-bar-track"><span class="night-bar-fill"></span></span><span class="night-bar-lab" data-i18n="night.depth">Depth</span></div>
   </div>
   <div id="nightFxBars" class="night-bars" aria-hidden="true">
     <div class="night-bar" data-bar="echo"><span class="night-bar-ico" data-svg="echo"></span><span class="night-bar-track"><span class="night-bar-fill"></span></span><span class="night-bar-lab" data-i18n="night.fx.echo">Echo</span></div>

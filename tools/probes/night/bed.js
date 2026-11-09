@@ -14,7 +14,7 @@
    the drone, the air lies above the playing's highest note, a pad chord spans an octave; (11) the worklet dropped no note and applied none late;
    (12) a context without AudioWorklet makes v2 fail cleanly (the door plays v1). Live: v2 is the default, loads, takes the drone, its pad is on
    the scale and follows a Mood change, plays no burst after a gap, parks after Off; the A/B switch hands over v2 → v1 → v2 while playing. The
-   v1 cases run behind its switch. */
+   v1 cases run behind its switch (NIGHT-5: v1 too plays no burst after a gap). */
 import { row } from '../core/rows.js';
 
 const SEC=40, RATE=48000;
@@ -72,6 +72,10 @@ export async function checkNightBed(){
     { const other=D.moods().find(m=>m!==mood0); D.setMood(other); const v1=S.CUR(), N1=v1.iv.length, t1=A.AC.currentTime; BD.bedTick(t1); BD.bedTick(t1+0.5);
       const L1=BD.bedDbg(), set=new Set(); for(let o=-1;o<=1;o++) for(let k=0;k<N1;k++) set.add(S.chordRowFreq(k,o,v1).toFixed(6)); n++;
       if(L1.slots.some(i=>!set.has(L1.voices[i].hz.toFixed(6)))) miss(`a Mood change (${other}): the next chord is not of the new scale`); D.setMood(mood0); }
+    /* NIGHT-5: v1 after a gap, as v2: 2 minutes on the probe clock → only the latest missed chord and the last second's events go out (the old
+       way sent every one of the law's events at once) */
+    { BD.bedTick(A.AC.currentTime+120); const T=BD.bedDbg().tick, out=T ? T.chord+T.glim+T.drift : NaN; n++; notes.push('v1 after a 2-minute gap: '+JSON.stringify(T));
+      if(!T || !(T.law>=20) || !(out<=4) || T.chord>2) miss('v1 after a 2-minute gap: '+JSON.stringify(T)+' (the law must hold 20+ events — CONTROL — of which at most 4 go out, at most 2 chords: the latest missed and one due now)'); }
     BD.bedSetMode('off'); n+=2; if(BD.bedTakesDrone()) miss('Off: the bed still holds the drone');
     BD.bedTick(A.AC.currentTime+BD.BED_PARK_S+1); if(!BD.bedDbg().parked) miss('Off: the bed was not parked after '+BD.BED_PARK_S+' s');
     /* ---- NIGHT-4: v2 offline ---- */

@@ -21,6 +21,7 @@ import { darkNew, darkStep, lostNew, lostStep, capsText, LOST_MS } from '../pure
 import { recording } from '../recorder.js';
 import { activeKind } from '../clip.js';
 import { rollOpen, arrOpen } from '../state.js';
+import { nsKey } from '../storens.js';   // CORE-11: «warned once» is per app on a shared origin
 import { t } from '../i18n.js';
 
 const M=makeMeter();
@@ -247,7 +248,7 @@ async function btCheck(){
   const ms=Math.max(Number.isFinite(outp)?outp:0, Number.isFinite(pipe)?pipe:0);
   btSeen=looksBluetooth({ outputMs:ms, label:outLabel });
   if(!btSeen) return;
-  const key='handsong.btWarned.'+(outLabel||'unnamed');
+  const key=nsKey('handsong.btWarned.'+(outLabel||'unnamed'));
   try{ if(localStorage.getItem(key)) return; localStorage.setItem(key,'1'); }catch(e){}
   const w=el('latWarn'), tx=el('latWarnTx'), ok=el('latWarnOk'); if(!w||!tx) return;
   tx.textContent=t('lat.btWarn', { ms:Math.round(ms) }); w.classList.add('on');

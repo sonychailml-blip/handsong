@@ -161,7 +161,9 @@ export async function checkNightShell(){
     $('nightInfoBtn').click(); n++; if($('nightInfo').hidden) miss('the info card did not open');
     { const f0=!!ST.nightView.fieldAll; $('nightFieldTg').click(); n++; if(!!ST.nightView.fieldAll===f0) miss('«Show the full note field» did not switch'); $('nightFieldTg').click(); }
     /* NIGHT-3 stage 5 (part 1): the Lantern is gone (it stays off); «Hands on screen» sits under Hand, «Room sounds» under Music; the first
-       picture choice is the room; the room-sound slider moves the ambience only — the hand's reach stays at REACH (RUN 8 had coupled them) */
+       picture choice is the room; the room-sound slider moves the ambience only — the hand's reach stays at REACH (RUN 8 had coupled them).
+       NIGHT-5: REACH is the whole range (1): the hand's far end fills the «Глубина» bar to 100 %, the bar has no mark and reads «night.depth»;
+       CONTROL: the old reach 0.6 stops the same far end at 60 % */
     n++; if($('nightLanternTg') || $('nightLantern')) miss('the Lantern is still in the settings or on the screen');
     { const sec=id=>{ const s=$(id) && $(id).closest('section'), h=s && s.querySelector('.night-sec-h'); return h ? h.dataset.i18n : null; }; n+=2;
       if(sec('nightDotsSeg')!=='night.set.hand') miss(`«Hands on screen» is in the section ${sec('nightDotsSeg')}, not Hand`);
@@ -171,7 +173,17 @@ export async function checkNightShell(){
       if(Math.abs(reach()-CS.REACH)>1e-9) miss(`the hand's reach is ${reach()}, not ${CS.REACH} (the reach is no longer set with the face)`);
       try{ sl.value='0.25'; sl.dispatchEvent(new Event('input')); const amb=A.ambienceInfo();
         if(!amb || Math.abs(amb.level-0.25)>1e-9 || Math.abs(reach()-CS.REACH)>1e-9) miss(`«Room sounds» 0.25: ambience ${amb && amb.level}, reach ${reach()} (the slider must move the sound only)`); }
-      finally{ sl.value=v0; sl.dispatchEvent(new Event('input')); } }
+      finally{ sl.value=v0; sl.dispatchEvent(new Event('input')); }
+      const G=await import('../../../core/gestures.js'), ps=G.fxParamsOf(ST.chainKeyOf('ld'),'fdepth'), fb=$('nightForestBar').querySelector('[data-bar="forest"]'), h=()=>fb.querySelector('.night-bar-fill').style.height; n+=4;
+      if(CS.REACH!==1) miss(`REACH is ${CS.REACH}: the hand must have the whole range`);
+      if(fb.querySelector('.night-bar-max')) miss('the depth bar still has its mark');
+      if(fb.querySelector('.night-bar-lab').textContent!==I.t('night.depth')) miss(`the depth bar reads «${fb.querySelector('.night-bar-lab').textContent}», not «${I.t('night.depth')}»`);
+      const keepD=ps[1] ? ps[1].get() : 0;
+      try{ ps[1].set(1); await frames(3); const full=h(); I0.params[3].setNorm(0.6); await frames(3); const ctl=h();
+        notes.push(`depth bar at the far end: ${full} (CONTROL reach 0.6: ${ctl})`);
+        if(full!=='100%') miss(`the hand's far end fills the depth bar to ${full}, not 100 %`);
+        if(ctl!=='60%') miss(`CONTROL: the old reach 0.6 fills ${ctl} — the bar check cannot fail`); }
+      finally{ I0.params[3].setNorm(CS.REACH); ps[1].set(keepD); } }
     $('nightInfoClose').click(); n++; if(!$('nightInfo').hidden) miss('the info card did not close');
   } catch(e){ miss('error: '+(e&&e.stack||e)); }
   finally{

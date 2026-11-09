@@ -7,8 +7,9 @@
    если и IndexedDB, и localStorage недоступны — только память страницы: файл работает до перезагрузки.
    ⛔ Нижний слой: DOM не трогает. Импортирует только i18n.store (цикла нет: i18n ничего не импортирует). */
 import { store } from './i18n.js';
+import { nsKey, nsDb } from './storens.js';   // CORE-11: the page's own names (absent: as before)
 
-const DB='handsong-user', OS='files', FB_KEY='handsong.userfiles';
+const DB=nsDb('handsong-user'), OS='files', FB_KEY=nsKey('handsong.userfiles');
 export let backend='?';   // 'indexeddb' | 'store' — куда пишем (печатает консоль U.list())
 let dbP=null;
 function openDB(){

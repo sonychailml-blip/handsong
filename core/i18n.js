@@ -17,6 +17,7 @@
    перезагрузку — приемлемо, лучше, чем исключение на старте). */
 const MEM = {};
 import { iconText, applyIcons } from './icons.js';   // UI1b: dictionary strings carry icon tokens
+import { nsKey } from './storens.js';   // CORE-11: the page's own name for the language choice (absent: «handsong.lang»)
 export const store = {
   get(k){ try{ const v = localStorage.getItem(k); return v===null ? (k in MEM ? MEM[k] : null) : v; }
           catch(e){ return k in MEM ? MEM[k] : null; } },
@@ -146,7 +147,7 @@ export const DICTS = {
     'night.bg':'Background', 'night.sleep':'Sleep',
     'night.music':'Music', 'night.music.off':'off', 'night.music.still':'Still', 'night.music.drift':'Drift', 'night.music.glimmer':'Glimmer',   // CORE-9: the music bed
     'night.set.music':'Music', 'night.musicVol':'Music volume', 'night.musicAnswer':'Music answers my notes: its next chord leans toward what I played', 'night.sleepOff':'off', 'night.sleepMin':'{n} min', 'night.asleep':'Sleeping — tap to wake',
-    'night.forest':'Forest', 'night.bgRoom':'Room', 'night.roomSounds':'Room sounds',   // CORE-10: «What's on screen» and the room's sound slider
+    'night.depth':'Depth', 'night.bgRoom':'Room', 'night.roomSounds':'Room sounds',   // CORE-10: «What's on screen» and the room's sound slider
     'night.begin':'Begin', 'night.stepPhones':'Use headphones — the forest is quiet.', 'night.stepLight':'Light your hands — a lamp beside you, not behind you.',
     'night.stepStand':'Stand your phone or laptop so both hands are free.', 'night.stepCamera':'Handsong will ask for your camera. Pictures never leave this device.',
     'fx.fdepth':'Forest depth', 'fx.fdepth.mix':'Amount', 'fx.fdepth.depth':'Depth', 'fx.fdepth.reach':'Forest at most', 'fx.fdepth.light':'Lighter forest',
@@ -879,7 +880,7 @@ export const DICTS = {
     'night.bg':'Фон', 'night.sleep':'Сон',
     'night.music':'Музыка', 'night.music.off':'выкл.', 'night.music.still':'Покой', 'night.music.drift':'Течение', 'night.music.glimmer':'Мерцание',   // CORE-9: the music bed
     'night.set.music':'Музыка', 'night.musicVol':'Громкость музыки', 'night.musicAnswer':'Музыка отвечает моим нотам: её следующий аккорд склоняется к сыгранному', 'night.sleepOff':'выкл.', 'night.sleepMin':'{n} мин', 'night.asleep':'Тишина — коснитесь, чтобы проснуться',
-    'night.forest':'Лес', 'night.bgRoom':'Комната', 'night.roomSounds':'Звуки комнаты',   // CORE-10
+    'night.depth':'Глубина', 'night.bgRoom':'Комната', 'night.roomSounds':'Звуки комнаты',   // CORE-10
     'night.begin':'Начать', 'night.stepPhones':'Наденьте наушники — лес тихий.', 'night.stepLight':'Осветите руки — лампа сбоку, а не за спиной.',
     'night.stepStand':'Поставьте телефон или ноутбук так, чтобы обе руки были свободны.', 'night.stepCamera':'Handsong попросит доступ к камере. Изображение не покидает это устройство.',
     'fx.fdepth':'Глубина леса', 'fx.fdepth.mix':'Сила', 'fx.fdepth.depth':'Глубина', 'fx.fdepth.reach':'Леса не больше', 'fx.fdepth.light':'Лёгкий лес',
@@ -1463,7 +1464,7 @@ export const DICTS = {
   es: {}, de: {},
 };
 
-const LS_KEY = 'handsong.lang';
+const LS_KEY = nsKey('handsong.lang');
 
 /* Язык браузера → один из доступных (по первым двум буквам, navigator.languages в порядке
    предпочтения); не совпало ни с одним — en. */

@@ -35,6 +35,12 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 5. The falling star passes in front of the trees. Natural?
 
 ## Records (English, at most about 15 lines each; older ones go to `archive/HANDOFF-history.md`)
+### NIGHT-5 (2026-11-09): the user's fixes from play (CORE-11). Log: `docs/night/WORK-LOG.md`
+- Part A of the window that continues with stage 5 part 2 (Part B, after the user's check).
+- Night never offers Full's song: a profile that records nothing runs no autosave and no offer; Night's page declares its own storage names (`<meta name="handsong-store">`, `core/storens.js`): language, autosave flag, user files, «warned once». Device facts stay shared. The runner's storage census proves it every session, with controls.
+- The playing hand's depth has the whole range: reach 1 (was 0.6), the bar fills 0…100 %, no mark. Far end: ~3.4 dB more room than the old stop, darker, loudness within ±1.5 dB. Not retuned (by ear: step 132).
+- The bar reads «Глубина». v1 has v2's gap rule (no burst after a hidden tab).
+- ⛳ Waiting for step 132 (five checks); then Part B.
 ### NIGHT-4 (2026-11-09): the music bed, version 2. Log: `docs/night/WORK-LOG.md`; design and «as built»: `docs/night/design/NIGHT-3-rooms/PLAN.md` §4b
 - The user put it before stage 5 part 2 (switching), which still waits.
 - One AudioWorklet (`apps/night/worklets/bed-worklet.js`) holds every voice and the bed's own long stereo room, at half rate. Measured first: native convolution 66–696 µs for 0.26–6 s IRs; a native 8-line network 72 µs; per native node 1–4.4 µs.
@@ -48,7 +54,7 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 - Cost (laptop, the bed alone): 1.9–2.7 % of a quantum at the arc's fullest (v1: 1.9–2.4 %). The census gate is 133 µs = 5 %; its peaks are 53 / 71 / 85 µs.
 - Level near the nature sound (K-like −1.0 / +1.1 / +1.9 dB).
 - v1 is unchanged behind the dev A/B pills `?probe&bed=v1|v2&voices=a|b`, and plays by itself if AudioWorklet is missing.
-- ⛳ Waiting for step 131 (five checks by ear) and the user's choice: v2 or v1, and voices or horns.
+- Accepted by ear (user, 2026-11-09): v2 with the «voices» palette stays the default; v1 stays as the fallback (NIGHT-5 gave it v2's gap rule).
 ### NIGHT-3 stage 5 part 1 (2026-11-08): the settings card for rooms (CORE-10). Log: `docs/night/WORK-LOG.md`
 - «Что на экране»: «Комната · Тёмный · Камера». «Звуки комнаты» (was «Лес» under View) sits under Music beside «Громкость музыки» and sets only the room's sound; the hand's reach is fixed at the old default 0.6, so nothing changed at the default position. «Руки на экране» moved to Hand. The Lantern switch is gone (it stays off; what it did: the work log).
 - Landscape: Hand on the left, Music and View stacked on the right. Approved and committed by the user (2026-11-09).

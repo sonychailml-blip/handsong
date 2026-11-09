@@ -695,6 +695,10 @@ CORE-7: THE DOOR FOR AN APP'S SOUND MODULES.
 - let (50): `scaleId`, `aRef`, `tunedFrom`, `chordModeSel`, `chordModeVer`, `seventh`, `fxChains`, `exprDisp`, `chFitDeg`, `exprBrightDisp`, `looperMsg`, `looperClear`, `latchDeg`, `latchOct`, `chordFam`, `latchTy`, `phoneInstr`, `handFn`, `handActs`, `rectPref`, `pinchFingers`, `camFacing`, `videoRec`, `splitOn`, `SPLIT_ROLES`, `octReg`, `bassOctReg`, `chordOctReg`, `tonicCents`, `viewRect`, `rollOpen`, `rollBeat0`, `rollSpan`, `rollSel`, `arrOpen`, `arrFace`, `rollSelNote`, `rollSelMany`, `rollPick`, `rollDrag`, `rollRole`, `laneRow0`, `laneDrag`, `rollRowsAll`, `rollAut`, `rollBendSel`, `secSel`, `rollVolBars`, `volFloor`, `nightView`
 - → ./config.js (1): `FX_VOL`
 
+## core/storens.js
+CORE-11: THE PAGE'S STORAGE NAMESPACE.
+- const (3): `STORE_NS`, `nsKey`, `nsDb`
+
 ## core/timbreload.js
 TIM3a (RUN 4) — THE TIMBRE RECORDS, loaded ONCE when the module starts (top-level await, the scales.js pattern) from the generated bundle data/timbres.bundle.json (tools/timbre-bundle.mjs; the sour…
 - const (5): `TIMBRE_RECORDS`, `timbreAll`, `timbreCheckDbg`, `timbreKnownId`, `timbreLoadReport`
@@ -1011,7 +1015,7 @@ SPLIT-2: row «NIGHT profile round trip» on Night's page: the checks of C0 that
 NIGHT-1 stage 3: the dev switch for the quiet floor.
 - fn (1): `mountTailSwitch`
 
-_196 modules, 2367 exported names._
+_197 modules, 2370 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

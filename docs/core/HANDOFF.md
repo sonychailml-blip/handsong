@@ -20,6 +20,7 @@ Index: `/HANDOFF.md`. Rules, short module map, step index: `CLAUDE.md`. Open ite
 - ✅ **CORE-8** (2026-11-03): the scene host left `core/legacy-ui/` for Night (`hooks.scene`); the profile takes room and ambience ids; the forest's tokens left core. For NIGHT-3 stage 3.
 - ✅ **CORE-9** (2026-11-04): the Music button's icon and texts, one engine-surface line, for NIGHT-3 stage 4.
 - ✅ **CORE-10** (2026-11-08): Night texts «Room» and «Room sounds»; the Lantern text removed with its switch. For NIGHT-3 stage 5 part 1.
+- ✅ **CORE-11** (2026-11-09): the page's storage namespace (`core/storens.js`, opt-in by a page `<meta>`; Full: every name as before); boot runs no autosave and no offer for a profile that records nothing; Night's text «Глубина». For NIGHT-5.
 - 74 modes, 18 tunings. Target: phone, portrait. Branch `dev`, main `main`.
 
 ## The foundation (full plan and contracts: `archive/HANDOFF-history.md`, «STAGE 3 — FOUNDATION PLAN»)
