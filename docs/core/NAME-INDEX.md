@@ -110,8 +110,8 @@ NIGHT-6 slice 1 — THE FOREST ANSWERS, as numbers.
 
 ## apps/night/rooms/forest/pure/fireflies.js
 VIS1c (RUN 6, Night plan §3.1) — the night forest's WILD FIREFLIES and its ground, as numbers.
-- const (2): `FOREST_FLIES`, `FOREST_DEPTH`
-- fn (4): `forestGround`, `fliesInit`, `fliesStep`, `depthDistance`
+- const (3): `FOREST_FLIES`, `holdK`, `FOREST_DEPTH`
+- fn (6): `rateK`, `forestGround`, `fliesInit`, `fliesStep`, `fliesDart`, `depthDistance`
 
 ## apps/night/rooms/forest/pure/forestlife.js
 RUN 9 — THE FOREST'S LIFE, as numbers.
@@ -997,7 +997,7 @@ NIGHT-2 stage 2: row «NIGHT calibration screens» (quick; the probe clock throu
 
 ## tools/probes/night/forest.js
 VIS1c (RUN 6, Night plan §10, review 2026-10-17): two rows (quick and all).
-- fn (9): `checkForestRoom`, `checkBackgrounds`, `checkForestPicture`, `checkNightCycle`, `checkForestResponse`, `checkForestDetail`, `checkForestRare`, `checkForestLevels`, `checkForestAnswers`
+- fn (10): `checkForestRoom`, `checkBackgrounds`, `checkForestPicture`, `checkNightCycle`, `checkForestResponse`, `checkForestDetail`, `checkForestRare`, `checkForestLevels`, `checkForestAnswers`, `checkForestMelody`
 
 ## tools/probes/night/headroom-calc.js
 NIGHT-1: the headroom page's sums, pure (runs in node: tools/probe-data.mjs, row «NIGHT-1 headroom sums»).
@@ -1047,7 +1047,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 - const (5): `TEST_ROOM_ID`, `TEST_ROOM`, `testRoomMode`, `testRoomInfo`, `testRoomFreeLeaks`
 - fn (2): `testRoomInstall`, `testRoomRemove`
 
-_203 modules, 2420 exported names._
+_203 modules, 2424 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

@@ -443,3 +443,35 @@ export async function checkForestAnswers(){
   return { cases:n, total:d.length, differences:d, notes };
 }
 row({ night:true, at:1008.63, name:'FOREST answers', drawn:true, run:()=>checkForestAnswers(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });
+/* NIGHT-6 slice 2: row «FOREST melody» — NUMBERS from the room built without a renderer. (1) A LONG NOTE: one note, then held 8 s (the host's
+   held seconds each frame) — the room's hold rises past 0.9, it keeps playing (the flies stay gathered), more flies within 2 of the light than
+   with the same note released at once — CONTROL: released, the room stops playing (today's release); (2) FAST PLAYING: 8 notes a second for
+   6 s against 2 a second — the room's rate past 0.8 vs under 0.1, notes sent flies out (darts) only when fast, the near flies further out. */
+export async function checkForestMelody(){
+  const d=[], notes=[]; let n=0; const miss=s=>d.push(s);
+  try{
+    const T=await loadThree(), w=844, h=390, rooms=[], mk=()=>{ const r=buildForest(T,{ C:cv, level:'full', w, h }); rooms.push(r); return r; };
+    const NIN={ mood:'major-penta', sleep:0 }, hv=[{ x:0.5*w, y:0.55*h, d:0.3, play:true }];
+    const near=(st,r0)=>{ const L=st.rigs[0]; return st.fliesAt.filter(p=>Math.hypot(p[0]-L.x, p[1]-L.y, p[2]-L.z)<r0); }, md=st=>{ const L=st.rigs[0], a=near(st,5.5); return a.reduce((s2,p)=>s2+Math.hypot(p[0]-L.x, p[1]-L.y, p[2]-L.z),0)/Math.max(1,a.length); };
+    try{
+      /* (1) a long note */
+      const A=mk(), B=mk(); for(const r of [A,B]) for(let i=0;i<120;i++) r.update(1/60, i/60, hv, null, NIN);
+      A.glint(0, 0.8); B.glint(0, 0.8); for(let i=0;i<480;i++){ const t=2+i/60; A.held(t-2); B.held(0); A.update(1/60, t, hv, null, NIN); B.update(1/60, t, hv, null, NIN); }
+      const sa=A.state(), sb=B.state(), na=near(sa,2).length, nb=near(sb,2).length; n+=4;
+      if(!(sa.melody.hold>0.9)) miss('a note held 8 s: the room\'s hold is '+sa.melody.hold.toFixed(3));
+      if(!sa.life.playing) miss('a note held 8 s: the room stopped playing (the flies would scatter)');
+      if(sb.life.playing) miss('CONTROL: the same note released at once still counts as playing after 8 s');
+      if(!(na>nb)) miss(`a note held 8 s gathers ${na} flies within 2 of the light, released ${nb}`);
+      notes.push(`a held note: hold ${sa.melody.hold.toFixed(2)}, ${na} flies within 2 of the light (released: ${nb}, mean distance ${md(sa).toFixed(2)} vs ${md(sb).toFixed(2)})`);
+      /* (2) fast playing against slow */
+      const C=mk(), D=mk(), play=(r, every)=>{ let next=0; for(let i=0;i<480;i++){ const t=i/60; if(t>=next){ r.glint(0, 0.7); next+=every; } r.update(1/60, t, hv, null, NIN); } return r.state(); };
+      const sc=play(C, 1/8), sd=play(D, 0.5); n+=4;
+      if(!(sc.melody.rate>0.8)) miss('8 notes a second: the room\'s rate is '+sc.melody.rate.toFixed(3)); if(!(sd.melody.rate<0.1)) miss('2 notes a second: the room\'s rate is '+sd.melody.rate.toFixed(3));
+      if(!(sc.melody.darts>0 && sd.melody.darts===0)) miss(`notes that sent flies out: fast ${sc.melody.darts}, slow ${sd.melody.darts}`);
+      if(!(md(sc)>=1.15*md(sd))) miss(`fast playing: the near flies ${md(sc).toFixed(2)} from the light, slow ${md(sd).toFixed(2)} (≥ 15 % further expected)`);
+      notes.push(`fast vs slow: rate ${sc.melody.rate.toFixed(2)} / ${sd.melody.rate.toFixed(2)}, darts ${sc.melody.darts} / ${sd.melody.darts}, mean distance ${md(sc).toFixed(2)} / ${md(sd).toFixed(2)}`);
+    } finally { for(const r of rooms) r.dispose(); }
+  } catch(e){ miss('error: '+(e&&e.stack||e)); }
+  return { cases:n, total:d.length, differences:d, notes };
+}
+row({ night:true, at:1008.635, name:'FOREST melody', run:()=>checkForestMelody(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });

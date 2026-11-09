@@ -35,6 +35,11 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 5. The falling star passes in front of the trees. Natural?
 
 ## Records (English, at most about 15 lines each; older ones go to `archive/HANDOFF-history.md`)
+### NIGHT-6 slice 2 (2026-11-09): the fireflies follow the melody. Log: `docs/night/WORK-LOG.md`; as built: `docs/night/design/NIGHT-6-forest/PLAN.md` top
+- Step 134 checked by the user: the forest answers look right; the Poco measurement comes later.
+- The firefly law takes `hold` (a long note: they close in, circle slower, breathe together, brighter) and `rate` (fast playing: wider rings, a quicker swirl); `fliesDart` sends the three nearest out on a note of fast playing. Both 0 = exactly the old step. The room eases them from the held seconds and its note times; a held note now keeps the flies gathered.
+- Rows: data «FOREST melody (app)» 21 cases (a long note 2.19 → 1.01 from the light; fast 3.87; CONTROL the old law meets neither); browser «FOREST melody» 8 (a held note 46 flies within 2 m against 4 released; fast playing 4.35 vs 2.50, darts 51 vs 0).
+- Checks: static PASS; [probe-data] PASS 42 / 0; P.night PASS 41 / 0; P.quick PASS 93 / 0. No GPU change. Waiting for step 135 (three checks by eye).
 ### NIGHT-6 slices 0 + 1 (2026-11-09): the yardstick and the forest answers. Log: `docs/night/WORK-LOG.md`; as built: `docs/night/design/NIGHT-6-forest/PLAN.md` top
 - The plan is approved with the user's eight answers and one rule for the run: what never changes during play is prepared ahead and shipped as files, rendered by a tool, registered, about 10–15 MB for the forest (PLAN.md top).
 - Slice 0: «Измерить это устройство» adds a step «forest medium as before NIGHT-6» and, per step, the room's frame time, draw calls, triangles, programs and texture memory; then every opening (the first is the cold one) and the device. `tools/forest-budget.eval.js` the same on the laptop. The Poco steps: step 134, item 4.

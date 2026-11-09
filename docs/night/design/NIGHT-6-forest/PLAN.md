@@ -36,6 +36,16 @@ The plan is approved, with these answers to §8 and one addition.
     - A glass note: one far firefly twinkles. Its glow only; the firefly law is untouched.
     - The swells stay under 0.5, below a note's own pulse.
 - **Where:** `rooms/forest/forest-answers.js`, `rooms/forest/pure/answers.js`, `pure/heard.js` (new); `forest.js`, `forest-life.js`, `pure/forestlife.js`, the forest's record (levels `dew`, `webs`), `rooms/index.js` (the files fetched before a build, once per session), `scene/host.js`, `shell.js`, `bed2.js`, `bed.js`. No core change.
+- **The user's look (step 134, 2026-11-09):** the forest answers look right. The Poco measurement comes later.
+
+### Slice 2 as built (2026-11-09): the fireflies follow the melody
+- **The law** (`rooms/forest/pure/fireflies.js`) takes two more inputs from the playing light. With both 0 or absent the step is exactly the old one.
+  - `hold` 0…1, from how long the note is held: 0 under 0.5 s, 1 from 2.5 s. The near flies' rings shrink (× 0.55 at full), they are pulled in harder (× 1.6), swirl slower (× 0.4), and their glow joins one shared breath of 3.6 s (80 %), brighter on average.
+  - `rate` 0…1, from the notes per second over the last 2 s: 0 at 1.5 a second, 1 from 5. Their rings widen (× 1.7 at full) and the swirl quickens (× 1.9).
+  - `fliesDart`: on a note of fast playing (rate from 0.15), the three nearest flies within 4 m dart outwards (2.2 × the rate).
+- **The room** (`forest.js`) eases the two inputs (hold in 0.6 s, out 1.2 s; rate in 0.4 s, out 1.5 s) from the host's held seconds and its own note times. A held note now counts as playing, so the flies stay gathered through it; before, they began to scatter about 3 s into a long note.
+- **Measured by the rows:** a long note brings the near flies from 2.19 to 1.01 away (the law alone), and in the room 46 flies within 2 m against 4 with the note released; fast playing (8 notes a second against 2) takes them from 2.50 to 4.35 away and sends flies out on 51 notes (slow: none).
+- **Cost:** no GPU change (the same points, the same draw); per note a sort of the 70 flies.
 
 **What this is.** A plan only. No app code changed. Tree hashes are the same before and after: core 14bd513ae15aa87e · apps/full d6b90cf2cb4be6da · apps/night 3279ec88c1f91059.
 

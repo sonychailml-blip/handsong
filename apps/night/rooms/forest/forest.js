@@ -9,7 +9,7 @@
    through THIS camera, so it projects onto its note row exactly; only the light's world position saturates at the room's bounds (never the
    coordinates). Seeded (one seed per room): the same forest on every device. No sound, no song, no network here (VIS1 contract). */
 import { seeded } from '../../../../core/pure/dsp.js';
-import { fliesInit, fliesStep, forestGround, depthDistance, FOREST_FLIES } from './pure/fireflies.js';
+import { fliesInit, fliesStep, forestGround, depthDistance, FOREST_FLIES, holdK, rateK, fliesDart } from './pure/fireflies.js';
 import { CLOUD_PASSES, NIGHT, nightAt, nightDeep, MOOD_TC } from '../../pure/cycle.js';   // RUN 9: the night's cycle, sleep, the moods' easing
 import { FOREST_ROOM } from './pure/room.js';   // NIGHT-3: the record — levels and the moods' looks
 import { roomLook } from '../../pure/room.js';
@@ -157,6 +157,9 @@ export function buildForest(T, opt){
   const detail=buildDetail({ T, s, C, pal, own, canvas2, tex, lv:Lv, U:life.U, fernT, reduce });   // RUN 9 (slice 3)
   const rare=buildRare({ T, s, C, pal, own, canvas2, tex, halo:HALO });   // RUN 9 (slice 4)
   let gather=0, playing=false, rel=0;
+  /* NIGHT-6 slice 2: THE MELODY — the held seconds of the playing note (the host), the note-on times of the last window, and their eased
+     inputs to the firefly law (hold, rate); darts — how many notes sent flies out */
+  let heldNow=0, holdE=0, rateE=0, darts=0; const noteT=[];
   const LC=col('light'), WARM=col('warm'), COLD=col('cold'), HC=col('halo'), lc=new T.Color(), hlc=new T.Color();
   const rings=[]; for(let j=0;j<8;j++){ const sp=sprite(col('trail'),0); sp.visible=false; s.add(sp); rings.push({ sp, t0:-1, amp:0 }); }
   /* the camera: the prototype's place and lean; portrait gets a wider view */
@@ -179,7 +182,7 @@ export function buildForest(T, opt){
     const B=FOREST_BOUNDS, x=clamp(out.x,B[0],B[1]), y0=clamp(out.y,B[2],B[3]), z=clamp(out.z,B[4],B[5]), y=Math.max(y0, gy(x,z)+0.25);
     const sat= x!==out.x || y!==out.y || z!==out.z; out.set(x,y,z); return sat;
   }
-  const lightsOf=()=>rigs.map((r,i)=>i ? { x:r.cur.x, y:r.cur.y, z:r.cur.z, on:r.on } : { x:r.cur.x, y:r.cur.y, z:r.cur.z, on:r.on, call:playing ? gather : 0, scatter:playing ? 0 : rel });
+  const lightsOf=()=>rigs.map((r,i)=>i ? { x:r.cur.x, y:r.cur.y, z:r.cur.z, on:r.on } : { x:r.cur.x, y:r.cur.y, z:r.cur.z, on:r.on, call:playing ? gather : 0, scatter:playing ? 0 : rel, hold:holdE, rate:rateE });
   /* RUN 9 (slice 1): THE NIGHT — once per frame from apps/night/pure/cycle.js: the moon's place and light under the clouds, the mist layers, the sleep
      timer's depth, the mood's look (eased) */
   let nt=null, deep=nightDeep(0), moodId=opt.mood||null, fkNow=1;
@@ -235,7 +238,10 @@ export function buildForest(T, opt){
       g.sp.visible=false; g.sp.material.opacity=0; continue; }
       g.sp.scale.setScalar(0.25+1.3*k); g.sp.material.opacity=g.amp*(1-k)*(1-k); }
     /* RUN 9: GATHER while playing (τ 2.5 s); when the notes stop the fireflies are RELEASED and drift away slowly (τ 10 s) */
-    playing= music>0.15 && rigs[0].on>0.5; gather+=((playing?1:0)-gather)*(1-Math.exp(-dt/(playing?2.5:7))); rel= playing ? gather : rel*Math.exp(-dt/10);
+    /* NIGHT-6 slice 2: the melody's inputs, eased (a held note counts as playing: the flies stay gathered through it) */
+    { const MM=FOREST_FLIES.melody, ME=MM.ease, hT=rigs[0].on>0.5 ? holdK(heldNow) : 0; while(noteT.length && noteT[0]<=t-MM.rate.window) noteT.shift();
+      const rT=rateK(noteT, t); holdE+=(hT-holdE)*(1-Math.exp(-dt/(hT>holdE ? ME.holdIn : ME.holdOut))); rateE+=(rT-rateE)*(1-Math.exp(-dt/(rT>rateE ? ME.rateIn : ME.rateOut))); }
+    playing= (music>0.15 || holdE>0.25) && rigs[0].on>0.5; gather+=((playing?1:0)-gather)*(1-Math.exp(-dt/(playing?2.5:7))); rel= playing ? gather : rel*Math.exp(-dt/10);
     rare.step(dt, t, { light:rigs[0].cur, flies });   // RUN 9 (slice 4): a rare event may begin (the emblem steers some flies)
     fliesStep(flies, lightsOf(), dt, t, kk, rare.form());
     const pa=fg.attributes.position.array, ga=fg.attributes.aGlow.array;
@@ -264,7 +270,8 @@ export function buildForest(T, opt){
   /* a note began on this rig's hand (from the bus `notes` ring) */
   const glint=(i,vel)=>{ const r=rigs[i]; if(r) r.glint=Math.max(r.glint, clamp(vel==null?0.6:vel,0.18,1)); music=Math.min(1.5, music+0.35*clamp(vel==null?0.6:vel,0.18,1));
     if(r && i===0 && r.on>0.05){ life.glint(vel, r.cur.x, r.cur.z, now); rare.glint();   // RUN 9: a wave of light across the moss, the mushrooms nearby pulse (and an open flower)
-      life.noteRing(r.cur.x, r.cur.z, vel==null?0.6:vel, now); answers.glint(vel); }   // NIGHT-6 slice 1: a ring on the stream; dew and webs glint
+      life.noteRing(r.cur.x, r.cur.z, vel==null?0.6:vel, now); answers.glint(vel);   // NIGHT-6 slice 1: a ring on the stream; dew and webs glint
+      noteT.push(now); if(noteT.length>64) noteT.shift(); const rk=rateK(noteT, now); if(rk>=FOREST_FLIES.melody.dart.from && fliesDart(flies, r.cur, rk).length) darts++; }   // NIGHT-6 slice 2: fast playing sends the nearest out
     if(r && i===0 && fxv.echo>0.02){ const v=clamp(vel==null?0.6:vel,0.18,1); let amp=0.9*v*fxv.echo;   // C5: one ring per echo, each fainter by the feedback
       for(let k=1;k<=6 && amp>0.03;k++){ echoes.push({ at:now+k*fxv.time, amp, pos:r.cur.clone() }); amp*=Math.max(0, fxv.fb); } } };
   /* probes: numbers only (never pixels) */
@@ -276,6 +283,7 @@ export function buildForest(T, opt){
     night:{ phase:nt?nt.phase:0, moon:[moonS.position.x, moonS.position.y, moonS.position.z], cover:nt?nt.cover:0, moonLight:nt?nt.moonLight:1, moonI:moonL.intensity,   // RUN 9
       clouds:clouds.map(c=>c.visible ? c.material.opacity : 0), mist:mists.map(x=>x[3].opacity), mistY:mists.map(x=>x[2].position.y), fog:s.fog.density, deep:deep.e, mood:moodId,
       fogHex:pal.fog.getHexString(), flies:fkNow }, life:{ ...life.state(), gather, playing, release:rel }, detail:detail.state(), rare:rare.state(flies),   // RUN 9 (slice 2)
+    melody:{ hold:holdE, rate:rateE, held:heldNow, darts },   // NIGHT-6 slice 2
     answers:answers.state(), bed:{ queued:bedQ.length, fired:fired.map(x=>({ ...x })), twinkles:twinkles.map(w=>({ ...w, glow:glow1[w.i] })) }, files:{ web:!!files.web, errors:assetErr.slice() } });   // NIGHT-6 slice 1
   function dispose(){ for(const o of own) try{ o.dispose(); }catch(e){} own.length=0; }
   /* NIGHT-6 slice 1: a music bed event `it` ({ kind 'chord' | 'loop' | 'glass', lv, a, h, r, amp }) heard at room time `at` (the host maps it) */
@@ -285,5 +293,5 @@ export function buildForest(T, opt){
     b+=w*h*4*(o.generateMipmaps!==false && pot ? 4/3 : 1); } return Math.round(b); }
   resize(W,H);
   return { id:FOREST_ROOM.id, scene:s, camera, update, resize, place, glint, project, state, dispose, lightsOf, lifeDbg:life, detailDbg:detail, bed, texBytes, answersDbg:answers,
-    held:rare.held, rareDbg:kind=>rare.force(kind, now, { light:rigs[0].cur, flies }) };   // RUN 9 (slice 4): held — how long the playing note is held (host); rareDbg — probes / captures   // RUN 9: lifeDbg / detailDbg — probes only (uniforms, silhouette boxes)
+    held:sec=>{ heldNow= sec>0 ? sec : 0; rare.held(sec); }, rareDbg:kind=>rare.force(kind, now, { light:rigs[0].cur, flies }) };   // RUN 9 (slice 4): held — how long the playing note is held (host); rareDbg — probes / captures   // RUN 9: lifeDbg / detailDbg — probes only (uniforms, silhouette boxes)
 }

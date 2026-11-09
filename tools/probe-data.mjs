@@ -1022,6 +1022,38 @@ async function forestAnswersCore(){
     if(Math.abs(h-5500)>1e-9) miss('heard: '+h+' ms (5500 expected)'); if(!(h-c>1000/30)) miss(`CONTROL heard: ignoring the output latency lands ${(h-c).toFixed(1)} ms early (more than one 30-fps frame expected)`); }
   return { cases:n, total:d.length, differences:d, notes };
 }
+/* NIGHT-6 slice 2: THE FIREFLIES FOLLOW THE MELODY (apps/night/rooms/forest/pure/fireflies.js). holdK and rateK at their marks; no melody input
+   (absent, or 0) is exactly the old step; a long note (hold 1, 12 s, a calling light) brings the near flies ≥ 20 % closer, slower, their glow in
+   step (spread ≤ half); fast playing (rate 1) takes them ≥ 15 % further out and quicker; CONTROL — the old law (the inputs stripped) meets
+   neither; fliesDart: the n nearest within reach gain exactly speed × s outwards, nobody else moves, s 0 moves nothing. */
+async function forestMelodyCore(){
+  const d=[], notes=[]; let n=0; const miss=s=>d.push(s), Fl=await import(new URL('../apps/night/rooms/forest/pure/fireflies.js', import.meta.url).href), C=Fl.FOREST_FLIES, M=C.melody;
+  n+=4; if(Fl.holdK(0)!==0 || Fl.holdK(M.hold.from)!==0) miss('holdK below its start is not 0'); if(Fl.holdK(M.hold.full)!==1) miss('holdK at its full is not 1');
+  if(Math.abs(Fl.holdK((M.hold.from+M.hold.full)/2)-0.5)>1e-12) miss('holdK half-way is not 0.5'); if(!(Fl.holdK(10)===1)) miss('holdK above full is not 1');
+  { const at=(k,t=10)=>Array.from({ length:k }, (_,i)=>t-i*(M.rate.window/k)*0.999); n+=4;
+    if(Fl.rateK(at(2),10)!==0) miss('rateK of 1 note a second is not 0'); if(Fl.rateK(at(M.rate.full*M.rate.window),10)!==1) miss('rateK at its full is not 1');
+    if(!(Fl.rateK(at(6),10)>0 && Fl.rateK(at(6),10)<1)) miss('rateK of 3 notes a second is not between'); if(Fl.rateK([1,2,3,4,5,6,7,8,9,9.5].map(x=>x-20),10)!==0) miss('rateK counted notes outside its window'); }
+  const L0={ x:0.5, y:1.4, z:-2.5, on:1 }, run=(extra, steps, strip=false)=>{ const A=Fl.fliesInit(); for(let i=0;i<steps;i++){ const L={ ...L0, call:1, ...extra }; if(strip){ delete L.hold; delete L.rate; } Fl.fliesStep(A, [L], 1/60, i/60); } return A; };
+  const near=A=>A.filter(q=>Math.hypot(q.p[0]-L0.x, q.p[1]-L0.y, q.p[2]-L0.z)<C.reach), mean=a=>a.reduce((x,y)=>x+y,0)/Math.max(1,a.length);
+  const dist=A=>mean(near(A).map(q=>Math.hypot(q.p[0]-L0.x, q.p[1]-L0.y, q.p[2]-L0.z))), speed=A=>mean(near(A).map(q=>Math.hypot(...q.v))), spread=A=>{ const g=near(A).map(q=>q.glow), m=mean(g); return Math.sqrt(mean(g.map(x=>(x-m)**2))); };
+  const h=A=>JSON.stringify(A.map(q=>q.p.map(v=>Math.round(v*1e9)))); n++; if(h(run({},600))!==h(run({ hold:0, rate:0 },600))) miss('hold 0 / rate 0 is not the old step');
+  const B=run({},720), H=run({ hold:1 },720), R=run({ rate:1 },720), Hs=run({ hold:1 },720,true), Rs=run({ rate:1 },720,true); n+=5;
+  if(!(dist(H)<=0.8*dist(B))) miss(`a long note: the near flies ${dist(H).toFixed(2)} from the light (without ${dist(B).toFixed(2)}; ≥ 20 % closer expected)`);
+  if(!(speed(H)<speed(B))) miss(`a long note: the near flies move ${speed(H).toFixed(3)} (without ${speed(B).toFixed(3)}; slower expected)`);
+  if(!(spread(H)<=0.5*spread(B))) miss(`a long note: their glow spreads ${spread(H).toFixed(3)} (without ${spread(B).toFixed(3)}; in step expected)`);
+  if(!(dist(R)>=1.15*dist(B))) miss(`fast playing: the near flies ${dist(R).toFixed(2)} from the light (without ${dist(B).toFixed(2)}; ≥ 15 % further expected)`);
+  if(!(speed(R)>speed(B))) miss(`fast playing: the near flies move ${speed(R).toFixed(3)} (without ${speed(B).toFixed(3)}; quicker expected)`);
+  n+=2; if(dist(Hs)<=0.8*dist(B) || spread(Hs)<=0.5*spread(B)) miss('CONTROL: the old law (hold stripped) passed the long-note cases'); if(dist(Rs)>=1.15*dist(B)) miss('CONTROL: the old law (rate stripped) passed the fast-playing case');
+  notes.push(`near flies, mean distance / speed / glow spread: plain ${dist(B).toFixed(2)} / ${speed(B).toFixed(3)} / ${spread(B).toFixed(3)} · a long note ${dist(H).toFixed(2)} / ${speed(H).toFixed(3)} / ${spread(H).toFixed(3)} · fast playing ${dist(R).toFixed(2)} / ${speed(R).toFixed(3)}`);
+  { const A=run({},720), before=A.map(q=>({ p:q.p.slice(), v:q.v.slice() })), ids=Fl.fliesDart(A, L0, 1), Dd=M.dart; n+=4;
+    const dl=i=>Math.hypot(before[i].p[0]-L0.x, before[i].p[1]-L0.y, before[i].p[2]-L0.z), inReach=before.map((q,i)=>i).filter(i=>dl(i)<Dd.reach);
+    if(ids.length!==Math.min(Dd.n, inReach.length)) miss(`a dart moved ${ids.length} flies (${Math.min(Dd.n, inReach.length)} expected)`);
+    if(inReach.some(i=>!ids.includes(i) && ids.some(j=>dl(j)>dl(i)))) miss('a dart moved a fly while a nearer one stayed');
+    if(ids.some(i=>{ const u=before[i].p.map((v,a)=>(v-[L0.x,L0.y,L0.z][a])/Math.max(dl(i),0.05)), gain=A[i].v.reduce((s2,v,a)=>s2+(v-before[i].v[a])*u[a],0); return Math.abs(gain-Dd.speed)>1e-9; })) miss('a dart did not add exactly its speed outwards');
+    if(A.some((q,i)=>!ids.includes(i) && q.v.some((v,a)=>v!==before[i].v[a]))) miss('a dart moved a fly it did not choose');
+    const B2=run({},720), b2=h(B2), v2=JSON.stringify(B2.map(q=>q.v)); n++; if(Fl.fliesDart(B2, L0, 0).length || h(B2)!==b2 || JSON.stringify(B2.map(q=>q.v))!==v2) miss('a dart of strength 0 moved something'); }
+  return { cases:n, total:d.length, differences:d, notes };
+}
 /* NIGHT-6: THE FOREST'S FILES (tools/forest-bake.mjs). Every prepared file matches what the tool draws now, pixel for pixel (CONTROL a changed
    pixel is caught); the PNG writer and reader round-trip; the forest's files stay inside the user's budget (CONTROL 16 MB is over it). The
    sizes are printed every run (the user's rule: report the size in every slice). */
@@ -1177,6 +1209,7 @@ const ROWS=[
   ['NIGHT cycle (core)',        ()=>nightCore(),    r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // RUN 9
   ['FOREST life (core)',        ()=>lifeCore(),     r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // RUN 9 (slice 2)
   ['FOREST answers (app)',      ()=>forestAnswersCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 1
+  ['FOREST melody (app)',       ()=>forestMelodyCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 2
   ['NIGHT forest files (app)',  ()=>nightForestFiles(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 (the files rule, the size budget)
   ['OLD NAME gone',             ()=>oldNameGone(),  r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // SPLIT-2
   ['NIGHT rare events (core)',  ()=>rareCore(),     r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // RUN 9 (slice 4)
