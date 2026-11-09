@@ -17,7 +17,7 @@ _Paths in older text: `src/core/` → `core/pure/`; `src/ui.js`, `draw.js`, `lat
 - ⬜ **ui-snap recheck on the GeForce.** RUN 9's Full screens were captured on the Intel HD 4000 and differ at rendering level from RUN 7's on the GeForce GT 635M (gradients ±1–2, glyph edges). A capture on the GeForce settles it.
 - ⬜ **Remove the embedded `profile.full` from Night's page** once Night has its own stress reference (`core/DEBT.md`).
 - ⬜ **Keep shrinking `core/legacy-ui/`** and the rest of `core/DEBT.md`. Next large piece: split the `recorder.js` facade so Night plays without the recording path.
-- ⬜ **Slim `CLAUDE.md` back under ~60 KB** (68.9 KB at SPLIT-2): it is loaded into every session, so move long reference sections into `docs/` files that sessions open on demand, keeping every rule findable. Prove nothing is lost: `tools/doc-split-check.mjs` with the new files added to its list.
+- ✅ **Slim `CLAUDE.md` back under ~60 KB** — done at DOC2 (2026-11-09): 73.6 → 49.5 KB, `docs/core/WORK-LOG.md` «DOC2». The item as it stood: (68.9 KB at SPLIT-2): it is loaded into every session, so move long reference sections into `docs/` files that sessions open on demand, keeping every rule findable. Prove nothing is lost: `tools/doc-split-check.mjs` with the new files added to its list.
 - ⬜ Remove `tools/split-*` and `tools/split-baseline/` when the user no longer needs the split's proof; the row «OLD NAME gone» then loses its exemption for them.
 - ⬜ Replace the temporary row exemptions as they fall away: `apps/night/migrate.js` (NIGHT backlog), and the known overlap in `tools/ui-snap.mjs` (`MSG_KNOWN`).
 

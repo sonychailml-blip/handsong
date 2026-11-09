@@ -1,6 +1,6 @@
 # HANDOFF — CORE track (`core/`, used by both apps)
 
-Index: `/HANDOFF.md`. Rules, short module map, step index: `CLAUDE.md`. Open items: `docs/core/BACKLOG.md`. The old handoff, word for word: `archive/HANDOFF-history.md`, «Moved from HANDOFF.md at SPLIT-2». Debt: `core/DEBT.md`.
+Index: `/HANDOFF.md`. Rules: `CLAUDE.md`; on demand (DOC2): module map `docs/core/MODULE-MAP.md`, runners and static check `docs/core/TOOLS.md`, step index `docs/core/STEPS.md`. Open items: `docs/core/BACKLOG.md`. The old handoff, word for word: `archive/HANDOFF-history.md`, «Moved from HANDOFF.md at SPLIT-2». Debt: `core/DEBT.md`.
 
 ## How we work
 - The user drives Claude Code in VS Code; a strategist assistant writes English prompts, checks plan and diff against REAL code, and explains everything to the user in Russian. The user does not read code comments or these files.
@@ -20,6 +20,7 @@ Index: `/HANDOFF.md`. Rules, short module map, step index: `CLAUDE.md`. Open ite
 - ✅ **CORE-8** (2026-11-03): the scene host left `core/legacy-ui/` for Night (`hooks.scene`); the profile takes room and ambience ids; the forest's tokens left core. For NIGHT-3 stage 3.
 - ✅ **CORE-9** (2026-11-04): the Music button's icon and texts, one engine-surface line, for NIGHT-3 stage 4.
 - ✅ **CORE-10** (2026-11-08): Night texts «Room» and «Room sounds»; the Lantern text removed with its switch. For NIGHT-3 stage 5 part 1.
+- ✅ **DOC2** (2026-11-09, docs only): `CLAUDE.md` 73.6 → 49.5 KB; the module map, the runners' and static check's detail and the step index moved word for word to `docs/core/MODULE-MAP.md`, `TOOLS.md`, `STEPS.md`; proved by `tools/doc-split-check.mjs` (commands in `CLAUDE.md`, «Docs»).
 - ✅ **CORE-12** (2026-11-09): boot option `detectPause` (an app's pause joins the editor's; absent = as before); Night's texts «Облегчённый режим», «Картинка комнаты», the Room button. For NIGHT-3 stage 5 part 2.
 - ✅ **CORE-11** (2026-11-09): the page's storage namespace (`core/storens.js`, opt-in by a page `<meta>`; Full: every name as before); boot runs no autosave and no offer for a profile that records nothing; Night's text «Глубина». For NIGHT-5.
 - 74 modes, 18 tunings. Target: phone, portrait. Branch `dev`, main `main`.

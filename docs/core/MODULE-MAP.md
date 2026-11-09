@@ -1,0 +1,83 @@
+# Module map (short) — moved out of CLAUDE.md at DOC2 (2026-11-09)
+
+Opened on demand (CLAUDE.md «Module map» points here). The lines below are CLAUDE.md's section «Module map (short)» word for word
+(`tools/doc-split-check.mjs` proves it). A new module gets one line here; its full detail goes to `archive/CLAUDE-history.md`.
+
+## Module map (short)
+One line per module. Every name per module: `docs/core/NAME-INDEX.md` (grep it). The FULL map as it stood at DOC1, with every slice's
+detail: `archive/CLAUDE-history.md` «Module map (full, moved at DOC1)», under the old paths (`docs/core/STALE-NAMES.md` maps them).
+- **Root:** `index.html` redirect only; `vercel.json`. **Pages:** `apps/<app>/index.html` markup only (CSP `<meta>` first, rule #33; `#privacyNote`), `manifest.json`/`sw.js` PWA (cache-free SW); `core/tokens.css` THE design tokens (DOM +
+  canvas `--cv-*`; static check 11); `core/legacy-ui/style.css` all shared CSS through tokens; `core/va-stub.js` counter stub.
+- **`apps/full/`:** `main.js` entry; `tutor.js` lessons + step engine; `demo.js` start-screen demo; `songs.js` demo songs (`data/songs/<name>.json`, SONG2); `data/full.json` profile.
+- **`apps/night/`:** `main.js` entry (first import `migrate.js`: old setting names, delete after the first public release); `shell.js` the shell (round buttons in 3 + 3 places — Room, shown only with two rooms or more · Music · Sound / Mood · Notes · Sleep —, the settings card: Hand · Music · View, sleep timer, the start, the bars, «Measure this device»; doors passed to `core/legacy-ui/ui.js`); `calib.js` the hand's calibration screens and the settings' Hand section (NIGHT-2, over CORE-1);
+  `ghost.js` the first-run ghost light; `night.css`; `data/night.json` profile; `fonts/` (OFL, register entries); `vendor/three-r128/` (lazy); `pure/cycle.js` (the 24-min night `nightAt`, sleep `nightDeep`, the moods' easing, rare events, emblem), `rooms/forest/pure/forestlife.js` (stream, mushroom / flower places, rings), `rooms/forest/pure/fireflies.js`;
+  `scene/host.js` the scene host (CORE-8, from `core/legacy-ui/`): `#scene` WebGL canvas only while a room shows, three.js lazy, levels high / medium (default) / low with a resolution scale, `setBackground('forest'|'dark'|'camera')` («forest» = the current room's picture), `setSceneLevel`, rooms by id (`sceneRoomAdd`, `sceneRoom`, `sceneRooms`; scene code loaded on first open, the room's 2D stand-in); the shared UI reaches it through `hooks.scene`. NIGHT-3 stage 5 part 2: every opening is a dark moment — `scenePausing` (boot's `detectPause`) and the canvas veiled until two frames, then a fade-in; a failed opening drops the renderer (the stand-in), one past 8 s shows the stand-in; `sceneSwitch` fades out first and keeps the context.
+  `roomswitch.js` THE ROOM SWITCH (NIGHT-3 stage 5 part 2): `roomSwitch(id)` (bed held → picture → nature crossfade on the second slot of `sound/ambience.js` → name → bed resumed; no audio node made), `natureModule` (the ambience registered by `main.js`), the room remembered (`handsong.nightRoom`, real rooms only); the dev test room `tools/probes/night/testroom.js` (`?probe&testroom`).
+  `rooms/index.js` THE ROOMS (NIGHT-3; order and parts: record, stand-in, `load`); `pure/room.js` the room record's validator (`checkRoom`, `ROOM_IDS` pinned, `roomLook`); a room = `rooms/<name>/`: `pure/room.js` its RECORD (levels, mood looks, nature recipe, acoustic), `standin.js`, its scene code. The forest: `rooms/forest/forest.js` (tokens `--cv-forest-*` in `night.css`), `forest-life.js`, `forest-detail.js`, `forest-rare.js`, `pure/forestlife.js`, `pure/fireflies.js`. Bus topic `nightSky` { mood, sleep, wind }.
+  `bed.js` the music bed's door + v1 driver (NIGHT-3), `pure/bed.js` its law, `sound/bed.js` its sound; NIGHT-4 v2 (the default): `bed2.js` driver, `pure/bed2.js` law + work census, `sound/bed2.js` + `worklets/bed-worklet.js` every voice and its room in one worklet at half rate (≤ 5 % of a quantum); the recipes are the room's `bed` / `bed2`; dev A/B `tools/probes/night/bedsw.js` (`?probe&bed`).
+  `sound/ambience.js` the rooms' ambience, built from a room's nature recipe (drone + wind + crickets; rule #38, registered by `main.js` through `core/soundmods.js` — CORE-7), `pure/ambience.js` its seeded laws.
+- `core/config.js` (leaf) — thresholds, scheduler timings, pool sizes (POOL1: the chord pool grows on demand to `CHORD_POOL_N`, spares ahead), palette/FX geometry (`palSplitX`, `rectBandY`, `coverView`), volume
+  curve (`volAmp`, `volVel`, `volFromOld`), `FX_VOL`, curve law of bends and lanes (`curveU`/`curveK`, `bendAt`/`bendSplit`, `bendPlan`).
+- `core/state.js` — cross-cutting musical/layout state + setters (scale, tonic, `tonicCents`, `aRef`, `tunedFrom`, timbres, `handFn`,
+  `voiceMode`, split + `phoneHalves`, registers, camera, editor/window); chain keys `chainKeyOf`/`trackChainKeyOf` (OPAQUE), `fxChains`.
+- `core/hooks.js` — nullable callbacks for lower layers (`tutor`, `cleared`, `af`, `afRow`, `key`, `renderBusy` …).
+- `core/soundmods.js` (CORE-7) — the door for an app's sound modules: `soundModAdd(kind, id, mod)` once before the start, `soundModOf(kind)`; one module per kind (today `ambience`); shared by both engine instances; none registered = none built (Full).
+- `core/i18n.js` — `LANGS`, `DICTS`, `t()`, `L()`, `applyI18n`. `core/icons.js` — THE icon component (`ICONS` by meaning, `icon`,
+  `iconText`, `applyIcons`). `core/palette.js` — canvas colours from tokens (`cv(name)`, `ROLE_COL`).
+- `core/data/` + `core/scaleload.js` — scale data as JSON (v1; manifest order = menu order); per-file validation; user files after built-ins.
+- `core/data/timbres/` + `core/timbreload.js` (TIM3a) — timbre records (one file per timbre = the truth; the app loads the GENERATED
+  `core/data/timbres.bundle.json` — `node tools/timbre-bundle.mjs` after any edit), checked by `core/pure/timbre.js` (T5 bounds).
+  `core/userstore.js` (IndexedDB, `u.<uuid>`), `tools/probes/core/userfiles.js` (`window.U`).
+- `core/scales.js` — teaching layer + PITCH TRUTH: builder → `TRADITIONS`, `TUNINGS`, `CHORD_FAM_SETS`, `SCALES`; `pitchHz`; `chordNotes`;
+  memoised view `scaleView`/`CUR()`; key doors `viewKey`/`viewKeyC`; predicates; rect layout; theremin; `registerRecord`.
+- `core/audio.js` — the Web Audio engine instance: pools, allocation, routing, drums, drone, metronome, `FX_FACTORY`, chain wiring, track
+  level/pan, master (rule #4), frozen-track store/reader, probe/render helpers; `engineCtx()` → `E` (AUD1a); THE ENGINE CONTRACT
+  `noteOn/noteSet/noteOff/bend/hit/drone` (ENG1); timbre tables + `timbresOf`/`timbreIdOf`/`timbreById` (TIM1).
+- `core/engine/surface.js` — every audio.js export listed by caller (static check 12). `core/engine/fdn.js` — FDN reverb. `core/engine/
+  worklets/` — `ks-worklet.js` (Karplus–Strong), `frz-worklet.js` (frozen store + reader), `dyn-worklet.js` (Glue / limiter),
+  `probe-cap-worklet.js` (probes). Rule #38 exempts the worklets.
+- `core/modules/timbres/` — stateless timbre builders (`stages.js`, `voice.js`, `fm.js`, `ks.js`, `subtractive.js`, `chord-voice.js`,
+  `bass-voice.js`, `drumkits.js`, `tine.js` — the struck tine as a solo bank, C4a; `modal.js` struck bodies by modal synthesis and `breath.js`
+  breathing sustained sounds — RUN 7; `strikes.js` Night's strike cap: caps `E.strikeCaps` from the profile, list `E.pool.ld.strikes`); `core/modules/effects/` — stateless effects (`param.js`, `reverb.js`, `delay.js`, `trem-mix.js`,
+  `bright.js`, `glide.js`, `volume.js`, `forest.js`, `glue.js`; Night-only: `forestdepth.js` «Forest depth» with `reach` and `light`, `night-fx.js` Echo · Warmth / Brightness
+  · Wave). All: rule #38, first argument `E`.
+- `core/arrange.js` — arrangement data + pure generation (`PROGRESSIONS`, `HARMONIES`, `RHYTHMS`, `BASS_MODES`, `buildArrangement`).
+- `core/recorder.js` — FACADE re-exporting `song/`, `transport/`, `freeze/`, `live/` + the wiring (`envWire`, `clockWire`, `schedWire`,
+  `freezeWire`, `recWire`, `backingWire`) + session glue (lane prune/reset/delete, mixer setters, `laneHush`, drone sync, editor SESSION
+  `editOpen`/`editClose`, snapshot steps + `histCommit` + `clearSong`, kinds snap/tab/master/key, `softAllOff`/`liveAllOff`/
+  `trackResplice`, `backingFollowKey`, `onLoop`, `onUndo`, `seedTake`, `clearRec`, `panic`, `songSaveRec`/`songOpenApply`).
+- `core/transport/clock.js` — transport state `loop`, song length, brace math, metre map, setters, ⛳ beat ↔ time (rule #35).
+  `core/transport/scheduler.js` — replay cursors, `scheduleLayers`, chase, `fireNear`, metronome, `tick`, `startTransport`, `seekTo`.
+- `core/freeze/registry.js` — frozen tracks by lane id, `freezeSig`/`freezeState`, watcher reads, install, 16-bit store, the AF2 swap, seams.
+  `core/frzqueue.js` — auto-freeze watcher (AF3) + queue (AF1), loaded by `render.js`.
+- `core/live/` — `eng.js` (`makeENG`, live `ENG`, pricing `evHz`), `record.js` (recording state, `noteSource`, `takeRoute`, `push`, W*
+  calls), `capture.js` (capture sampling, fine automaton, effect playback, live isolation `setLiveIsolation`), `backing.js`
+  (`loadArrangement`, `loadJam`, `clearJam`).
+- `core/song/` (pure; imports only `song/`, `pure/`, `config.js`, `scales.js` — REC1/REC3): `store.js` (`events`, `schedInvalidate`, birth
+  order, ids `evIdFill`, `compactEvents`), `lanes.js` (track tables by lane id), `notes.js` (owner keys, `songNotes`/`songSegs`, `tyEq`),
+  `history.js` (THE one history, `histKind` registry with each kind's FIELDS, VALUE tripwire `histHash`, journal `onApplied` — CMD1),
+  `commands.js` (CMD1c: `histToJSON`/`histFromJSON` — steps by permanent ids), `edit-notes.js`, `edit-chords.js`, `edit-group.js`,
+  `edit-insert.js`, `clipboard.js`, `quantise.js`, `transpose.js`, `sections.js`, `automation.js`, `capture.js` (capture records, lane
+  law, lane-point ids), `env.js` (THE song layer's environment `ENV`), `file.js` (`songData`/`songPlan`/`songNeeds`; song file v7 — track ids).
+  `recorder.cmdSet`/`cmdNote` (CMD1d) — the commands that are not history steps (mute, solo, arm, ⟳, brace, tempo; key, A4) tell the journal.
+- `core/pure/` (PURE, rule #36; runs in node): `format.js` (file envelope, migrations), `registry.js` (id spaces, `createRegistry`),
+  `songfile.js` (song file parse/upgrade/check), `pack.js` (packs + offline licence keys, PACK1), `profile.js` (profile record, C0), `bus.js` (VIS1a; the visuals' event bus `BUS`: state `hands`, `handsView`, `picture`; ring `notes` from the LIVE engine contract), `engclass.js` (provisional power class, dropout rate — ENG2), `timbre.js` (the timbre record + T5 bounds — TIM3a), `latency.js`, `handsched.js` (search
+  schedule), `camlight.js` (low light, camera restore), `dsp.js` (seeded, forest IR, dynamics curves), `canon.js` (canonical JSON + FNV — CMD1a), `nightui.js` (shell logic).
+- `core/autosave.js` — the song kept on the device (IndexedDB, last 5, `asTick`, `asFlush`); off in a profile that records nothing (boot, CORE-11).
+- `core/storens.js` (CORE-11) — the page's storage namespace (`<meta name="handsong-store">`; `nsKey`, `nsDb`); absent (Full) = every name as before.
+- `core/pure/profile.js` (C0) — PROFILES, checked by `core/pure/profile.js`; `profileApply(id)` called once at the start by `boot` with the page's profile; writes through ui.js doors `profileWire`. Full's face stays embedded on Night's page for probes only (`core/DEBT.md`). `core/edition.js` — `EDITION` ('dev' here; `tools/build.mjs` writes 'release').
+- `core/legacy-ui/` (temporary, only shrinks; rule 2 of «Two apps, one core»): `boot.js` the shared start and loop (`onHands`, `loop()`, `startApp()`, the one start path; options `profile`, `frameFilter`, `afterDraw` — CORE-6, `detectPause` — CORE-12), `ui.js` menus, buttons, handlers, panels, editor shell, window, song Save/Open (`songSaveText`/`songOpenText`), tutorial helpers; `draw.js` FACADE over `views/` (`common.js`, `camera.js`, `strip.js` strip/window/mixer + `loopView`, `roll.js` editor +
+  `rollView`, `play.js` overlays + play screen + Night's fingertip fireflies and row glow, `stack.js` the compositor: layers scene · background · instrument · overlay; the scene host moved to `apps/night/scene/host.js` at CORE-8); `latmeter.js` latency meter UI (LAT1–LAT3).
+- `core/vision.js` — camera + detection path + frame pump (LAT2), low-light switches, camera restore (rule #34), robust start (0b).
+  `core/handdet.js` — the detector (two models, worker-safe). `core/hand-worker.js` — classic worker.
+- `core/gestures.js` — FACADE over `core/gestures/` (`features.js` pure gesture math, `expr.js` expression hand, `fxhand.js` the aim
+  `fxParamsOf`, `looper.js`, `roles.js` stateless helpers, `hands.js` the state machine `HANDS`/`processHands`, `pose.js` the pose generator: HAND1 and the ghost).
+- `core/handcal.js` (CORE-1) — hand calibration and sensitivity, the live service, inert until an app calls `handCalOpen({scope})` (opt-in `farHold`, CORE-6: a far steady hand accepted down to the tracking floor); `core/pure/handcal.js` the laws, record and routine. Design: `docs/core/CORE-1-DESIGN.md`. Test panel (dev only): `<page>?probe&calpanel`, `tools/probes/core/calpanel.js`. Prints: `tools/prints/hand-depth.<app>.print.json`.
+- `core/clip.js` — clip/audio recorder. `core/render.js` — offline render, freeze, `renderQueued`, console `R.*`.
+- `tools/probes/` — `full.js`, `night.js` the page facades (`install()`); rows `core/` (register themselves: `core/rows.js` `row()`/`family()`; `probedata.js` + `tools/probe-data.mjs` the node part), `full/`, `night/`. `tools/prints/` — `scales.before.json`, `song.print.json`, `gold.print.json`,
+  `gesture.print.json`, `census.print.json`, `night.print.json`, `timbres.before.json`.
+- `tools/` — `check-static.mjs`, `probe-browser.mjs`, `probe-data.mjs`, `check-licences.mjs` + `licences.json`, `lex.mjs`, `ui-snap.mjs`, `smoke-paths.mjs`, `build.mjs`, `tree-hash.mjs`,
+  `pack-keygen.mjs`, `doc-split-check.mjs` (DOC1), `name-index.mjs` (generates `docs/core/NAME-INDEX.md`); `split-*` the split's proof tools; `docs/night/prototypes/` = reference
+  prototypes, not app code (licence use «reference», never shipped); `tools/listen/` = the Night listening page (dev, RUN 6); `docs/night/design/` = the Night design proposals (docs only).
+- `tools/probes/night/headroom.js` (+ `-calc`, `-worklet`) — NIGHT-1's dev-only sound headroom page, `<page>?probe&headroom`; the laptop's run: `tools/night-headroom.eval.js`; results: `docs/night/NIGHT-1-HEADROOM.md`.
+- Stale (removed) names to ignore: `docs/core/STALE-NAMES.md` (copied to the end of the generated `docs/core/NAME-INDEX.md`).
