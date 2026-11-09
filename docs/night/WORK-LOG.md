@@ -4,6 +4,44 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`, `archive/NIGHT-RUN-LOG-2026-10.md`. New runs start at `NIGHT-1`.
 
+# NIGHT-4 (2026-11-09): the music bed, version 2
+Tree hashes before: core 8d60632b9df3c10c · apps/full d6b90cf2cb4be6da · apps/night d742fc9c204910f1. After: core 8d60632b9df3c10c (unchanged) · apps/full d6b90cf2cb4be6da (unchanged) · apps/night 4847cfc23a871c7a.
+- The user's run (2026-11-09): v1 sounds primitive (one low octave, one plain timbre, nearly dry, a random chord every 13–22 s); v2 full, always new, restful; stage 5 part 2 waits. Design note first, then built: `docs/night/design/NIGHT-3-rooms/PLAN.md` §4b (with «as built»).
+- New in `apps/night/`:
+  - `worklets/bed-worklet.js` — one processor for every voice and the bed's own room (8-line delay network, Hadamard, 4 allpasses), at half rate with a 4-tap interpolator; events at explicit times, idle and asleep cost nothing;
+  - `pure/bed2.js` — the law, the work census, the wavetables;
+  - `sound/bed2.js` — the node;
+  - `bed2.js` — the driver: the module load, pricing from the live view, the pad-slot mirror, the live tick and `bed2Plan`.
+- Changed in `apps/night/`:
+  - `bed.js` is the door: v2 by default, v1 unchanged behind `bedSetEngine`, and the fallback; palette; Lighter;
+  - `shell.js` passes the room's `bed2` and sets Lighter (the setting, or a weak device);
+  - the forest's record has `bed2`; the room validator checks it (3 more damages).
+- Tools:
+  - data row «NIGHT music bed v2 law (app)», 174 cases, with the work census in laptop µs;
+  - the browser row «NIGHT music bed», 19 → 42 cases: v2 offline in a bare context, with a CONTROL that the bare path is level-equal to the master tap, and v2 live, a 2-minute gap included; v1's cases behind its switch;
+  - the headroom page's `bedCost` measures v1 and v2 alone;
+  - `tools/probes/night/bedsw.js`, the dev A/B pills (`?probe&bed`), with a smoke test;
+  - `NET_LISTED`: the worklet's load;
+  - the data runner prints a row's notes.
+- Measured (laptop, offline, the bed alone, best of 5, % of a quantum):
+  - v1: Still 1.87, Drift 2.44, Glimmer 2.22;
+  - v2 from the start: 1.89 / 2.25 / 2.05;
+  - v2 at the arc's fullest: 1.91 / 1.88 / 2.66;
+  - Lighter there: 1.68 / 1.73 / 1.61;
+  - «horns»: 1.91 / 1.68 / 2.26;
+  - the NIGHT-1 way (render copy + Night's chain), v1: 2.54 / 2.47 / 3.17.
+- Level at the default volume, against the nature sound: Drift −1.6 dB plain; K-like loudness Still −1.0, Drift +1.1, Glimmer +1.9 dB. No click (≤ 0.13 of 0.5). The worklet dropped and delayed no note.
+- Found and fixed (v2 only): after a hidden tab the driver would have sent every missed note at once; it now skips notes more than 1 s late and plays the latest missed chord. v1 has the same burst and stays unchanged for the A/B.
+- Fix rounds: 7.
+  1. Too dear: 3.4–4.8 % from the first 14 s, at full rate → half rate, block-rate envelopes, a flattened room loop, monophonic loop voices with a 1.8 s handoff.
+  2. 9 dB too quiet → the levels by K-like loudness.
+  3. A greedy open voicing ran out of range → a small search; wider pad registers.
+  4. Lighter not lighter → 3-tone pad, tails × 0.7, judged on its voices.
+  5. The air under the note field's top (3.5 kHz) → 4.8–8 kHz.
+  6. The first chord came after the first look-ahead → 0.4 s.
+  7. A peak plan's window held no chord → the sounding chord comes along.
+- Waiting for step 131 (five checks by ear) and the A/B choice.
+
 # NIGHT-3 — stage 5 part 1 (2026-11-08): the settings card for rooms (with CORE-10)
 Tree hashes before: core cdf27dd0d90bbad7 · apps/full d6b90cf2cb4be6da · apps/night 87bb83d83ea385cd. After: core 8d60632b9df3c10c · apps/full d6b90cf2cb4be6da (unchanged) · apps/night d742fc9c204910f1.
 - The user split stage 5: settings first, then the switching machinery. Decisions and the reach choice: `docs/night/design/NIGHT-3-rooms/PLAN.md` «Stage 5 part 1 as built».

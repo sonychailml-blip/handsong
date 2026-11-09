@@ -1,18 +1,24 @@
-/* NIGHT-3 stage 4: THE MUSIC BED's DRIVER (live) — the state the Music button and the settings set (off / still / drift / glimmer, the volume,
-   the response switch, all remembered by the shell), the law (pure/bed.js) run ahead on the audio clock each frame, every step priced from the
-   LIVE view (rule #2: chordRowFreq of the scale, its tonic and A4), the sound (sound/bed.js) built on the first On and parked a while after Off.
-   With the bed on it takes over the forest's low drone (main.js asks bedTakesDrone). A Mood change: the next chord comes from the new scale at
-   once, the ground glides. bedPlan() lays a whole timeline into any engine context (the probes' and the cost measurement's offline renders): the
-   live tick and it share one event path (applyEv). */
+/* NIGHT-3 stage 4: THE MUSIC BED's DOOR AND ITS v1 DRIVER (live) — the state the Music button and the settings set (off / still / drift /
+   glimmer, the volume, the response switch, all remembered by the shell), the law (pure/bed.js) run ahead on the audio clock each frame, every
+   step priced from the LIVE view (rule #2: chordRowFreq of the scale, its tonic and A4), the sound (sound/bed.js) built on the first On and
+   parked a while after Off. With the bed on it takes over the forest's low drone (main.js asks bedTakesDrone). A Mood change: the next chord
+   comes from the new scale at once, the ground glides. bedPlan() lays a whole timeline into any engine context (the probes' and the cost
+   measurement's offline renders): the live tick and it share one event path (applyEv).
+   NIGHT-4: v2 (apps/night/bed2.js, one worklet) plays by default; v1 stays here unchanged — the A/B switch (dev, bedSetEngine) and the
+   fallback when AudioWorklet is missing. The door also keeps the palette of v2's loop voices (dev switch) and Lighter (the «Lighter forest»
+   setting, or a weak device: fewer loops and layers). */
 import { AC, engineCtx } from '../../core/audio.js';
 import { CUR, chordRowFreq, droneSecondHz } from '../../core/scales.js';
 import { BUS } from '../../core/pure/bus.js';
 import { seeded } from '../../core/pure/dsp.js';
 import { BED_OFF, BED_PRESETS, BED_ANSWER, bedInit, bedStep, bedSoon } from './pure/bed.js';
 import { BED_POOL, buildBed, bedVoice, bedVoicePark, bedFilter, bedGround, bedGlim, bedLevel, bedPark } from './sound/bed.js';
+import { bed2On, bed2Off, bed2Volume, bed2Tick, bed2Failed, bed2Dbg } from './bed2.js';
 
 export const BED_SEED=0x42454431, BED_AHEAD=0.5, BED_PARK_S=9, BED_QUIET_TC=8;   // a released voice parks after 8 time constants (−70 dB)
+export const BED_ENGINES=Object.freeze(['v2','v1']), BED_PALETTES=Object.freeze(['a','b']);
 let mode=BED_OFF, vol=null, answer=false, recipe=null, bed=null, st=null, origin=0, view=null, parkAt=0, ons=0, notesSeq=0;
+let engine='v2', palette='a', light=false, recipe2=null, v2want=false, v1on=false;   // NIGHT-4: v1on — v1 is the one playing (chosen, or the fallback)
 const played=[];   // { pc, t } of your recent notes (AC time) — read only with the response on
 const READ=BUS.reader();
 /* a bed object with its seeded per-voice detunes and its two sides' filter positions (× the chord's middle pitch) */
@@ -47,35 +53,63 @@ function parkQuiet(E, b, now){ const tq=BED_QUIET_TC*b.B.pad.release;
 /* every pad voice out (Off, or before a probe's plan ends) */
 function allOut(E, b, when){ for(const i of b.slots) if(i!=null){ bedVoice(E, b, i, 0, 0, when, b.B.pad.release); b.voices[i].step=null; b.voices[i].quietAt=when; } b.slots=[]; }
 
-/* the shell's doors */
-export const bedTakesDrone=()=>mode!==BED_OFF;
-export const bedModeOf=()=>mode;
-export function bedSetMode(m, B){
-  if(m!==BED_OFF && !BED_PRESETS.includes(m)) m=BED_OFF;
-  const was=mode; mode=m; if(B) recipe=B;
-  if(!AC || !recipe) return;
-  const E=engineCtx(), now=AC.currentTime;
-  if(m===BED_OFF){ if(bed && was!==BED_OFF){ bedLevel(E, bed, 0, now); bedGround(E, bed, bed.ground.hz[0]||55, bed.ground.hz[1]||82, false, now); allOut(E, bed, now); parkAt=now+BED_PARK_S; } return; }
+/* v1 on (a preset) or off at AC time `now` — the stage-4 driver's own steps, unchanged (a fresh start when v1 was not playing) */
+function v1Set(m, now, E){
+  if(m===BED_OFF){ if(bed && v1on){ bedLevel(E, bed, 0, now); bedGround(E, bed, bed.ground.hz[0]||55, bed.ground.hz[1]||82, false, now); allOut(E, bed, now); parkAt=now+BED_PARK_S; } v1on=false; return; }
   if(!bed) bed=makeBed(E, E.master.in, recipe, BED_SEED);
   bedPark(E, bed, false); parkAt=0;
-  if(was===BED_OFF){ st=bedInit((BED_SEED+(++ons)*7919)>>>0); origin=now+0.05; view=CUR(); const [r,s2]=groundOf(view); bedGround(E, bed, r, s2, true, now); }
+  if(!v1on){ st=bedInit((BED_SEED+(++ons)*7919)>>>0); origin=now+0.05; view=CUR(); const [r,s2]=groundOf(view); bedGround(E, bed, r, s2, true, now); }
   else if(st) bedSoon(st, now-origin);   // another preset: its first chord soon
-  bedLevel(E, bed, vol==null ? recipe.level : vol, now);
+  bedLevel(E, bed, vol==null ? recipe.level : vol, now); v1on=true;
 }
-export function bedSetVolume(v){ vol=Math.max(0, Math.min(1, +v||0)); if(AC && bed && mode!==BED_OFF) bedLevel(engineCtx(), bed, vol, AC.currentTime); }
+/* NIGHT-4: v2 plays when it is chosen, its recipe is known and its worklet did not fail */
+const useV2=()=> engine==='v2' && !!recipe2 && !bed2Failed();
+const opts=()=>({ light, palette });
+let applied=false;   // the mode has reached the audio (a mode set before the audio existed is applied by the first tick)
+function apply(){
+  const E=engineCtx(), now=AC.currentTime; applied=true;
+  if(useV2()){ if(v1on) v1Set(BED_OFF, now, E);
+    if(mode===BED_OFF){ v2want=false; bed2Off(E, now); return; }
+    const r=bed2On(AC, E, E.master.in, recipe2, mode, bedVolumeOf(), now, opts()); v2want= r==='pending';
+    if(r==='failed') v1Set(mode, now, E);
+    return; }
+  v2want=false; bed2Off(E, now); v1Set(mode, now, E);
+}
+
+/* the shell's doors. B the room's v1 recipe, B2 its v2 recipe (NIGHT-4; a caller passing only B keeps the v2 recipe it had) */
+export const bedTakesDrone=()=>mode!==BED_OFF;
+export const bedModeOf=()=>mode;
+export function bedSetMode(m, B, B2){
+  if(m!==BED_OFF && !BED_PRESETS.includes(m)) m=BED_OFF;
+  mode=m; if(B) recipe=B; if(B2) recipe2=B2;
+  if(!AC || !recipe) return;
+  apply();
+}
+export function bedSetVolume(v){ vol=Math.max(0, Math.min(1, +v||0)); if(!AC || mode===BED_OFF) return; const E=engineCtx(), now=AC.currentTime;
+  if(bed && v1on) bedLevel(E, bed, vol, now); else bed2Volume(E, vol, now); }
 export const bedVolumeOf=()=> vol==null ? (recipe ? recipe.level : 0.6) : vol;
 export function bedSetAnswer(on){ answer=!!on; }
 export const bedAnswerOf=()=>answer;
+/* NIGHT-4: which engine (dev A/B: 'v2' | 'v1'), the palette of v2's loop voices ('a' voices | 'b' horns), Lighter (fewer loops and layers) */
+export function bedSetEngine(e){ if(!BED_ENGINES.includes(e) || e===engine) return; engine=e; if(AC && recipe && applied) apply(); }
+export const bedEngineOf=()=> v1on || !useV2() ? 'v1' : 'v2';
+export function bedSetPalette(p){ if(BED_PALETTES.includes(p)) palette=p; }
+export const bedPaletteOf=()=>palette;
+export function bedSetLight(on){ light=!!on; }
+export const bedLightOf=()=>light;
 /* once per screen frame (the shell's tick); `at` — the audio time to act at (a probe's clock; default now) */
 export function bedTick(at){
   if(!AC) return;
-  if(!bed){ if(mode!==BED_OFF && recipe){ const m=mode; mode=BED_OFF; bedSetMode(m); } return; }   // a remembered mode set before the audio existed
+  if(!applied){ if(mode!==BED_OFF && recipe) apply(); return; }   // a remembered mode set before the audio existed
   const E=engineCtx(), now=at!=null ? at : AC.currentTime;
-  if(mode===BED_OFF){ if(parkAt && now>=parkAt){ bedPark(E, bed, true); parkAt=0; } return; }
-  const N=READ.since('notes', notesSeq); notesSeq=N.seq;
+  if(mode!==BED_OFF){ const N=READ.since('notes', notesSeq); notesSeq=N.seq; const n=sizeOf(CUR());
+    for(const it of N.items) if(it.kind==='on' && it.role==='ld' && Number.isInteger(it.deg)) played.push({ pc:((it.deg%n)+n)%n, t:now });
+    while(played.length && played[0].t<now-BED_ANSWER.window) played.shift(); }
+  if(v2want){ const r=bed2On(AC, E, E.master.in, recipe2, mode, bedVolumeOf(), now, opts()); if(r!=='pending') v2want=false; if(r==='failed') v1Set(mode, now, E); }
+  bed2Tick(E, now, played.map(p=>p.pc), answer, opts());
+  if(!bed) return;
+  if(!v1on){ if(parkAt && now>=parkAt){ bedPark(E, bed, true); parkAt=0; } return; }
   const v=CUR(), n=sizeOf(v);
-  for(const it of N.items) if(it.kind==='on' && it.role==='ld' && Number.isInteger(it.deg)) played.push({ pc:((it.deg%n)+n)%n, t:now });
-  while(played.length && played[0].t<now-BED_ANSWER.window) played.shift();
   if(v!==view){ view=v; const [r,s2]=groundOf(v); bedGround(E, bed, r, s2, true, now); bedSoon(st, now-origin); }
   parkQuiet(E, bed, now);
   const P=recipe.presets[mode];
@@ -95,4 +129,5 @@ export function bedPlan(E, dest, B, preset, sec, o={}){
 }
 /* probe only */
 export const bedDbg=()=>({ mode, vol:bedVolumeOf(), answer, built:!!bed, parked:bed ? bed.parked : null, slots:bed ? bed.slots.slice() : [], played:played.length,
-  voices:bed ? bed.voices.map(x=>({ hz:x.hz, step:x.step })) : [], ground:bed ? bed.ground.hz.slice() : null, origin, view:view ? view.mode && view.mode.id : null });
+  voices:bed ? bed.voices.map(x=>({ hz:x.hz, step:x.step })) : [], ground:bed ? bed.ground.hz.slice() : null, origin, view:view ? view.mode && view.mode.id : null,
+  engine:bedEngineOf(), palette, light, v1on, v2want, v2:bed2Dbg() });   // NIGHT-4

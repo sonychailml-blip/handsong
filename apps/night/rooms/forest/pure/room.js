@@ -42,4 +42,26 @@ export const FOREST_ROOM=F({
       drift:F({ voices:3, every:F([13, 22]), drift:F({ every:F([7, 13]), depth:0.25 }), glim:null }),
       glimmer:F({ voices:3, every:F([13, 22]), drift:F({ every:F([7, 13]), depth:0.25 }), glim:F({ every:F([7, 17]) }) }),
     }) }),
+  /* NIGHT-4: THE MUSIC BED v2's recipe (apps/night/pure/bed2.js the law, worklets/bed-worklet.js the sound; design PLAN.md §4b). Registers in
+     octaves above step 0 (the tonic an octave under the playing). Amplitudes are the voices' own, `master` the bus at volume 1 (heard as
+     volume²); `send` how much of a layer goes to the room; a preset's loopDb lifts its loops (Still's are low and sparse). Times in seconds. voices.a «voices» (F1/F2 of the vowels u · o · a, their Q),
+     voices.b «horns» (the low-pass from bloom[0] to bloom[1] × the pitch with the note's swell). */
+  bed2:F({ master:0.7, level:0.6,
+    arc:F({ period:F([300, 600]) }), breath:F({ every:F([8.5, 11.5]) }), color:F({ every:F([20, 60]), tc:F([8, 16]), spread:0.5 }),
+    ground:F({ amp:0.07, fifth:0.5, beat:0.11, send:0.2 }),
+    pad:F({ amp:0.07, attack:F([5, 8]), release:F([5, 7.5]), detune:F([4, 9]), send:0.5 }),
+    loops:F({ amp:0.13, attack:F([1.2, 2.6]), hold:F([1.5, 4]), release:F([3, 5]), detune:F([4, 9]), vary:0.25, renew:0.08, send:0.55 }),
+    voices:F({ a:F({ vowels:F([F([325, 700]), F([450, 800]), F([650, 1080])]), q:F([6, 9]), breath:0.04, body:0.12 }), b:F({ bloom:F([1.3, 5]), q:0.8 }) }),
+    glass:F({ amp:0.036, oct:F([3, 4.4]), attack:F([0.12, 0.3]), decay:F([1.6, 3]), send:0.9, ratios:F([1, 2.01, 3.98]), gains:F([1, 0.3, 0.12]) }),
+    air:F({ amp:0.011, bands:F([4800, 8000]), sway:0.25, q:2.2, every:F([12, 30]), tc:8 }),   // above the note field's top (4 octaves of a pentatonic: 3.5 kHz) even at its lowest sway
+    reverb:F({ pre:0.04, wet:0.6 }),
+    lighter:F({ loops:2, padOsc:2, padTones:3, glass:0.5, release:0.7 }),
+    presets:F({
+      still:F({ loops:2, loopLen:F([29, 37]), loopReg:F([0.5, 1.5]), notes:F([2, 3]), padTones:F([2, 3]), padReg:F([0, 2.4]), every:F([30, 48]),
+        glass:null, air:false, breath:1.4, bright:0.2, arcDepth:0.7, rt60:7, damp:2200, loopDb:5 }),
+      drift:F({ loops:4, loopLen:F([17, 23, 29, 31]), loopReg:F([1, 2.2]), notes:F([2, 4]), padTones:F([3, 3]), padReg:F([0, 2.6]), every:F([20, 34]),
+        glass:F({ every:F([18, 36]) }), air:false, breath:1.1, bright:0.4, arcDepth:0.8, rt60:5.5, damp:3200, loopDb:0 }),
+      glimmer:F({ loops:4, loopLen:F([17, 23, 29, 31]), loopReg:F([1.2, 2.6]), notes:F([2, 4]), padTones:F([3, 4]), padReg:F([0.4, 2.8]), every:F([20, 34]),
+        glass:F({ every:F([5, 13]) }), air:true, breath:1, bright:0.7, arcDepth:0.8, rt60:5, damp:4600, loopDb:0 }),
+    }) }),
 });

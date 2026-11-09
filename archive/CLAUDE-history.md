@@ -1822,6 +1822,12 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
     3. «Музыка отвечает моим нотам» (Settings, off by default): turn it on, play two or three notes over and over for about 20 s, then rest; do the next chords lean toward them? Decide whether it stays off by default.
     4. Off and memory: tap until «выкл.» — the bed fades in about three seconds and the forest's drone returns; reload — the choice is kept; a first start in an incognito tab — «выкл.».
     5. (Optional) The Poco: on a `handsong-night` preview, the same listen on the phone, or `?probe&headroom` (its row «+ the music bed (Glimmer)» is new).
+131. The music bed v2 (NIGHT-4), at most five checks, by ear; everything else is in the rows «NIGHT music bed» and «NIGHT music bed v2 law (app)». Laptop, headphones, a quiet room, `http://127.0.0.1:5500/apps/night/?probe&bed` (two pills top left: «Bed: v2 · v1» and «Loop voices: voices · horns»; a line under them shows the arc and how many loops sound). Each preset 3–5 minutes: first hands down, then play for about a minute.
+    1. «Покой»: deep, dark and sparse — a warm low ground, a few low pad tones, two low voices with long, slow phrases, a long soft room. Nothing struck, nothing like the handpan, the singing bowl, the firefly or the breath flute. No click when a chord changes.
+    2. «Течение»: slow melodies in the middle that you can follow; each comes back on its own loop, now and then changed by a note; together they never quite repeat. Over five minutes the line under the pills goes from few loops to more and back («arc» rises toward 1). While you play, it stays out of your way.
+    3. «Мерцание»: brighter, with soft, distant glass now and then and a very quiet high air; still restful.
+    4. A/B: while «Течение» plays, tap «Bed: v2» → v1 (stage 4) and back; tap «Loop voices» → horns and back. Which bed, and which palette for the loop voices?
+    5. A Mood change while «Течение» plays: the melodies go on in the new mood with no jump or crackle; then Settings → «Лёгкий лес» on: fewer voices (two loops), still pleasant; «Громкость музыки» sets its level; off again.
 
 ## Superseded at DOC1 (old lines verbatim, replaced in place above by a later slice)
 - NIGHT-2 stage 3 (2026-11-03, the rule of at most five manual checks) updated this line of CLAUDE.md's report format:

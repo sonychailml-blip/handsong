@@ -403,7 +403,7 @@ detail: `archive/CLAUDE-history.md` «Module map (full, moved at DOC1)», under 
   `ghost.js` the first-run ghost light; `night.css`; `data/night.json` profile; `fonts/` (OFL, register entries); `vendor/three-r128/` (lazy); `pure/cycle.js` (the 24-min night `nightAt`, sleep `nightDeep`, the moods' easing, rare events, emblem), `rooms/forest/pure/forestlife.js` (stream, mushroom / flower places, rings), `rooms/forest/pure/fireflies.js`;
   `scene/host.js` the scene host (CORE-8, from `core/legacy-ui/`): `#scene` WebGL canvas only while a room shows, three.js lazy, levels high / medium (default) / low with a resolution scale, `setBackground('forest'|'dark'|'camera')` («forest» = the current room's picture), `setSceneLevel`, rooms by id (`sceneRoomAdd`, `sceneRoom`, `sceneRooms`; scene code loaded on first open, the room's 2D stand-in); the shared UI reaches it through `hooks.scene`.
   `rooms/index.js` THE ROOMS (NIGHT-3; order and parts: record, stand-in, `load`); `pure/room.js` the room record's validator (`checkRoom`, `ROOM_IDS` pinned, `roomLook`); a room = `rooms/<name>/`: `pure/room.js` its RECORD (levels, mood looks, nature recipe, acoustic), `standin.js`, its scene code. The forest: `rooms/forest/forest.js` (tokens `--cv-forest-*` in `night.css`), `forest-life.js`, `forest-detail.js`, `forest-rare.js`, `pure/forestlife.js`, `pure/fireflies.js`. Bus topic `nightSky` { mood, sleep, wind }.
-  `bed.js` the music bed's driver (NIGHT-3), `pure/bed.js` its law, `sound/bed.js` its sound (≤ 3 % of a quantum); the recipe is the room's `bed`.
+  `bed.js` the music bed's door + v1 driver (NIGHT-3), `pure/bed.js` its law, `sound/bed.js` its sound; NIGHT-4 v2 (the default): `bed2.js` driver, `pure/bed2.js` law + work census, `sound/bed2.js` + `worklets/bed-worklet.js` every voice and its room in one worklet at half rate (≤ 5 % of a quantum); the recipes are the room's `bed` / `bed2`; dev A/B `tools/probes/night/bedsw.js` (`?probe&bed`).
   `sound/ambience.js` the rooms' ambience, built from a room's nature recipe (drone + wind + crickets; rule #38, registered by `main.js` through `core/soundmods.js` — CORE-7), `pure/ambience.js` its seeded laws.
 - `core/config.js` (leaf) — thresholds, scheduler timings, pool sizes (POOL1: the chord pool grows on demand to `CHORD_POOL_N`, spares ahead), palette/FX geometry (`palSplitX`, `rectBandY`, `coverView`), volume
   curve (`volAmp`, `volVel`, `volFromOld`), `FX_VOL`, curve law of bends and lanes (`curveU`/`curveK`, `bendAt`/`bendSplit`, `bendPlan`).
@@ -549,7 +549,7 @@ THERE in full and here as one index entry):
   120 The night's cycle · 121 The forest answers the playing · 122 The forest's detail · 123 Rare events · 124 Quality levels and the budget (RUN 9)
   125 Hand calibration (CORE-1; on the panel `?probe&calpanel`) · 126 Sound headroom (NIGHT-1; the page `?probe&headroom`) · 127 The quiet floor by ear (NIGHT-1; `?probe&tails=on|off`)
   128 Night's calibration screens and settings, laptop + Poco (NIGHT-2; covers 125 for Night) · 129 Night's hand setup, five checks (NIGHT-2 stage 3; replaces 128)
-  130 The music bed, five checks (NIGHT-3 stage 4)
+  130 The music bed, five checks (NIGHT-3 stage 4) · 131 The music bed v2, five checks by ear (NIGHT-4)
 
 ## Language
 - **Code comments:** existing ones are Russian; new and edited ones are short English (standing rule). Never translate en masse.

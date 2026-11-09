@@ -839,6 +839,101 @@ async function nightBedLaw(){
     if(Math.abs(sOff-sNone)>1e-12) miss('CONTROL: with the response off the share depends on your notes'); }
   return { cases:n, total:d.length, differences:d };
 }
+/* NIGHT-4: THE MUSIC BED v2's LAW (apps/night/pure/bed2.js) over the forest's recipe, for scales of 5, 6 and 7 degrees, an hour each: repeatable,
+   another seed differs (CONTROL); LOOPS — the lengths differ, each voice repeats its own phrase (most loop notes repeat the last cycle's offset and
+   step), phrases change now and then (15–55 % of a voice's loops), notes are long and soft and inside the loop register; the COMBINATION never
+   repeats (no two 60-s windows hold the same loop notes; CONTROL: equal lengths and no changes must repeat); PAD chords are the scale's own
+   degrees rising from the root, inside the pad register, no two tones a step apart; on 5-degree scales (Night's moods) open: a mean span of
+   1.2 octaves or more and 75 % of the 3-tone chords at least an octave wide (in 6 or 7 degrees every other degree climbs in thirds); glass and air only where the preset has them; BREATH 5–7.5 swells a minute; the ARC starts sparse, its periods 300–600 s, loops
+   sound more where it is full; PRESETS differ (Still lowest and sparsest, no glass or air; Glimmer the most glass); LIGHTER: at most two loop
+   voices, no air, at most ¾ of the glass, its voices at their heavy moments (the census' 95th percentile, without the node and its room) at most
+   75 % of the full bed's; THE WORK CENSUS's peak
+   under its budget (5 % of the laptop's quantum); RESPONSE as v1 (off: your notes
+   change nothing; on: every time identical, your notes more often in phrases and chords; CONTROL); a scale-size change keeps the phrases; the
+   WAVETABLES are band-limited (CONTROL: one harmonic too many is caught) */
+async function nightBed2Law(){
+  const d=[]; let n=0; const miss=s=>d.push(s);
+  const L=await import(new URL('../apps/night/pure/bed2.js', import.meta.url).href), V1=await import(new URL('../apps/night/pure/bed.js', import.meta.url).href);
+  /* BUDGET: the census (laptop µs per quantum, from the measured part costs) at 5 % of the 2,667-µs quantum */
+  const R=(await import(new URL('../apps/night/rooms/forest/pure/room.js', import.meta.url).href)).FOREST_ROOM.bed2, BUDGET=133;
+  const mod=(s,N)=>((s%N)+N)%N;
+  const run=(preset, N, seed, o={})=>{ const P=o.P||R.presets[preset], st=L.bed2Init(seed, o.R||R, P); const ev=L.bed2Step(st, o.R||R, P, N, o.sec||3600, o.played||[], !!o.answer, !!o.light); return { st, ev, P }; };
+  const work={};
+  for(const N of [5,6,7]) for(const preset of ['still','drift','glimmer']){ const tag=`${preset}, ${N} degrees`, P=R.presets[preset];
+    const A=run(preset,N,7), B=run(preset,N,7), C=run(preset,N,8); n+=2;
+    if(JSON.stringify(A.ev)!==JSON.stringify(B.ev)) miss(tag+': the same seed gave another bed');
+    if(JSON.stringify(A.ev)===JSON.stringify(C.ev)) miss('CONTROL '+tag+': another seed gave the same bed');
+    const ev=A.ev, loops=ev.filter(e=>e.kind==='loop'), ch=ev.filter(e=>e.kind==='chord'), gl=ev.filter(e=>e.kind==='glass'), air=ev.filter(e=>e.kind==='air'), br=ev.filter(e=>e.kind==='breath');
+    /* loops */
+    n+=4; const lens=A.st.loops.map(x=>x.len); if(new Set(lens).size!==lens.length) miss(`${tag}: loop lengths ${lens} are not all different`);
+    let rep=0, all=0; for(const Lp of A.st.loops){ const mine=loops.filter(e=>e.v===Lp.v), key=e=>Math.round(((e.t%Lp.len)+Lp.len)%Lp.len*100)+':'+e.step, byCycle=new Map();
+      for(const e of mine){ const c=Math.floor(e.t/Lp.len+1e-9); if(!byCycle.has(c)) byCycle.set(c,new Set()); byCycle.get(c).add(key(e)); }
+      for(const e of mine){ const c=Math.floor(e.t/Lp.len+1e-9), prev=byCycle.get(c-1); if(!prev) continue; all++; if(prev.has(key(e))) rep++; }
+      const share=Lp.changes/Math.max(1,Lp.cycles-1); if(Lp.cycles>8 && (share<0.15 || share>0.55)){ miss(`${tag}: loop ${Lp.v} changed its phrase in ${(100*share).toFixed(0)} % of ${Lp.cycles} loops`); break; } }
+    if(all && rep/all<0.6) miss(`${tag}: only ${(100*rep/all).toFixed(0)} % of loop notes repeat the last loop's note`);
+    const reg=L.bed2Reg(P.loopReg, N); if(loops.some(e=>e.step<reg.lo || e.step>reg.hi || e.a<1 || e.a+e.h+e.r<4 || e.amp<0.7-1e-9 || e.amp>1)) miss(`${tag}: a loop note outside its register (${reg.lo}…${reg.hi}) or not long and soft`);
+    { const sig=new Map(); let same=0; for(let w=0; w+60<=3600; w+=30){ const inW=loops.filter(e=>e.t>=w && e.t<w+60); if(inW.length<2) continue; const k=inW.map(e=>(e.t-w).toFixed(2)+'/'+e.v+'/'+e.step).join(); if(sig.has(k)) same++; else sig.set(k,w); }
+      if(same) miss(`${tag}: ${same} 60-s windows repeat an earlier window's loop notes`); }
+    /* pad */
+    n+=3; const pr=L.bed2Reg(P.padReg, N); let bad=null, gapBad=null, wide=0, many=0, close=0, span=0;
+    for(const e of ch){ const s=e.steps, root=mod(s[0],N), T=s.length, pcs=V1.chordPcs(root,T,N);
+      if(T<P.padTones[0] || T>P.padTones[1] || s.some((x,i)=>mod(x,N)!==pcs[i]) || s.some(x=>x<pr.lo || x>pr.hi) || s.some((x,i)=>i && x<=s[i-1]) || s[0]>pr.lo+N-1){ bad=e; break; }
+      span+=(s[T-1]-s[0])/N; if(T>=3){ many++; if(s[T-1]-s[0]>=N) wide++; } if(s.some((x,i)=>i && x-s[i-1]<2)) close++; }
+    for(let i=1;i<ch.length;i++){ const g=ch[i].t-ch[i-1].t; if(g<P.every[0]-1e-9 || g>P.every[1]+1e-9){ gapBad=g; break; } }
+    if(bad) miss(`${tag}: chord ${JSON.stringify(bad.steps)} at ${bad.t.toFixed(1)} s is not the scale's degrees, rising from the root in ${pr.lo}…${pr.hi}`);
+    /* openness on Night's pentatonic moods; on any scale: no clusters */
+    if((N===5 && ((many && wide/many<0.75) || span/Math.max(1,ch.length)<(P.padTones[1]>=3 ? 1.2 : 0.6))) || close/Math.max(1,ch.length)>0.05) miss(`${tag}: not open: ${wide}/${many} chords of 3+ tones span an octave, ${close} have two tones a step apart, mean span ${(span/Math.max(1,ch.length)).toFixed(2)} octaves`);
+    if(gapBad!=null || ch.length<3600/P.every[1]-2) miss(`${tag}: ${ch.length} chords, a gap of ${gapBad}`);
+    /* glass, air, breath, arc */
+    n+=4; if(!P.glass ? gl.length : gl.length<3600/(P.glass.every[1]*1.35)) miss(`${tag}: ${gl.length} glass notes`);
+    if(P.air ? !air.some(e=>e.lvl>0) : air.some(e=>e.lvl>0)) miss(`${tag}: the air does not follow the preset (${P.air})`);
+    { const swells=br.length/2/60; if(swells<5 || swells>7.5) miss(`${tag}: ${swells.toFixed(2)} breaths a minute`); }
+    { const ends=A.st.arc.ends, per=ends.slice(1).map((x,i)=>x-ends[i]), d0=L.bed2Density(A.st,0,P.arcDepth);
+      if(Math.abs(d0-(1-P.arcDepth))>1e-9 || per.some(p=>p<300-1e-9 || p>600+1e-9)) miss(`${tag}: the arc starts at ${d0.toFixed(3)}, periods ${per.map(p=>p.toFixed(0))}`);
+      const rate=hi=>{ let c=0, s=0; for(let t=0;t<3600;t+=5){ const dd=L.bed2Density(A.st,t,P.arcDepth); if((dd>=1-P.arcDepth/2)===hi){ s+=5; c+=loops.filter(e=>e.t>=t && e.t<t+5).length; } } return c/Math.max(1,s); };
+      n++; if(P.loops>1 && !(rate(true)>rate(false)*1.15)) miss(`${tag}: loops do not sound more where the arc is full (${rate(true).toFixed(3)} vs ${rate(false).toFixed(3)} a second)`); }
+    /* lighter and the work census */
+    const Li=run(preset,N,7,{ light:true }), wf=L.bed2Work(A.ev,3600), wl=L.bed2Work(Li.ev,3600,{ light:true }); n+=3;
+    if(Li.ev.some(e=>e.kind==='loop' && e.v>=R.lighter.loops) || Li.ev.some(e=>e.kind==='air' && e.lvl>0)) miss(`${tag}: Lighter keeps more than ${R.lighter.loops} loops or the air`);
+    if(gl.length && Li.ev.filter(e=>e.kind==='glass').length>0.75*gl.length) miss(`${tag}: Lighter keeps ${Li.ev.filter(e=>e.kind==='glass').length} of ${gl.length} glass notes`);
+    { const fx=L.BED2_WORK.fixed, vl=wl.p95-fx, vf=wf.p95-fx;   // Lighter = fewer loops and layers: its voices (the census without the node and its room) at the heavy moments
+      if(!(vl<=0.75*vf) && P.loops>R.lighter.loops) miss(`${tag}: Lighter's voices at their heavy moments (95th percentile) ${vl.toFixed(1)} µs are not ≤ 75 % of ${vf.toFixed(1)}`); }
+    n++; if(wf.peak>BUDGET) miss(`${tag}: the work census peaks at ${wf.peak.toFixed(0)}, over the budget ${BUDGET}`);
+    if(N===5) work[preset]={ full:wf.mean.toFixed(1), p95:wf.p95.toFixed(1), peak:wf.peak.toFixed(1), light:wl.mean.toFixed(1), lightP95:wl.p95.toFixed(1), lightPeak:wl.peak.toFixed(1) }; }
+  /* the presets' characters (5 degrees) */
+  { const S=run('still',5,7).ev, D=run('drift',5,7).ev, G=run('glimmer',5,7).ev, mean=a=>a.reduce((x,y)=>x+y,0)/Math.max(1,a.length), lp=a=>a.filter(e=>e.kind==='loop'); n+=3;
+    const hS=mean(lp(S).map(e=>e.step)), hD=mean(lp(D).map(e=>e.step)), hG=mean(lp(G).map(e=>e.step));
+    if(!(hS<hD && hD<hG)) miss(`the presets' loop heights are not Still < Drift < Glimmer: ${hS.toFixed(2)} / ${hD.toFixed(2)} / ${hG.toFixed(2)}`);
+    if(!(lp(S).length<lp(D).length)) miss(`Still is not sparser than Drift: ${lp(S).length} vs ${lp(D).length} loop notes an hour`);
+    if(!(G.filter(e=>e.kind==='glass').length>D.filter(e=>e.kind==='glass').length)) miss('Glimmer has no more glass than Drift'); }
+  /* the response */
+  { const N=5, mine=[1,3,1,3,1], times=ev=>ev.map(e=>e.kind+'@'+e.t.toFixed(9)).join();
+    const off0=run('drift',N,11).ev, offP=run('drift',N,11,{ played:mine }).ev, onP=run('drift',N,11,{ played:mine, answer:true }).ev; n+=2;
+    if(JSON.stringify(off0)!==JSON.stringify(offP)) miss('with the response off, your notes changed the bed');
+    if(times(onP)!==times(off0)) miss('with the response on, an event moved in time — it must change only which notes, never when');
+    const share=(answer, pl)=>{ let hit=0, all=0; for(let sd=1; sd<=40; sd++) for(const e of run('drift',N,sd,{ played:pl, answer, sec:600 }).ev){ const st= e.kind==='loop' ? [e.step] : e.kind==='chord' ? e.steps : null; if(!st) continue; for(const s of st){ all++; if(mine.includes(mod(s,N))) hit++; } } return hit/all; };
+    const sOn=share(true,mine), sOff=share(false,mine), sNone=share(false,[]); n+=2;
+    if(!(sOn>sOff+0.03)) miss(`the response does not lean: your notes are ${(100*sOn).toFixed(1)} % of the bed's notes with it on, ${(100*sOff).toFixed(1)} % off`);
+    if(Math.abs(sOff-sNone)>1e-12) miss('CONTROL: with the response off the share depends on your notes'); }
+  /* CONTROL for the no-repeat check: equal loop lengths and no phrase changes must repeat */
+  { const R2=JSON.parse(JSON.stringify(R)); R2.loops.vary=0; R2.loops.renew=0; const P2={ ...R2.presets.drift, loopLen:[20,20,20,20], arcDepth:0 };
+    const ev=run('drift',5,7,{ R:R2, P:P2, sec:1200 }).ev.filter(e=>e.kind==='loop'); let same=0; const sig=new Set();
+    for(let w=0; w+60<=1200; w+=20){ const k=ev.filter(e=>e.t>=w && e.t<w+60).map(e=>(e.t-w).toFixed(2)+'/'+e.v+'/'+e.step).join(); if(k && sig.has(k)) same++; sig.add(k); }
+    n++; if(!same) miss('CONTROL: equal loop lengths without changes did not repeat — the no-repeat check cannot fail'); }
+  /* a scale-size change keeps the phrases (5 → 7 degrees at 300 s): every loop note after it lies in its voice's 7-degree register, and a voice
+     that did not change its phrase plays its stored steps, folded into that register */
+  { const P=R.presets.drift, st=L.bed2Init(21, R, P); L.bed2Step(st, R, P, 5, 300); const kept=st.loops.map(x=>({ steps:x.phrase ? x.phrase.map(q=>q.step) : null, ch:x.changes }));
+    const after=L.bed2Step(st, R, P, 7, 420).filter(e=>e.kind==='loop'); let bad=0, same=0;
+    for(const e of after){ const reg=L.bed2LoopReg(P, e.v, 7), K=kept[e.v]; if(e.step<reg.lo || e.step>reg.hi){ bad++; continue; }
+      if(K.steps && st.loops[e.v].changes===K.ch){ if(K.steps.some(s=>L.bed2Fold(s, reg.lo, reg.hi, 7)===e.step)) same++; else bad++; } }
+    n++; if(bad || !same) miss(`a scale-size change: ${bad} loop notes off their phrase or register, ${same} kept`); }
+  /* the wavetables: band-limited (energy above the zone's last harmonic); CONTROL: a table with harmonics past the limit is caught */
+  { const T=L.bed2Tables(48000), N=T.size, over=(t, fromK)=>{ let e=0, tot=0; for(let k=1;k<200;k++){ let re=0, im=0; for(let i=0;i<N;i+=1){ re+=t[i]*Math.cos(2*Math.PI*k*i/N); im+=t[i]*Math.sin(2*Math.PI*k*i/N); } const p=re*re+im*im; tot+=p; if(k>=fromK) e+=p; } return e/tot; };
+    for(const z of [3,5]){ const H=Math.max(1, Math.min(64, Math.floor(0.45*48000/T.zones[z]))); n++; if(over(T.saw[z], H+1)>1e-9) miss(`wavetable zone ${z} has energy above harmonic ${H}`); if(T.saw[z][N]!==T.saw[z][0]) miss(`wavetable zone ${z}: no guard sample`); }
+    const bad=new Float32Array(N+1); for(let i=0;i<N;i++) for(let k=1;k<=30;k++) bad[i]+=Math.sin(2*Math.PI*k*i/N)/k; n++;
+    if(!(over(bad, 25)>1e-4)) miss('CONTROL: a table with 30 harmonics read as band-limited at 24 — the check cannot fail'); }
+  return { cases:n, total:d.length, differences:d, notes:['work census (laptop µs per quantum, 5 degrees, an hour): '+Object.entries(work).map(([k,w])=>`${k} ${w.full} (95 % ${w.p95}, peak ${w.peak}; Lighter ${w.light}, 95 % ${w.lightP95}, peak ${w.lightPeak})`).join(' · ')+`; the gate ${BUDGET} µs = 5 %`] };
+}
 /* NIGHT-3: THE ROOM RECORDS — every room of the catalogue is valid (apps/night/pure/room.js) against this app's modes, the ids are the pinned list,
    every look's tokens are in night.css, every Night mood has a look, an unknown mood falls back to the room's default look; CONTROLS: each damage
    of ROOM_DAMAGES is refused with a line naming its field */
@@ -1026,6 +1121,7 @@ const ROWS=[
   ['NIGHT cricket schedule (app)', ()=>nightCricketsCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['NIGHT room records (app)',  ()=>nightRooms(),       r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // NIGHT-3
   ['NIGHT music bed law (app)', ()=>nightBedLaw(),     r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // NIGHT-3 stage 4
+  ['NIGHT music bed v2 law (app)', ()=>nightBed2Law(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-4
   ['VIS1c fireflies (core)',    ()=>fliesCore(),    r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['NIGHT cycle (core)',        ()=>nightCore(),    r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // RUN 9
   ['FOREST life (core)',        ()=>lifeCore(),     r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // RUN 9 (slice 2)
@@ -1043,13 +1139,14 @@ for(const [name,run,read] of ROWS){
   const t0=performance.now(); let row;
   if(!verbose){ console.log=console.warn=console.table=console.info=mute; }
   try{ let res=run(); if(res && typeof res.then==='function') res=await res;
-       const x=read(res); row={ check:name, cases:x.cases, differences:x.diff }; if(x.diff) lists.push([name, x.list||[]]); }
+       const x=read(res); row={ check:name, cases:x.cases, differences:x.diff }; if(x.notes) Object.defineProperty(row, 'notes', { value:x.notes }); if(x.diff) lists.push([name, x.list||[]]); }
   catch(err){ row={ check:name, cases:'—', differences:'ERROR' }; lists.push([name,[String(err&&err.stack||err)]]); }
   finally{ Object.assign(console,keep); }
   row.ms=Math.round(performance.now()-t0);
   row.status= row.differences===0 ? 'pass' : 'FAIL';
   rows.push(row);
   out(`[probe-data] ${row.status==='pass'?'pass':'FAIL'} · ${name} · ${row.cases} cases · ${row.differences} differences · ${row.ms} ms`);
+  for(const x of row.notes||[]) out(`[probe-data]     ${x}`);   // NIGHT-4: a row's notes (numbers worth seeing, not judged)
 }
 console.table(rows);
 for(const [name,list] of lists){ console.warn(`[probe-data] ${name}: first differences`); list.slice(0,5).forEach(m=>console.warn('   '+m)); }

@@ -159,6 +159,17 @@ async function tailPill(label, dir, addr){ const served=[], bad=[], srv=await se
     await page.goto(origin+addr+'?probe'); await page.waitForFunction(()=>window.P,null,{ timeout:90e3 }).catch(()=>bad.push('window.P did not appear')); await page.waitForTimeout(500); if(await page.$('#tailPill')) bad.push('?probe alone shows the pill');
   }catch(e){ bad.push('error: '+(e&&e.message||e)); } finally{ await browser.close().catch(()=>{}); srv.close(); }
   out(`[smoke] quiet-floor switch, ${label}: ${bad.length?'NOT A PASS — '+bad.slice(0,4).join(' · '):'PASS'}`); return bad; }
+/* NIGHT-4: the music bed's A/B pills: ?probe&bed=v1 reads v1 and flips to v2; ?probe&bed shows the voices pill and flips it; the bed's worklet
+   file is served from its path (the build carries it); ?probe alone shows no pill */
+async function bedPill(label, dir, addr){ const served=[], bad=[], srv=await serve(dir,'/',served,null), origin=`http://127.0.0.1:${srv.address().port}`, browser=await chromium.launch({ channel:'chrome', headless:true });
+  try{ const ctx=await browser.newContext(); await cdnCache(ctx); const page=await ctx.newPage(); page.on('pageerror', e=>bad.push('page error: '+(e&&e.message||e)));
+    await page.goto(origin+addr+'?probe&bed=v1'); await page.waitForSelector('#bedEnginePill',{ timeout:90e3 }); if(!/v1/.test(await page.textContent('#bedEnginePill'))) bad.push('=v1 did not read v1');
+    await page.click('#bedEnginePill'); if(!/Bed: v2/.test(await page.textContent('#bedEnginePill'))) bad.push('the bed pill did not flip to v2');
+    const v0=await page.textContent('#bedVoicesPill'); await page.click('#bedVoicesPill'); if(v0===await page.textContent('#bedVoicesPill')) bad.push('the voices pill did not flip');
+    const st=await page.evaluate(async ()=>(await fetch(window.__bedSwitch.worklet)).status).catch(()=>0); if(st!==200) bad.push('the bed worklet is not served (HTTP '+st+')');
+    await page.goto(origin+addr+'?probe'); await page.waitForFunction(()=>window.P,null,{ timeout:90e3 }).catch(()=>bad.push('window.P did not appear')); await page.waitForTimeout(500); if(await page.$('#bedPills')) bad.push('?probe alone shows the bed pills');
+  }catch(e){ bad.push('error: '+(e&&e.message||e)); } finally{ await browser.close().catch(()=>{}); srv.close(); }
+  out(`[smoke] music bed switch, ${label}: ${bad.length?'NOT A PASS — '+bad.slice(0,4).join(' · '):'PASS'}`); return bad; }
 async function roomAbsent(dir){ const served=[], srv=await serve(dir,'/',served,null), origin=`http://127.0.0.1:${srv.address().port}`; let st=0; try{ st=(await fetch(origin+'/'+ROOM)).status; }catch(e){} srv.close(); const ok=st===404; out(`[smoke] headroom page on production: ${ok?'PASS — absent':'NOT A PASS — HTTP '+st}`); return ok?0:1; }
 /* ?probe on a built tree: window.P on a preview, nothing at all on production */
 async function probeGate(app, dir, want){ const served=[], srv=await serve(dir,'/',served,null), origin=`http://127.0.0.1:${srv.address().port}`, browser=await chromium.launch({ channel:'chrome', headless:true }); const bad=[];
@@ -180,6 +191,7 @@ for(const app of ['full','night']) for(const prefix of ['/','/some/sub/']) if((a
 if((await statsPage('repo tree',ROOT)).length) fails++;
 if((await roomPage('repo tree',ROOT,'/apps/night/')).length) fails++;
 if((await tailPill('repo tree',ROOT,'/apps/night/')).length) fails++;
+if((await bedPill('repo tree',ROOT,'/apps/night/')).length) fails++;   // NIGHT-4
 for(const app of ['full','night']) if((await panelGate(`${app}, repo tree`,ROOT,`/apps/${app}/`,true)).length) fails++;
 if(!NO_CONTROL){ const c=await panelGate('CONTROL (its file refused)',ROOT,'/apps/night/',true,'calpanel.js'); out(`[smoke] CONTROL (the panel without its file must fail): ${c.length?'caught':'NOT caught'}`); if(!c.length) fails++; }
 if(!NO_CONTROL){ const c=await roomPage('CONTROL (its sums refused)',ROOT,'/apps/night/','headroom-calc.js'); out(`[smoke] CONTROL (the headroom page without its sums must fail): ${c.length?'caught':'NOT CAUGHT — the test cannot fail'}`); if(!c.length) fails++; }
@@ -191,7 +203,7 @@ if(BUILD){ fails+=await redirectCheck();
     if((await run(app,prev,'/')).length) fails++;
     fails+=await probeGate(app,prod,false); fails+=await probeGate(app,prev,true);
     if((await statsPage(`${app} preview`,prev)).length) fails++; fails+=await statsAbsent(prod);
-    if(app==='night'){ if((await roomPage('night preview',prev,'/')).length) fails++; if((await tailPill('night preview',prev,'/')).length) fails++; fails+=await roomAbsent(prod); }
+    if(app==='night'){ if((await roomPage('night preview',prev,'/')).length) fails++; if((await tailPill('night preview',prev,'/')).length) fails++; if((await bedPill('night preview',prev,'/')).length) fails++; fails+=await roomAbsent(prod); }
     if((await panelGate(`${app} preview`,prev,'/',true)).length) fails++; if((await panelGate(`${app} production`,prod,'/',false)).length) fails++; }
   if((await run('night',build('night','release'),'/',false,false)).length) fails++; }
 if(!NO_CONTROL){ const c=await run('full',prodFull||ROOT,'/',true); const caught=c.some(x=>/ks-worklet/.test(x));

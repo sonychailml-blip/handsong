@@ -13,7 +13,7 @@ import { fxDenorm } from '../../core/modules/effects/param.js';
 import { NIGHT_FX } from '../../core/modules/effects/night-fx.js';
 import { ROOMS, roomById } from './rooms/index.js';   // NIGHT-3: the current room's nature recipe (its default level, its wind)
 import { bedNext } from './pure/bed.js';
-import { bedSetMode, bedModeOf, bedSetVolume, bedVolumeOf, bedSetAnswer, bedAnswerOf, bedTick } from './bed.js';   // NIGHT-3 stage 4: the music bed
+import { bedSetMode, bedModeOf, bedSetVolume, bedVolumeOf, bedSetAnswer, bedAnswerOf, bedTick, bedSetLight } from './bed.js';   // NIGHT-3 stage 4: the music bed (NIGHT-4: v2, Lighter)
 import { t, onLangChange } from '../../core/i18n.js';
 import { svgIcon } from '../../core/icons.js';
 import { nightView, setNightView, chainKeyOf, setVolFloor } from '../../core/state.js';
@@ -38,6 +38,8 @@ const GHOST_WAIT=10000;   // after the calibration the ghost waits this long for
    default position nothing changed. */
 const room=()=>(roomById(sceneRoom())||ROOMS[0]).record, nature=()=>room().nature;
 const roomSound=()=>{ const v=parseFloat(load(KEY.roomSound)); return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : nature().level; };
+/* NIGHT-4: a weak device (≤ 2 GB or ≤ 2 cores, as the browser reports) gets the music bed's lighter variant whatever the setting */
+const WEAK=!!((navigator.deviceMemory && navigator.deviceMemory<=2) || (navigator.hardwareConcurrency && navigator.hardwareConcurrency<=2));
 export const REACH=0.6;   // the hand's reach in the room (Forest depth's `reach`): the old «Forest» slider's default
 
 /* the doors (ui.js): timbres() / timbre() / setTimbre(id) / timbreName(id); moods() / mood() / setMood(id); hand() 'right'|'left' /
@@ -50,7 +52,7 @@ export function nightShellFace(p){
   setNightView(on ? { glow:p.noteField==='glow', plain:p.labels==='plain', fieldAll:load(KEY.field)==='1', tips:load(KEY.joints)!=='all' } : null);   // RUN 8: tips — fingertips only (dev switch)
   document.body.classList.toggle('night-plain', on && !!(D && D.plain()));
   /* NIGHT-3 stage 4: the music bed (its mode before the ambience: with the bed on, the drone stays out) */
-  if(on){ const v=parseFloat(load(KEY.musicVol)); if(Number.isFinite(v)) bedSetVolume(v); bedSetAnswer(load(KEY.musicAnswer)==='1'); bedSetMode(load(KEY.music)||'off', room().bed); }
+  if(on){ const v=parseFloat(load(KEY.musicVol)); if(Number.isFinite(v)) bedSetVolume(v); bedSetAnswer(load(KEY.musicAnswer)==='1'); bedSetMode(load(KEY.music)||'off', room().bed, room().bed2); }
   else bedSetMode('off');
   amb=on && !!p.ambience; ambienceOn(amb, roomSound());
   setTimbreTrim(on ? p.levels : null);   // RUN 8: the face's per-timbre level trim (Full: none)
@@ -97,7 +99,7 @@ function sleepSet(mins){
 function infoShow(v){ info=v; $('nightInfo').hidden=!v; if(v) render(); }
 function wire(){
   const tap=(id,f)=>{ $(id).onclick=()=>{ if(!D) return; f(); glint($(id)); render(); }; };
-  tap('nightMusic', ()=>{ const m=bedNext(bedModeOf()); bedSetMode(m, room().bed); save(KEY.music, m); if(amb) ambienceOn(true, roomSound()); });   // NIGHT-3 stage 4: off → still → drift → glimmer → off; the drone hands over
+  tap('nightMusic', ()=>{ const m=bedNext(bedModeOf()); bedSetMode(m, room().bed, room().bed2); save(KEY.music, m); if(amb) ambienceOn(true, roomSound()); });   // NIGHT-3 stage 4: off → still → drift → glimmer → off; the drone hands over
   tap('nightSound', ()=>D.setTimbre(nextOf(D.timbres(), D.timbre())));
   tap('nightMood', ()=>D.setMood(nextOf(D.moods(), D.mood())));
   tap('nightNotes', ()=>D.setNoteMode(D.noteMode()==='hold' ? 'note' : 'hold'));
@@ -177,7 +179,7 @@ function bars(now, hv, fxv){
    largest fixed cost), struck sounds ring at most 60 % of their caps (audio.setLowPower), the forest picture at medium (the level chosen
    before is remembered and comes back when it is off), no glass blur. `boot` = applied with the face (the scene level only if it differs). */
 function lightApply(v, boot){
-  setLowPower(v); const I=fxInstance(chainKeyOf('ld'),'fdepth'); if(I && I.params[4]) I.params[4].setNorm(v ? 1 : 0);
+  setLowPower(v); bedSetLight(v || WEAK); const I=fxInstance(chainKeyOf('ld'),'fdepth'); if(I && I.params[4]) I.params[4].setNorm(v ? 1 : 0);   // NIGHT-4: the music bed's lighter variant too (also on a weak device)
   if(v){ const cur=sceneLevel(); if(cur==='full'){ if(!boot || load(KEY.lightScene)==null) save(KEY.lightScene, cur); setSceneLevel('reduced'); } }
   else if(!boot){ const back=load(KEY.lightScene); if(back && sceneLevel()==='reduced') setSceneLevel(back); }
 }

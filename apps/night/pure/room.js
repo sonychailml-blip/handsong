@@ -5,7 +5,7 @@ export const ROOM_FORMAT='handsong/room', ROOM_VERSION=1;
 export const ROOM_IDS=Object.freeze(['room.forest']);   // pinned: never renamed or reused
 export const ROOM_LEVELS=Object.freeze(['full','reduced']);   // the WebGL levels; «minimal» is the 2D stand-in
 export const ROOM_ACOUSTICS=Object.freeze(['fdepth']);
-const FIELDS=['format','version','id','name','tokens','levels','looks','moods','look','nature','acoustic','bed'];
+const FIELDS=['format','version','id','name','tokens','levels','looks','moods','look','nature','acoustic','bed','bed2'];
 const NATURE=['id','drone','wind','crickets','echo','level','master','ahead'];
 const plain=o=> o!==null && typeof o==='object' && !Array.isArray(o);
 const num=v=> typeof v==='number' && Number.isFinite(v);
@@ -38,7 +38,7 @@ export function checkRoom(r, known={}){
   if(!num(N.master) || N.master<=0 || N.master>1) return 'nature.master: above 0, at most 1';
   if(!num(N.ahead) || N.ahead<=0 || N.ahead>2) return 'nature.ahead: above 0, at most 2 s';
   if(!ROOM_ACOUSTICS.includes(r.acoustic)) return 'acoustic: one of '+ROOM_ACOUSTICS.join(' / ');
-  return checkBed(r.bed);
+  return checkBed(r.bed) || checkBed2(r.bed2);
 }
 /* NIGHT-3 stage 4: the music bed's recipe (see the forest's record) */
 const range=(a, lo, hi)=> Array.isArray(a) && a.length===2 && num(a[0]) && num(a[1]) && a[0]>=lo && a[1]<=hi && a[0]<=a[1];
@@ -62,6 +62,41 @@ function checkBed(B){
     if(Q.glim!==null && (!plain(Q.glim) || !range(Q.glim.every, 2, 120))) return `bed.presets.${k}.glim: null or { every }`; }
   return null;
 }
+/* NIGHT-4: the music bed v2's recipe (see the forest's record; design PLAN.md §4b) */
+const nums=(a, k, lo, hi)=> Array.isArray(a) && a.length===k && a.every(x=>num(x) && x>=lo && x<=hi);
+const in01=x=> num(x) && x>=0 && x<=1;
+function checkBed2(B){
+  if(!plain(B)) return 'bed2: the music bed v2 recipe';
+  if(!num(B.master) || B.master<=0 || B.master>1) return 'bed2.master: above 0, at most 1';
+  if(!in01(B.level)) return 'bed2.level: 0…1';
+  if(!plain(B.arc) || !range(B.arc.period, 60, 1800)) return 'bed2.arc: { period [lo, hi] s, 60…1800 }';
+  if(!plain(B.breath) || !range(B.breath.every, 2, 30)) return 'bed2.breath: { every [lo, hi] s, 2…30 }';
+  if(!plain(B.color) || !range(B.color.every, 2, 300) || !range(B.color.tc, 0.05, 60) || !in01(B.color.spread)) return 'bed2.color: { every, tc, spread 0…1 }';
+  const G=B.ground; if(!plain(G) || !num(G.amp) || G.amp<0 || G.amp>0.5 || !in01(G.fifth) || !num(G.beat) || G.beat<0 || G.beat>2 || !in01(G.send)) return 'bed2.ground: { amp, fifth 0…1, beat 0…2 Hz, send }';
+  const P=B.pad; if(!plain(P) || !num(P.amp) || P.amp<=0 || P.amp>0.5 || !range(P.attack, 0.5, 20) || !range(P.release, 0.5, 20) || !range(P.detune, 0, 25) || !in01(P.send)) return 'bed2.pad: { amp, attack, release 0.5…20 s, detune 0…25 cents, send }';
+  const L=B.loops; if(!plain(L) || !num(L.amp) || L.amp<=0 || L.amp>0.5 || !range(L.attack, 0.3, 10) || !range(L.hold, 0, 20) || !range(L.release, 0.5, 20) || !range(L.detune, 0, 25)
+    || !in01(L.vary) || !in01(L.renew) || L.vary+L.renew>1 || !in01(L.send)) return 'bed2.loops: { amp, attack ≥ 0.3 s (never struck), hold, release, detune, vary + renew at most 1, send }';
+  const V=B.voices; if(!plain(V) || !plain(V.a) || !Array.isArray(V.a.vowels) || V.a.vowels.length<2 || !V.a.vowels.every(f=>nums(f, 2, 100, 4000)) || !nums(V.a.q, 2, 0.3, 30)
+    || !num(V.a.breath) || V.a.breath<0 || V.a.breath>0.3 || !in01(V.a.body) || !plain(V.b) || !range(V.b.bloom, 0.5, 20) || !num(V.b.q) || V.b.q<=0.3 || V.b.q>10) return 'bed2.voices: { a: { vowels [[F1, F2] …], q, breath, body }, b: { bloom, q } }';
+  const S=B.glass; if(!plain(S) || !num(S.amp) || S.amp<=0 || S.amp>0.3 || !range(S.oct, 1, 6) || !range(S.attack, 0.05, 2) || !range(S.decay, 0.2, 10) || !in01(S.send)
+    || !nums(S.ratios, 3, 1, 16) || !nums(S.gains, 3, 0, 1)) return 'bed2.glass: { amp, oct, attack ≥ 0.05 s (never struck), decay, send, ratios, gains }';
+  const A=B.air; if(!plain(A) || !num(A.amp) || A.amp<0 || A.amp>0.1 || !nums(A.bands, 2, 200, 9000) || !num(A.sway) || A.sway<0 || A.sway>0.5 || A.bands[1]*(1+A.sway)>10500 || !num(A.q) || A.q<=0.3 || A.q>20 || !range(A.every, 1, 120) || !num(A.tc) || A.tc<=0)
+    return 'bed2.air: { amp 0…0.1, bands 200…9000 Hz, sway 0…0.5 (the top at most 10.5 kHz: the worklet runs at half rate), q, every, tc }';
+  if(!plain(B.reverb) || !num(B.reverb.pre) || B.reverb.pre<0 || B.reverb.pre>0.1 || !in01(B.reverb.wet)) return 'bed2.reverb: { pre 0…0.1 s, wet 0…1 }';
+  const X=B.lighter; if(!plain(X) || !Number.isInteger(X.loops) || X.loops<1 || X.loops>4 || ![2, 3].includes(X.padOsc) || !Number.isInteger(X.padTones) || X.padTones<1 || X.padTones>4 || !num(X.glass) || X.glass<=0 || X.glass>1 || !num(X.release) || X.release<0.3 || X.release>1) return 'bed2.lighter: { loops 1…4, padOsc 2 | 3, padTones 1…4, glass (0, 1], release 0.3…1 }';
+  if(!plain(B.presets) || Object.keys(B.presets).join()!==BED_PRESETS.join()) return 'bed2.presets: '+BED_PRESETS.join(', ');
+  for(const [k,Q] of Object.entries(B.presets)){ const at=`bed2.presets.${k}`;
+    if(!plain(Q) || !Number.isInteger(Q.loops) || Q.loops<1 || Q.loops>4) return `${at}: loops 1…4`;
+    if(!Array.isArray(Q.loopLen) || Q.loopLen.length<Q.loops || !Q.loopLen.every(x=>num(x) && x>=5 && x<=120) || new Set(Q.loopLen).size!==Q.loopLen.length) return `${at}.loopLen: one length per loop, 5…120 s, all different (the combination must not repeat)`;
+    if(!range(Q.loopReg, -1, 4) || !range(Q.notes, 1, 6) || !Number.isInteger(Q.notes[0]) || !Number.isInteger(Q.notes[1])) return `${at}: loopReg [lo, hi] octaves, notes [lo, hi] 1…6`;
+    if(!range(Q.padTones, 1, 4) || !Number.isInteger(Q.padTones[0]) || !Number.isInteger(Q.padTones[1]) || !range(Q.padReg, -1, 4) || Q.padReg[1]-Q.padReg[0]<2) return `${at}: padTones 1…4, padReg at least 2 octaves wide (open voicing over two to three octaves)`;
+    if(!range(Q.every, 4, 120)) return `${at}.every: [lo, hi] s between chords, 4…120`;
+    if(Q.glass!==null && (!plain(Q.glass) || !range(Q.glass.every, 1, 120))) return `${at}.glass: null or { every }`;
+    if(typeof Q.air!=='boolean' || !num(Q.breath) || Q.breath<0 || Q.breath>6 || !in01(Q.bright) || !in01(Q.arcDepth)) return `${at}: air (a switch), breath 0…6 dB, bright 0…1, arcDepth 0…1`;
+    if(!num(Q.rt60) || Q.rt60<0.5 || Q.rt60>15 || !num(Q.damp) || Q.damp<500 || Q.damp>12000) return `${at}: rt60 0.5…15 s, damp 500…12000 Hz`;
+    if(!num(Q.loopDb) || Q.loopDb<-12 || Q.loopDb>12) return `${at}.loopDb: −12…12 dB`; }
+  return null;
+}
 /* the CONTROLS of the data row: each damage must be refused with a line naming its field */
 export const ROOM_DAMAGES=Object.freeze([
   ['id', r=>{ r.id='room.monastery'; }],
@@ -81,4 +116,7 @@ export const ROOM_DAMAGES=Object.freeze([
   ['bed.presets', r=>{ delete r.bed.presets.glimmer; }],   // stage 4
   ['bed.glim', r=>{ r.bed.glim.swell=0; }],
   ['bed.presets.drift', r=>{ r.bed.presets.drift.voices=5; }],
+  ['bed2.presets.drift.loopLen', r=>{ r.bed2.presets.drift.loopLen=[17, 23, 23, 31]; }],   // NIGHT-4: equal loop lengths would repeat
+  ['bed2.loops', r=>{ r.bed2.loops.attack=[0.05, 1]; }],   // a struck attack
+  ['bed2.presets', r=>{ delete r.bed2.presets.drift; }],
 ]);

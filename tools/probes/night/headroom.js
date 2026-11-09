@@ -19,6 +19,7 @@ import { afPause } from '../../../core/frzqueue.js';
 import * as C from './headroom-calc.js';
 import { LEAN_PATH } from '../../../apps/night/shell.js';
 import { bedPlan } from '../../../apps/night/bed.js';   // NIGHT-3 stage 4: the music bed
+import { bed2Plan, bed2Load } from '../../../apps/night/bed2.js';   // NIGHT-4: the music bed v2
 import { FOREST_ROOM } from '../../../apps/night/rooms/forest/pure/room.js';
 
 const off=undefined, wait=ms=>new Promise(r=>setTimeout(r,ms));
@@ -107,13 +108,28 @@ export async function sharedParts(tell=()=>{}){
   return out;
 }
 /* NIGHT-3 stage 4: THE MUSIC BED's cost, the NIGHT-1 way — offline, best of `times`, µs per 128-sample quantum — over Night's lean chain at rest,
-   without and with the bed (each preset), the ambience beside it for scale; `addPct` = the bed's own share of the quantum (the gate: ≤ 3 %) */
+   without and with the bed (each preset), the ambience beside it for scale; `addPct` = the bed's own share of the quantum (the gate: ≤ 3 % at
+   stage 4, ≤ 5 % for v2 since NIGHT-4) */
 export async function bedCost(tell=()=>{}, times=5){
-  const len=14, win=[4,13], out={}, B=FOREST_ROOM.bed;
+  const len=14, win=[4,13], out={}, B=FOREST_ROOM.bed, B2=FOREST_ROOM.bed2;
   const base=await best(eng=>{ prep(eng,NIGHT[0]); }, len, { win }, times); out.base=row(base); tell('base');
   const plus=(k,r)=>{ out[k]={ ...row(r), add:C.round(r.us-base.us,0), addPct:C.round(C.loadPct(r.us-base.us, r.rate),2) }; tell(k); };
   for(const p of ['still','drift','glimmer']) plus('bed '+p, await best((eng,E,add)=>{ prep(eng,NIGHT[0]); bedPlan(E, E.master.in, B, p, len, { at:add }); }, len, { win }, times));   // parking as live
   plus('ambience', await best(eng=>{ prep(eng,NIGHT[0]); eng.ambienceOn(true,0.6,0); eng.ambienceTick(len); }, len, { win }, times));
+  /* NIGHT-4: v2 (one worklet) — the bed alone in a bare offline context (a worklet cannot load into the render copy's stubbed context), the
+     same window from the start and at the first arc's fullest point (where most voices sound), full and Lighter; v1 the same way beside it */
+  const bare=async(build, sec, w)=>{ let m=Infinity; for(let i=0;i<times;i++){ const ctx=new OfflineAudioContext(2, Math.round(AC.sampleRate*sec), AC.sampleRate); await bed2Load(ctx);
+      const map=new Map(), at=(t,fn)=>{ const q=Math.max(0, Math.floor(t*ctx.sampleRate/128)); if(!map.has(q)) map.set(q,[]); map.get(q).push(fn); }; await build({ ac:ctx }, ctx.destination, at); let work=0;
+      for(const [q,fns] of map){ if(q===0){ fns.forEach(f=>f()); continue; } ctx.suspend(q*128/ctx.sampleRate).then(()=>{ const w0=performance.now(); fns.forEach(f=>f()); work+=performance.now()-w0; ctx.resume(); }); }
+      const st=[]; for(const t of w) ctx.suspend(t).then(()=>{ st.push(performance.now()-work); ctx.resume(); }); await ctx.startRendering(); m=Math.min(m, st[1]-st[0]); }
+    return C.usPerQuantum(m, w[1]-w[0], AC.sampleRate); };
+  const solo=(k,us)=>{ out[k]={ us:C.round(us,0), pct:C.round(C.loadPct(us, AC.sampleRate),2) }; tell(k); }, W2=[win[0]+25, win[1]+25];
+  for(const p of ['still','drift','glimmer']){
+    solo('alone v1 '+p, await bare((E,d,at)=>bedPlan(E, d, B, p, len, { at }), len, win));
+    solo('alone v2 '+p, await bare((E,d)=>bed2Plan(E, d, B2, p, len), len, win));
+    solo('alone v2 '+p+', fullest', await bare((E,d)=>bed2Plan(E, d, B2, p, len+25, { skip:'peak' }), len+25, W2));
+    solo('alone v2 '+p+', fullest, Lighter', await bare((E,d)=>bed2Plan(E, d, B2, p, len+25, { skip:'peak', light:true }), len+25, W2));
+    solo('alone v2 '+p+', fullest, horns', await bare((E,d)=>bed2Plan(E, d, B2, p, len+25, { skip:'peak', palette:'b' }), len+25, W2)); }
   return out;
 }
 /* 2. one ringing note, then more */

@@ -9,6 +9,7 @@
 - Stage 4 changes (user, 2026-11-03): NO stepping back while playing (the bed keeps its own slow life; the «Step back» setting dropped); the response, if any, subtle and musical — built as «the next chord leans toward the notes you played», a switch, off by default (not clearly better without ears). Sound: detune between each voice's two oscillators, a slow filter drift, pads below the playing; default level near the nature sound; the bed's notes shown in the room → backlog.
 - Stage 4 as built (2026-11-04): two shared side filters instead of one per voice, quiet voices parked, every moved param k-rate — 2.1–2.5 % of a quantum (one filter and pan per voice was 3.7–4.2 %).
 - **⛳ WHERE WE STOPPED (2026-11-09):** stage 5 part 1 (settings) is built, approved and committed by the user. **Next: stage 5 part 2, the switching machinery**, started by the user in a new window. Nothing of part 2 is built yet.
+- **NIGHT-4 (user, 2026-11-09): the music bed, version 2, comes first; part 2 waits.** Design note and «as built»: §4b below. Built 2026-11-09; waiting for step 131 (five checks by ear) and the user's A/B choice (v1 / v2, voices / horns).
 - **Stage 5 part 2: what it is and the user's notes (2026-11-08/09).** Scope (the user's words): the fades, hand detection paused while a room builds, the two-slot nature crossfade, the room remembered, the low-memory rules, the row «NIGHT room switch» with its control, all tested with a development-only test room players never see; Dark or Camera → Room must not crackle either; the Room button stays hidden for players until there are two real rooms. Notes:
   - **The row is judged on exact controls** (user, 2026-11-09), replacing §7's real-time control: (1) hand detection takes no frame while a room builds — the old way (no pause) takes some; (2) no audio node is created during a switch — the counter must see a node made inside its window; (3) no click in an offline render of the nature crossfade — an instant swap must show one; (4) after 20 switches programs, geometries, textures and contexts are back at their baseline — a test room that leaks a texture must be caught. The real-time dropouts (switches vs quiet windows, and the old way) are printed, not judged; so `--repeat 3` is not required.
   - **Also in part 2:** fix the stale `shell.js` line in `CLAUDE.md`'s module map (it says «four controls»); the bar shown while playing (`#nightForestBar`, today the fixed key `night.forest` «Лес») is labelled with the current room's name.
@@ -101,6 +102,73 @@ The forest becomes the first room. A room is a folder `apps/night/rooms/<name>/`
 
 **On the Poco:** its audio thread runs on cores close to this laptop's in single-core speed, so about 1–1.5× (est.): the bed ≈ 2–3%, nature + bed ≈ 4–6% of the quantum. Since NIGHT-1 stage 2, the laptop has 50–63% free with camera, tracking and the forest. The bed is about a sixth of one 12.5% ballast step, below what real time can resolve. NIGHT-1's Poco numbers aren't in yet, so the Poco figure is an extrapolation until the phone page runs with the bed added.
 **Gate:** the bed's offline cost must stay at or under 3% of the laptop quantum (a probe row). If the Poco's free share under stress with camera, room and bed falls below 25%, the «Lighter» setting also drops the glimmer and one pad voice.
+
+## 4b. NIGHT-4: the music bed, version 2 (design note, 2026-11-09)
+**Why v1 is thin** (the user's ears): one low octave (110–165 Hz), one plain timbre, nearly dry, a random chord every 13–22 s. **The aim:** full, always new, restful (Music for Airports, Budd, Yoshimura, Stars of the Lid).
+
+**Engine: one AudioWorklet node** (`apps/night/worklets/bed-worklet.js`) holds every v2 voice and its reverb. Measured first (laptop, offline µs per 128-frame quantum, best of 5; the quantum is 2,667 µs): native convolution with a generated stereo IR costs 66 µs at 0.26 s, 141 at 1 s, 696 at 6 s. Live, the part after 0.26 s moves to a background thread, but that is still about a quarter of a core on a phone. A native 8-line delay network costs 72 µs. Each native node costs 1–4.4 µs, so a layered bed in native nodes would cost ≈ 8 %. Written in JS inside one node, it is est. 2.5–3.5 %. **Chosen: the worklet.**
+- Rules: built once on the first On and parked while Off (disconnected, asleep: rule #3). Events are posted ≥ 0.5 s ahead with explicit times and applied at their exact frame (rule #15). Every Hz is priced by the driver from the live view (rule #2). Noise and LFOs are seeded. The reverb is inside the node and the node feeds the master's input, so none of the hand's effects reach it (rule #31). Wavetables are made once on the main thread and handed over, so nothing heavy runs on the audio thread. If AudioWorklet is missing, v1 plays.
+
+**The law** (`apps/night/pure/bed2.js`, pure, steps as in v1: degree `s mod n`, octave `floor(s/n)`, so phrases survive a Mood change):
+- **Ground:** the tonic and the fifth (today's drone pricing), with a 2nd and 3rd partial so small speakers hear it. It takes the drone over.
+- **Pad:** strings in open voicing, the root low and the rest spread over 2–3 octaves (110–500 Hz in A). Voice-led, a chord every 20–48 s, 5–8 s attacks.
+- **Loops:** 2–4 voices, each repeating its own phrase of 2–4 long notes on its own loop length (17, 23, 29, 31 s; Still 29, 37). At each loop's end a voice sometimes varies one note (≈ 25 %) or takes a new phrase (≈ 8 %).
+- **Glass** (high, soft-attacked, nearly all reverb, now and then 2–3 together) and **air** (two noise bands at 2.6–5.2 kHz, very quiet).
+- **Breath:** a swell every 8.5–11.5 s (≈ 6 a minute), about ±1.2 dB on pad and ground. **Arc:** density goes sparse → full → sparse over 5–10 min (seeded), starting sparse. It opens loops, pad tones and glass.
+- **Response** (off by default): your notes lean the choice of new phrase notes and chord roots. Each pick takes exactly one draw, so no time ever moves.
+
+**Timbres** (none struck, none a sine-and-breath flute, so none passes for Night's instruments):
+- ground: two warm sines, slowly beating;
+- pad: a bowed-string ensemble, 3 detuned band-limited saws, a two-pole low-pass whose colour drifts over 20–60 s;
+- loops, palette A «voices»: two detuned saws through two formant resonators that morph between vowels over a note;
+- loops, palette B «horns»: two detuned saws, a low-pass that blooms with each note;
+- glass: three near-harmonic sines;
+- air: as above.
+
+**Reverb:** an 8-line delay network (Hadamard mixing, lines 51–126 ms, four input allpasses, damping in the loop, two lines slowly modulated). RT60 5–7 s by preset, pre-delay 40 ms. It never changes while playing.
+
+**Presets:**
+- «Покой»: dark and deep. Ground, 2–3 low pad tones, 2 low loops, a slow breath, the longest room, no glass, no air.
+- «Течение»: 4 loops in the middle, a 3-tone pad, a little glass.
+- «Мерцание»: a brighter pad, 4 loops a little higher, glass and air.
+
+**Lighter** (the «Lighter forest» switch, or a device reporting ≤ 2 GB or ≤ 2 cores): at most 2 loops, 2 saws per pad tone, no air, half the glass.
+
+**A/B, dev only:** `?probe&bed=v1|v2&voices=a|b`, a pill each. v1 is unchanged.
+
+**Gate:** ≤ 5 % of the laptop quantum. Measured on the headroom page (`bedCost`) before and after, plus a deterministic work census in the node row (voice-samples per quantum per preset; Lighter well under full).
+
+**Checks:**
+- the node row «NIGHT music bed v2 law (app)»;
+- the browser row «NIGHT music bed» on v2, with v1 still working behind its switch;
+- NIGHT untouched with the music off.
+
+**As built (2026-11-09).** What changed from the note above, each found by measuring:
+- **Half rate.** Every voice and the room run at half the sample rate, with the tables band-limited for it and one 4-tap half-band interpolator on the output. The bed needs nothing above ≈ 10 kHz, and this cut its cost by a third to a half.
+- **Monophonic loop voices.** Each loop voice sings one note at a time: a new note takes over its own last note with a 1.8 s legato crossfade. This halved the loop notes sounding at once.
+- **Envelopes at block rate**, ramped inside the block.
+- **Wider pad registers:** Still 2.4 octaves, Drift 2.6, Glimmer 2.4, and the validator requires at least 2. A narrower register cannot open every root.
+- **The air at 4.8–8 kHz.** A pentatonic note field reaches 3.5 kHz (four octaves).
+- **Lighter** also caps the pad at three tones and shortens the pad's and loops' tails × 0.7.
+- **Levels** were set by the K-like loudness: the loops sit 2 dB under the pad, and Still's loops get +5 dB.
+
+**Cost** (laptop, offline, the bed alone, best of 5, % of a 128-frame quantum):
+
+| Preset | v1 | v2 | v2 at the arc's fullest | Lighter there |
+|---|---|---|---|---|
+| Still | 1.87 | 1.89 | 1.91 | 1.68 |
+| Drift | 2.44 | 2.25 | 1.88 | 1.73 |
+| Glimmer | 2.22 | 2.05 | 2.66 | 1.61 |
+
+The parts, in µs per quantum:
+- the node itself, idle: 6.9;
+- node + ground + room: 23.7;
+- each pad tone: 2.25;
+- each loop note: 3.9 («voices») / 2.2 («horns»);
+- each glass note: 2.0;
+- the air: 4.5.
+
+**The gate:** the work census (those part costs along the law's timeline) must peak under 133 µs = 5 %. Over an hour it peaks at 53 / 71 / 85 µs. Lighter's voices at their heavy moments stay at most 75 % of the full bed's. The node and its room (24 µs) stay in Lighter.
 
 ## 5. Which sketch room to port first
 

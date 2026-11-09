@@ -35,6 +35,20 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 5. The falling star passes in front of the trees. Natural?
 
 ## Records (English, at most about 15 lines each; older ones go to `archive/HANDOFF-history.md`)
+### NIGHT-4 (2026-11-09): the music bed, version 2. Log: `docs/night/WORK-LOG.md`; design and «as built»: `docs/night/design/NIGHT-3-rooms/PLAN.md` §4b
+- The user put it before stage 5 part 2 (switching), which still waits.
+- One AudioWorklet (`apps/night/worklets/bed-worklet.js`) holds every voice and the bed's own long stereo room, at half rate. Measured first: native convolution 66–696 µs for 0.26–6 s IRs; a native 8-line network 72 µs; per native node 1–4.4 µs.
+- The law (`pure/bed2.js`, node row «NIGHT music bed v2 law (app)», 174 cases):
+  - 2–4 loop voices, each repeating a phrase of 2–4 long notes on its own loop length (17 / 23 / 29 / 31 s), sometimes changed by a note; kept in steps, so a Mood change keeps the melodies;
+  - an open-voiced pad over 2–2.6 octaves; a warm ground that takes the drone over; soft glass; air above the note field;
+  - a breath about 6 a minute; an arc sparse → full → sparse over 5–10 min.
+- Timbres: bowed-string pad, loop voices «voices» (formant vowels, the default) or «horns» (blooming low-pass).
+- Presets: «Покой» dark and deep, «Течение» melodies in the middle, «Мерцание» bright with glass and air.
+- Lighter (the «Лёгкий лес» switch, or ≤ 2 GB / ≤ 2 cores): two loops, a 3-tone pad, no air, half the glass.
+- Cost (laptop, the bed alone): 1.9–2.7 % of a quantum at the arc's fullest (v1: 1.9–2.4 %). The census gate is 133 µs = 5 %; its peaks are 53 / 71 / 85 µs.
+- Level near the nature sound (K-like −1.0 / +1.1 / +1.9 dB).
+- v1 is unchanged behind the dev A/B pills `?probe&bed=v1|v2&voices=a|b`, and plays by itself if AudioWorklet is missing.
+- ⛳ Waiting for step 131 (five checks by ear) and the user's choice: v2 or v1, and voices or horns.
 ### NIGHT-3 stage 5 part 1 (2026-11-08): the settings card for rooms (CORE-10). Log: `docs/night/WORK-LOG.md`
 - «Что на экране»: «Комната · Тёмный · Камера». «Звуки комнаты» (was «Лес» under View) sits under Music beside «Громкость музыки» and sets only the room's sound; the hand's reach is fixed at the old default 0.6, so nothing changed at the default position. «Руки на экране» moved to Hand. The Lantern switch is gone (it stays off; what it did: the work log).
 - Landscape: Hand on the left, Music and View stacked on the right. Approved and committed by the user (2026-11-09).

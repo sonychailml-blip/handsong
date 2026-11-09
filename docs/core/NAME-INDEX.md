@@ -22,9 +22,15 @@ SPLIT-2: the Full app's entry.
 - fn (2): `wireStarter`, `openLessons`
 
 ## apps/night/bed.js
-NIGHT-3 stage 4: THE MUSIC BED's DRIVER (live) — the state the Music button and the settings set (off / still / drift / glimmer, the volume, the response switch, all remembered by the shell), the l…
-- const (6): `BED_SEED`, `bedTakesDrone`, `bedModeOf`, `bedVolumeOf`, `bedAnswerOf`, `bedDbg`
-- fn (5): `bedSetMode`, `bedSetVolume`, `bedSetAnswer`, `bedTick`, `bedPlan`
+NIGHT-3 stage 4: THE MUSIC BED's DOOR AND ITS v1 DRIVER (live) — the state the Music button and the settings set (off / still / drift / glimmer, the volume, the response switch, all remembered by t…
+- const (10): `BED_SEED`, `BED_ENGINES`, `bedTakesDrone`, `bedModeOf`, `bedVolumeOf`, `bedAnswerOf`, `bedEngineOf`, `bedPaletteOf`, `bedLightOf`, `bedDbg`
+- fn (8): `bedSetMode`, `bedSetVolume`, `bedSetAnswer`, `bedSetEngine`, `bedSetPalette`, `bedSetLight`, `bedTick`, `bedPlan`
+
+## apps/night/bed2.js
+NIGHT-4: THE MUSIC BED v2's DRIVER (live and offline).
+- const (4): `BED2_AHEAD`, `bed2Failed`, `bed2Dbg`, `bed2StatsLive`
+- fn (6): `bed2Load`, `bed2On`, `bed2Off`, `bed2Volume`, `bed2Tick`, `bed2Plan`
+- → ./sound/bed2.js (1): `bed2Stats`
 
 ## apps/night/calib.js
 NIGHT-2 stage 2: the hand's calibration screens over CORE-1's engine (core/handcal.js; design docs/night/design/NIGHT-2-calibration/DESIGN.md).
@@ -53,6 +59,11 @@ THE AMBIENCE'S SEEDED LAWS (RUN 7, C4c; docs/night/QUALITY.md points 1, 5, 8; Ni
 NIGHT-3 stage 4: THE MUSIC BED's LAW — what plays and when, as numbers (pure, rule #36; data row «NIGHT music bed law (app)»).
 - const (5): `BED_OFF`, `BED_ANSWER`, `bedNext`, `padRange`, `chordPcs`
 - fn (5): `voiceLead`, `rootWeights`, `bedInit`, `bedSoon`, `bedStep`
+
+## apps/night/pure/bed2.js
+NIGHT-4: THE MUSIC BED v2's LAW — what plays and when, as numbers (pure, rule #36; data row «NIGHT music bed v2 law (app)»).
+- const (4): `BED2_SEED`, `bed2Reg`, `BED2_WORK`, `BED2_TABLE`
+- fn (9): `bed2Fold`, `bed2Density`, `bed2Init`, `bed2Soon`, `bed2LoopReg`, `bed2Voice`, `bed2Step`, `bed2Work`, `bed2Tables`
 
 ## apps/night/pure/cycle.js
 RUN 9 — THE NIGHT over the forest, as numbers.
@@ -123,6 +134,15 @@ THE ROOMS' AMBIENCE (RUN 7, C4c; Night's own since CORE-7): drone + wind + dista
 NIGHT-3 stage 4: THE MUSIC BED's SOUND — built once on the first On into the master's input (the sleep fade and the limiter cover it; live sound, never a track — rule #31), from a room's bed recipe B.
 - const (1): `BED_POOL`
 - fn (8): `buildBed`, `bedVoice`, `bedVoicePark`, `bedFilter`, `bedGround`, `bedGlim`, `bedLevel`, `bedPark`
+
+## apps/night/sound/bed2.js
+NIGHT-4: THE MUSIC BED v2's NODE — one AudioWorkletNode («night-bed», apps/night/worklets/bed-worklet.js) into the master's input (the sleep fade and the limiter cover it; live sound, never a track…
+- const (3): `BED2_WORKLET`, `BED2_POOLS`, `BED2_DIV`
+- fn (4): `buildBed2`, `bed2Post`, `bed2Park`, `bed2Stats`
+
+## apps/night/worklets/bed-worklet.js
+NIGHT-4: THE MUSIC BED v2 — one AudioWorklet processor «night-bed» holding every voice of the bed and its own reverb (design: docs/night/design/NIGHT-3-rooms/PLAN.md §4b; the law apps/night/pure/be…
+- exports: none
 
 ## core/arrange.js
 Размер такта (metre) приходит через ctx.metre из loop.metre — модуль остаётся чистым (без импорта состояния).
@@ -940,6 +960,10 @@ SPLIT-2: the probe entry of the Night page: its own rows and the core rows flagg
 NIGHT-3 stage 4: row «NIGHT music bed» (P.night).
 - fn (1): `checkNightBed`
 
+## tools/probes/night/bedsw.js
+NIGHT-4: the music bed's A/B switch, dev only.
+- fn (1): `mountBedSwitch`
+
 ## tools/probes/night/calib.js
 NIGHT-2 stage 2: row «NIGHT calibration screens» (quick; the probe clock through the REAL processHands, an injected store and camera: no real key is touched).
 - fn (1): `checkNightCalib`
@@ -987,7 +1011,7 @@ SPLIT-2: row «NIGHT profile round trip» on Night's page: the checks of C0 that
 NIGHT-1 stage 3: the dev switch for the quiet floor.
 - fn (1): `mountTailSwitch`
 
-_191 modules, 2328 exported names._
+_196 modules, 2367 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 
