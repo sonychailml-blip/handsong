@@ -8370,3 +8370,15 @@ not a control · run a "random" failure many times and print WHERE and HOW MUCH 
   (2–3 s first time, then ~0.4 s) — now inside the opening; the hand lights never change the light count (no recompile on the first hand).
 - Rows: core «NIGHT cycle», «FOREST life», «NIGHT rare events»; browser «FOREST night cycle / response / detail / rare events / levels».
   Captures: `ui-snap --forest`. Open: steps 120–124, questions in WORK-LOG.
+
+## Moved from docs/night/HANDOFF.md at NIGHT-6 slices 0 + 1 (2026-11-09), word for word
+### NIGHT-2 stage 1 (2026-11-03): calibration screens, design only. `docs/night/design/NIGHT-2-calibration/DESIGN.md`
+- No app code. 12 screens at 3 sizes in `tools/design/NIGHT-2-calibration/`; 12 open questions. Stops until the user approves.
+### NIGHT-1 stage 3 (2026-11-03): the quiet floor, off for players. `docs/night/NIGHT-1-HEADROOM.md` «Stage 3», step 127
+- Partials and notes stop below −70 dBFS behind `?probe&tails=on`. Saving 2–11%, sound −46 to −64 dB away. Waiting for the user's ears.
+### NIGHT-1 stage 2 (2026-11-03): options 1 and 2. Numbers: `docs/night/NIGHT-1-HEADROOM.md` «Stage 2»
+- Night's face turns on CORE-3's lean path: unused stages, roles and closed effects out of the graph, silent flute banks parked. Same sound (−133 to −141 dB, row «NIGHT lean path»). Fast passages 32–36% → 15–19% of budget; free share with camera and forest about 13–38% → 50–63%. If Night's chain ever gains drive, brightness, tremolo or the expression hand, turn the matching switch off first; the row fails until then.
+### NIGHT-1 stage 1 (2026-11-02/03): sound headroom, measured. Numbers: `docs/night/NIGHT-1-HEADROOM.md`. Log: `docs/night/WORK-LOG.md`
+- Waiting for: the user's decision, the Poco numbers, step 125. No fixes yet.
+- Laptop, cool and idle: no crackle (0–2 dropouts in 39 stress passes). Free share under stress: a quarter to a third with sound alone, less with camera and forest; about one 12.5% step below Full's SuperSaw.
+- Heaviest: not the partials (a bowl's 24: 66 µs). The forest room, stages Night doesn't use, idle chord voices, flute and SuperSaw banks that never stop. Three unused stages save 17–20% with the sound identical (−138 dB). No slowdown near silence (control: 9–10× in JS).

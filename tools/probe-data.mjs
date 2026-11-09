@@ -984,6 +984,57 @@ async function lifeCore(){
   const h=A=>JSON.stringify(A.map(q=>q.p.map(v=>Math.round(v*1e9)))); n++; if(h(run({}, 300))!==h(run({ call:0, scatter:0 }, 300))) miss('CONTROL: call 0 / scatter 0 is not the old step');
   return { cases:n, total:d.length, differences:d };
 }
+/* NIGHT-6 slice 1: THE FOREST ANSWERS (apps/night/rooms/forest/pure/answers.js, apps/night/pure/heard.js). Dew: each level's count, inside its
+   band, never in the stream or under the eye, repeatable (CONTROL another seed differs); its light near ≥ 5× far, glint raises it, the light off
+   gives 0 (CONTROL: on gives more). Webs beside the trunks given: off the aisle, inside the band, each beside its own trunk (CONTROL a web at the
+   aisle is caught); none without trunks. A note's stream ring: full at the water, fainter away, none past the reach. The envelope: 0 before and
+   after, 1 at its peak, never above. The bed's clusters: disjoint, near their first, the farthest first (CONTROL r 0: one each). Heard: an event
+   lands at the output time; the CONTROL that ignores the output latency is early by it, more than one 30-fps frame. */
+async function forestAnswersCore(){
+  const d=[], notes=[]; let n=0; const miss=s=>d.push(s);
+  const A=await import(new URL('../apps/night/rooms/forest/pure/answers.js', import.meta.url).href), Li=await import(new URL('../apps/night/rooms/forest/pure/forestlife.js', import.meta.url).href);
+  const H=await import(new URL('../apps/night/pure/heard.js', import.meta.url).href), FR=(await import(new URL('../apps/night/rooms/forest/pure/room.js', import.meta.url).href)).FOREST_ROOM, D=A.ANSWERS.dew, W=A.ANSWERS.webs;
+  for(const lv of ['full','reduced']){ const want=FR.levels[lv].dew, p=A.dewPlaces(want); let bad=0; n+=2;
+    if(p.n!==want) miss(`${lv}: ${p.n} dew points (${want} wanted)`);
+    for(let i=0;i<p.n;i++){ const x=p.pos[i*3], z=p.pos[i*3+2]; if(Math.hypot(x-D.cam[0], z-D.cam[1])<D.camR || Li.streamNear(x,z).d<Li.STREAM.half+0.1 || Math.abs(x)>D.x || z>D.zNear || z<D.zFar) bad++; }
+    if(bad) miss(`${lv}: ${bad} dew points out of their band, in the water or under the eye`); }
+  { const a=A.dewPlaces(200), b=A.dewPlaces(200), c=A.dewPlaces(200, 7), h=x=>Array.from(x.pos).join(); n+=2; if(h(a)!==h(b)) miss('dew: one seed gave two sets'); if(h(a)===h(c)) miss('CONTROL dew: another seed gave the same set'); }
+  { const near=A.dewLight(0.3,1,0,1), far=A.dewLight(3,1,0,1), gl=A.dewLight(0.3,1,1,1), off=A.dewLight(0.3,0,1,1); n+=4;
+    if(!(near>=5*far)) miss(`dew: near ${near.toFixed(3)} vs far ${far.toFixed(3)}`); if(!(gl>near)) miss('dew: a glint does not raise it'); if(off!==0) miss('dew: the light off gives '+off); if(!(near>0)) miss('CONTROL dew: the light on gives nothing');
+    const wn=A.webLight(0.4,1,0), wf=A.webLight(4,1,0), wo=A.webLight(0.4,0,1); n+=3; if(!(wn>=5*wf)) miss(`webs: near ${wn.toFixed(3)} vs far ${wf.toFixed(3)}`); if(wo!==0) miss('webs: the light off gives '+wo); if(!(A.webLight(0.4,1,1)>wn)) miss('webs: a glint does not raise it'); }
+  { const trunks=[[-2.1,-2.2,0.34],[2.5,-4.6,0.42],[-1.3,-8.2,0.3],[3.6,0.4,0.28],[-4.2,-5,0.5],[1.1,-11.5,0.36],[-3.3,1.2,0.22],[4.6,-9,0.46],[0,-3,0.3],[9,-2,0.4],[-2,-20,0.4]];
+    const ok=(w,t)=>Math.abs(w.x)>=W.aisle-1e-9 && Math.abs(w.x)<=W.xMax+1e-9 && w.z<=W.zNear+0.25 && w.z>=W.zFar-0.25 && t.some(([x,z,r])=>Math.abs(Math.abs(w.x-x)-(r+w.s/2))<=W.off[1]+1e-9 && Math.abs(Math.abs(w.x-x)-(r+w.s/2))>=W.off[0]-1e-9 && Math.abs(w.z-z)<=0.25+1e-9);
+    const ws=A.webPlaces(9, trunks); n+=3; notes.push(`webs beside 11 test trunks: ${ws.length} of 9 asked`);
+    if(!(ws.length>=5 && ws.length<=9)) miss(`webs: ${ws.length} placed beside 11 trunks`); const bad=ws.filter(w=>!ok(w, trunks)); if(bad.length) miss('webs off their trunk or band: '+JSON.stringify(bad[0]));
+    if(ok({ x:0, z:-3, s:0.5 }, trunks)) miss('CONTROL webs: a web at the aisle passed'); n++; if(A.webPlaces(9, []).length) miss('webs without trunks'); }
+  { const R=A.ANSWERS.ring; n+=4; if(Math.abs(A.noteRingAmp(0,1)-R.amp)>1e-12) miss('the stream ring at the water ≠ its amp'); if(Math.abs(A.noteRingAmp(R.reach,1)-R.amp/Math.E)>1e-12) miss('the stream ring at the reach ≠ amp / e');
+    if(A.noteRingAmp(2.5*R.reach,1)!==0) miss('a stream ring far from the water'); if(A.noteRingAmp(0,0)!==0) miss('a stream ring at velocity 0'); }
+  { const e=a=>A.swellAt(a, 1.5, 0.5, 4); n+=4; if(e(-0.1)!==0 || e(6.01)!==0) miss('the envelope is not 0 outside'); if(Math.abs(e(1.5)-1)>1e-12 || Math.abs(e(1.9)-1)>1e-12) miss('the envelope is not 1 at its peak');
+    let mono=true, prev=-1, mx=0; for(let a=0;a<=1.5;a+=0.01){ const v=e(a); if(v<prev-1e-12) mono=false; prev=v; } for(let a=0;a<=6;a+=0.01) mx=Math.max(mx, e(a)); if(!mono) miss('the envelope does not rise steadily'); if(mx>1+1e-12) miss('the envelope above 1'); }
+  { const P=Li.lifePlaces(), C=A.bedClusters(P), all=C.flat(); n+=4;
+    if(C.length!==A.ANSWERS.bed.loop.clusters) miss(`${C.length} bed clusters (${A.ANSWERS.bed.loop.clusters} wanted)`);
+    if(new Set(all).size!==all.length || all.some(i=>P[i].kind!=='shroom')) miss('the bed clusters overlap or hold a flower');
+    if(C.some(c=>c.some(i=>Math.hypot(P[i].x-P[c[0]].x, P[i].z-P[c[0]].z)>A.ANSWERS.bed.loop.r+1e-9))) miss('a cluster member is far from its first');
+    const zs=C.map(c=>P[c[0]].z); if(zs.some((z,i)=>i && z<zs[i-1])) miss('the clusters are not farthest first: '+zs.map(z=>z.toFixed(2)).join(' '));
+    n++; if(A.bedClusters(P, 4, 0).some(c=>c.length!==1)) miss('CONTROL: clusters of radius 0 hold more than one');
+    notes.push('the bed\'s clusters: '+C.map(c=>`${c.length} at z ${P[c[0]].z.toFixed(1)}`).join(', ')); }
+  { const ck={ ctx:10, perf:5000, now:10.15, nowPerf:5000 }, h=H.heardMs(ck, 10.5), c=H.heardMs(ck, 10.5, true); n+=2;
+    if(Math.abs(h-5500)>1e-9) miss('heard: '+h+' ms (5500 expected)'); if(!(h-c>1000/30)) miss(`CONTROL heard: ignoring the output latency lands ${(h-c).toFixed(1)} ms early (more than one 30-fps frame expected)`); }
+  return { cases:n, total:d.length, differences:d, notes };
+}
+/* NIGHT-6: THE FOREST'S FILES (tools/forest-bake.mjs). Every prepared file matches what the tool draws now, pixel for pixel (CONTROL a changed
+   pixel is caught); the PNG writer and reader round-trip; the forest's files stay inside the user's budget (CONTROL 16 MB is over it). The
+   sizes are printed every run (the user's rule: report the size in every slice). */
+async function nightForestFiles(){
+  const d=[], notes=[]; let n=0; const miss=s=>d.push(s), B=await import(new URL('./forest-bake.mjs', import.meta.url).href);
+  const r=B.check(); n+=r.cases; d.push(...r.differences);
+  { const b=B.bakeAll(); b[0].px[1000]^=0x40; const c=B.check(b); n++; if(!c.differences.length) miss('CONTROL: a changed pixel was not caught'); }
+  for(const f of B.bakeAll()){ const g=B.pngRead(B.pngOf(f)); n++; if(g.w!==f.w || g.h!==f.h || g.px.some((v,i)=>v!==f.px[i])) miss(f.name+': the PNG round trip differs'); }
+  const S=B.forestSizes(), over=t=>t>B.FOREST_BUDGET, MB=x=>(x/1048576).toFixed(2)+' MB', KB=x=>(x/1024).toFixed(1)+' KB'; n+=2;
+  if(over(S.total)) miss(`the forest's files are ${MB(S.total)}, over the budget of ${MB(B.FOREST_BUDGET)}`); if(!over(16*1048576)) miss('CONTROL: 16 MB is not over the budget');
+  notes.push(`the forest's files: ${MB(S.total)} of ${MB(B.FOREST_BUDGET)} — code ${KB(S.code)}, prepared files ${KB(S.files)} (${S.list.filter(([f])=>!f.endsWith('.js')).map(([f,b])=>f.split('/').pop()+' '+KB(b)).join(', ')})`);
+  return { cases:n, total:d.length, differences:d, notes };
+}
 /* RUN 9 (slice 4): THE RARE EVENTS' schedule (core/night.js rareStep) over 8 simulated hours with a long-held note now and then: the same
    seed gives the same night; never the same kind twice in a row (CONTROL: without the rule a repeat appears); a timed event never comes
    sooner than gapLo after the last, a flower never sooner than bloomGap and only while a note is held >= hold; every few minutes (10…30 an
@@ -1125,6 +1176,8 @@ const ROWS=[
   ['VIS1c fireflies (core)',    ()=>fliesCore(),    r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['NIGHT cycle (core)',        ()=>nightCore(),    r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // RUN 9
   ['FOREST life (core)',        ()=>lifeCore(),     r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // RUN 9 (slice 2)
+  ['FOREST answers (app)',      ()=>forestAnswersCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 1
+  ['NIGHT forest files (app)',  ()=>nightForestFiles(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 (the files rule, the size budget)
   ['OLD NAME gone',             ()=>oldNameGone(),  r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // SPLIT-2
   ['NIGHT rare events (core)',  ()=>rareCore(),     r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // RUN 9 (slice 4)
   ['NIGHT-1 headroom sums (tool)', ()=>headroomCalc(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],

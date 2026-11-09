@@ -10,8 +10,8 @@ export const FOREST_ROOM=F({
   format:'handsong/room', version:1, id:'room.forest', name:F({ en:'Forest', ru:'Лес' }), tokens:'forest-',
   /* full: real shadows (hand light 1024², 512² on small screens), 70 wild fireflies, 16-step trails, moving mist; reduced: no shadow, 35 fireflies,
      8-step trails, still mist; «minimal» has no WebGL (the room's 2D stand-in) */
-  levels:F({ full:F({ flies:70, trail:16, shadow:1024, shadowSmall:512, mist:true, shrooms:28, blooms:10, grass:3500, leaves:60, moths:6, beams:4 }),
-    reduced:F({ flies:35, trail:8, shadow:0, shadowSmall:0, mist:false, shrooms:14, blooms:5, grass:1400, leaves:24, moths:3, beams:2 }) }),
+  levels:F({ full:F({ flies:70, trail:16, shadow:1024, shadowSmall:512, mist:true, shrooms:28, blooms:10, grass:3500, leaves:60, moths:6, beams:4, dew:1100, webs:9 }),
+    reduced:F({ flies:35, trail:8, shadow:0, shadowSmall:0, mist:false, shrooms:14, blooms:5, grass:1400, leaves:24, moths:3, beams:2, dew:500, webs:5 }) }),   // NIGHT-6 slice 1: dew, webs
   looks:F({
     glow:LOOK('forest-', 0.06, 1, 1),            // Glow: the base tokens
     dusk:LOOK('forest-dusk-', 0.052, 0.8, 0.9),  // Dusk: violet sky, a warm low moon, less mist

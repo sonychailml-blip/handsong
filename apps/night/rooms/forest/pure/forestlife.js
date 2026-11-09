@@ -46,8 +46,9 @@ export function lifePlaces(nShroom=LIFE.shrooms, nBloom=LIFE.blooms, seed=LIFE.s
 /* a note of velocity vel struck with the playing light at (lx, lz): how much a thing at (x, z) pulses (0…1 per note; Gaussian in distance) */
 export const pulseOf=(x, z, lx, lz, vel)=>Math.max(0, Math.min(1, +vel||0))*Math.exp(-((x-lx)**2+(z-lz)**2)/(2*LIFE.reach*LIFE.reach));
 /* RINGS (ground waves, water rings): a fixed list of n slots { x, z, t0, amp } (t0 −1 = free); a new ring takes a free slot or the OLDEST */
-export const RINGS=Object.freeze({ ground:Object.freeze({ n:6, life:3, speed:2.2, width:0.5 }), water:Object.freeze({ n:8, life:2.2, speed:0.85, width:0.07 }) });
-export const ringsNew=n=>Array.from({ length:n }, ()=>({ x:0, z:0, t0:-1, amp:0 }));
-export function ringAdd(list, x, z, t0, amp){ let s=list.find(r=>r.t0<0); if(!s) s=list.reduce((a,b)=>a.t0<=b.t0?a:b); s.x=x; s.z=z; s.t0=t0; s.amp=amp; return s; }
+/* NIGHT-6 slice 1: 12 water slots (a note's own ring joins Echo's); a ring's kind ('note', 'echo', '' ground) is for the probes */
+export const RINGS=Object.freeze({ ground:Object.freeze({ n:6, life:3, speed:2.2, width:0.5 }), water:Object.freeze({ n:12, life:2.2, speed:0.85, width:0.07 }) });
+export const ringsNew=n=>Array.from({ length:n }, ()=>({ x:0, z:0, t0:-1, amp:0, kind:'' }));
+export function ringAdd(list, x, z, t0, amp, kind=''){ let s=list.find(r=>r.t0<0); if(!s) s=list.reduce((a,b)=>a.t0<=b.t0?a:b); s.x=x; s.z=z; s.t0=t0; s.amp=amp; s.kind=kind; return s; }
 /* frees the rings older than life at time t → how many are active */
 export function ringsAge(list, t, life){ let n=0; for(const r of list){ if(r.t0>=0 && t-r.t0>=life) r.t0=-1; if(r.t0>=0) n++; } return n; }

@@ -35,6 +35,22 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 5. The falling star passes in front of the trees. Natural?
 
 ## Records (English, at most about 15 lines each; older ones go to `archive/HANDOFF-history.md`)
+### NIGHT-6 slices 0 + 1 (2026-11-09): the yardstick and the forest answers. Log: `docs/night/WORK-LOG.md`; as built: `docs/night/design/NIGHT-6-forest/PLAN.md` top
+- The plan is approved with the user's eight answers and one rule for the run: what never changes during play is prepared ahead and shipped as files, rendered by a tool, registered, about 10–15 MB for the forest (PLAN.md top).
+- Slice 0: «Измерить это устройство» adds a step «forest medium as before NIGHT-6» and, per step, the room's frame time, draw calls, triangles, programs and texture memory; then every opening (the first is the cold one) and the device. `tools/forest-budget.eval.js` the same on the laptop. The Poco steps: step 134, item 4.
+- Slice 1: dew (1,100 / 500 points) twinkling near the light; webs (9 / 5) beside the near trunks catching the light; each note rings the stream; the music bed's chords swell the mushrooms, each loop voice glows in its own far cluster, glass notes make a far firefly twinkle, each at the moment it is heard (bus `bed` and `audioClock`, `pure/heard.js`).
+- The first prepared file: `rooms/forest/tex/web.png` (21 KB), drawn by `tools/forest-bake.mjs`, register entry `forest-files`. The forest's files: 0.11 MB of 15 MB (row «NIGHT forest files (app)»).
+- Laptop, an undisturbed run: medium −1.2 / −1.7 % hand detections vs Dark with the additions, −2.9 / 0.0 % without (noise); draws 53 vs 51–52, programs 22 vs 20; 0 dropouts; the first opening at high 3.2–3.6 s, later about 0.4 s. A second run was disturbed (Dark itself swung) and is not used.
+- Probes at 48 kHz: P.night PASS 40 / 0, P.quick PASS 93 / 0. At 44.1 kHz (a headset) three rows that render at the live rate failed with no code of theirs changed: the next CORE item pins them at 48 kHz (WORK-LOG).
+- Waiting for step 134: the user's look and the Poco text.
+
+### NIGHT-6 stage 1 (2026-11-09): the forest, polished and alive — the comparison and the plan only. `docs/night/design/NIGHT-6-forest/PLAN.md`
+- No app code; tree hashes unchanged (core 14bd513ae15aa87e · apps/full d6b90cf2cb4be6da · apps/night 3279ec88c1f91059).
+- Compared item by item with the sketch «Живой лес»: the forest lacks most of the sketch's plant life (no leaves anywhere, no herb layer, one fern), the fallen wood, moss, the stream's banks and life, webs, dew, the moon's gap and stars, the painted distance, film. Today is ahead on the night cycle, moods, response, rare events.
+- Kept exactly: everything floating and how it moves, the mushrooms' glow per Mood (their rows stay unchanged; new inputs default to today's step). Rule: add, don't move.
+- Costs by RUN 9's method (hand detections vs Dark) and NIGHT-1's (µs per quantum): medium has 3.8 points left (−6.2 → −10 %), split into allowances; the opening (textures, programs) is the main Poco risk. No Poco number exists yet: slice 0 measures it.
+- New sound kinds (rain, the stream, owl, splash) need no core change: Night's nature module gains parts (native nodes for hiss, one nature worklet for events), one seeded schedule shared with the picture.
+- 14 slices proposed (0 the yardstick; 1 answers to notes and the bed; 2 fireflies follow the melody; … 11 sound and rain; 12 animals) and 8 decisions. Waiting for the user's approval.
 ### NIGHT-3 stage 5 part 2 (2026-11-09): the switching machinery (CORE-12). Log: `docs/night/WORK-LOG.md`; as built: PLAN.md top
 - `apps/night/roomswitch.js` switches a room: the bed fades and holds, the picture fades out, the new room opens in the dark, the nature crossfades on its second slot, the name shows, the bed comes back. The room is remembered (real rooms only).
 - Every opening (Dark/Camera → Room too) pauses hand detection until the room has drawn two frames, then fades in; a failed opening shows the room's stand-in; past 8 s the stand-in shows. No audio node is made in a switch.
@@ -86,16 +102,6 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 ### NIGHT-2 stage 2 (2026-11-03): calibration screens and settings, built. Log: `docs/night/WORK-LOG.md`; decisions: `docs/night/design/NIGHT-2-calibration/DESIGN.md`
 - `apps/night/calib.js` + the settings card: the offer once per camera, then the ghost; the step on the camera picture with every point; «Играть» saves, «Ещё раз» repeats; the side of the calibrated hand sets the roles (voted over the hold) and is saved; reset clears all. Five main buttons + settings; background, Forest slider, hand points in settings. Landscape low-light hint fixed.
 - Core part CORE-5 (texts, icon). Row «NIGHT calibration screens». Waiting for step 128 (laptop + Poco, covers 125 for Night).
-### NIGHT-2 stage 1 (2026-11-03): calibration screens, design only. `docs/night/design/NIGHT-2-calibration/DESIGN.md`
-- No app code. 12 screens at 3 sizes in `tools/design/NIGHT-2-calibration/`; 12 open questions. Stops until the user approves.
-### NIGHT-1 stage 3 (2026-11-03): the quiet floor, off for players. `docs/night/NIGHT-1-HEADROOM.md` «Stage 3», step 127
-- Partials and notes stop below −70 dBFS behind `?probe&tails=on`. Saving 2–11%, sound −46 to −64 dB away. Waiting for the user's ears.
-### NIGHT-1 stage 2 (2026-11-03): options 1 and 2. Numbers: `docs/night/NIGHT-1-HEADROOM.md` «Stage 2»
-- Night's face turns on CORE-3's lean path: unused stages, roles and closed effects out of the graph, silent flute banks parked. Same sound (−133 to −141 dB, row «NIGHT lean path»). Fast passages 32–36% → 15–19% of budget; free share with camera and forest about 13–38% → 50–63%. If Night's chain ever gains drive, brightness, tremolo or the expression hand, turn the matching switch off first; the row fails until then.
-### NIGHT-1 stage 1 (2026-11-02/03): sound headroom, measured. Numbers: `docs/night/NIGHT-1-HEADROOM.md`. Log: `docs/night/WORK-LOG.md`
-- Waiting for: the user's decision, the Poco numbers, step 125. No fixes yet.
-- Laptop, cool and idle: no crackle (0–2 dropouts in 39 stress passes). Free share under stress: a quarter to a third with sound alone, less with camera and forest; about one 12.5% step below Full's SuperSaw.
-- Heaviest: not the partials (a bowl's 24: 66 µs). The forest room, stages Night doesn't use, idle chord voices, flute and SuperSaw banks that never stop. Three unused stages save 17–20% with the sound identical (−138 dB). No slowdown near silence (control: 9–10× in JS).
 ### RUN 9 (2026-10-19/20): the living forest. Log and plain summary: `archive/WORK-LOG-before-split.md` «RUN 9» (old name)
 - NIGHT (`apps/night/pure/cycle.js`): a 24-min seamless cycle: the moon drifts, 7 cloud passes dim it, four mist layers; the sleep timer deepens and stills the night; moods Glow / Dusk / Mist recolour the forest (token sets). Bus `nightSky` { mood, sleep, wind } from the shell.
 - RESPONSE (`apps/night/pure/forestlife.js`, `apps/night/scene/forest-life.js`): a ring of light per note; mushrooms / flowers pulse; fireflies gather while you play; a stream with the moon's reflection: Echo = rings on the water, Wave = the leaves shimmer, Warmth = the light's colour.

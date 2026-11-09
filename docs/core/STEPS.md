@@ -37,6 +37,7 @@ THERE in full and here as one index entry):
   128 Night's calibration screens and settings, laptop + Poco (NIGHT-2; covers 125 for Night) · 129 Night's hand setup, five checks (NIGHT-2 stage 3; replaces 128)
   130 The music bed, five checks (NIGHT-3 stage 4) · 131 The music bed v2, five checks by ear (NIGHT-4)
   132 Night's own storage, the whole depth range, «Глубина», v1 after a hidden tab (NIGHT-5) · 133 Room switching with the test room (NIGHT-3 stage 5 part 2)
+  134 The forest answers notes (stream rings, webs, dew, the music bed in the mushrooms) and the Poco measured (NIGHT-6 slices 0 + 1)
 
 ## Moved to `archive/CLAUDE-history.md` at DOC1 (grep by title; read only what the slice needs)
 - «Module map (full, moved at DOC1)» — every module's detailed paragraph (AUD1a … IDS1, SONG1, AUTOSAVE1, PACK1 …).

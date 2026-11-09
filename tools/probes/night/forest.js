@@ -13,9 +13,11 @@
    the second time exactly as the first (closing the room is not a lost context). */
 import { row } from '../core/rows.js';
 import { cv } from '../../../core/palette.js';
-import { loadThree, setBackground, sceneInfo, setSceneLevel, sceneLevel, sceneRoomDbg, sceneSnapDbg, sceneProgramsDbg, sceneHeldDbg } from '../../../apps/night/scene/host.js';   // RUN 8: + the quality levels and the room (NIGHT forest picture)
-import { buildForest } from '../../../apps/night/rooms/forest/forest.js';
-import { fliesInit, fliesStep, FOREST_FLIES } from '../../../apps/night/rooms/forest/pure/fireflies.js';
+import { loadThree, setBackground, sceneInfo, setSceneLevel, sceneLevel, sceneRoomDbg, sceneSnapDbg, sceneProgramsDbg, sceneHeldDbg, sceneBedDbg } from '../../../apps/night/scene/host.js';   // RUN 8: + the quality levels and the room (NIGHT forest picture)
+import { buildForest, forestAssets } from '../../../apps/night/rooms/forest/forest.js';
+import { fliesInit, fliesStep, FOREST_FLIES, depthDistance } from '../../../apps/night/rooms/forest/pure/fireflies.js';
+import { ANSWERS, noteRingAmp } from '../../../apps/night/rooms/forest/pure/answers.js';   // NIGHT-6 slice 1
+import { nightClockDbg } from '../../../apps/night/shell.js';
 import { NIGHT, nightAt, CLOUD_PASSES } from '../../../apps/night/pure/cycle.js';   // RUN 9
 import { FOREST_ROOM } from '../../../apps/night/rooms/forest/pure/room.js';   // NIGHT-3: the moods' looks are the room's
 const MOOD_LOOKS=FOREST_ROOM.looks;
@@ -244,12 +246,13 @@ export async function checkForestResponse(){
       notes.push(`fireflies within 3 of the light: playing ${nb}, silent ${nc}, 10 s after the playing stopped ${nb2}`);
       /* Echo → rings on the water; Wave → shimmer; Warmth → the waves' colour */
       const D=mk(), FXE={ echo:0.8, time:0.3, fb:0.5, tone:0, wave:0.7 }; run(D, 0, 1, FXE); D.glint(0, 0.8); let se=run(D, 1, 1.0, FXE); n+=4;
-      if(!(se.life.water.length>=2)) miss(se.life.water.length+' water rings 1 s after a note with Echo 0.8 (≥ 2 expected)');
+      const echoes=x=>x.life.water.filter(r=>r.kind==='echo').length;   // NIGHT-6: a note's own stream ring is kind 'note'
+      if(!(echoes(se)>=2)) miss(echoes(se)+' echo rings on the water 1 s after a note with Echo 0.8 (≥ 2 expected)');
       for(const r of se.life.water){ if(streamNear(r.x, r.z).d>1e-6) miss(`a water ring off the stream (${r.x.toFixed(2)}, ${r.z.toFixed(2)})`); }
       if(se.life.shimmer!==0.7) miss('Wave 0.7: the leaves shimmer '+se.life.shimmer);
       const wc=se.life.waveCol, lc=se.fx.color; if(Math.max(...wc.map((v,i)=>Math.abs(v-lc[i])))>1e-6 || !(wc[0]>wc[2])) miss('Warmth: the colour of the waves '+JSON.stringify(wc)+' vs the light '+JSON.stringify(lc));
       const E=mk(); run(E, 0, 1); E.glint(0, 0.8); const s0=run(E, 1, 1.0); n+=2;
-      if(s0.life.water.length!==0) miss('CONTROL: water rings without Echo'); if(s0.life.shimmer!==0) miss('CONTROL: the leaves shimmer without Wave');
+      if(echoes(s0)!==0) miss('CONTROL: echo rings without Echo'); if(s0.life.shimmer!==0) miss('CONTROL: the leaves shimmer without Wave');
       /* a mood colours the mushrooms */
       const G=mk(); const sg=run(G, 0, 20, FX0, { mood:'minor-penta', sleep:0 }), want=new T.Color(cv(MOOD_LOOKS.dusk.tokens.shroom)), c=sg.life.shroomCol; n++;
       if(Math.max(Math.abs(c[0]-want.r), Math.abs(c[1]-want.g), Math.abs(c[2]-want.b))>0.02) miss('Dusk: the mushrooms '+JSON.stringify(c)+' vs its token '+cv(MOOD_LOOKS.dusk.tokens.shroom));
@@ -366,3 +369,77 @@ export async function checkForestLevels(){
   return { cases:n, total:d.length, differences:d, notes };
 }
 row({ night:true, at:1008.68, name:'FOREST levels', drawn:true, run:()=>checkForestLevels(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });
+/* NIGHT-6 slice 1: row «FOREST answers» — NUMBERS from the room built without a renderer, then the host's delivery on the opened forest.
+   (1) each level draws its dew and webs (the web FILE reached the room); the baseline override (dew 0, webs 0 — «Measure this device»'s step
+   before NIGHT-6) draws none; (2) a web lit by the playing light is ≥ 5× itself unlit — CONTROL: with no hand every web is at its base glow;
+   (3) a note RINGS THE STREAM at its nearest point with the law's amplitude — CONTROL: a note with no light makes none; (4) the MUSIC BED: a
+   chord heard at `at` swells the mushrooms from the first frame at or after `at` (CONTROL: nothing in the frame before), never above
+   ANSWERS.bed.max; a loop note lights only its own cluster; a glass note makes one far firefly twinkle; (5) DELIVERY (drawn): with a synthetic
+   audio clock whose output latency is 0.15 s, the host hands a bed event to the room at the time it is heard, and the room fires it in that
+   frame — CONTROL: the mapping that ignores the latency hands it 150 ms early; (6) the dew and the webs RENDER (one frame drawn twice, them
+   hidden the second time; CONTROL the same frame twice differs by 0). */
+export async function checkForestAnswers(){
+  const d=[], notes=[]; let n=0; const miss=s=>d.push(s);
+  const was=profileCurrent(), keepLevel=sceneLevel();
+  try{
+    const T=await loadThree(); await forestAssets(); const w=844, h=390, rooms=[], mk=(lv='full', o={})=>{ const r=buildForest(T,{ C:cv, level:lv, w, h, ...o }); rooms.push(r); return r; };
+    const NIN={ mood:'major-penta', sleep:0 }, run=(r, t0, sec, hands=[])=>{ for(let i=0;i<Math.round(sec*60);i++) r.update(1/60, t0+i/60, hands, null, NIN); return r.state(); };
+    try{
+      for(const lv of ['full','reduced']){ const s=mk(lv).state(), L=FOREST_LEVELS[lv]; n+=3;
+        if(s.answers.dew!==L.dew) miss(`${lv}: ${s.answers.dew} dew points (${L.dew})`);
+        if(!(s.answers.webs.length>=Math.min(4, L.webs) && s.answers.webs.length<=L.webs)) miss(`${lv}: ${s.answers.webs.length} webs (${L.webs} asked)`);
+        if(!s.answers.webTex || !s.files.web) miss(`${lv}: the web file did not reach the room (${JSON.stringify(s.files)})`);
+        notes.push(`${lv}: ${s.answers.dew} dew points, ${s.answers.webs.length} webs`); }
+      { const s=mk('reduced', { lv:{ dew:0, webs:0 } }).state().answers; n++; if(s.dew!==0 || s.webs.length!==0) miss('the baseline override still draws '+s.dew+' dew, '+s.webs.length+' webs'); }
+      /* (2) a web lit by the light: the hand on the web's screen point, at the depth nearest its distance */
+      { const R=mk('full'), s0=run(R, 0, 2), Ws=s0.answers.webs, cam=R.camera, fwd=new T.Vector3(); cam.getWorldDirection(fwd);
+        const k=Ws.reduce((a,b,i)=>Math.abs(b.x)+Math.abs(b.z)<Math.abs(Ws[a].x)+Math.abs(Ws[a].z) ? i : a, 0), W0=Ws[k], P=new T.Vector3(W0.x, W0.y, W0.z), dist=P.clone().sub(cam.position).dot(fwd), sp=P.clone().project(cam);
+        let best=0, bd=1e9; for(let i=0;i<=200;i++){ const e=Math.abs(depthDistance(i/200)-dist); if(e<bd){ bd=e; best=i/200; } }
+        const hv=[{ x:(sp.x+1)/2*w, y:(1-sp.y)/2*h, d:best, play:true }], lit=run(R, 2, 2.5, hv).answers.webs[k].b, R2=mk('full'), un=run(R2, 0, 4.5).answers.webs, base=Math.max(...un.map(x=>x.b)); n+=2;
+        notes.push(`the web nearest the aisle: lit ${lit.toFixed(3)}, unlit ${un[k].b.toFixed(3)} (every web with no hand ≤ ${base.toFixed(3)})`);
+        if(!(lit>=5*un[k].b)) miss(`a web by the light shines ${lit.toFixed(3)}, unlit ${un[k].b.toFixed(3)} (≥ 5× expected)`);
+        if(!(base<=ANSWERS.webs.base+0.03+1e-9)) miss('CONTROL: with no hand a web shines '+base.toFixed(3)+' (its base glow at most '+(ANSWERS.webs.base+0.03).toFixed(3)+')'); }
+      /* (3) a note rings the stream */
+      { const R=mk('full'), hv=[{ x:0.5*w, y:0.62*h, d:0.25, play:true }]; run(R, 0, 2, hv); const L0=R.state().rigs[0]; R.glint(0, 0.8); const wr=R.state().life.water.filter(r=>r.kind==='note'), q=streamNear(L0.x, L0.z), want=noteRingAmp(q.d, 0.8); n+=2;
+        if(want>0 ? !(wr.length===1 && Math.hypot(wr[0].x-q.x, wr[0].z-q.z)<1e-9 && Math.abs(wr[0].amp-want)<1e-12) : wr.length!==0) miss(`a note ${q.d.toFixed(2)} from the water: rings ${JSON.stringify(wr)} (the law: ${want.toFixed(3)} at ${q.x.toFixed(2)}, ${q.z.toFixed(2)})`);
+        notes.push(`a note ${q.d.toFixed(2)} from the water rings it at ${want.toFixed(3)}`);
+        const R2=mk('full'); run(R2, 0, 2); R2.glint(0, 0.8); if(R2.state().life.water.some(r=>r.kind==='note')) miss('CONTROL: a note with no light rang the stream'); }
+      /* (4) the music bed in the room */
+      { const R=mk('full'); let s=run(R, 0, 1); const at=1.5; R.bed({ kind:'chord' }, at); R.bed({ kind:'loop', lv:1, a:1, h:1, r:3, amp:1 }, at); R.bed({ kind:'glass' }, at);
+        let pre=null, fr=null; for(let i=0;i<120;i++){ const t=1+i/60; R.update(1/60, t, [], null, NIN); const st=R.state(); if(t<at) pre=st; else if(!fr){ fr=st; } }
+        const mid=R.state(), late=run(R, 3, 1.2), C=late.life.bed.clusters, shroomBed=late.life.places.filter(p=>p.kind==='shroom'), fired=fr.bed.fired; n+=6;
+        if(pre.life.places.some(p=>p.bed>0) || pre.bed.fired.length) miss('CONTROL: the bed swelled before its event was heard');
+        if(fired.length!==3 || fired.some(f=>f.at!==at || f.t<at || !(f.prev<at))) miss('the bed\'s events did not fire in the frame they are heard: '+JSON.stringify(fired));
+        if(!shroomBed.every(p=>p.bed>0)) miss('a chord did not swell every mushroom');
+        if(late.life.places.some(p=>p.bed>ANSWERS.bed.max+1e-12)) miss('a bed swell above its cap '+ANSWERS.bed.max);
+        const inC=new Set(C[1]), lp=late.life.places, other=lp.map((p,i)=>i).filter(i=>lp[i].kind==='shroom' && !inC.has(i)); if(!(C[1].every(i=>lp[i].bed>lp[other[0]].bed+0.05))) miss('a loop note did not light its own cluster above the others');
+        if(!(mid.bed.twinkles.length===1 && mid.bed.twinkles[0].glow>0) || late.bed.twinkles.length) miss('a glass note: '+JSON.stringify([mid.bed.twinkles, late.bed.twinkles]));
+        notes.push(`the bed: chord swell ${shroomBed[0].bed.toFixed(3)} at +2.2 s, loop cluster 1 ${lp[C[1][0]].bed.toFixed(3)} vs another ${lp[other[0]].bed.toFixed(3)}, glass twinkle ${mid.bed.twinkles[0] ? mid.bed.twinkles[0].glow.toFixed(3) : '—'} at +1.5 s`); }
+    } finally { for(const r of rooms) r.dispose(); }
+    /* (5) delivery through the host, (6) the dew and the webs render — the opened forest */
+    const why=profileApply('profile.night'); n++; if(why){ miss('Night refused: '+why); return { cases:n, total:d.length, differences:d, notes }; }
+    await setSceneLevel('reduced'); await setBackground('forest'); await frames(6);
+    const room=sceneRoomDbg(); if(!room || !sceneInfo().webgl){ notes.push('no WebGL room — the delivery and drawn checks do not apply'); return { cases:n, total:d.length, differences:d, notes }; }
+    const c0=1000, p0=performance.now(), LAT=0.15, clock=()=>{ const p=performance.now(), c=c0+(p-p0)/1000; return { ctx:c-LAT, perf:p, now:c, nowPerf:p }; };
+    const deliver=async ignore=>{ nightClockDbg(clock); sceneBedDbg({ ignoreLatency:ignore });
+      try{ const c=clock(), at=c.now+0.4, want=(p0+(at-c0+LAT)*1000)/1000; BUS.set('audioClock', clock()); BUS.push('bed', { kind:'chord', at, v:0 });
+        for(let k=0;k<40;k++){ BUS.set('audioClock', clock()); await sleep(25); } const f=room.state().bed.fired.slice(-1)[0]; return { f, want }; }
+      finally { nightClockDbg(null); sceneBedDbg({ ignoreLatency:false }); } };
+    { const a=await deliver(false), b=await deliver(true); n+=2;
+      const okAt=x=>x.f && Math.abs(x.f.at-x.want)<0.002 && x.f.t>=x.f.at && x.f.prev<x.f.at;   // handed over at the heard time, fired in the first frame at or after it
+      if(!okAt(a)) miss(`the host handed the bed's chord to the room at ${a.f ? a.f.at.toFixed(4) : '—'} s, fired at ${a.f ? a.f.t.toFixed(4) : '—'}, heard at ${a.want.toFixed(4)}`);
+      if(okAt(b)) miss('CONTROL: ignoring the output latency still landed on the heard frame — the delivery check cannot fail');
+      notes.push(`delivery: heard at ${a.want.toFixed(3)} s, handed over ${a.f ? a.f.at.toFixed(3) : '—'}, fired in the frame at ${a.f ? a.f.t.toFixed(3) : '—'}; ignoring the latency: ${b.f ? ((b.want-b.f.at)*1000).toFixed(0) : '—'} ms early`); }
+    { const A=room.answersDbg && room.answersDbg.parts, clk={ t:7.5e6, W:canvas.width, H:canvas.height }; handsProbe(clk, ()=>true);
+      try{ for(let i=0;i<20;i++){ clk.t+=33; processHandsProbe({ landmarks:[pose({ x:0.5, y:0.78, s:0.24 })], handednesses:[[{ categoryName:'Right' }]] }); } await sleep(1500);
+        if(A){ for(const [name,obj] of [['dew',A.dew],['webs',A.webs]]){ const ab=await sceneSnapDbg(on=>{ obj.visible=!on; }, true), cc=await sceneSnapDbg(()=>{}, true); n+=2;
+          if(!ab || !cc){ notes.push(name+': no frame rendered — the drawn check does not apply'); continue; }
+          notes.push(`${name} add ${(ab[0]-ab[1]).toFixed(4)} to the mean RGB sum of one frame (CONTROL the same frame twice ${(cc[0]-cc[1]).toFixed(4)})`);
+          if(!(ab[0]-ab[1]>0)) miss(name+' do not show in the picture: '+(ab[0]-ab[1])); if(cc[0]!==cc[1]) miss('CONTROL: one frame rendered twice differs by '+(cc[0]-cc[1])); } }
+        else miss('the room shows no dew / web parts to the probe'); }
+      finally { handsProbe(null); } }
+  } catch(e){ miss('error: '+(e&&e.stack||e)); }
+  finally{ nightClockDbg(null); sceneBedDbg({ ignoreLatency:false }); try{ await setSceneLevel(keepLevel); }catch(e){} if(profileCurrent()!==was) profileApply(was); await setBackground('camera'); await sleep(30); }
+  return { cases:n, total:d.length, differences:d, notes };
+}
+row({ night:true, at:1008.63, name:'FOREST answers', drawn:true, run:()=>checkForestAnswers(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });

@@ -128,7 +128,8 @@ export function bedTick(at){
      latest missed chord comes, so v1 never plays a burst of everything it missed */
   const evs=bedStep(st, recipe, P, n, now-origin+BED_AHEAD, played.map(p=>p.pc), answer), late=now-1-origin;
   const last=evs.filter(e=>e.kind==='chord' && e.t<late).pop(), T=v1tick={ law:evs.length, chord:0, glim:0, drift:0 };
-  for(const ev of evs){ if(ev.t<late && ev!==last) continue; T[ev.kind]=(T[ev.kind]||0)+1; applyEv(E, bed, ev, Math.max(origin+ev.t, now+0.02), P, v); }
+  for(const ev of evs){ if(ev.t<late && ev!==last) continue; T[ev.kind]=(T[ev.kind]||0)+1; const at=Math.max(origin+ev.t, now+0.02); applyEv(E, bed, ev, at, P, v);
+    if(ev.kind==='chord' || ev.kind==='glim') BUS.push('bed', { kind:ev.kind==='glim' ? 'glass' : 'chord', at, v:1 }); }   // NIGHT-6 slice 1: v1's chords and glimmer for the room
 }
 /* a whole timeline into an engine context E (offline renders): the preset `preset` of recipe B for `sec` s from 0 → { bed, events }. o.at(t, fn)
    given (an offline context's timed callback, the cost measurement): each event is applied just before its time and the quiet voices park, as

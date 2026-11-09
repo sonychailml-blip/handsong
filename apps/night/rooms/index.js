@@ -6,7 +6,7 @@ import { standInForest } from './forest/standin.js';
 import { ROOM_IDS } from '../pure/room.js';
 
 export const ROOMS=Object.freeze([
-  Object.freeze({ record:FOREST_ROOM, standIn:standInForest, load:()=>import('./forest/forest.js').then(m=>m.buildForest) }),
+  Object.freeze({ record:FOREST_ROOM, standIn:standInForest, load:()=>import('./forest/forest.js').then(m=>m.forestAssets().then(()=>m.buildForest)) }),   // NIGHT-6: its prepared files first
 ]);
 const LIST=[...ROOMS];
 export const roomsAll=()=>LIST.slice();

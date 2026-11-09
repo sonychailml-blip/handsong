@@ -7,8 +7,11 @@
    - THE STREAM: a ribbon of water across the floor (its own small shader: the sky, the moon's and the playing light's reflections, a slow
      flow); Echo shows as RINGS ON THE WATER at the stream's nearest point, one per echo, fainter by the feedback;
    - THE LEAVES' SWAY: the ferns sway gently (a vertex patch); Wave makes them SHIMMER at the effect's own 4.5 Hz.
+   - NIGHT-6 slice 1: each note also RINGS THE STREAM at its nearest point (fainter with the distance); the MUSIC BED's chords swell every
+     mushroom softly and each of its loop voices glows in its own distant cluster (the swells stay under a note's pulse: ANSWERS.bed.max).
    Colours: tokens through the room's palette (the moods' looks). Everything numeric is from the core (probe rows compare it). */
 import { STREAM, STREAM_LINE, streamNear, LIFE, lifePlaces, pulseOf, RINGS, ringsNew, ringAdd, ringsAge } from './pure/forestlife.js';
+import { ANSWERS, noteRingAmp, swellAt, bedClusters } from './pure/answers.js';   // NIGHT-6 slice 1: a note rings the stream; the music bed's swells
 
 const f=v=>Number(v).toFixed(4);
 /* the ground's material gains the ground waves: U = { uNow, uGW (6 × vec4: x, z, t0 (−1 free), amp), uGWCol, uGWK (gain: 1; a probe's control sets 0) } */
@@ -71,6 +74,7 @@ export function buildLife(ctx){
   const ground=ringsNew(RINGS.ground.n), water=ringsNew(RINGS.water.n);
   /* mushrooms and flowers */
   const places=lifePlaces(lv.shrooms, lv.blooms), N=places.length, pulse=new Float32Array(N), glow=new Float32Array(N);
+  const SHROOMS=places.map((p,i)=>i).filter(i=>places[i].kind==='shroom'), clusters=bedClusters(places), bedG=new Float32Array(N), bedEv=[];   // NIGHT-6 slice 1
   const d=new T.Object3D(), shrooms=places.filter(p=>p.kind==='shroom'), blooms=places.filter(p=>p.kind==='bloom');
   const capG=new T.SphereGeometry(1,10,5,0,Math.PI*2,0,Math.PI/2), stemG=new T.CylinderGeometry(0.16,0.22,1,6), bloomG=new T.PlaneGeometry(1,1); bloomG.rotateX(-Math.PI/2); own.push(capG, stemG, bloomG);
   const capM=new T.MeshBasicMaterial({ color:0xffffff }); capM.onBeforeCompile=sh=>{   // a dome's shading on an unlit cap: bright top, dark rim
@@ -116,7 +120,12 @@ export function buildLife(ctx){
     WU.uLightCol.value.copy(F.lightCol); WU.uRingCol.value.copy(F.lightCol);
     SH.copy(pal.shroom); BL.copy(pal.bloom);
     const k=Math.exp(-dt/LIFE.tau), ga=gg.attributes.aGlow.array, ca=gg.attributes.aCol.array;
-    places.forEach((p,i)=>{ pulse[i]*=k; const g=Math.min(1.6, (LIFE.base+LIFE.breathe*(0.5+0.5*Math.sin(t*0.6+p.ph)))*F.dim+pulse[i]); glow[i]=g;
+    /* NIGHT-6 slice 1: the bed's swells, each an envelope from the moment it is heard; their sum capped under a note's pulse */
+    bedG.fill(0);
+    for(let j=bedEv.length-1;j>=0;j--){ const e=bedEv[j], a=t-e.t0; if(a>e.rise+e.hold+e.fall || a<-60){ bedEv.splice(j,1); continue; }
+      const v=swellAt(a, e.rise, e.hold, e.fall)*e.amp; if(v>0) for(const i of e.set) bedG[i]+=v; }
+    for(let i=0;i<N;i++) if(bedG[i]>ANSWERS.bed.max) bedG[i]=ANSWERS.bed.max;
+    places.forEach((p,i)=>{ pulse[i]*=k; const g=Math.min(1.6, (LIFE.base+LIFE.breathe*(0.5+0.5*Math.sin(t*0.6+p.ph))+bedG[i])*F.dim+pulse[i]); glow[i]=g;
       const c= p.kind==='shroom' ? SH : BL; ga[i]=g*0.75; ca[i*3]=c.r; ca[i*3+1]=c.g; ca[i*3+2]=c.b;
       const m= p.kind==='shroom' ? caps : petals, j= p.kind==='shroom' ? shrooms.indexOf(p) : blooms.indexOf(p), e=0.03+0.32*g; m.instanceColor.setXYZ(j, c.r*e, c.g*e, c.b*e); });   // unlit: kept dim (sRGB output), the glow point carries the light
     gg.attributes.aGlow.needsUpdate=gg.attributes.aCol.needsUpdate=true; caps.instanceColor.needsUpdate=petals.instanceColor.needsUpdate=true;
@@ -125,9 +134,17 @@ export function buildLife(ctx){
   function glint(vel, lx, lz, t){ const v=Math.max(0.18, Math.min(1, vel==null?0.6:vel)); ringAdd(ground, lx, lz, t, 0.9*v);
     places.forEach((p,i)=>{ pulse[i]=Math.min(1.5, pulse[i]+pulseOf(p.x, p.z, lx, lz, v)); }); }
   /* an echo of a note struck at (x, z): a ring on the stream's nearest point */
-  function echo(x, z, amp, t){ const q=streamNear(x, z); ringAdd(water, q.x, q.z, t, Math.min(1, amp)); return q; }
-  const state=()=>({ ground:ground.filter(r=>r.t0>=0).map(r=>({ ...r })), water:water.filter(r=>r.t0>=0).map(r=>({ ...r })), places:places.map((p,i)=>({ kind:p.kind, x:p.x, z:p.z, pulse:pulse[i], glow:glow[i] })),
+  function echo(x, z, amp, t){ const q=streamNear(x, z); ringAdd(water, q.x, q.z, t, Math.min(1, amp), 'echo'); return q; }
+  /* NIGHT-6 slice 1: a note struck with the light over (lx, lz) rings the stream at its nearest point → the ring's amplitude (0: too far, none) */
+  function noteRing(lx, lz, vel, t){ const q=streamNear(lx, lz), a=noteRingAmp(q.d, vel); if(a>0) ringAdd(water, q.x, q.z, t, a, 'note'); return a; }
+  /* the music bed, heard at t0: a chord swells every mushroom; loop voice k glows in its cluster over its note's own envelope (a, h, r) */
+  const B=ANSWERS.bed;
+  function bedChord(t0){ bedEv.push({ kind:'chord', t0, rise:B.chord.rise, hold:B.chord.hold, fall:B.chord.fall, amp:B.chord.amp, set:SHROOMS }); }
+  function bedLoop(k, t0, a, h, r, amp){ if(!clusters.length) return; const c=clusters[((k|0)%clusters.length+clusters.length)%clusters.length];
+    bedEv.push({ kind:'loop', t0, rise:Math.max(0.2, +a||1), hold:Math.max(0, +h||0), fall:Math.max(0.5, +r||3), amp:B.loop.amp*(0.6+0.4*Math.max(0, Math.min(1, amp==null?1:amp))), set:c }); }
+  const state=()=>({ ground:ground.filter(r=>r.t0>=0).map(r=>({ ...r })), water:water.filter(r=>r.t0>=0).map(r=>({ ...r })), places:places.map((p,i)=>({ kind:p.kind, x:p.x, z:p.z, pulse:pulse[i], glow:glow[i], bed:bedG[i] })),
+    bed:{ active:bedEv.length, clusters:clusters.map(c=>c.slice()) },   // NIGHT-6 slice 1
     sway:U.uSway.value, shimmer:U.uShimmer.value, waveCol:[U.uGWCol.value.r, U.uGWCol.value.g, U.uGWCol.value.b], shroomCol:[SH.r, SH.g, SH.b] });
   const resize=scale=>{ gm.uniforms.uScale.value=scale; };
-  return { U, update, glint, echo, state, resize, stream };
+  return { U, update, glint, echo, noteRing, bedChord, bedLoop, state, resize, stream };
 }

@@ -12,6 +12,7 @@ import { stackAdd, stackSet } from '../../../core/legacy-ui/views/stack.js';
 import { cv } from '../../../core/palette.js';
 import { ctx, canvas as cv2d } from '../../../core/vision.js';
 import { BUS } from '../../../core/pure/bus.js';
+import { heardMs } from '../pure/heard.js';   // NIGHT-6 slice 1: the music bed's events shown when heard
 const READ=BUS.reader();   // RUN 9: the mood at the room's opening, read-only (the frames read the bus they are given)
 
 export const BACKGROUNDS=Object.freeze(['forest','dark','camera']);
@@ -42,6 +43,10 @@ const LOW_MEM=typeof navigator!=='undefined' && navigator.deviceMemory>0 && navi
 const startLevel=()=>{ const v=storedLevel()||SCENE_LEVEL_DEFAULT; return LOW_MEM && v==='full' ? 'reduced' : v; };
 const heldAt=new Map();   // RUN 9: owner → when its note began (ms)
 let THREE=null, loading=null, renderer=null, glCanvas=null, onLost=null, room=null, want=null, level=startLevel(), made=0, live=0, last=0, notesSeq=0, bg='camera';
+/* NIGHT-6: the music bed's events (bus «bed», each at its audio time) reach the room at the page time they are heard (the bus «audioClock», the
+   shell's); bedLate — probe CONTROL only: map through the current time, ignoring the output latency. OPEN_LOG — every opening of this page
+   session (the first is the cold one: three.js, the files, every program compiled) */
+let bedSeq=0, bedLate=false; const OPEN_LOG=[];
 /* NIGHT-3 stage 5 part 2: THE OPENING in progress { id, t0, frames, late, waits }; the switch's fades (ms; --night-scene-out / -in in night.css);
    an opening past OPEN_LATE_MS shows the stand-in and lets detection run again */
 let opening=null, pauseOff=false, lateMs=8000, openHook=null;
@@ -107,7 +112,9 @@ export async function sceneOpen(id=roomId, opt={}){
     catch(e){ openFail(op, e); return sceneInfo(); }   // a failed build: the renderer goes, the room's 2D stand-in shows (never black)
     last=0; info.t0=0; info.frames=0;
     /* RUN 9 (slice 5): compile every shader NOW (inside the opening, not inside a frame later: a 1–4-s frame) */
-    try{ renderer.compile(room.scene, room.camera); }catch(e){ errors.push('compile: '+(e&&e.message||e)); } info.openMs=Math.round(performance.now()-tb); }
+    try{ renderer.compile(room.scene, room.camera); }catch(e){ errors.push('compile: '+(e&&e.message||e)); } info.openMs=Math.round(performance.now()-tb);
+    OPEN_LOG.push({ id, level, ms:info.openMs, programs:(renderer.info.programs||[]).length }); if(OPEN_LOG.length>24) OPEN_LOG.splice(1, 1);   // NIGHT-6 slice 0: the first stays
+    bedSeq=READ.seq('bed'); }   // NIGHT-6: a new room starts with the bed's next events (older ones were heard before it)
   stackSet('scene', !!renderer);
   if(!renderer) openEnd(op);   // the stand-in: nothing to wait for
   return sceneInfo();
@@ -138,8 +145,12 @@ function sceneFrame(t, bus){
   for(const it of N.items) if(it.role==='ld'){ if(it.kind==='on') heldAt.set(it.owner, t); else if(it.kind==='off') heldAt.delete(it.owner); }
   let hs=0; for(const [o,t0] of heldAt){ const a=(t-t0)/1000; if(a>60) heldAt.delete(o); else if(a<30) hs=Math.max(hs, a); } if(room.held) room.held(hs);
   const t0=performance.now();
+  /* NIGHT-6 slice 1: the music bed's new events, each at the room time it is heard */
+  { const B=bus.since('bed', bedSeq), ck=bus.get('audioClock'); bedSeq=B.seq;
+    if(room.bed && ck) for(const it of B.items) if(Number.isFinite(it.at)) room.bed(it, heardMs(ck, it.at, bedLate)/1000+clockOff); }
   room.update(dt, t/1000+clockOff, bus.get('handsView')||[], bus.get('nightFx'), bus.get('nightSky'));   // RUN 7 (C5): the Night effects' values; RUN 9: the mood and the sleep
   renderer.render(room.scene, room.camera);
+  info.calls=renderer.info.render.calls; info.tris=renderer.info.render.triangles;   // NIGHT-6 slice 0: this frame's draw calls and triangles
   if(opening && opening.id===room.id && ++opening.frames>=2) openEnd(opening);   // NIGHT-3 stage 5 part 2: two frames drawn — detection resumes, the picture fades in
   if(snapWant){ const f=snapWant; snapWant=null; f(); }   // RUN 8 probe: copy the frame JUST rendered (the drawing buffer is cleared once presented)
   const ms=performance.now()-t0; info.ms= info.ms ? info.ms*0.9+ms*0.1 : ms;
@@ -189,6 +200,7 @@ export const sceneInfo=()=>({ id:room?room.id:null, room:roomId, bg, level, webg
   memory:renderer ? { geometries:renderer.info.memory.geometries, textures:renderer.info.memory.textures } : null,
   pixelRatio: renderer ? renderer.getPixelRatio() : 0, fpsCap:LV[level].fps, shadow: renderer ? renderer.shadowMap.enabled : false, openMs:info.openMs||0,   // RUN 9 (slice 5)
   programs: renderer ? (renderer.info.programs||[]).length : 0, rendered:info.total||0,
+  calls:renderer ? info.calls||0 : 0, triangles:renderer ? info.tris||0 : 0, texBytes:room && room.texBytes ? room.texBytes() : 0, openings:OPEN_LOG.map(o=>({ ...o })),   // NIGHT-6 slice 0
   errors:errors.slice(-5) });
 /* probes: the room object (numbers through its state()/project()); a level for the next open */
 export const sceneRoomDbg=()=>room;
@@ -214,5 +226,7 @@ let clockOff=0;
 export const sceneClockDbg=sec=>{ clockOff= sec==null ? 0 : sec-performance.now()/1000; return clockOff; };
 /* NIGHT-3 stage 5 part 2, probe only: { pause:false } = the old way (no detection pause in an opening); { lateMs } = the stand-in's deadline;
    { hook(kind, id) } called at an opening's 'begin' and 'end' (before the veil lifts) — null removes it */
+/* NIGHT-6 slice 1, probe only: { ignoreLatency:true } = the CONTROL mapping of the bed's events (early by the output latency) */
+export const sceneBedDbg=(o={})=>{ if('ignoreLatency' in o) bedLate=!!o.ignoreLatency; return { ignoreLatency:bedLate }; };
 export const sceneOpenDbg=(o={})=>{ if('pause' in o) pauseOff=o.pause===false; if('lateMs' in o) lateMs=o.lateMs==null ? OPEN_LATE_MS : o.lateMs; if('hook' in o) openHook=o.hook||null;
   return { pause:!pauseOff, lateMs, hook:!!openHook }; };

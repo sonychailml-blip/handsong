@@ -21,7 +21,7 @@ import { nightView, setNightView, chainKeyOf, setVolFloor } from '../../core/sta
 import { EDITION } from '../../core/edition.js';
 import { ghostArm } from './ghost.js';   // C7: the ghost light
 import { calWire, calOfferIfNew, calActive, calSideApply, calSideSet, calSettingsRender, calAbort } from './calib.js';   // NIGHT-2: the hand's calibration (its picture is drawn by the loop: main.js afterDraw)
-import { setSceneLevel, sceneLevel, setBackground, backgroundOf, sceneInfo, sceneRoom, sceneRooms } from './scene/host.js';   // RUN 8 (slice 4): the scene's quality (development switch); C8 the measurement
+import { setSceneLevel, sceneLevel, setBackground, backgroundOf, sceneInfo, sceneRoom, sceneRooms, sceneOptDbg } from './scene/host.js';   // RUN 8 (slice 4): the scene's quality (development switch); C8 the measurement
 import { roomSwitch, roomNext } from './roomswitch.js';   // NIGHT-3 stage 5 part 2: the Room button
 import { latReport } from '../../core/legacy-ui/latmeter.js';   // C8: the device measurement reads the latency meter
 
@@ -134,6 +134,7 @@ function tick(now){
   if(startDue){ startDue=false; startFlow(); }
   if(amb){ ambienceRetune(); ambienceTick(); }   // the drone follows the mood; the crickets are scheduled ahead
   bedTick();   // NIGHT-3 stage 4: the music bed's next events, ahead on the audio clock
+  if(AC) BUS.set('audioClock', clockNow());   // NIGHT-6 slice 1: the room shows the bed's events when they are heard
   leadParkTick();   // NIGHT-1: a silent flute's bank stops being computed
   const fxv=nightFxNow(); BUS.set('nightFx', fxv);   // C5: the effects hand's values for the forest's visuals (rings, colour, tremble)
   BUS.set('nightSky', { mood:D.mood(), sleep:sleepProgress(sleep.t0, sleep.mins, now), wind:windNow() });   // RUN 9: the forest's palette (mood), the night's depth (sleep), the wind
@@ -187,26 +188,43 @@ function lightApply(v, boot){
   if(v){ const cur=sceneLevel(); if(cur==='full'){ if(!boot || load(KEY.lightScene)==null) save(KEY.lightScene, cur); setSceneLevel('reduced'); } }
   else if(!boot){ const back=load(KEY.lightScene); if(back && sceneLevel()==='reduced') setSceneLevel(back); }
 }
-/* RUN 8 (C8): MEASURE THIS DEVICE (development; the phone steps): about 2 minutes — Dark, Forest high, Forest medium, the Lighter forest, 25 s
-   each with a soft note every half second — then the numbers as text (copied): audio dropouts per minute, hand detection per second and its
-   time, the camera's and the picture's frame rates. The person's choices come back after it. */
+/* NIGHT-6 slice 1: THE AUDIO CLOCK on the bus — the audio time being output and the page time it comes out at (the output timestamp: the
+   output latency is in it), and the current time with the page time it was read at (apps/night/pure/heard.js). Without an output timestamp
+   (a suspended context) the latency the context reports stands in. clockOver — probe only (nightClockDbg): a synthetic clock */
+let clockOver=null;
+function clockNow(){ if(clockOver) return clockOver();
+  const now=AC.currentTime, nowPerf=performance.now(); let ts=null; try{ ts=AC.getOutputTimestamp ? AC.getOutputTimestamp() : null; }catch(e){}
+  if(ts && ts.performanceTime>0) return { ctx:ts.contextTime, perf:ts.performanceTime, now, nowPerf };
+  return { ctx:now-((AC.outputLatency||0)+(AC.baseLatency||0)), perf:nowPerf, now, nowPerf }; }
+export const nightClockDbg=fn=>{ clockOver=typeof fn==='function' ? fn : null; return !!clockOver; };
+/* RUN 8 (C8): MEASURE THIS DEVICE (development; the phone steps): about 2 minutes — Dark, Forest high, Forest medium, NIGHT-6: Forest medium
+   as it was before NIGHT-6 (its additions left out: the baseline), the Lighter forest, 20 s each with a soft note every half second — then the
+   numbers as text (copied): audio dropouts per minute, hand detection per second and its time, the camera's and the picture's frame rates;
+   NIGHT-6 slice 0: the room's frame time, draw calls, triangles, shader programs and texture memory per step, every opening of the session
+   (the first is the cold one) and the device. The person's choices come back after it. */
 let measuring=false;
+const BEFORE_N6=Object.freeze({ dew:0, webs:0 });   // NIGHT-6: the counts its slices added, left out for the baseline step
 async function measure(){
-  if(measuring || !AC) return; measuring=true; const out=$('nightMeasureOut'), wait=ms=>new Promise(r=>setTimeout(r,ms)), SEC=25;
+  if(measuring || !AC) return; measuring=true; const out=$('nightMeasureOut'), wait=ms=>new Promise(r=>setTimeout(r,ms)), SEC=20;
   const keep={ bg:backgroundOf(), level:sceneLevel(), light:load(KEY.light)==='1' }, i=timbreIdx('ld', D.timbre()), rows=[];
   const pb=()=>{ try{ return AC.playbackStats ? AC.playbackStats.underrunEvents : NaN; }catch(e){ return NaN; } };
   let k=0; const notes=setInterval(()=>{ const own='measure:'+(k%2); leadOn(own, 330*Math.pow(2,(k%5)/5), 0.6, i); setTimeout(()=>leadOff(own), 300); k++; }, 500);
   const steps=[['dark', async()=>{ lightApply(false,false); await setBackground('dark'); }], ['forest high', async()=>{ await setSceneLevel('full'); await setBackground('forest'); }],
-    ['forest medium', async()=>{ await setSceneLevel('reduced'); }], ['lighter forest', async()=>{ lightApply(true,false); }]];
+    ['forest medium', async()=>{ await setSceneLevel('reduced'); }], ['forest medium, before NIGHT-6', async()=>{ sceneOptDbg({ lv:BEFORE_N6 }); await setSceneLevel('reduced'); }],
+    ['lighter forest', async()=>{ sceneOptDbg(null); await setSceneLevel('reduced'); lightApply(true,false); }]];
   try{
     out.hidden=false;
     for(let s=0;s<steps.length;s++){ out.textContent=t('night.measuring', { n:s+1, m:steps.length }); await steps[s][1](); await wait(3000);
       const r0=latReport(), u0=pb(), d0=r0.camera.framesDetected, t0=performance.now(); await wait(SEC*1000);
       const r=latReport(), sec=(performance.now()-t0)/1000, sc=sceneInfo();
-      rows.push(`${steps[s][0]}: dropouts ${Number.isFinite(u0) ? Math.round((pb()-u0)*60/sec) : '—'}/min · detection ${((r.camera.framesDetected-d0)/sec).toFixed(1)}/s, ${r.stages.detect.mean} ms · camera ${r.camera.fps} fps · picture ${sc.webgl ? sc.fps+' fps' : 'no WebGL'}`); }
-    const text=['Handsong Night — device measurement', navigator.userAgent, (latReport().gpu||{}).renderer||'', ...rows].join('\n');
+      rows.push(`${steps[s][0]}: dropouts ${Number.isFinite(u0) ? Math.round((pb()-u0)*60/sec) : '—'}/min · detection ${((r.camera.framesDetected-d0)/sec).toFixed(1)}/s, ${r.stages.detect.mean} ms · camera ${r.camera.fps} fps · picture ${sc.webgl ? sc.fps+' fps' : 'no WebGL'}`
+        +(sc.webgl ? ` · frame ${sc.frameMs} ms, draws ${sc.calls}, triangles ${sc.triangles}, programs ${sc.programs}, textures ${(sc.texBytes/1048576).toFixed(1)} MB` : '')); }
+    const O=sceneInfo().openings, op=o=>`${o.level==='full' ? 'high' : 'medium'} ${o.ms} ms (${o.programs} programs)`;
+    const text=['Handsong Night — device measurement', navigator.userAgent, (latReport().gpu||{}).renderer||'', ...rows,
+      O.length ? `openings: first ${op(O[0])}; later ${O.slice(1).map(op).join(', ')||'none'}` : 'openings: none',
+      `device: ${navigator.deviceMemory||'?'} GB, ${navigator.hardwareConcurrency||'?'} cores, ${devicePixelRatio} device px per CSS px, screen ${screen.width}×${screen.height}`].join('\n');
     out.textContent=t('night.measured')+'\n'+text; try{ await navigator.clipboard.writeText(text); }catch(e){}
-  } finally { clearInterval(notes); for(const o of ['measure:0','measure:1']) leadOff(o);
+  } finally { clearInterval(notes); for(const o of ['measure:0','measure:1']) leadOff(o); sceneOptDbg(null);
     lightApply(keep.light,false); await setSceneLevel(keep.level); await setBackground(keep.bg); measuring=false; render(); }
 }
 /* the room's reach (Forest depth, its 4th parameter) — set on the instance like a fixed value (the hand never aims at it) */

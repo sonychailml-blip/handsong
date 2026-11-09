@@ -16,6 +16,7 @@
    the scale and follows a Mood change, plays no burst after a gap, parks after Off; the A/B switch hands over v2 → v1 → v2 while playing. The
    v1 cases run behind its switch (NIGHT-5: v1 too plays no burst after a gap). */
 import { row } from '../core/rows.js';
+import { BUS } from '../../../core/pure/bus.js';   // NIGHT-6 slice 1: the bed's events for the room
 
 const SEC=40, RATE=48000;
 const midOf=b=>{ const m=new Float32Array(b.L.length); for(let i=0;i<m.length;i++) m[i]=(b.L[i]+b.R[i])/2; return m; };
@@ -74,7 +75,8 @@ export async function checkNightBed(){
       if(L1.slots.some(i=>!set.has(L1.voices[i].hz.toFixed(6)))) miss(`a Mood change (${other}): the next chord is not of the new scale`); D.setMood(mood0); }
     /* NIGHT-5: v1 after a gap, as v2: 2 minutes on the probe clock → only the latest missed chord and the last second's events go out (the old
        way sent every one of the law's events at once) */
-    { BD.bedTick(A.AC.currentTime+120); const T=BD.bedDbg().tick, out=T ? T.chord+T.glim+T.drift : NaN; n++; notes.push('v1 after a 2-minute gap: '+JSON.stringify(T));
+    { const g0=BUS.seq('bed'); BD.bedTick(A.AC.currentTime+120); const T=BD.bedDbg().tick, out=T ? T.chord+T.glim+T.drift : NaN, pub=BUS.since('bed', g0).items; n+=2;
+      if(!T || pub.length!==T.chord+T.glim || pub.some(x=>x.v!==1)) miss(`v1 after a gap: ${pub.length} events published for the room, ${T ? T.chord+T.glim : '—'} chords and glimmer went out (NIGHT-6: exactly what goes out is published)`); notes.push('v1 after a 2-minute gap: '+JSON.stringify(T));
       if(!T || !(T.law>=20) || !(out<=4) || T.chord>2) miss('v1 after a 2-minute gap: '+JSON.stringify(T)+' (the law must hold 20+ events — CONTROL — of which at most 4 go out, at most 2 chords: the latest missed and one due now)'); }
     BD.bedSetMode('off'); n+=2; if(BD.bedTakesDrone()) miss('Off: the bed still holds the drone');
     BD.bedTick(A.AC.currentTime+BD.BED_PARK_S+1); if(!BD.bedDbg().parked) miss('Off: the bed was not parked after '+BD.BED_PARK_S+' s');
@@ -106,11 +108,13 @@ export async function checkNightBed(){
       notes.push(`v2 worklet voices at most: Drift ${JSON.stringify(d1.stats.max)}, Glimmer ${JSON.stringify(g2.stats.max)}`); }
     n++; if(await B2.bed2Load({})) miss('v2: a context without AudioWorklet did not refuse the worklet');
     /* ---- NIGHT-4: v2 live ---- */
-    BD.bedSetEngine('v2'); BD.bedSetMode('drift', B, R2);
+    const bs0=BUS.seq('bed'); BD.bedSetEngine('v2'); BD.bedSetMode('drift', B, R2);
     for(let k=0;k<40 && !(BD.bedDbg().v2.on); k++){ await wait(100); BD.bedTick(); }
     BD.bedTick(); const V0=BD.bedDbg(), w0=S.CUR(), M0=w0.iv.length; n+=3;
     if(!V0.v2.on || V0.engine!=='v2' || !BD.bedTakesDrone() || V0.v1on) miss('v2 On: '+JSON.stringify({ on:V0.v2.on, engine:V0.engine, drone:BD.bedTakesDrone(), v1on:V0.v1on, fail:V0.v2.fail }));
     if(V0.v2.slots.length!==R2.presets.drift.padTones[0]) miss('v2 On: the first chord did not come ('+V0.v2.slots.length+' tones)');
+    { const it=BUS.since('bed', bs0).items.filter(x=>x.v===2), ch=it.filter(x=>x.kind==='chord'); n++;   // NIGHT-6 slice 1
+      if(!ch.length || it.some(x=>!Number.isFinite(x.at))) miss('v2 On: its first chord was not published for the room (bus «bed»): '+JSON.stringify(it.slice(0,3))); }
     { const set=new Set(); for(let o=-1;o<=4;o++) for(let k=0;k<M0;k++) set.add(S.chordRowFreq(k,o,w0).toFixed(6)); if(V0.v2.slots.some(i=>!set.has(V0.v2.voices[i].hz.toFixed(6)))) miss('v2 On: a pad tone not on the scale'); }
     { const other=D.moods().find(m=>m!==mood0); D.setMood(other); const w1=S.CUR(), M1=w1.iv.length, t1=A.AC.currentTime; BD.bedTick(t1); BD.bedTick(t1+0.5);
       const V1=BD.bedDbg(), set=new Set(); for(let o=-1;o<=4;o++) for(let k=0;k<M1;k++) set.add(S.chordRowFreq(k,o,w1).toFixed(6)); n++;
@@ -118,7 +122,8 @@ export async function checkNightBed(){
     { BD.bedSetEngine('v1'); BD.bedTick(); const a=BD.bedDbg(); BD.bedSetEngine('v2'); for(let k=0;k<10 && !BD.bedDbg().v2.on; k++){ await wait(50); BD.bedTick(); } const b=BD.bedDbg(); n++;
       if(!(a.engine==='v1' && a.v1on && !a.v2.on && b.engine==='v2' && b.v2.on && !b.v1on)) miss('the A/B switch: '+JSON.stringify({ v1:[a.engine, a.v1on, a.v2.on], v2:[b.engine, b.v1on, b.v2.on] })); }
     /* a gap (a hidden tab: frames stop, the audio clock does not): 2 minutes on the probe clock → only the last second's notes and the latest chord go out */
-    { BD.bedTick(A.AC.currentTime+120); const T=BD.bedDbg().v2.tick; n++;
+    { const g0=BUS.seq('bed'); BD.bedTick(A.AC.currentTime+120); const T=BD.bedDbg().v2.tick, pub=BUS.since('bed', g0).items; n+=2;
+      if(!T || pub.length!==T.chord+T.loop+T.glass || pub.some(x=>x.v!==2)) miss(`v2 after a gap: ${pub.length} events published for the room, ${T ? T.chord+T.loop+T.glass : '—'} went out (NIGHT-6: exactly what goes out is published)`);
       if(!T || !(T.law>=20) || T.loop>4 || T.glass>3 || T.chord>1) miss('v2 after a 2-minute gap: '+JSON.stringify(T)+' (the law must hold 20+ events — CONTROL — of which at most 4 loop notes, 3 glass notes and 1 chord go out)'); }
     BD.bedSetMode('off'); n+=2; if(BD.bedTakesDrone()) miss('v2 Off: the bed still holds the drone');
     BD.bedTick(A.AC.currentTime+B2.BED2_PARK_S+1); if(!BD.bedDbg().v2.parked) miss('v2 Off: the bed was not parked after '+B2.BED2_PARK_S+' s');

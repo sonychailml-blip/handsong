@@ -71,10 +71,18 @@ RUN 9 — THE NIGHT over the forest, as numbers.
 - const (7): `NIGHT`, `CLOUD_PASSES`, `sleepProgress`, `MOOD_TC`, `RARE`, `EMBLEM_AT`, `emblemPoints`
 - fn (4): `nightAt`, `nightDeep`, `rareInit`, `rareStep`
 
+## apps/night/pure/heard.js
+NIGHT-6 slice 1 — WHEN A SOUND IS HEARD, on the page's clock.
+- const (1): `heardMs`
+
 ## apps/night/pure/room.js
 NIGHT-3: THE ROOM RECORD's shape and validator (pure, rule #36; data row «NIGHT room records» with controls).
 - const (6): `ROOM_FORMAT`, `ROOM_IDS`, `ROOM_LEVELS`, `ROOM_ACOUSTICS`, `roomLook`, `ROOM_DAMAGES`
 - fn (1): `checkRoom`
+
+## apps/night/rooms/forest/forest-answers.js
+NIGHT-6 slice 1 — THE FOREST ANSWERS (parts of the night forest room; forest.js builds them; the numbers are ./pure/answers.js): - DEW: points on the low leaves in view, one draw; each twinkles on …
+- fn (1): `buildAnswers`
 
 ## apps/night/rooms/forest/forest-detail.js
 RUN 9 (slice 3) — THE FOREST'S DETAIL.
@@ -93,7 +101,12 @@ RUN 9 (slice 4) — THE FOREST'S RARE EVENTS (every few minutes, never the same 
 ## apps/night/rooms/forest/forest.js
 VIS1c (RUN 6, Night plan §3) — THE NIGHT FOREST ROOM's picture: a scene module built with three.js r128 (vendored, loaded by the scene host apps/night/scene/host.js).
 - const (3): `FOREST_SEED`, `FOREST_LEVELS`, `FOREST_BOUNDS`
-- fn (1): `buildForest`
+- fn (2): `forestAssets`, `buildForest`
+
+## apps/night/rooms/forest/pure/answers.js
+NIGHT-6 slice 1 — THE FOREST ANSWERS, as numbers.
+- const (3): `ANSWERS`, `dewLight`, `webLight`
+- fn (5): `dewPlaces`, `webPlaces`, `noteRingAmp`, `swellAt`, `bedClusters`
 
 ## apps/night/rooms/forest/pure/fireflies.js
 VIS1c (RUN 6, Night plan §3.1) — the night forest's WILD FIREFLIES and its ground, as numbers.
@@ -124,12 +137,12 @@ NIGHT-3 stage 5 part 2: THE ROOM SWITCH — one door for everything a room chang
 
 ## apps/night/scene/host.js
 THE SCENE HOST and Night's BACKGROUNDS (VIS1b, RUN 6; Night's own since CORE-8 — the shared UI reaches it through hooks.scene).
-- const (20): `BACKGROUNDS`, `sceneRoomAdd`, `sceneRoomRemove`, `sceneRooms`, `sceneRoom`, `sceneRoomSet`, `SCENE_LEVEL_DEFAULT`, `SCENE_FADE`, `scenePausing`, `backgroundOf`, `sceneLevel`, `sceneShadowDbg`, `sceneOptDbg`, `sceneInfo`, `sceneRoomDbg`, `sceneLevelDbg`, `sceneHeldDbg`, `sceneProgramsDbg`, `sceneClockDbg`, `sceneOpenDbg`
+- const (21): `BACKGROUNDS`, `sceneRoomAdd`, `sceneRoomRemove`, `sceneRooms`, `sceneRoom`, `sceneRoomSet`, `SCENE_LEVEL_DEFAULT`, `SCENE_FADE`, `scenePausing`, `backgroundOf`, `sceneLevel`, `sceneShadowDbg`, `sceneOptDbg`, `sceneInfo`, `sceneRoomDbg`, `sceneLevelDbg`, `sceneHeldDbg`, `sceneProgramsDbg`, `sceneClockDbg`, `sceneBedDbg`, `sceneOpenDbg`
 - fn (7): `loadThree`, `sceneOpen`, `sceneSwitch`, `sceneClose`, `setBackground`, `setSceneLevel`, `sceneSnapDbg`
 
 ## apps/night/shell.js
 RUN 7 (C6 + C11, Night plan §5; docs/night/QUALITY.md points 4, 5, 6, 9, 10) — THE NIGHT SHELL (DOM side; the logic is core/nightui.js).
-- const (4): `LEAN_PATH`, `REACH`, `nightShellDbg`, `nightSleepDbg`
+- const (5): `LEAN_PATH`, `REACH`, `nightClockDbg`, `nightShellDbg`, `nightSleepDbg`
 - fn (2): `nightShellWire`, `nightShellFace`
 
 ## apps/night/sound/ambience.js
@@ -983,7 +996,7 @@ NIGHT-2 stage 2: row «NIGHT calibration screens» (quick; the probe clock throu
 
 ## tools/probes/night/forest.js
 VIS1c (RUN 6, Night plan §10, review 2026-10-17): two rows (quick and all).
-- fn (8): `checkForestRoom`, `checkBackgrounds`, `checkForestPicture`, `checkNightCycle`, `checkForestResponse`, `checkForestDetail`, `checkForestRare`, `checkForestLevels`
+- fn (9): `checkForestRoom`, `checkBackgrounds`, `checkForestPicture`, `checkNightCycle`, `checkForestResponse`, `checkForestDetail`, `checkForestRare`, `checkForestLevels`, `checkForestAnswers`
 
 ## tools/probes/night/headroom-calc.js
 NIGHT-1: the headroom page's sums, pure (runs in node: tools/probe-data.mjs, row «NIGHT-1 headroom sums»).
@@ -1033,7 +1046,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 - const (5): `TEST_ROOM_ID`, `TEST_ROOM`, `testRoomMode`, `testRoomInfo`, `testRoomFreeLeaks`
 - fn (2): `testRoomInstall`, `testRoomRemove`
 
-_200 modules, 2405 exported names._
+_203 modules, 2419 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

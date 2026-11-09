@@ -119,6 +119,19 @@
    "replace": "kept — the user's chosen Night design (RUN 7); the earlier «H» icons were replaced"
   },
   {
+   "id": "forest-files",
+   "name": "The night forest's prepared files (textures that never change during play: today the spider web)",
+   "class": "image",
+   "use": "shipped",
+   "version": "—",
+   "licence": "own-work",
+   "source": "drawn by our own seeded code, tools/forest-bake.mjs (regenerate: node tools/forest-bake.mjs; the data row «NIGHT forest files (app)» proves the files match it) — NIGHT-6, after the user's sketch «Живой лес»",
+   "files": [
+    "apps/night/rooms/forest/tex/web.png"
+   ],
+   "replace": "kept — our own generated material (NIGHT-6: the user's rule that what never changes is prepared ahead as files)"
+  },
+  {
    "id": "system-fonts",
    "name": "Interface and canvas text — the device's system fonts (CSS --font stack, canvas system-ui)",
    "class": "font",

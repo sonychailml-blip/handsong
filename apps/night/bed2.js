@@ -6,6 +6,7 @@
    measurement's offline renders) through the same message path (msgsOf) the live tick uses. */
 import { CUR, chordRowFreq, droneSecondHz } from '../../core/scales.js';
 import { seeded } from '../../core/pure/dsp.js';
+import { BUS } from '../../core/pure/bus.js';   // NIGHT-6 slice 1: the bed's events for the room (bus «bed»)
 import { BED2_SEED, bed2Init, bed2Step, bed2Soon, bed2Tables, bed2Density } from './pure/bed2.js';
 import { BED2_WORKLET, BED2_POOLS, BED2_DIV, buildBed2, bed2Post, bed2Park, bed2Stats } from './sound/bed2.js';
 
@@ -92,7 +93,9 @@ export function bed2Tick(E, now, played, answer, o){
      comes, so the bed never plays a burst of everything it missed */
   const late=now-1-S.origin, last=evs.filter(e=>e.kind==='chord' && e.t<late).pop(), T=S.tick={ law:evs.length, loop:0, glass:0, chord:0 };
   for(const ev of evs){ if(ev.t<late && (ev.kind==='loop' || ev.kind==='glass' || (ev.kind==='chord' && ev!==last))) continue;
-    if(T[ev.kind]!=null) T[ev.kind]++; list.push(...msgsOf(S.M, ev, Math.max(S.origin+ev.t, now+0.02), v, S.R, P, o)); }
+    if(T[ev.kind]!=null) T[ev.kind]++; const at=Math.max(S.origin+ev.t, now+0.02); list.push(...msgsOf(S.M, ev, at, v, S.R, P, o));
+    /* NIGHT-6 slice 1: what goes out is published at its audio time, so a room can show it when heard */
+    if(ev.kind==='chord' || ev.kind==='loop' || ev.kind==='glass') BUS.push('bed', { kind:ev.kind, at, lv:ev.v, a:ev.a, h:ev.h, r:ev.r, amp:ev.amp, v:2 }); }
   bed2Post(E, S.b, list);
 }
 /* probe only */

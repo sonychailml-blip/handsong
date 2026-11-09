@@ -16,12 +16,25 @@ import { roomLook } from '../../pure/room.js';
 import { buildLife, patchGroundWaves, patchSway } from './forest-life.js';   // RUN 9 (slice 2): the forest answers the playing
 import { buildDetail } from './forest-detail.js';   // RUN 9 (slice 3): grass, leaves, moths, moonbeams, silhouettes
 import { buildRare } from './forest-rare.js';   // RUN 9 (slice 4): the falling star, the flower, the emblem
+import { buildAnswers } from './forest-answers.js';   // NIGHT-6 slice 1: dew and webs
+import { ANSWERS, swellAt } from './pure/answers.js';
 
 export const FOREST_SEED=0x464F5231;
 export const FOREST_LEVELS=FOREST_ROOM.levels;   // NIGHT-3: what each level draws lives in the record
 export const FOREST_BOUNDS=Object.freeze([-6, 6, 0.3, 4.2, -15, 3.8]);   // x, y, z ranges the light may reach (it saturates there)
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+/* NIGHT-6: the forest's prepared FILES (the user's rule: what never changes during play is prepared ahead and shipped — drawn by
+   tools/forest-bake.mjs, registered in tools/licences.json), fetched once per session from our own origin; the room's load awaits them, so a
+   build finds them ready. A missing file leaves its part dark, never the room. */
+const FILES=Object.freeze({ web:new URL('./tex/web.png', import.meta.url) });
+let ASSETS=null, ASSETS_P=null; const assetErr=[];
+async function fileImage(url){ const r=await fetch(url); if(!r.ok) throw new Error(r.status+' '+url.pathname);
+  const u=URL.createObjectURL(await r.blob()), img=new Image(); try{ img.src=u; await img.decode(); } finally { URL.revokeObjectURL(u); } return img; }
+export function forestAssets(){
+  return ASSETS_P || (ASSETS_P=Promise.all(Object.entries(FILES).map(([k,u])=>fileImage(u).then(img=>[k,img], e=>{ assetErr.push(k+': '+String(e&&e.message||e)); return [k,null]; })))
+    .then(es=>(ASSETS=Object.fromEntries(es))));
+}
 /* colour helpers: a token's text → [r, g, b, a]; jittered variants in HSL (texture painting only) */
 function rgbOf(s){ s=String(s||'').trim(); let m=s.match(/^#([0-9a-f]{6})$/i); if(m){ const n=parseInt(m[1],16); return [n>>16&255, n>>8&255, n&255, 1]; }
   m=s.match(/^#([0-9a-f]{3})$/i); if(m){ const q=m[1]; return [0,1,2].map(i=>parseInt(q[i]+q[i],16)).concat(1); }
@@ -45,6 +58,7 @@ export function buildForest(T, opt){
     reduce=!!opt.reduce, R=seeded(FOREST_SEED), V=(x,y,z)=>new T.Vector3(x,y,z);
   const col=n=>new T.Color(C('forest-'+n));
   const own=[];   // everything to dispose
+  const files=opt.files||ASSETS||{};   // NIGHT-6: the prepared files (opt.files: a probe's own)
   const tex=(c,srgb,rx=1,ry=1)=>{ const t=new T.CanvasTexture(c); t.wrapS=t.wrapT=T.RepeatWrapping; t.repeat.set(rx,ry); t.anisotropy=8; if(srgb) t.encoding=T.sRGBEncoding; own.push(t); return t; };
   /* RUN 9: the PALETTE is the mood's look (the record's looks → tokens), eased towards a new mood's look (τ MOOD_TC s) */
   const looks=new Map(), lookCols=L=>{ let c=looks.get(L.pre); if(!c){ c={}; for(const [k,n] of Object.entries(L.tokens)) c[k]=new T.Color(C(n)); looks.set(L.pre,c); } return c; };
@@ -147,11 +161,15 @@ export function buildForest(T, opt){
   const rings=[]; for(let j=0;j<8;j++){ const sp=sprite(col('trail'),0); sp.visible=false; s.add(sp); rings.push({ sp, t0:-1, amp:0 }); }
   /* the camera: the prototype's place and lean; portrait gets a wider view */
   const camPos=V(0,1.55,5.5), camLook=V(0,1.35,-6), camera=new T.PerspectiveCamera(55,1,0.05,120), camOff=V(0,0,0), camGoal=V(0,0,0), look=V(0,0,0);
+  /* NIGHT-6 slice 1: dew and webs (the webs hang beside the trunks above); the music bed's events wait here until they are heard */
+  let webTex=null; if(files.web && (Lv.webs||0)>0){ webTex=new T.Texture(files.web); webTex.encoding=T.sRGBEncoding; webTex.needsUpdate=true; own.push(webTex); }
+  const answers=buildAnswers({ T, s, own, lv:{ dew:Lv.dew||0, webs:Lv.webs||0 }, trunks:spots, webTex, cam:[camPos.x, camPos.y, camPos.z] });
+  const bedQ=[], fired=[], twinkles=[], glow1=new Float32Array(flies.length); let glassN=0, tLast=-Infinity;
   const ray=new T.Raycaster(), ndc=new T.Vector2(), fwd=V(0,0,0), tmp=V(0,0,0);
   let W=opt.w||800, H=opt.h||600, pxH=H;
   function aimCamera(){ camera.position.copy(camPos).add(camOff); look.copy(camLook).addScaledVector(camOff,-1.2); camera.lookAt(look); camera.updateMatrixWorld(); }
   function resize(w,h,bufH){ W=w; H=h; pxH=bufH||h; camera.aspect=w/h; camera.fov= w/h<0.8 ? 68 : 55; camera.updateProjectionMatrix();
-    fm.uniforms.uScale.value=pxH/(2*Math.tan(camera.fov*Math.PI/360)); life.resize(fm.uniforms.uScale.value); aimCamera(); detail.resize(w, h, camera, fm.uniforms.uScale.value); }
+    fm.uniforms.uScale.value=pxH/(2*Math.tan(camera.fov*Math.PI/360)); life.resize(fm.uniforms.uScale.value); aimCamera(); detail.resize(w, h, camera, fm.uniforms.uScale.value); answers.resize(fm.uniforms.uScale.value); }
   /* the hand's play point (canvas pixels px, py) and depth 0…1 → the light's world place on THIS camera's ray (it projects back onto the
      point); saturates at the room's bounds and the ground → out; returns true when it saturated */
   function place(px, py, d01, out){
@@ -184,6 +202,14 @@ export function buildForest(T, opt){
   /* one frame: hands = [{ x, y, d, play }] (canvas pixels, depth 0…1; play = the note hand); nin = the bus «nightSky» ({ mood, sleep 0…1 }) */
   function update(dt, t, hands, fx, nin){
     now=t; if(fx) fxv=fx; night(dt, t, nin);
+    /* NIGHT-6 slice 1: the bed's events whose moment has come (heard at q.at, room time) — each envelope starts exactly then */
+    for(let j=0;j<bedQ.length;){ const q=bedQ[j]; if(t<q.at){ j++; continue; } bedQ.splice(j,1); const it=q.it;
+      fired.push({ kind:it.kind, at:q.at, t, prev:tLast }); if(fired.length>32) fired.shift();
+      if(it.kind==='chord') life.bedChord(q.at);
+      else if(it.kind==='loop') life.bedLoop(it.lv, q.at, it.a, it.h, it.r, it.amp);
+      else if(it.kind==='glass'){ const far=flies.map((f,i)=>i).filter(i=>Math.hypot(flies[i].p[0]-camPos.x, flies[i].p[1]-camPos.y, flies[i].p[2]-camPos.z)>ANSWERS.bed.glass.near);
+        if(far.length) twinkles.push({ i:far[(glassN++)%far.length], t0:q.at }); } }
+    tLast=t;
     const kk=(reduce?0.4:1)*deep.motion, H2=hands||[], play=H2.find(h=>h.play), other=H2.find(h=>h!==play);
     rigs.forEach((r,i)=>{ const h= i===0 ? play : other; let on=0;
       if(h){ r.sat=place(h.x, h.y, h.d, r.tgt); on=1; if(r.on<0.02) r.cur.copy(r.tgt); r.d+=(h.d-r.d)*Math.min(1, dt*8); }
@@ -215,7 +241,10 @@ export function buildForest(T, opt){
     const pa=fg.attributes.position.array, ga=fg.attributes.aGlow.array;
     music*=Math.exp(-dt/1.8); const mg=1+0.6*Math.min(1,music);
     const fk=fkNow=deep.flies*fliesK;   // RUN 9: the sleep and the mood dim the wild lights
-    flies.forEach((q,i)=>{ pa[i*3]=q.p[0]; pa[i*3+1]=q.p[1]; pa[i*3+2]=q.p[2]; ga[i]=q.glow*mg*fk; });
+    /* NIGHT-6 slice 1: a glass note of the bed makes one far firefly twinkle (its glow only — the law moves it as ever) */
+    const GL=ANSWERS.bed.glass; glow1.fill(0);
+    for(let j=twinkles.length-1;j>=0;j--){ const w=twinkles[j], a=t-w.t0; if(a>GL.rise+GL.hold+GL.fall || a<-60){ twinkles.splice(j,1); continue; } glow1[w.i]=Math.max(glow1[w.i], swellAt(a, GL.rise, GL.hold, GL.fall)*GL.amp); }
+    flies.forEach((q,i)=>{ pa[i*3]=q.p[0]; pa[i*3+1]=q.p[1]; pa[i*3+2]=q.p[2]; ga[i]=(q.glow*mg+glow1[i])*fk; });
     fg.attributes.position.needsUpdate=fg.attributes.aGlow.needsUpdate=true;
     wild.forEach((l,i)=>{ const q=flies[Math.min(flies.length-1,i*7)]; l.position.set(q.p[0],q.p[1],q.p[2]); l.intensity=q.glow*0.7*(1+0.5*Math.min(1,music))*fk; });
     hemi.intensity=0.26*(1+0.15*Math.min(1,music))*(0.8+0.2*nt.moonLight)*deep.light;   // RUN 9: the sky follows the moon and the sleep
@@ -225,6 +254,8 @@ export function buildForest(T, opt){
     life.update(dt, t, { light:rigs[0].cur, lightOn:rigs[0].on, lightCol:rigs[0].light.color, moon:nt.moon, moonK:nt.moonLight*deep.light, fogD:s.fog.density,
       sway, shimmer:reduce ? 0 : fxv.wave, dim:deep.light });   // RUN 9 (slice 2)
     detail.update(dt, t, { light:rigs[0].cur, lightOn:rigs[0].on, moon:nt.moon, moonK:nt.moonLight*deep.light, mist:nt.mist.reduce((a,b)=>a+b,0)/nt.mist.length, wind:sway, cam:camera.position });
+    answers.update(dt, t, { light:rigs[0].cur, on:rigs[0].on, light1:rigs[1].cur, on1:rigs[1].on, lightCol:rigs[0].light.color, fxCol:rigs[1].light.color, moonCol:pal.moonhalo,
+      moonK:nt.moonLight*deep.light, dim:deep.light, fogD:s.fog.density, cam:camera.position });   // NIGHT-6 slice 1
     /* parallax: the camera leans a little towards the playing light (near and far things slide past each other) */
     const f0=rigs[0].on>0.05 ? rigs[0].cur : camLook;
     camGoal.set(clamp(f0.x,-4,4)*0.16, (clamp(f0.y,0,5)-1.7)*0.1, 0); if(reduce) camGoal.multiplyScalar(0.3);
@@ -232,7 +263,8 @@ export function buildForest(T, opt){
   }
   /* a note began on this rig's hand (from the bus `notes` ring) */
   const glint=(i,vel)=>{ const r=rigs[i]; if(r) r.glint=Math.max(r.glint, clamp(vel==null?0.6:vel,0.18,1)); music=Math.min(1.5, music+0.35*clamp(vel==null?0.6:vel,0.18,1));
-    if(r && i===0 && r.on>0.05){ life.glint(vel, r.cur.x, r.cur.z, now); rare.glint(); }   // RUN 9: a wave of light across the moss, the mushrooms nearby pulse (and an open flower)
+    if(r && i===0 && r.on>0.05){ life.glint(vel, r.cur.x, r.cur.z, now); rare.glint();   // RUN 9: a wave of light across the moss, the mushrooms nearby pulse (and an open flower)
+      life.noteRing(r.cur.x, r.cur.z, vel==null?0.6:vel, now); answers.glint(vel); }   // NIGHT-6 slice 1: a ring on the stream; dew and webs glint
     if(r && i===0 && fxv.echo>0.02){ const v=clamp(vel==null?0.6:vel,0.18,1); let amp=0.9*v*fxv.echo;   // C5: one ring per echo, each fainter by the feedback
       for(let k=1;k<=6 && amp>0.03;k++){ echoes.push({ at:now+k*fxv.time, amp, pos:r.cur.clone() }); amp*=Math.max(0, fxv.fb); } } };
   /* probes: numbers only (never pixels) */
@@ -243,9 +275,15 @@ export function buildForest(T, opt){
     music, halo:rigs[0].halo.scale.x, hemi:hemi.intensity,   // RUN 8
     night:{ phase:nt?nt.phase:0, moon:[moonS.position.x, moonS.position.y, moonS.position.z], cover:nt?nt.cover:0, moonLight:nt?nt.moonLight:1, moonI:moonL.intensity,   // RUN 9
       clouds:clouds.map(c=>c.visible ? c.material.opacity : 0), mist:mists.map(x=>x[3].opacity), mistY:mists.map(x=>x[2].position.y), fog:s.fog.density, deep:deep.e, mood:moodId,
-      fogHex:pal.fog.getHexString(), flies:fkNow }, life:{ ...life.state(), gather, playing, release:rel }, detail:detail.state(), rare:rare.state(flies) });   // RUN 9 (slice 2)
+      fogHex:pal.fog.getHexString(), flies:fkNow }, life:{ ...life.state(), gather, playing, release:rel }, detail:detail.state(), rare:rare.state(flies),   // RUN 9 (slice 2)
+    answers:answers.state(), bed:{ queued:bedQ.length, fired:fired.map(x=>({ ...x })), twinkles:twinkles.map(w=>({ ...w, glow:glow1[w.i] })) }, files:{ web:!!files.web, errors:assetErr.slice() } });   // NIGHT-6 slice 1
   function dispose(){ for(const o of own) try{ o.dispose(); }catch(e){} own.length=0; }
+  /* NIGHT-6 slice 1: a music bed event `it` ({ kind 'chord' | 'loop' | 'glass', lv, a, h, r, amp }) heard at room time `at` (the host maps it) */
+  function bed(it, at){ if(!it || !(at>-1e9) || at-now>30) return; bedQ.push({ it, at }); if(bedQ.length>64) bedQ.shift(); }
+  /* NIGHT-6 slice 0: the room's texture memory in bytes (its own textures: pixels × 4, mipmaps × 4/3) */
+  function texBytes(){ let b=0; for(const o of own){ if(!o || !o.isTexture) continue; const im=o.image||{}, w=im.width||0, h=im.height||0, pot=!(w&(w-1)) && !(h&(h-1));
+    b+=w*h*4*(o.generateMipmaps!==false && pot ? 4/3 : 1); } return Math.round(b); }
   resize(W,H);
-  return { id:FOREST_ROOM.id, scene:s, camera, update, resize, place, glint, project, state, dispose, lightsOf, lifeDbg:life, detailDbg:detail,
+  return { id:FOREST_ROOM.id, scene:s, camera, update, resize, place, glint, project, state, dispose, lightsOf, lifeDbg:life, detailDbg:detail, bed, texBytes, answersDbg:answers,
     held:rare.held, rareDbg:kind=>rare.force(kind, now, { light:rigs[0].cur, flies }) };   // RUN 9 (slice 4): held — how long the playing note is held (host); rareDbg — probes / captures   // RUN 9: lifeDbg / detailDbg — probes only (uniforms, silhouette boxes)
 }
