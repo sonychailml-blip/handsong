@@ -704,3 +704,43 @@ export async function checkForestPaint(){
   return { cases:n, total:d.length, differences:d, notes };
 }
 row({ night:true, at:1008.6399, name:'FOREST paint', drawn:true, run:()=>checkForestPaint(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });
+/* NIGHT-6 slice 9: row «FOREST hidden» — the room built without a renderer: the foxfire's trail as long as the level asks and the wood's and
+   bark's shaders carry it (their program keys), the flowers counted; the baseline has neither; the playing light moved through the room's
+   update leaves a trail and opens the flower it reaches — CONTROL a flower it never reaches stays closed; drawn (medium): the foxfire on the
+   bank log and the opened flowers RENDER — CONTROL one frame twice differs by 0. */
+export async function checkForestHidden(){
+  const d=[], notes=[]; let n=0; const miss=s=>d.push(s);
+  const was=profileCurrent(), keepLevel=sceneLevel();
+  try{
+    const T=await loadThree(); await forestAssets('full'); await forestAssets('reduced'); const w=844, h=390, rooms=[], mk=(lv, o={})=>{ const r=buildForest(T,{ C:cv, level:lv, w, h, gl2:true, ...o }); rooms.push(r); return r; };
+    const NIN={ mood:'major-penta', sleep:0 }, V=new T.Vector3();
+    try{
+      for(const lv of ['full','reduced']){ const r=mk(lv), st=r.state().hidden, L=FOREST_LEVELS[lv], mats=[r.woodDbg.parts.material]; n+=2;
+        if(st.of!==L.foxfire || r.foxDbg.uFox.value.length!==L.foxfire || st.flowers!==L.flowers) miss(`${lv}: ${JSON.stringify({ of:st.of, flowers:st.flowers })}`);
+        if(mats.some(m=>!/\.fox\d+$/.test(m.customProgramCacheKey()))) miss(lv+': the wood\'s shader has no foxfire');
+        notes.push(`${lv}: a trail of ${st.of} points, ${st.flowers} night flowers`); }
+      { const r=mk('reduced', { lv:{ foxfire:0, flowers:0 } }), st=r.state().hidden; n++; if(st.of || st.flowers || /fox/.test(r.woodDbg.parts.material.customProgramCacheKey())) miss('the baseline still has '+JSON.stringify(st)); }
+      { const r=mk('reduced'), F=r.hiddenDbg.flowers, f=F[0], far=F.reduce((a,b)=>Math.hypot(b.x-f.x, b.z-f.z)>Math.hypot(a.x-f.x, a.z-f.z) ? b : a, F[0]);
+        let best=null, bd=1e9; for(let px=0;px<=w;px+=w/48) for(let py=0;py<=h;py+=h/30) for(const dd of [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]){ r.place(px, py, dd, V); const e=Math.hypot(V.x-f.x, V.y-(f.y+0.5), V.z-f.z); if(e<bd){ bd=e; best=[px, py, dd]; } }
+        let t=1; for(let i=0;i<150;i++){ t+=1/60; r.update(1/60, t, [{ x:best[0], y:best[1], d:best[2], play:true }], null, NIN); }
+        const st=r.state().hidden, i0=F.indexOf(f), iF=F.indexOf(far); n+=3;
+        if(!(st.trail>0)) miss('the light left no trail'); if(!(st.open[i0]>0.99)) miss(`the flower the light reached is ${st.open[i0]} open (the light ${bd.toFixed(2)} m from its place)`);
+        if(st.open[iF]!==0) miss('CONTROL: a flower '+Math.hypot(far.x-f.x, far.z-f.z).toFixed(1)+' m away opened: '+st.open[iF]);
+        notes.push(`the light ${bd.toFixed(2)} m from a flower for 2.5 s: it opened, ${st.open.filter(o=>o>0).length} of ${F.length} open; a trail of ${st.trail}`); }
+    } finally { for(const r of rooms) r.dispose(); }
+    const why=profileApply('profile.night'); n++; if(why){ miss('Night refused: '+why); return { cases:n, total:d.length, differences:d, notes }; }
+    await setSceneLevel('reduced'); await setBackground('forest'); await frames(6);
+    const room=sceneRoomDbg(); if(!room || !sceneInfo().webgl){ notes.push('no WebGL room — the drawn checks do not apply'); return { cases:n, total:d.length, differences:d, notes }; }
+    const FU=room.foxDbg, logs=woodPlaces(FOREST_LEVELS.reduced, forestTrunks()).logs, K=logs.find(l=>!l.bridge), mid=[(K.a[0]+K.b[0])/2, (K.a[1]+K.b[1])/2+0.2, (K.a[2]+K.b[2])/2], P=room.hiddenDbg.parts;
+    const open=P.petals.geometry.attributes.aOpen, keepOpen=open.array.slice();
+    for(const [name, fn] of [['the foxfire', on=>{ const p=FU.uFox.value[0]; if(on){ p.set(mid[0], mid[1], mid[2], FU.uFoxT.value); } else p.w=-1; }],
+      ['the opened flowers', on=>{ open.array.fill(on ? 1 : 0); if(!on) open.array.set(keepOpen); open.needsUpdate=true; }]]){
+      const ab=await sceneSnapDbg(fn, true), cc=await sceneSnapDbg(()=>{}, true); n+=2;
+      if(!ab || !cc){ notes.push(name+': no frame rendered'); continue; }
+      notes.push(`${name} change the mean RGB sum of one frame by ${(ab[0]-ab[1]).toFixed(4)} (CONTROL ${(cc[0]-cc[1]).toFixed(4)})`);
+      if(!(Math.abs(ab[0]-ab[1])>0)) miss(name+' do not show'); if(cc[0]!==cc[1]) miss('CONTROL: one frame rendered twice differs by '+(cc[0]-cc[1])); }
+  } catch(e){ miss('error: '+(e&&e.stack||e)); }
+  finally{ try{ await setSceneLevel(keepLevel); }catch(e){} if(profileCurrent()!==was) profileApply(was); await setBackground('camera'); await sleep(30); }
+  return { cases:n, total:d.length, differences:d, notes };
+}
+row({ night:true, at:1008.63995, name:'FOREST hidden', drawn:true, run:()=>checkForestHidden(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });

@@ -35,6 +35,14 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 5. The falling star passes in front of the trees. Natural?
 
 ## Records (English, at most about 15 lines each; older ones go to `archive/HANDOFF-history.md`)
+### NIGHT-6 slice 9 (2026-11-10): hidden things the light finds. Log: `docs/night/WORK-LOG.md`; as built: `docs/night/design/NIGHT-6-forest/PLAN.md` top
+- Step 141: the glows stay crisp; the strokes' strength and the grain at medium were left open by the user (asked again in the report); unchanged.
+- Foxfire: thin glowing veins on the dead and fallen wood and on the feet of some old trunks, near the playing light's trail (12 / 8 recent places); each patch holds 8–12 s after the light, then fades in 2.5 s (the wood's and the bark's shaders; no new program).
+- Night flowers: 14 / 8 small closed buds among the herbs, in view and in the light's reach; within a metre of the light they open (0.6 s) and glow softly, stay 20 s, close (3 s). Their petals: one small shader (+1 program); their glow: the mushrooms' glow points.
+- Found on the way: the probe snapshot's second drawing kept the frame's geometry uploads (three uploads attributes once per frame; since slice 8 the host counts frames itself) — the snapshot now starts a new frame.
+- Laptop medium: detections = Dark (0.0 / 0.0 %), frame 2.5–2.7 ms, draws 69–70, programs 29, textures 16.9 MB; first opening 5.1 s after high. High −52.4 / −45.7 %. Files unchanged (3.29 MB of 30).
+- Rows: data «FOREST hidden (app)» 16; browser «FOREST hidden» 13. Waiting for step 142 (and the two open answers of step 141).
+
 ### NIGHT-6 slice 8 (2026-11-10): the painted distance and the film. Log: `docs/night/WORK-LOG.md`; as built: `docs/night/design/NIGHT-6-forest/PLAN.md` top
 - Step 140 checked by the user: the canopy, the moon's window, the stars and the dapple look right; the light stays clearly visible.
 - Departure from the plan (reason measured): no far forest baked beyond 28 m — today's fog leaves ≥ 94 % fog there, so it would not show; the sketch's painted look is its per-frame stroke pass on the middle distance, so that is what was built (the plan had left it out for cost): strokes from 7 m growing to the level's radius at 26 m (high 3 px, medium 2.5), written out tap by tap (29 / 21 taps, 92 / 68 sector feeds against the sketch's 81 × 8).
@@ -50,13 +58,6 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 - Darkness, measured (medium, landscape, light at three places): the top third with / without the canopy 7.98 / 8.12, 8.30 / 8.30, 8.45 / 8.57; round the light unchanged (±0.2). The leaves carry a faint moonlit glow (a value; a stronger one made them pale cut-outs).
 - Laptop medium: detections = Dark (0.0 / −0.2 %); draws 66–67, programs 27, triangles 189 k, textures 16.9 MB; first opening 4.1 s (after high in the page). High −54.4 / −52.6 % (left as is). Files: high 2.15, medium 1.00, low 0.50 MB (3.29 of 30).
 - Rows: data «FOREST canopy (app)» 18; browser «FOREST canopy» 14. Waiting for step 140.
-
-### NIGHT-6 slice 6 (2026-11-10): the effects hand moves the forest; high made cheaper. Log: `docs/night/WORK-LOG.md`; as built: `docs/night/design/NIGHT-6-forest/PLAN.md` top
-- Step 138 checked by the user: the near forest, the bridge, the stumps and the bark look right; the ferns sway again.
-- High made cheaper as offered: the wood is out of the hand light's shadow pass, the moss cushions lighter (10×4 segments). Triangles 260 k → 218 k; detections within the noise (−47.6 / −45.0 %, before −46.9 / −48.8 %); the cold first opening 6.0 s. Measured: the light's shadow is about 10 points of high's cost (−36.5 % without it); the rest is high's sharper picture.
-- The gust (`pure/gust.js`, `forest-gust.js`): the effects hand's light, when it SWEEPS, bends the grass, today's ferns, the floor plants and the ivy along the sweep (the shared sway shader), stirs cat's-paws on the water, shakes leaves loose (12 / 6) and leaves a wake of rings on the stream. A still or slow hand: exactly nothing. Picture only.
-- Laptop medium: detections = Dark (0.0 %); draws 63–64, programs 26, triangles 156 k, textures 14.9 MB. Files unchanged (2.66 MB of 30).
-- Rows: data «FOREST gust (app)» 18; browser «FOREST gust» 11. Waiting for step 139.
 
 ### NIGHT-6 stage 1 (2026-11-09): the forest, polished and alive — the comparison and the plan only. `docs/night/design/NIGHT-6-forest/PLAN.md`
 - No app code; tree hashes unchanged (core 14bd513ae15aa87e · apps/full d6b90cf2cb4be6da · apps/night 3279ec88c1f91059).

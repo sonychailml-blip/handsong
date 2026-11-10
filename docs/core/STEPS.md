@@ -45,6 +45,7 @@ THERE in full and here as one index entry):
   139 The effects hand moves the forest: the gust, loose leaves, the stream's wake (NIGHT-6 slice 6)
   140 The canopy and the moon's window: crowns, the understorey, stars, the moon's face, dappled moonlight (NIGHT-6 slice 7)
   141 The painted distance (brush strokes by depth) and the film (vignette, grain), the camera's breath (NIGHT-6 slice 8)
+  142 Hidden things the light finds: foxfire veins on the wood, night flowers among the herbs (NIGHT-6 slice 9)
 
 ## Moved to `archive/CLAUDE-history.md` at DOC1 (grep by title; read only what the slice needs)
 - «Module map (full, moved at DOC1)» — every module's detailed paragraph (AUD1a … IDS1, SONG1, AUTOSAVE1, PACK1 …).

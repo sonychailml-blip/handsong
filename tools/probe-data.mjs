@@ -1278,6 +1278,41 @@ async function forestPaintCore(){
   { const L=FR.levels; n++; if(!L.full.paint || !L.reduced.paint || !L.full.grain || L.reduced.grain || !(L.full.paintR>L.reduced.paintR)) miss('the levels: '+JSON.stringify({ full:[L.full.paint, L.full.paintR, L.full.grain], reduced:[L.reduced.paint, L.reduced.paintR, L.reduced.grain] })); }
   return { cases:n, total:d.length, differences:d, notes };
 }
+/* NIGHT-6 slice 9: HIDDEN THINGS THE LIGHT FINDS (apps/night/rooms/forest/pure/hidden.js). Foxfire: no light, no trail point and exactly 0
+   glow; a moving light leaves points a step apart, the ring keeps the newest; at a point just made the glow is exactly 1, it holds 8–12 s
+   (the patch's own hold — CONTROL holdK 0 and 1 differ at 10 s), then fades to exactly 0; it falls with distance. Night flowers: in view and in
+   the light's reach, beside a herb, never in the water, apart; never found exactly closed; the light within reach opens one, it stays open
+   FLOWERS.stay s after, then closes — CONTROL a light 1.5 m away, or too high, opens none. */
+async function forestHiddenCore(){
+  const d=[], notes=[]; let n=0; const miss=s=>d.push(s);
+  const Hd=await import(new URL('../apps/night/rooms/forest/pure/hidden.js', import.meta.url).href), Fl=await import(new URL('../apps/night/rooms/forest/pure/floor.js', import.meta.url).href);
+  const L=await import(new URL('../apps/night/rooms/forest/pure/forestlife.js', import.meta.url).href), Lo=await import(new URL('../apps/night/rooms/forest/pure/layout.js', import.meta.url).href);
+  const FR=(await import(new URL('../apps/night/rooms/forest/pure/room.js', import.meta.url).href)).FOREST_ROOM, X=Hd.FOX, FL=Hd.FLOWERS;
+  { const tr=Hd.foxTrail(12); for(let t=0;t<5;t+=0.1) Hd.foxTrailStep(tr, t, null); n+=2; if(tr.pts.some(p=>p.t>=0)) miss('an unlit light left a trail'); if(Hd.foxAt(tr, 0, 0, 0, 5)!==0) miss('no trail but a glow'); }
+  const tr=Hd.foxTrail(12); for(let k=0;k<=40;k++) Hd.foxTrailStep(tr, k*0.1, [k*0.1, 0.5, 0]);   // 4 m in 4 s
+  { const pts=tr.pts.filter(p=>p.t>=0).sort((a,b)=>a.t-b.t); n+=2; let gap=Infinity; for(let i=1;i<pts.length;i++) gap=Math.min(gap, Math.hypot(pts[i].x-pts[i-1].x, pts[i].z-pts[i-1].z));
+    if(pts.length!==Math.min(12, Math.floor(4/X.step)+1)) miss(pts.length+' trail points'); if(!(gap>=X.step-1e-9)) miss('trail points '+gap.toFixed(3)+' m apart');
+    notes.push(`a 4-m pass in 4 s leaves ${pts.length} points ${X.step} m apart`); }
+  { const last=tr.last, at=(t, k=0.5, dx=0)=>Hd.foxAt(tr, last.x+dx, last.y, last.z, t, k); n+=5;
+    if(at(last.t)!==1) miss('the glow at a point just made is '+at(last.t)); if(!(at(last.t+7)>0.99)) miss('the glow fades before 8 s');
+    if(at(last.t+X.hold[1]+X.fade+0.01)!==0) miss('the glow lasts past its hold and fade: '+at(last.t+X.hold[1]+X.fade+0.01));
+    if(!(at(last.t+10, 0)<at(last.t+10, 1))) miss('CONTROL: the patch\'s own hold changes nothing at 10 s');
+    if(!(at(last.t, 0.5, 2.4)<0.05 && at(last.t, 0.5, 0.6)>at(last.t, 0.5, 1.2))) miss('the glow does not fall with distance');
+    notes.push(`the glow: 1 at the point, ${at(last.t, 0.5, 1.2).toFixed(2)} 1.2 m away; at 10 s ${at(last.t+10, 0).toFixed(2)} (hold 8 s) vs ${at(last.t+10, 1).toFixed(2)} (12 s); gone by ${(X.hold[1]+X.fade).toFixed(1)} s`); }
+  const herbs=Fl.floorPlaces(Object.fromEntries([...Fl.HERBS, 'fern2'].map(k=>[k, FR.levels.full[k]])), Lo.forestTrunks(), []), F=Hd.flowerPlaces(FR.levels.full.flowers, herbs);
+  { let bad=0; for(const f of F){ const az=Math.abs(Math.atan2(f.x, 5.5-f.z))*180/Math.PI, e=Math.hypot(f.x, f.z-5.5);
+      if(az>FL.az+1e-9 || Math.abs(f.x)>FL.box.x || f.z<FL.box.z || e<FL.eye[0] || e>FL.eye[1] || L.streamNear(f.x,f.z).d<L.STREAM.half+0.25) bad++;
+      if(!herbs.some(h=>Math.hypot(h.x-f.x, h.z-f.z)<0.13)) bad++; if(F.some(o=>o!==f && Math.hypot(o.x-f.x, o.z-f.z)<FL.gap)) bad++; }
+    n+=2; if(F.length!==FR.levels.full.flowers) miss(F.length+' flowers of '+FR.levels.full.flowers); if(bad) miss(bad+' flowers out of view, out of reach, in the water, crowded or by no herb'); }
+  { const f0=F[0], run=(f, sec, light, t0=0)=>{ let t=t0; for(let i=0;i<Math.round(sec*60);i++){ t+=1/60; Hd.flowerStep(f, 1/60, t, light ? light(t) : null); } return t; };
+    const a={ ...f0, open:0, seen:null }; run(a, 30, null); n++; if(a.open!==0) miss('a flower never found opened: '+a.open);
+    const b={ ...f0, open:0, seen:null }; let t=run(b, 1, ()=>[f0.x+0.5, f0.y+0.6, f0.z]); const o1=b.open; t=run(b, FL.stay-2, null, t); const o2=b.open; t=run(b, 6, null, t); const o3=b.open; n+=3;
+    if(o1!==1) miss('the light at the flower opens it to '+o1); if(o2!==1) miss('it closed before '+FL.stay+' s: '+o2); if(o3!==0) miss('it stays open long after: '+o3);
+    const c={ ...f0, open:0, seen:null }, e={ ...f0, open:0, seen:null }; run(c, 3, ()=>[f0.x+1.5, f0.y+0.6, f0.z]); run(e, 3, ()=>[f0.x, f0.y+FL.lift+0.2, f0.z]); n++;
+    if(c.open!==0 || e.open!==0) miss(`CONTROL: a light 1.5 m away (${c.open}) or too high (${e.open}) opened it`);
+    notes.push(`${F.length} flowers (${[...new Set(F.map(f=>f.by))].join(', ')}); a flower found opens in ${(1/FL.open).toFixed(2)} s, stays ${FL.stay} s, closes in ${(1/FL.close).toFixed(1)} s`); }
+  return { cases:n, total:d.length, differences:d, notes };
+}
 /* NIGHT-6: THE FOREST'S FILES (tools/forest-bake.mjs). Every prepared file matches what the tool draws now, pixel for pixel (CONTROL a changed
    pixel is caught); the PNG writer and reader round-trip; the forest's files stay inside the user's budget (CONTROL 16 MB is over it). The
    sizes are printed every run (the user's rule: report the size in every slice). */
@@ -1441,6 +1476,7 @@ const ROWS=[
   ['FOREST gust (app)',         ()=>forestGustCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 6
   ['FOREST canopy (app)',       ()=>forestCanopyCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 7
   ['FOREST paint (app)',        ()=>forestPaintCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 8
+  ['FOREST hidden (app)',       ()=>forestHiddenCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 9
   ['NIGHT forest files (app)',  ()=>nightForestFiles(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 (the files rule, the size budget)
   ['OLD NAME gone',             ()=>oldNameGone(),  r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // SPLIT-2
   ['NIGHT rare events (core)',  ()=>rareCore(),     r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // RUN 9 (slice 4)

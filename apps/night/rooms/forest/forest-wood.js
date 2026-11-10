@@ -42,9 +42,19 @@ const LOOK=`{ vec3 wp=vWP7, wn=normalize(vWN7); float dead=vW7.x, kind=vW7.y, to
 /* the colour uniforms (tokens) */
 export function woodUniforms(T, C){ const k=n=>({ value:new T.Color(C('forest-'+n)) });
   return { uMossW:k('moss'), uLichen:k('lichen'), uGrain:k('grain'), uGrainDark:k('grain-dark'), uFungus:k('fungus'), uFungusRim:k('fungus-rim'), uDead:k('deadwood') }; }
-/* mat → the wood's look. attrs: true = per-vertex (aW7, aCap7: the merged wood), false = today's bark (instanced, no moss on top) */
-function patchLook(mat, WU, attrs, key){
-  mat.onBeforeCompile=sh=>{ Object.assign(sh.uniforms, WU);
+/* NIGHT-6 slice 9: FOXFIRE (pure/hidden.js foxAt, the same formula): veins glowing on the dead wood (aW7.x dead > 0.25) and on the feet of some
+   old trunks (the bark: patches of a slow noise, below 3 m), near the light's trail (uFox: x, y, z, its time; time < 0 empty), each patch holding
+   8–12 s, then fading. With no trail point it adds exactly nothing */
+const FOX=(n, L)=>`{ vec3 wp=vWP7; float above=wp.y-gnd7(wp.xz);
+  float where= vW7.x>0.25 ? 1.0 : (vW7.z<0.01 && vW7.y<0.5 ? smoothstep(0.55, 0.75, vn7(wp.xz*0.45+3.1))*(1.0-smoothstep(1.2, 3.0, above)) : 0.0);
+  if(where>0.0 && uFoxK>0.0){ float act=0.0;
+    for(int i=0;i<${n};i++){ vec4 p=uFox[i]; if(p.w<0.0) continue; float age=uFoxT-p.w, hold=${L.hold[0].toFixed(3)}+${(L.hold[1]-L.hold[0]).toFixed(3)}*vn7(wp.xz*1.7+float(i)), f= age<hold ? 1.0 : max(0.0, 1.0-(age-hold)/${L.fade.toFixed(3)}); vec3 dd=wp-p.xyz; act=max(act, f*exp(-dot(dd,dd)/${(L.r*L.r).toFixed(4)})); }
+    if(act>0.0){ vec2 q=vec2(wp.x*7.0+wp.z*4.3, wp.y*8.0-wp.z*3.1); float vein=(1.0-smoothstep(0.015, 0.05, abs(vn7(q)-0.5)))*smoothstep(0.3, 0.6, vn7(q*0.37+3.0));   // connected thin lines, some stretches faded
+      totalEmissiveRadiance+=uFoxCol*(uFoxK*where*act*(vein*0.6+0.02)*(0.75+0.25*sin(uFoxT*1.3+wp.x*3.0+wp.z*2.0))); } } }`;   // the veins and a faint glow round them
+/* mat → the wood's look. attrs: true = per-vertex (aW7, aCap7: the merged wood), false = today's bark (instanced, no moss on top). WU.uFox
+   present: + foxfire (WU.foxLaw: { hold, fade, r }) */
+function patchLook(mat, WU, attrs, key){ const fox=WU.uFox ? WU.uFox.value.length : 0, law=WU.foxLaw, U={ ...WU }; delete U.foxLaw;
+  mat.onBeforeCompile=sh=>{ Object.assign(sh.uniforms, U);
     sh.vertexShader=(attrs ? 'attribute vec3 aW7;\nattribute vec2 aCap7;\n' : '')+'varying vec3 vWP7;\nvarying vec3 vWN7;\nvarying vec3 vW7;\nvarying vec2 vCap7;\n'+sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
   { vec4 w7=vec4(transformed,1.0); vec3 n7=objectNormal;
   #ifdef USE_INSTANCING
@@ -52,8 +62,9 @@ function patchLook(mat, WU, attrs, key){
   #endif
     vWP7=(modelMatrix*w7).xyz; vWN7=normalize(mat3(modelMatrix)*n7); ${attrs ? 'vW7=aW7; vCap7=aCap7;' : 'vW7=vec3(0.0); vCap7=vec2(0.0);'} }`);
     sh.fragmentShader='varying vec3 vWP7;\nvarying vec3 vWN7;\nvarying vec3 vW7;\nvarying vec2 vCap7;\n'+GLSL+'\n'+sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n'+LOOK)
-      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  if(vW7.y>1.5) roughnessFactor=0.7;'); };
-  mat.customProgramCacheKey=()=>key; return mat; }
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  if(vW7.y>1.5) roughnessFactor=0.7;');
+    if(fox) sh.fragmentShader=`uniform vec4 uFox[${fox}];\nuniform vec3 uFoxCol;\nuniform float uFoxK, uFoxT;\n`+sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n'+FOX(fox, law)); };
+  mat.customProgramCacheKey=()=>key+(fox ? '.fox'+fox : ''); return mat; }
 /* today's bark (trunks, branches): moss low on the north side, lichen, darker at the foot */
 export const patchBark=(mat, WU)=>patchLook(mat, WU, false, 'handsong.bark7');
 
@@ -123,7 +134,7 @@ function cushionGeo(T){ const g=new T.SphereGeometry(1, 10, 4, 0, TAU, 0, Math.P
 /* ctx: { T, s, C, own, P (woodPlaces), barkMap, bumpMap, rockMat (the stream rocks' material), floorMat (or null), cast (casts the light's shadow) }
    → { state(), parts } */
 export function buildWood(ctx){
-  const { T, s, C, own, P, rockMat, floorMat }=ctx, WU=woodUniforms(T, C), d=new T.Object3D(), R=seeded(0x57444231);
+  const { T, s, C, own, P, rockMat, floorMat }=ctx, WU={ ...woodUniforms(T, C), ...(ctx.FU||{}) }, d=new T.Object3D(), R=seeded(0x57444231);   // FU: the foxfire's uniforms (slice 9)
   /* the wood */
   const wg=woodGeo(T, P), woodM=patchLook(new T.MeshStandardMaterial({ map:ctx.barkMap||null, bumpMap:ctx.bumpMap||null, bumpScale:0.035, roughness:0.93 }), WU, true, 'handsong.wood7');
   const wood=wg ? new T.Mesh(wg, woodM) : null; own.push(woodM); if(wood){ own.push(wg); wood.castShadow=!!ctx.cast; wood.receiveShadow=true; s.add(wood); }

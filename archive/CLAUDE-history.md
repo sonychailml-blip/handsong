@@ -1890,6 +1890,11 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
     3. The vignette (darker corners); at high a fine moving grain. Is the grain worth having at medium too?
     4. The camera's small sideways breath: felt, not seen.
     5. Each Mood (Glow, Dusk, Mist): the depth of the view, and a Mood change.
+142. Hidden things the light finds (NIGHT-6 slice 9), picture only, at most four checks; the rest is in the rows «FOREST hidden (app)» (no light no trail and exactly no glow; points a step apart; the glow 1 at a fresh point, holding 8–12 s — CONTROL the patch's own hold differs at 10 s —, gone by 14.5 s; flowers in view and in the light's reach, beside a herb; never found exactly closed; found: open, 20 s, closed — CONTROL a light 1.5 m away or too high opens none) and «FOREST hidden» (the trail and flowers per level, the wood's shader carries the foxfire, the baseline none; the light moved through the room opens the flower it reaches — CONTROL a far one stays closed; the foxfire and the opened flowers render — CONTROL one frame twice). Laptop: Live Server; `http://127.0.0.1:5500/apps/night/`, the room's picture on (medium, the default).
+    1. Move your light slowly along the log on the bank, over a stump and past the feet of the trunks: thin glowing veins appear on the dead wood and some old bark near it and stay lit 8–12 s after the light moves on, then fade — a trail of what it found. Too strong, too faint, or right?
+    2. Through the herbs, low, in front of you: small closed buds open into pale glowing flowers when the light comes within a metre; about 20 s later they close.
+    3. Away from the light nothing glows that did not glow before.
+    4. Everything else as before (the mushrooms, the fireflies, the painted distance).
 
 ## Superseded at DOC1 (old lines verbatim, replaced in place above by a later slice)
 - NIGHT-2 stage 3 (2026-11-03, the rule of at most five manual checks) updated this line of CLAUDE.md's report format:

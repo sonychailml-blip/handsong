@@ -4,6 +4,15 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`, `archive/NIGHT-RUN-LOG-2026-10.md`. New runs start at `NIGHT-1`.
 
+# NIGHT-6 — slice 9 (2026-11-10): hidden things the light finds
+Tree hashes before: core 2b6fc141521883a3 · apps/full d6b90cf2cb4be6da · apps/night 845492ac100b9e56. After: core 2b6fc141521883a3 (unchanged) · apps/full d6b90cf2cb4be6da (unchanged) · apps/night 930d69a397b488d9.
+- Step 141: the user's note kept both choices open (the strokes: right / stronger / weaker; the grain at medium: yes / no) — left unchanged, asked again.
+- New: `rooms/forest/pure/hidden.js` (`FOX`, `FLOWERS`, `foxTrail`, `foxTrailStep`, `foxAt`, `flowerPlaces`, `flowerStep`), `rooms/forest/forest-hidden.js` (`foxUniforms`, `buildHidden`). Changed: `forest-wood.js` (the foxfire in the wood's look when the uniforms are given; program keys `.foxN`), `forest-life.js` (`glowMat` exposed), `forest.js` (the trail's uniforms shared by the bark and the wood, the hidden things), `scene/host.js` (the snapshot's second drawing starts a new frame), `pure/room.js` (foxfire 12 / 8, flowers 14 / 8), `night.css` (three tokens), `shell.js` and the budget eval (baseline off).
+- Look rounds: the veins first came out as big smears, then as dashes on a teal wash; now connected thin lines, some stretches faded, a faint glow round them, at 0.6 of the token; the flowers' glow (the mushrooms' size) halved; the first flower law put flowers outside the view, where the light cannot go — now in view and in its reach.
+- Rows: data «FOREST hidden (app)» (16; first run PASS); browser «FOREST hidden» (13; one round — «the opened flowers do not show»: the snapshot's second drawing reused the frame's attribute uploads; fixed in the host, not in the row). One capture stalled on a mis-placed comment of mine that swallowed a loop's closing brace (the module parsed differently; found by the page's probe load error, fixed before any suite).
+- Checks: static PASS · `[probe-data] PASS — 49 checks, 0 differences` · `P.night: PASS — 48 checks, 0 differences` · `P.quick: PASS — 93 checks, 0 differences` · smoke paths with builds PASS. Budget (laptop): medium 0.0 / 0.0 %, frame 2.5–2.7 ms, draws 69–70, programs 29, first opening 5.1 s after high; high −52.4 / −45.7 %, without the light's shadow −36.5 %.
+- Files unchanged: high 2.15 MB, medium 1.00 MB, low 0.50 MB.
+
 # NIGHT-6 — slice 8 (2026-11-10): the painted distance and the film
 Tree hashes before: core 2b6fc141521883a3 · apps/full d6b90cf2cb4be6da · apps/night 4e48f17877f46829. After: core 2b6fc141521883a3 (unchanged) · apps/full d6b90cf2cb4be6da (unchanged) · apps/night 845492ac100b9e56.
 - Step 140 checked by the user.

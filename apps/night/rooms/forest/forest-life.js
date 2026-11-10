@@ -201,5 +201,5 @@ export function buildLife(ctx){
     bed:{ active:bedEv.length, clusters:clusters.map(c=>c.slice()) },   // NIGHT-6 slice 1
     sway:U.uSway.value, shimmer:U.uShimmer.value, waveCol:[U.uGWCol.value.r, U.uGWCol.value.g, U.uGWCol.value.b], shroomCol:[SH.r, SH.g, SH.b] });
   const resize=scale=>{ gm.uniforms.uScale.value=scale; };
-  return { U, update, glint, echo, noteRing, wake, bedChord, bedLoop, state, resize, stream };
+  return { U, update, glint, echo, noteRing, wake, bedChord, bedLoop, state, resize, stream, glowMat:gm };   // glowMat: NIGHT-6 slice 9 (the night flowers' glow shares it)
 }

@@ -8443,3 +8443,11 @@ not a control · run a "random" failure many times and print WHERE and HOW MUCH 
 - Fixed: today's ferns had stopped swaying in slice 4 (two calls left behind a comment); a row now checks it.
 - Laptop medium: detections = Dark (0.0 %); draws 62–63 (51–52 before NIGHT-6), programs 26 (20), triangles 177 k (71 k), textures 14.9 MB, frame 1.9–2.1 ms (1.6). High −46.9 / −48.8 %, 260 k triangles; the first opening at high 5.7 s.
 - Files per level: high 1.76 MB, medium 0.81 MB, low 0.42 MB (all 2.66 MB of 30). Rows: data «FOREST wood (app)» 25; browser «FOREST wood» 22. Waiting for step 138.
+
+# Moved from docs/night/HANDOFF.md at NIGHT-6 slice 9 (2026-11-10)
+### NIGHT-6 slice 6 (2026-11-10): the effects hand moves the forest; high made cheaper. Log: `docs/night/WORK-LOG.md`; as built: `docs/night/design/NIGHT-6-forest/PLAN.md` top
+- Step 138 checked by the user: the near forest, the bridge, the stumps and the bark look right; the ferns sway again.
+- High made cheaper as offered: the wood is out of the hand light's shadow pass, the moss cushions lighter (10×4 segments). Triangles 260 k → 218 k; detections within the noise (−47.6 / −45.0 %, before −46.9 / −48.8 %); the cold first opening 6.0 s. Measured: the light's shadow is about 10 points of high's cost (−36.5 % without it); the rest is high's sharper picture.
+- The gust (`pure/gust.js`, `forest-gust.js`): the effects hand's light, when it SWEEPS, bends the grass, today's ferns, the floor plants and the ivy along the sweep (the shared sway shader), stirs cat's-paws on the water, shakes leaves loose (12 / 6) and leaves a wake of rings on the stream. A still or slow hand: exactly nothing. Picture only.
+- Laptop medium: detections = Dark (0.0 %); draws 63–64, programs 26, triangles 156 k, textures 14.9 MB. Files unchanged (2.66 MB of 30).
+- Rows: data «FOREST gust (app)» 18; browser «FOREST gust» 11. Waiting for step 139.

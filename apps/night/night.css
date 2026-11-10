@@ -32,7 +32,8 @@
   --cv-forest-stem:#3b3a30; --cv-forest-water:#03070c;   /* RUN 9 (slice 2): the mushrooms' stems, the stream's deep colour */
   /* NIGHT-6 slice 5: the wood — lichen, end grain (light and its rings), bracket fungi (and their pale rim), dead wood's grey */
   --cv-forest-lichen:#3f493c; --cv-forest-grain:#6b5236; --cv-forest-grain-dark:#33251a; --cv-forest-fungus:#5c4630; --cv-forest-fungus-rim:#8a7a60; --cv-forest-deadwood:#5e5950;
-  --cv-forest-star:#cfd9ff; --cv-forest-leafglow:#030604;   /* NIGHT-6 slice 7: the stars in the canopy's gap; the leaves' faint moonlit glow */
+  --cv-forest-star:#cfd9ff; --cv-forest-leafglow:#030604;
+  --cv-forest-foxfire:#34d39a; --cv-forest-bud:#18240f; --cv-forest-nightbloom:#d6e6ff;   /* NIGHT-6 slice 9: foxfire's glow, the night flowers' bud and bloom */   /* NIGHT-6 slice 7: the stars in the canopy's gap; the leaves' faint moonlit glow */
   --cv-forest-grass:#22361a; --cv-forest-grass-dry:#38381c; --cv-forest-leaf-fall:#2c2012; --cv-forest-moth:#d9d2bd; --cv-forest-sil:#020403;   /* slice 3 */
   --cv-forest-dusk-fog:#110c1c; --cv-forest-dusk-sky:#3a2c55; --cv-forest-dusk-under:#070508; --cv-forest-dusk-moon:#c79a78;
   --cv-forest-dusk-moonhalo:#e2b78f; --cv-forest-dusk-haze:#9c88b4; --cv-forest-dusk-cloud:#2a2238;
