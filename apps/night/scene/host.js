@@ -64,7 +64,7 @@ function makeRenderer(){
     const c=document.createElement('canvas'); c.id='scene'; c.className='veil'; c.setAttribute('aria-hidden','true');   // born veiled: it fades in once its room has drawn
     const r=new THREE.WebGLRenderer({ canvas:c, antialias:level==='full', powerPreference:'high-performance' });
     made++; live++;
-    r.outputEncoding=THREE.sRGBEncoding; r.toneMapping=THREE.ACESFilmicToneMapping; r.toneMappingExposure=1.0;
+    r.outputEncoding=THREE.sRGBEncoding; r.toneMapping=THREE.ACESFilmicToneMapping; r.toneMappingExposure=1.0; r.info.autoReset=false;   // NIGHT-6 slice 8: the frame resets it (a frame may take several passes)
     r.shadowMap.enabled=shadowOn(); r.shadowMap.type=THREE.PCFSoftShadowMap;
     onLost=e=>{ e.preventDefault(); errors.push('context lost'); level='minimal'; dropRenderer(false); stackSet('scene', false); if(opening) openEnd(opening); };   // a real loss (our own close removes it first)
     c.addEventListener('webglcontextlost', onLost);
@@ -149,8 +149,8 @@ function sceneFrame(t, bus){
   { const B=bus.since('bed', bedSeq), ck=bus.get('audioClock'); bedSeq=B.seq;
     if(room.bed && ck) for(const it of B.items) if(Number.isFinite(it.at)) room.bed(it, heardMs(ck, it.at, bedLate)/1000+clockOff); }
   room.update(dt, t/1000+clockOff, bus.get('handsView')||[], bus.get('nightFx'), bus.get('nightSky'));   // RUN 7 (C5): the Night effects' values; RUN 9: the mood and the sleep
-  renderer.render(room.scene, room.camera);
-  info.calls=renderer.info.render.calls; info.tris=renderer.info.render.triangles;   // NIGHT-6 slice 0: this frame's draw calls and triangles
+  renderer.info.reset(); draw();
+  info.calls=renderer.info.render.calls; info.tris=renderer.info.render.triangles;   // NIGHT-6 slice 0: this frame's draw calls and triangles (slice 8: every pass of it)
   if(opening && opening.id===room.id && ++opening.frames>=2) openEnd(opening);   // NIGHT-3 stage 5 part 2: two frames drawn — detection resumes, the picture fades in
   if(snapWant){ const f=snapWant; snapWant=null; f(); }   // RUN 8 probe: copy the frame JUST rendered (the drawing buffer is cleared once presented)
   const ms=performance.now()-t0; info.ms= info.ms ? info.ms*0.9+ms*0.1 : ms;
@@ -215,7 +215,9 @@ export function sceneSnapDbg(alt, full=false){
   const grab=()=>{ const t=document.createElement('canvas'); t.width=gw; t.height=gh; const g=t.getContext('2d'); g.drawImage(glCanvas,0,0,gw,gh);
     const px=g.getImageData(0,0,gw,gh).data; let sum=0; for(let i=0;i<px.length;i+=4) sum+=px[i]+px[i+1]+px[i+2]; return sum/(px.length/4); };
   return new Promise(res=>{ const to=setTimeout(()=>{ snapWant=null; res(null); }, 2000);
-    snapWant=()=>{ clearTimeout(to); const a=grab(); if(!alt){ res(a); return; } try{ alt(true); renderer.render(room.scene, room.camera); res([a, grab()]); } finally { alt(false); } }; }); }
+    snapWant=()=>{ clearTimeout(to); const a=grab(); if(!alt){ res(a); return; } try{ alt(true); draw(); res([a, grab()]); } finally { alt(false); } }; }); }
+/* NIGHT-6 slice 8: one frame on the screen — the room's own passes when it has them (the painted distance), else the scene in one */
+function draw(){ if(room.render) room.render(renderer, performance.now()/1000); else renderer.render(room.scene, room.camera); }
 /* NIGHT-6, capture only: the next rendered frame at full size as a PNG data URL (null without WebGL; after 2 s) */
 export function sceneShotDbg(){ if(!renderer || !glCanvas) return Promise.resolve(null);
   return new Promise(res=>{ const to=setTimeout(()=>{ snapWant=null; res(null); }, 2000); snapWant=()=>{ clearTimeout(to); res(glCanvas.toDataURL('image/png')); }; }); }

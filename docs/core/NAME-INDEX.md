@@ -105,6 +105,10 @@ NIGHT-6 slice 6 — THE EFFECTS HAND MOVES THE FOREST (a part of the night fores
 RUN 9 (slice 2) — THE FOREST ANSWERS THE PLAYING, softly (never busy).
 - fn (5): `patchGroundWaves`, `patchSway`, `patchWetGround`, `patchSoftEdges`, `buildLife`
 
+## apps/night/rooms/forest/forest-paint.js
+NIGHT-6 slice 8 — THE PAINTED DISTANCE AND THE FILM (the night forest room's picture pass; forest.js builds it; the numbers are ./pure/paint.js).
+- fn (1): `buildPaint`
+
 ## apps/night/rooms/forest/forest-rare.js
 RUN 9 (slice 4) — THE FOREST'S RARE EVENTS (every few minutes, never the same kind twice in a row; the schedule is apps/night/pure/cycle.js rareStep, seeded): a FALLING STAR streaks across the sky …
 - const (1): `RARE_LOOK`
@@ -159,6 +163,11 @@ NIGHT-6 slice 6 — THE EFFECTS HAND MOVES THE FOREST, as numbers.
 NIGHT-6 slice 5 — TODAY'S FOREST'S PLACES, as numbers (pure, rule #36), for whoever needs them outside the room: the bake tool paints the contact shadows under the trunks and rocks (tools/forest-ba…
 - const (3): `FOREST_SEED`, `PAINT_DRAWS`, `ROCKS_TODAY`
 - fn (1): `forestTrunks`
+
+## apps/night/rooms/forest/pure/paint.js
+NIGHT-6 slice 8 — THE PAINTED DISTANCE AND THE FILM, as numbers.
+- const (3): `PAINT`, `strokeR`, `breathAt`
+- fn (2): `strokeTaps`, `vignetteAt`
 
 ## apps/night/rooms/forest/pure/room.js
 NIGHT-3: THE FOREST ROOM'S RECORD — what the room is, as data (pure, rule #36; checked by apps/night/pure/room.js, data row «NIGHT room records»).
@@ -1049,7 +1058,7 @@ NIGHT-2 stage 2: row «NIGHT calibration screens» (quick; the probe clock throu
 
 ## tools/probes/night/forest.js
 VIS1c (RUN 6, Night plan §10, review 2026-10-17): two rows (quick and all).
-- fn (15): `checkForestRoom`, `checkBackgrounds`, `checkForestPicture`, `checkNightCycle`, `checkForestResponse`, `checkForestDetail`, `checkForestRare`, `checkForestLevels`, `checkForestAnswers`, `checkForestMelody`, `checkForestFloor`, `checkForestStream`, `checkForestWood`, `checkForestGust`, `checkForestCanopy`
+- fn (16): `checkForestRoom`, `checkBackgrounds`, `checkForestPicture`, `checkNightCycle`, `checkForestResponse`, `checkForestDetail`, `checkForestRare`, `checkForestLevels`, `checkForestAnswers`, `checkForestMelody`, `checkForestFloor`, `checkForestStream`, `checkForestWood`, `checkForestGust`, `checkForestCanopy`, `checkForestPaint`
 
 ## tools/probes/night/headroom-calc.js
 NIGHT-1: the headroom page's sums, pure (runs in node: tools/probe-data.mjs, row «NIGHT-1 headroom sums»).
@@ -1099,7 +1108,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 - const (5): `TEST_ROOM_ID`, `TEST_ROOM`, `testRoomMode`, `testRoomInfo`, `testRoomFreeLeaks`
 - fn (2): `testRoomInstall`, `testRoomRemove`
 
-_214 modules, 2492 exported names._
+_216 modules, 2499 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

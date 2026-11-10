@@ -1197,6 +1197,7 @@ async function forestGustCore(){
     n+=3; if(back) miss(back+' of 8 plants round the gust bend against the sweep'); if(!(top>low && low>0)) miss(`the top bends ${top.toFixed(3)}, low down ${low.toFixed(3)}`); if(far!==0) miss('the gust reaches '+(G.GUST.R*2.2).toFixed(1)+' m: '+far);
     notes.push(`the bend at the centre: ${(top*100).toFixed(1)} cm at 1 m up, ${(low*100).toFixed(1)} cm at 0.2 m; ${(G.GUST.R*2.2).toFixed(1)} m away exactly ${far}`); }
   { const g=run({ ...sweep }, 6, ()=>null); n++; if(g.k!==0) miss('six seconds after the sweep the gust is '+g.k); }
+  { const g=run(run(G.gustNew(), 1, t=>[-2+3*t, -3]), 1, t=>[1-3*t, -3]); n++; if(!(g.dx<-0.95)) miss('a sweep straight back does not reverse the gust: '+g.dx.toFixed(3)); }   // slice 8: the blend of opposite directions could not turn
   { const g=run(run({ ...sweep }, 4, ()=>null), 1.2, t=>[4, 2-3*t]), c=run(run({ ...sweep }, 4, ()=>null), 1.2, ()=>[4, 2]); n+=2;
     if(!(g.k>0.5 && Math.hypot(g.x-4, g.z-(2-3.6))<0.6)) miss(`a second sweep elsewhere: strength ${g.k.toFixed(2)} at ${g.x.toFixed(2)}, ${g.z.toFixed(2)}`);
     if(c.k!==0) miss('CONTROL: a hand held still at the new place makes a gust of '+c.k); }
@@ -1252,6 +1253,30 @@ async function forestCanopyCore(){
   { const g={ x:0, z:0, dx:1, dz:0, k:1 }; n+=2; if(G.gustBend(g, 0.3, 0, 1, 4.5)[0]!==0) miss('the gust reaches a crown at 4.5 m'); if(!(G.gustBend(g, 0.3, 0, 1, 0)[0]>0)) miss('the gust lost the ground plants'); }
   { const a=JSON.stringify(Cn.canopyPlaces(Lv.reduced, T)), b=JSON.stringify(Cn.canopyPlaces(Lv.reduced, T)), c=JSON.stringify(Cn.canopyPlaces(Lv.reduced, T, 99)); n+=2; if(a!==b) miss('one seed gave two canopies'); if(a===c) miss('CONTROL: another seed gave the same'); }
   void B; return { cases:n, total:d.length, differences:d, notes };
+}
+/* NIGHT-6 slice 8: THE PAINTED DISTANCE AND THE FILM (apps/night/rooms/forest/pure/paint.js). The strokes' taps: inside the disc, symmetric, the
+   centre feeding every sector equally, each other tap at most three sectors, every sector fed — CONTROL a disc of 0 has only the centre; the
+   stroke radius: 0 up to PAINT.near, the full radius from PAINT.far, rising between; the vignette 1 in the middle, 1 − k at the ellipse's edge,
+   falling outwards; the breath: bounded, not still, its mean over ten minutes near 0; the levels: painting at both, the grain at high only. */
+async function forestPaintCore(){
+  const d=[], notes=[]; let n=0; const miss=s=>d.push(s);
+  const Pp=await import(new URL('../apps/night/rooms/forest/pure/paint.js', import.meta.url).href), FR=(await import(new URL('../apps/night/rooms/forest/pure/room.js', import.meta.url).href)).FOREST_ROOM, P=Pp.PAINT;
+  for(const R of [3, 2.5]){ const T=Pp.strokeTaps(R), key=t=>t.i+','+t.j, has=new Set(T.map(key)); n+=5;
+    if(T.some(t=>t.d2>R*R+0.5)) miss(`R ${R}: a tap outside the disc`); if(T.some(t=>!has.has((-t.i)+','+(-t.j)))) miss(`R ${R}: the taps are not symmetric`);
+    const c=T.find(t=>!t.d2); if(!c || c.w.length!==P.sectors || Math.abs(c.w.reduce((a,[,w])=>a+w,0)-1)>1e-12) miss(`R ${R}: the centre does not feed every sector equally`);
+    if(T.some(t=>t.d2 && (t.w.length<1 || t.w.length>3))) miss(`R ${R}: a tap feeds ${Math.max(...T.map(t=>t.w.length))} sectors`);
+    const fed=new Set(T.filter(t=>t.d2).flatMap(t=>t.w.map(([k])=>k))); if(fed.size!==P.sectors) miss(`R ${R}: only ${fed.size} sectors fed`);
+    notes.push(`R ${R}: ${T.length} taps, ${T.reduce((a,t)=>a+t.w.length,0)} sector feeds (the sketch's loop: 81 × 8)`); }
+  { n++; if(Pp.strokeTaps(0).length!==1) miss('CONTROL: a disc of 0 has '+Pp.strokeTaps(0).length+' taps'); }
+  { const a=Pp.strokeR(P.near, 3), b=Pp.strokeR(P.far, 3), c=Pp.strokeR((P.near+P.far)/2, 3), e=Pp.strokeR(2, 3); n+=2; if(a!==0 || e!==0 || b!==3) miss(`the stroke radius: ${e} at 2 m, ${a} at ${P.near} m, ${b} at ${P.far} m`); if(!(c>0 && c<3)) miss('the radius does not rise between'); }
+  { const m=Pp.vignetteAt(0.5, 1-P.vignette.cy), e=Pp.vignetteAt(0, 0), q=Pp.vignetteAt(0.95, 0.15); n+=2;
+    if(m!==1) miss('the vignette dims the middle: '+m); if(!(e<=1-P.vignette.k+1e-9 && q<1 && q>e)) miss(`the vignette: corner ${e.toFixed(3)}, between ${q.toFixed(3)}`);
+    notes.push(`the vignette: 1 in the middle, ${q.toFixed(2)} near the lower right, ${e.toFixed(2)} in the corner`); }
+  { let mx=0, sum=0, k=0; for(let t=0;t<600;t+=0.1){ const b=Pp.breathAt(t); mx=Math.max(mx, Math.abs(b)); sum+=b; k++; } n+=2;
+    if(!(mx>0.01 && mx<=P.breath.ax+P.breath.bx+1e-12)) miss('the breath reaches '+mx.toFixed(4)+' m'); if(Math.abs(sum/k)>0.005) miss('the breath drifts: mean '+(sum/k).toFixed(4));
+    notes.push(`the breath: at most ${(mx*100).toFixed(1)} cm sideways, mean ${(sum/k*1000).toFixed(2)} mm over ten minutes`); }
+  { const L=FR.levels; n++; if(!L.full.paint || !L.reduced.paint || !L.full.grain || L.reduced.grain || !(L.full.paintR>L.reduced.paintR)) miss('the levels: '+JSON.stringify({ full:[L.full.paint, L.full.paintR, L.full.grain], reduced:[L.reduced.paint, L.reduced.paintR, L.reduced.grain] })); }
+  return { cases:n, total:d.length, differences:d, notes };
 }
 /* NIGHT-6: THE FOREST'S FILES (tools/forest-bake.mjs). Every prepared file matches what the tool draws now, pixel for pixel (CONTROL a changed
    pixel is caught); the PNG writer and reader round-trip; the forest's files stay inside the user's budget (CONTROL 16 MB is over it). The
@@ -1415,6 +1440,7 @@ const ROWS=[
   ['FOREST wood (app)',         ()=>forestWoodCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 5
   ['FOREST gust (app)',         ()=>forestGustCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 6
   ['FOREST canopy (app)',       ()=>forestCanopyCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 7
+  ['FOREST paint (app)',        ()=>forestPaintCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 8
   ['NIGHT forest files (app)',  ()=>nightForestFiles(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 (the files rule, the size budget)
   ['OLD NAME gone',             ()=>oldNameGone(),  r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // SPLIT-2
   ['NIGHT rare events (core)',  ()=>rareCore(),     r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // RUN 9 (slice 4)

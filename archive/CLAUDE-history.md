@@ -1884,6 +1884,12 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
     3. Your light anywhere in its reach: it should stay clearly visible (the understorey keeps out of its way).
     4. The floor: soft patches of moonlight drifting slowly; they fade when a cloud covers the moon.
     5. Everything else as before: the stream, the wood, the floor plants, the fireflies, the gust.
+141. The painted distance and the film (NIGHT-6 slice 8), at most five checks; the rest is in the rows «FOREST paint (app)» (the strokes' taps, the radius by depth, the vignette, the breath, the levels — CONTROL a disc of 0) and «FOREST paint» (it paints at both levels; every glowing thing in its own pass with its own depth test — CONTROL a plain material has none; the camera breathes — CONTROL the baseline stands still; with the pass set to pass through and the glows hidden the painted pipeline is EXACTLY the one-pass picture; the strokes and the vignette change it — CONTROL one frame twice), «FOREST gust» (a sweep straight back reverses the gust), «NIGHT forest picture». Laptop: Live Server; `http://127.0.0.1:5500/apps/night/`, the room's picture on (medium, the default).
+    1. The middle distance (from about 7 m) in brush strokes growing with depth: trunks and crowns painted, the near forest sharp. Compare `tools/.ui-snap/n6s8/medium-before-after.png` (left unpainted, right painted) and the app. Stronger, weaker or right?
+    2. The fireflies, your light, the dew, the mushrooms' glow, the moon and the stars stay crisp, never smeared.
+    3. The vignette (darker corners); at high a fine moving grain. Is the grain worth having at medium too?
+    4. The camera's small sideways breath: felt, not seen.
+    5. Each Mood (Glow, Dusk, Mist): the depth of the view, and a Mood change.
 
 ## Superseded at DOC1 (old lines verbatim, replaced in place above by a later slice)
 - NIGHT-2 stage 3 (2026-11-03, the rule of at most five manual checks) updated this line of CLAUDE.md's report format:

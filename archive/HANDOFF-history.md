@@ -8433,3 +8433,13 @@ not a control · run a "random" failure many times and print WHERE and HOW MUCH 
 - Laptop medium: draws 59–60 (before NIGHT-6 51–52), programs 25 (20), triangles 94 k (71 k), textures 13.6 MB (as slice 3); detections −1.8 / 0.0 % (noise). High −43.7 / −37.9 %. First opening: high 4.9 s, medium 3.2 s (in a page that had opened high), later 0.4–1 s.
 - Files per level unchanged by this slice: high 1.46 MB, medium 0.67 MB, low 0.34 MB (all 2.21 MB of 30).
 - Rows: data «FOREST stream (app)» 27; browser «FOREST stream» 14. Waiting for step 137.
+
+# Moved from docs/night/HANDOFF.md at NIGHT-6 slice 8 (2026-11-10)
+### NIGHT-6 slice 5 (2026-11-10): moss, roots and fallen wood. Log: `docs/night/WORK-LOG.md`; as built: `docs/night/design/NIGHT-6-forest/PLAN.md` top
+- Step 137 checked by the user: the stream looks good and is easy to see; keep the soft edges; everything else as before.
+- The trunks flare at the foot; roots spread from the 14 near trees; a log across the stream (the bridge) and one on the bank; 5 stumps with cut tops (rings, cracks), 3 standing dead trees, bracket fungi; 56 fallen branches at high only: one merged geometry, one new material over today's bark (`forest-wood.js`, laws `pure/wood.js`).
+- Moss low on the bark's north side, lichen higher, darker at the foot (today's bark material); moss cushions (400 / 200) with the stream rocks' material; ivy on the 12 / 6 nearest trunks (a new cell of the plant sheet); 30 / 16 mushrooms on the wood after today's.
+- Contact shadows: a prepared map `tex/shade-2048` → 1024, 512, painted by the bake tool from the same laws (`pure/layout.js` replays today's trunks); medium is a part of high, so one map serves both.
+- Fixed: today's ferns had stopped swaying in slice 4 (two calls left behind a comment); a row now checks it.
+- Laptop medium: detections = Dark (0.0 %); draws 62–63 (51–52 before NIGHT-6), programs 26 (20), triangles 177 k (71 k), textures 14.9 MB, frame 1.9–2.1 ms (1.6). High −46.9 / −48.8 %, 260 k triangles; the first opening at high 5.7 s.
+- Files per level: high 1.76 MB, medium 0.81 MB, low 0.42 MB (all 2.66 MB of 30). Rows: data «FOREST wood (app)» 25; browser «FOREST wood» 22. Waiting for step 138.

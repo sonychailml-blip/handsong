@@ -4,6 +4,17 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`, `archive/NIGHT-RUN-LOG-2026-10.md`. New runs start at `NIGHT-1`.
 
+# NIGHT-6 — slice 8 (2026-11-10): the painted distance and the film
+Tree hashes before: core 2b6fc141521883a3 · apps/full d6b90cf2cb4be6da · apps/night 4e48f17877f46829. After: core 2b6fc141521883a3 (unchanged) · apps/full d6b90cf2cb4be6da (unchanged) · apps/night 845492ac100b9e56.
+- Step 140 checked by the user.
+- Departure from the plan: the far-forest bake (and its counter check) dropped — today's fog (Glow 0.06, Dusk 0.052, Mist 0.085) leaves ≥ 94 % fog beyond 28 m; the per-frame stroke pass the plan had left out was built instead, made cheap (written out tap by tap). The check of the bake counter became the exactness check (pass-through = the one-pass picture).
+- New: `rooms/forest/pure/paint.js` (`PAINT`, `strokeR`, `strokeTaps`, `vignetteAt`, `breathAt`), `rooms/forest/forest-paint.js` (`buildPaint`: the render target with depth, the composite, the glow layer's depth test, probe switches). Changed: `forest.js` (the paint, the room's `render`, the breath), `scene/host.js` (`draw()` uses the room's `render`; `info.autoReset` off — the frame resets it, so counts include every pass), `pure/gust.js` (it turns by angle), `pure/room.js` (paint, paintR 3 / 2.5, vignette, grain high only, breath), `shell.js` and the budget eval (baseline off).
+- Look rounds: the grain's first hash drew lines across the picture (replaced).
+- Rows: data «FOREST paint (app)» (18; rounds: 2 — a vignette check point inside the clear middle; a comment used the product's old name as a plain word); «FOREST gust (app)» + the reversal case; browser «FOREST paint» (15). Night suite rounds: 2 — «NIGHT forest picture»: one frame drawn twice differed by the grain (it used the wall clock; now the room's frame time); «FOREST gust»: the gust could not reverse (a real law bug, fixed by turning by angle).
+- Programs: the glow pass first compiled a second copy of each glowing material (36); the lights now see both passes and the shadow map is not redrawn in the glow pass (28).
+- Checks: static PASS · `[probe-data] PASS — 48 checks, 0 differences` · `P.night: PASS — 47 checks, 0 differences` · `P.quick: PASS — 93 checks, 0 differences` · smoke paths with builds PASS. Budget (laptop, the second, clean run): medium 0.0 / 0.0 %, frame 2.1–2.2 ms, programs 28, textures 16.9 MB, first opening 3.9 s; high −48.5 / −45.0 %, cold opening 8.3 s. (The first run read −8.7 % on the step right after high, with its Dark neighbour disturbed — 66 ms detections; the repeat was clean.)
+- Files unchanged: high 2.15 MB, medium 1.00 MB, low 0.50 MB.
+
 # NIGHT-6 — slice 7 (2026-11-10): the canopy and the moon's window
 Tree hashes before: core 2b6fc141521883a3 · apps/full d6b90cf2cb4be6da · apps/night 74ca4ff802dbf38b. After: core 2b6fc141521883a3 (unchanged) · apps/full d6b90cf2cb4be6da (unchanged) · apps/night 4e48f17877f46829.
 - Step 139 checked by the user; high left as it is.

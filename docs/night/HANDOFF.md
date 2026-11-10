@@ -35,6 +35,14 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 5. The falling star passes in front of the trees. Natural?
 
 ## Records (English, at most about 15 lines each; older ones go to `archive/HANDOFF-history.md`)
+### NIGHT-6 slice 8 (2026-11-10): the painted distance and the film. Log: `docs/night/WORK-LOG.md`; as built: `docs/night/design/NIGHT-6-forest/PLAN.md` top
+- Step 140 checked by the user: the canopy, the moon's window, the stars and the dapple look right; the light stays clearly visible.
+- Departure from the plan (reason measured): no far forest baked beyond 28 m — today's fog leaves ≥ 94 % fog there, so it would not show; the sketch's painted look is its per-frame stroke pass on the middle distance, so that is what was built (the plan had left it out for cost): strokes from 7 m growing to the level's radius at 26 m (high 3 px, medium 2.5), written out tap by tap (29 / 21 taps, 92 / 68 sector feeds against the sketch's 81 × 8).
+- The glowing things (light, fireflies, dew, mushrooms' glow, moths, leaves, moon, clouds, stars) draw after the strokes with their own depth test, so they stay crisp. Film: vignette at both levels, a fine grain at high, a slight cool grade; the camera breathes sideways (≤ 5 cm).
+- Found on the way: the gust could not reverse (its direction blended through zero) — now it turns by angle (data row case added); the glow pass first compiled a second copy of every glowing material (+9 programs) — the lights now see both passes.
+- Laptop medium (a clean second run): detections = Dark (0.0 / 0.0 %), frame 2.1–2.2 ms (1.8 before NIGHT-6), programs 28, textures 16.9 MB; first opening 3.9 s after high. High −48.5 / −45.0 %, cold first opening 8.3 s. Counts of draws and triangles now include every pass.
+- Files unchanged (3.29 MB of 30). Rows: data «FOREST paint (app)» 18; browser «FOREST paint» 15. Waiting for step 141.
+
 ### NIGHT-6 slice 7 (2026-11-10): the canopy and the moon's window. Log: `docs/night/WORK-LOG.md`; as built: `docs/night/design/NIGHT-6-forest/PLAN.md` top
 - Step 139 checked by the user: the gust looks right. High stays as it is (for stronger devices; levels per device later).
 - Crowns on all 95 trees (limbs split twice, leaf sprays of four kinds from a new prepared sheet), young trees and hazel-like shrubs outside the light's reach, saplings at the sides; stars; the moon's face (a prepared file); dappled moonlight drifting on the floor (a prepared pattern), dimmed by clouds.
@@ -49,15 +57,6 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 - The gust (`pure/gust.js`, `forest-gust.js`): the effects hand's light, when it SWEEPS, bends the grass, today's ferns, the floor plants and the ivy along the sweep (the shared sway shader), stirs cat's-paws on the water, shakes leaves loose (12 / 6) and leaves a wake of rings on the stream. A still or slow hand: exactly nothing. Picture only.
 - Laptop medium: detections = Dark (0.0 %); draws 63–64, programs 26, triangles 156 k, textures 14.9 MB. Files unchanged (2.66 MB of 30).
 - Rows: data «FOREST gust (app)» 18; browser «FOREST gust» 11. Waiting for step 139.
-
-### NIGHT-6 slice 5 (2026-11-10): moss, roots and fallen wood. Log: `docs/night/WORK-LOG.md`; as built: `docs/night/design/NIGHT-6-forest/PLAN.md` top
-- Step 137 checked by the user: the stream looks good and is easy to see; keep the soft edges; everything else as before.
-- The trunks flare at the foot; roots spread from the 14 near trees; a log across the stream (the bridge) and one on the bank; 5 stumps with cut tops (rings, cracks), 3 standing dead trees, bracket fungi; 56 fallen branches at high only: one merged geometry, one new material over today's bark (`forest-wood.js`, laws `pure/wood.js`).
-- Moss low on the bark's north side, lichen higher, darker at the foot (today's bark material); moss cushions (400 / 200) with the stream rocks' material; ivy on the 12 / 6 nearest trunks (a new cell of the plant sheet); 30 / 16 mushrooms on the wood after today's.
-- Contact shadows: a prepared map `tex/shade-2048` → 1024, 512, painted by the bake tool from the same laws (`pure/layout.js` replays today's trunks); medium is a part of high, so one map serves both.
-- Fixed: today's ferns had stopped swaying in slice 4 (two calls left behind a comment); a row now checks it.
-- Laptop medium: detections = Dark (0.0 %); draws 62–63 (51–52 before NIGHT-6), programs 26 (20), triangles 177 k (71 k), textures 14.9 MB, frame 1.9–2.1 ms (1.6). High −46.9 / −48.8 %, 260 k triangles; the first opening at high 5.7 s.
-- Files per level: high 1.76 MB, medium 0.81 MB, low 0.42 MB (all 2.66 MB of 30). Rows: data «FOREST wood (app)» 25; browser «FOREST wood» 22. Waiting for step 138.
 
 ### NIGHT-6 stage 1 (2026-11-09): the forest, polished and alive — the comparison and the plan only. `docs/night/design/NIGHT-6-forest/PLAN.md`
 - No app code; tree hashes unchanged (core 14bd513ae15aa87e · apps/full d6b90cf2cb4be6da · apps/night 3279ec88c1f91059).

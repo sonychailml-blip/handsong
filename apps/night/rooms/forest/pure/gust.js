@@ -22,7 +22,7 @@ export function gustStep(g, dt, p, on=1){ const G=GUST; let target=0;
     if(g.px==null){ g.px=p[0]; g.pz=p[1]; if(g.k===0){ g.x=p[0]; g.z=p[1]; } }
     const vx=(p[0]-g.px)/dt, vz=(p[1]-g.pz)/dt, sp=Math.hypot(vx, vz); g.px=p[0]; g.pz=p[1];
     g.v+=(sp-g.v)*Math.min(1, dt*8);
-    if(sp>1e-6){ const a=Math.min(1, dt*G.turn); let dx=g.dx+(vx/sp-g.dx)*a, dz=g.dz+(vz/sp-g.dz)*a; const l=Math.hypot(dx,dz)||1; g.dx=dx/l; g.dz=dz/l; }
+    if(sp>1e-6){ const a=Math.min(1, dt*G.turn), cur=Math.atan2(g.dz, g.dx); let dd=Math.atan2(vz, vx)-cur; dd=Math.atan2(Math.sin(dd), Math.cos(dd)); const na=cur+dd*a; g.dx=Math.cos(na); g.dz=Math.sin(na); }   // it turns by angle: a sweep straight back reverses it too
     const f=Math.min(1, dt*G.follow); g.x+=(p[0]-g.x)*f; g.z+=(p[1]-g.z)*f;
     target=clamp(on,0,1)*smooth(G.vMin, G.vFull, g.v);
   } else { g.px=g.pz=null; g.v=0; }

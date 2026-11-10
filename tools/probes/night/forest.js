@@ -662,3 +662,45 @@ export async function checkForestCanopy(){
   return { cases:n, total:d.length, differences:d, notes };
 }
 row({ night:true, at:1008.6398, name:'FOREST canopy', drawn:true, run:()=>checkForestCanopy(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });
+/* NIGHT-6 slice 8: row «FOREST paint» — the room built without a renderer: it paints at both levels (its stroke radius and taps), every sprite
+   and point cloud is in the glow pass with its own depth test, nothing else is — CONTROL a plain mesh has no depth test of its own; the camera
+   breathes sideways — CONTROL the baseline (no breath) stands still; the baseline paints nothing; drawn (medium): with the pass set to pass
+   through and the glowing things hidden, the painted pipeline gives EXACTLY the one-pass picture; the strokes, the vignette change it —
+   CONTROL one frame twice differs by 0. */
+export async function checkForestPaint(){
+  const d=[], notes=[]; let n=0; const miss=s=>d.push(s);
+  const was=profileCurrent(), keepLevel=sceneLevel();
+  try{
+    const T=await loadThree(); await forestAssets('full'); await forestAssets('reduced'); const w=844, h=390, rooms=[], mk=(lv, o={})=>{ const r=buildForest(T,{ C:cv, level:lv, w, h, gl2:true, ...o }); rooms.push(r); return r; };
+    const NIN={ mood:'major-penta', sleep:0 };
+    try{
+      for(const lv of ['full','reduced']){ const r=mk(lv), st=r.state().paint, L=FOREST_LEVELS[lv]; let bad=0, glow=0, plain=0; n+=3;
+        if(!st.on || st.R!==L.paintR || !(st.taps>10)) miss(`${lv}: ${JSON.stringify(st)}`);
+        r.scene.traverse(o=>{ const g=o.isSprite || o.isPoints, m=o.material; if(!m || Array.isArray(m)) return; if(g){ glow++; if(o.layers.mask!==2 || (m.depthTest!==false && !m.userData.depthAware)) bad++; } else if(o.isMesh){ plain++; if(m.userData.depthAware || o.layers.mask!==1) bad++; } });
+        if(bad) miss(`${lv}: ${bad} objects in the wrong pass`);
+        const x=t=>{ r.update(1/60, t, [], null, NIN); return r.camera.position.x; }, a=x(10), b=x(12);
+        if(!(Math.abs(a-b)>0.001)) miss(lv+': the camera does not breathe ('+(a-b).toFixed(5)+')');
+        notes.push(`${lv}: strokes up to ${st.R} px (${st.taps} taps), ${glow} glowing things in their own pass, ${plain} meshes in the painted one; the breath ${((a-b)*100).toFixed(2)} cm over 2 s`); }
+      { const r=mk('reduced', { lv:{ paint:false, paintR:0, vignette:false, grain:false, breath:false } }), st=r.state().paint, x=t=>{ r.update(1/60, t, [], null, NIN); return r.camera.position.x; }; n+=2;
+        if(st.on || st.breath) miss('the baseline still paints or breathes: '+JSON.stringify(st)); if(x(10)!==x(12)) miss('CONTROL: the baseline camera moves sideways'); }
+      { const m=new T.MeshStandardMaterial(); n++; if(m.userData.depthAware) miss('CONTROL: a plain material has a depth test of its own'); m.dispose(); }
+    } finally { for(const r of rooms) r.dispose(); }
+    const why=profileApply('profile.night'); n++; if(why){ miss('Night refused: '+why); return { cases:n, total:d.length, differences:d, notes }; }
+    await setSceneLevel('reduced'); await setBackground('forest'); await frames(6);
+    const room=sceneRoomDbg(); if(!room || !sceneInfo().webgl){ notes.push('no WebGL room — the drawn checks do not apply'); return { cases:n, total:d.length, differences:d, notes }; }
+    const P=room.paintDbg, glows=[]; room.scene.traverse(o=>{ if((o.isSprite || o.isPoints) && o.visible){ glows.push(o); o.visible=false; } });
+    try{
+      const keep=P.set({ uR:0, uSoft:0, uVig:0, uGrain:0, uGrade:0 }); await frames(3);
+      const id=await sceneSnapDbg(on=>{ P.set({ direct:on }); }, true); n++;
+      if(!id) notes.push('no frame rendered'); else { notes.push(`passing through: the painted pipeline ${id[0].toFixed(4)}, one pass ${id[1].toFixed(4)}`); if(id[0]!==id[1]) miss('the pipeline set to pass through is not the one-pass picture: '+(id[0]-id[1])); }
+      P.set(keep); await frames(3);
+      for(const [name, o] of [['the strokes', { uR:0 }], ['the vignette', { uVig:0 }]]){ let back=null; const ab=await sceneSnapDbg(on=>{ if(on) back=P.set(o); else P.set(back); }, true), cc=await sceneSnapDbg(()=>{}, true); n+=2;
+        if(!ab || !cc){ notes.push(name+': no frame rendered'); continue; }
+        notes.push(`${name} change the mean RGB sum of one frame by ${(ab[0]-ab[1]).toFixed(4)} (CONTROL ${(cc[0]-cc[1]).toFixed(4)})`);
+        if(!(Math.abs(ab[0]-ab[1])>0)) miss(name+' do not show'); if(cc[0]!==cc[1]) miss('CONTROL: one frame rendered twice differs by '+(cc[0]-cc[1])); }
+    } finally { for(const o of glows) o.visible=true; P.set({ direct:false }); }
+  } catch(e){ miss('error: '+(e&&e.stack||e)); }
+  finally{ try{ await setSceneLevel(keepLevel); }catch(e){} if(profileCurrent()!==was) profileApply(was); await setBackground('camera'); await sleep(30); }
+  return { cases:n, total:d.length, differences:d, notes };
+}
+row({ night:true, at:1008.6399, name:'FOREST paint', drawn:true, run:()=>checkForestPaint(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });

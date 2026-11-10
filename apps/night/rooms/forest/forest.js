@@ -26,7 +26,9 @@ import { FOREST_SEED, ROCKS_TODAY } from './pure/layout.js';   // NIGHT-6 slice 
 import { woodPlaces } from './pure/wood.js';
 import { buildWood, patchBark, patchShade, trunkGeo, woodUniforms } from './forest-wood.js';
 import { buildGust } from './forest-gust.js';   // NIGHT-6 slice 6: the effects hand moves the forest
-import { buildCanopy, patchDapple } from './forest-canopy.js';   // NIGHT-6 slice 7: the canopy, the stars, the dappled moonlight   // NIGHT-6 slice 5: moss, roots, fallen wood, contact shadows
+import { buildCanopy, patchDapple } from './forest-canopy.js';   // NIGHT-6 slice 7: the canopy, the stars, the dappled moonlight
+import { buildPaint } from './forest-paint.js';   // NIGHT-6 slice 8: the painted distance and the film
+import { breathAt } from './pure/paint.js';   // NIGHT-6 slice 5: moss, roots, fallen wood, contact shadows
 
 export { FOREST_SEED };
 export const FOREST_LEVELS=FOREST_ROOM.levels;   // NIGHT-3: what each level draws lives in the record
@@ -316,7 +318,7 @@ export function buildForest(T, opt){
     /* parallax: the camera leans a little towards the playing light (near and far things slide past each other) */
     const f0=rigs[0].on>0.05 ? rigs[0].cur : camLook;
     camGoal.set(clamp(f0.x,-4,4)*0.16, (clamp(f0.y,0,5)-1.7)*0.1, 0); if(reduce) camGoal.multiplyScalar(0.3);
-    camOff.lerp(camGoal, 1-Math.exp(-dt*1.6)); aimCamera(); if(!reduce){ camera.position.y+=Math.sin(t*0.23)*0.025; camera.updateMatrixWorld(); }
+    camOff.lerp(camGoal, 1-Math.exp(-dt*1.6)); aimCamera(); if(!reduce){ camera.position.y+=Math.sin(t*0.23)*0.025; if(Lv.breath) camera.position.x+=breathAt(t); camera.updateMatrixWorld(); }   // NIGHT-6 slice 8: + the sideways breath
   }
   /* a note began on this rig's hand (from the bus `notes` ring) */
   const glint=(i,vel)=>{ const r=rigs[i]; if(r) r.glint=Math.max(r.glint, clamp(vel==null?0.6:vel,0.18,1)); music=Math.min(1.5, music+0.35*clamp(vel==null?0.6:vel,0.18,1));
@@ -340,6 +342,7 @@ export function buildForest(T, opt){
     wood:{ ...wood.state(), shade:!!shadeTex, flare:!!Lv.flare, bark:!!Lv.barkMoss },   // NIGHT-6 slice 5
     gust:gust.state(),   // NIGHT-6 slice 6
     canopy:{ ...canopy.state(), dapple:!!dapTex, moonFace:!!moonTex },   // NIGHT-6 slice 7
+    paint:{ ...paint.state(), breath:!!Lv.breath && !reduce },   // NIGHT-6 slice 8
     answers:answers.state(), bed:{ queued:bedQ.length, fired:fired.map(x=>({ ...x })), twinkles:twinkles.map(w=>({ ...w, glow:glow1[w.i] })) }, files:{ web:!!files.web, floor:!!files.floor, errors:assetErr.slice() } });   // NIGHT-6 slice 1
   function dispose(){ for(const o of own) try{ o.dispose(); }catch(e){} own.length=0; }
   /* NIGHT-6 slice 1: a music bed event `it` ({ kind 'chord' | 'loop' | 'glass', lv, a, h, r, amp }) heard at room time `at` (the host maps it) */
@@ -347,7 +350,9 @@ export function buildForest(T, opt){
   /* NIGHT-6 slice 0: the room's texture memory in bytes (its own textures: pixels × 4, mipmaps × 4/3) */
   function texBytes(){ let b=0; for(const o of own){ if(!o || !o.isTexture) continue; const im=o.image||{}, w=im.width||0, h=im.height||0, pot=!(w&(w-1)) && !(h&(h-1));
     b+=w*h*(o.format===T.RedFormat ? 1 : 4)*(o.generateMipmaps!==false && pot ? 4/3 : 1); } return Math.round(b); }   // NIGHT-6 slice 5: one byte a texel for one channel
+  const paint=buildPaint({ T, scene:s, camera, lv:Lv, gl2:opt.gl2, own });   // NIGHT-6 slice 8: after every object is in the scene (it sorts the glowing ones into their pass)
+  const render=r=>paint.render(r, now);   // the room's own frame time: one frame drawn twice is the same picture (the grain too)
   resize(W,H);
-  return { id:FOREST_ROOM.id, scene:s, camera, update, resize, place, glint, project, state, dispose, lightsOf, lifeDbg:life, detailDbg:detail, bed, texBytes, answersDbg:answers, floorDbg:floor, streamDbg:stream, woodDbg:wood, gustDbg:gust, canopyDbg:canopy, dappleDbg:DU, fernsDbg:{ fronds, frondM, frondD },
+  return { id:FOREST_ROOM.id, scene:s, camera, update, resize, place, glint, project, state, dispose, lightsOf, lifeDbg:life, detailDbg:detail, bed, texBytes, answersDbg:answers, floorDbg:floor, streamDbg:stream, woodDbg:wood, gustDbg:gust, canopyDbg:canopy, dappleDbg:DU, render, paintDbg:paint, fernsDbg:{ fronds, frondM, frondD },
     held:sec=>{ heldNow= sec>0 ? sec : 0; rare.held(sec); }, rareDbg:kind=>rare.force(kind, now, { light:rigs[0].cur, flies }) };   // RUN 9 (slice 4): held — how long the playing note is held (host); rareDbg — probes / captures   // RUN 9: lifeDbg / detailDbg — probes only (uniforms, silhouette boxes)
 }
