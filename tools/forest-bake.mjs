@@ -10,20 +10,27 @@
    - web-1024 → 512, 256: a spider web, radial threads, a sagging spiral and dew beads (slice 1);
    - floor-2048 → 1024, 512: the floor's plant sheet (slice 3, cells: apps/night/rooms/forest/pure/floor.js FLOOR_ATLAS) — the fine fern
      (an iterated-function fern), nettle, sedge, wood sorrel, a broad-leaved herb, bilberry with berries, wood anemone. Colours are the
-     sketch «Живой лес»'s, each leaf jittered. Transparent pixels carry their neighbours' colour (no dark fringes when filtered). */
+     sketch «Живой лес»'s, each leaf jittered. Transparent pixels carry their neighbours' colour (no dark fringes when filtered).
+     Slice 4 added four fallen leaves, slice 5 an ivy sprig (each drawn after the others, so every earlier cell stays as it was).
+   - shade-2048 → 1024, 512 (slice 5): the CONTACT SHADOWS, the darkness on the ground under the trunks, roots, rocks, logs, stumps and dead
+     trees, painted from the same laws the room places them by (apps/night/rooms/forest/pure/wood.js shadeBlobs; the area WOOD.shade). */
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, statSync, existsSync, rmSync } from 'node:fs';
 import { deflateSync, inflateSync } from 'node:zlib';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { seeded } from '../core/pure/dsp.js';
 import { FLOOR_ATLAS } from '../apps/night/rooms/forest/pure/floor.js';
+import { WOOD, woodPlaces, shadeBlobs, blobDark } from '../apps/night/rooms/forest/pure/wood.js';
+import { forestTrunks } from '../apps/night/rooms/forest/pure/layout.js';
+import { streamRocks } from '../apps/night/rooms/forest/pure/stream.js';
+import { FOREST_ROOM } from '../apps/night/rooms/forest/pure/room.js';
 
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const FOREST_DIR='apps/night/rooms/forest', TEX_DIR=FOREST_DIR+'/tex';
 /* the user's size budget for the forest's files, every level together (2026-11-09: warn before 30 MB) */
 export const FOREST_BUDGET=30*1048576;
 /* which file each level loads (high = the masters); the room's own table is forest.js FILES */
-export const LEVEL_FILES=Object.freeze({ high:['web-1024.png','floor-2048.png'], medium:['web-512.png','floor-1024.png'], low:['web-256.png','floor-512.png'] });
+export const LEVEL_FILES=Object.freeze({ high:['web-1024.png','floor-2048.png','shade-2048.png'], medium:['web-512.png','floor-1024.png','shade-1024.png'], low:['web-256.png','floor-512.png','shade-512.png'] });
 
 /* ---------------- grey drawing (the web): coverage 0…1, lines blend by max ---------------- */
 function line(img, S, x0, y0, x1, y1, w, v){
@@ -136,6 +143,27 @@ function drawLeaf(r, w, h, R, k){
   for(let i=0;i<5;i++){ const u=0.2+R()*0.6, o=(R()-0.5)*L*0.25, bx=x0+Math.cos(a)*L*u-Math.sin(a)*o, by=y0+Math.sin(a)*L*u+Math.cos(a)*o, br=w*(0.015+R()*0.03); r.ellipse(bx, by, br, br*(0.6+R()*0.4), R()*3, shade(col, 0.65, -0.7)); }
 }
 /* the fine fern from an iterated-function system (the «mutant» fern), coloured by height and density, directly at master size */
+/* ivy: a wandering stem with lobed, dark, glossy leaves on short stalks, alternating, larger low down */
+function ivyLeaf(r, x, y, sz, a, col){
+  const lobes=[[0, 1], [0.95, 0.74], [-0.95, 0.74], [1.9, 0.48], [-1.9, 0.48]], dark=shade(col, 0.55);
+  for(const [k, c, g] of [[1.06, dark, 0], [1, col, 1]]) { r.ellipse(x, y, sz*0.36*k, sz*0.3*k, a, c);
+    for(const [da, l] of lobes){ const b=a+da, L=sz*l; r.ellipse(x+Math.cos(b)*L*0.48, y+Math.sin(b)*L*0.48, L*0.56*k, L*0.3*k, b, c); } void g; }
+  for(const [da, l] of lobes){ const b=a+da, L=sz*l*0.88; r.stroke([[x, y], [x+Math.cos(b)*L, y+Math.sin(b)*L]], Math.max(0.8, sz*0.028), hsl(78, 0.2, 0.26, 0.85), Math.max(0.5, sz*0.01)); }
+  r.ellipse(x+Math.cos(a-0.5)*sz*0.35, y+Math.sin(a-0.5)*sz*0.35, sz*0.22, sz*0.09, a, hsl(118, 0.22, 0.24, 0.4));   // the gloss
+}
+function drawIvy(r, w, h, R){
+  const st=bez(w/2, h, w*0.28, h*0.7, w*0.74, h*0.36, w*0.5+(R()-0.5)*w*0.1, h*0.02, 40);
+  r.stroke(st, w*0.016, hsl(28, 0.3, 0.12), w*0.007);
+  for(let i=0;i<11;i++){ const t=(i+0.6)/11.6, p=st[Math.min(st.length-1, Math.round(t*(st.length-1)))], s=i%2 ? 1 : -1, sz=w*(0.1+R()*0.045)*(1.15-0.4*t);
+    const bx=p[0]+s*w*(0.07+R()*0.04), by=p[1]-h*(0.005+R()*0.02); r.stroke([p, [bx, by]], w*0.007, hsl(30, 0.3, 0.14), w*0.005);
+    ivyLeaf(r, bx, by, sz, (s>0 ? -0.55 : Math.PI+0.55)+(R()-0.5)*0.5, hsl(116+R()*18, 0.3+R()*0.14, 0.085+R()*0.06)); }
+}
+/* the contact shadows: every blob multiplies the ground's light by 1 − a·blobDark(q), one sample per pixel at its centre (the map is smooth);
+   rows run from the area's far edge (z0) towards the viewer */
+function drawShade(S=2048){ const A=WOOD.shade, Lv=FOREST_ROOM.levels, T=forestTrunks(), P=woodPlaces(Lv.full, T), B=shadeBlobs(T, P, streamRocks(Lv.reduced.rocks)), v=new Float32Array(S*S).fill(1), px=S/A.w, pz=S/A.d;
+  for(const [x,z,rx,rz,rot,a] of B){ const c=Math.cos(rot), s=Math.sin(rot), Rr=Math.max(rx,rz), i0=Math.max(0, Math.floor((x-Rr-A.x0)*px)), i1=Math.min(S-1, Math.ceil((x+Rr-A.x0)*px)), j0=Math.max(0, Math.floor((z-Rr-A.z0)*pz)), j1=Math.min(S-1, Math.ceil((z+Rr-A.z0)*pz));
+    for(let j=j0;j<=j1;j++) for(let i=i0;i<=i1;i++){ const dx=A.x0+(i+0.5)/px-x, dz=A.z0+(j+0.5)/pz-z, u=(dx*c+dz*s)/rx, w=(-dx*s+dz*c)/rz, q=Math.hypot(u, w); if(q<1) v[j*S+i]*=1-a*blobDark(q); } }
+  return v; }
 function drawFern2(w, h, seed=9){
   const maps=[[0,0,0,0.25,0,-0.4,0.02],[0.95,0.005,-0.005,0.93,-0.002,0.5,0.84],[0.035,-0.2,0.16,0.04,-0.09,0.02,0.07],[-0.04,0.2,0.16,0.04,0.083,0.12,0.07]];
   const R=seeded(seed), cum=[]; let acc=0; for(const m of maps){ acc+=m[6]; cum.push(acc); }
@@ -155,7 +183,7 @@ function floorMaster(){
   const A=FLOOR_ATLAS, S=A.size, sheet=new Float32Array(S*S*4), R=seeded(0x464C5231), SS=3;
   const put=(c, X, Y)=>{ for(let y=0;y<c.h;y++) sheet.set(c.p.subarray(y*c.w*4, (y+1)*c.w*4), ((Y+y)*S+X)*4); };
   const draw={ sorrel:drawSorrel, forb:drawForb, bilberry:drawBilberry, anemone:drawAnemone, nettle:drawNettle, sedge:drawSedge,
-    leaf0:(r,w,h,R)=>drawLeaf(r,w,h,R,0), leaf1:(r,w,h,R)=>drawLeaf(r,w,h,R,1), leaf2:(r,w,h,R)=>drawLeaf(r,w,h,R,2), leaf3:(r,w,h,R)=>drawLeaf(r,w,h,R,3) };   // the leaves last: every earlier cell stays as it was
+    leaf0:(r,w,h,R)=>drawLeaf(r,w,h,R,0), leaf1:(r,w,h,R)=>drawLeaf(r,w,h,R,1), leaf2:(r,w,h,R)=>drawLeaf(r,w,h,R,2), leaf3:(r,w,h,R)=>drawLeaf(r,w,h,R,3), ivy:drawIvy };   // added cells last: every earlier cell stays as it was
   for(const [sp,[x,y,w,h]] of Object.entries(A.cells)){ if(sp==='fern2'){ put(drawFern2(w,h), x, y); continue; } const r=new Ras(w, h, SS); draw[sp](r, w, h, R); put(r.down(), x, y); }
   return sheet;
 }
@@ -178,6 +206,7 @@ export function bakeAll(){
   out.push({ name:'web-1024.png', w:1024, h:1024, ch:1, px:wg }, { name:'web-512.png', w:512, h:512, ch:1, px:greyDown(wg,1024,2) }, { name:'web-256.png', w:256, h:256, ch:1, px:greyDown(wg,1024,4) });
   const S=FLOOR_ATLAS.size, m=floorMaster(); out.push({ name:`floor-${S}.png`, w:S, h:S, ch:4, px:toRGBA(m, S) });
   for(const d of FLOOR_ATLAS.derived) out.push({ name:`floor-${d}.png`, w:d, h:d, ch:4, px:toRGBA(boxDown(m, S, S/d), d, 3) });
+  const sg=toGrey(drawShade(2048)); out.push({ name:'shade-2048.png', w:2048, h:2048, ch:1, px:sg }, { name:'shade-1024.png', w:1024, h:1024, ch:1, px:greyDown(sg,2048,2) }, { name:'shade-512.png', w:512, h:512, ch:1, px:greyDown(sg,2048,4) });   // NIGHT-6 slice 5
   return out;
 }
 

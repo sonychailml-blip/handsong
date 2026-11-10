@@ -35,6 +35,15 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 5. The falling star passes in front of the trees. Natural?
 
 ## Records (English, at most about 15 lines each; older ones go to `archive/HANDOFF-history.md`)
+### NIGHT-6 slice 5 (2026-11-10): moss, roots and fallen wood. Log: `docs/night/WORK-LOG.md`; as built: `docs/night/design/NIGHT-6-forest/PLAN.md` top
+- Step 137 checked by the user: the stream looks good and is easy to see; keep the soft edges; everything else as before.
+- The trunks flare at the foot; roots spread from the 14 near trees; a log across the stream (the bridge) and one on the bank; 5 stumps with cut tops (rings, cracks), 3 standing dead trees, bracket fungi; 56 fallen branches at high only: one merged geometry, one new material over today's bark (`forest-wood.js`, laws `pure/wood.js`).
+- Moss low on the bark's north side, lichen higher, darker at the foot (today's bark material); moss cushions (400 / 200) with the stream rocks' material; ivy on the 12 / 6 nearest trunks (a new cell of the plant sheet); 30 / 16 mushrooms on the wood after today's.
+- Contact shadows: a prepared map `tex/shade-2048` → 1024, 512, painted by the bake tool from the same laws (`pure/layout.js` replays today's trunks); medium is a part of high, so one map serves both.
+- Fixed: today's ferns had stopped swaying in slice 4 (two calls left behind a comment); a row now checks it.
+- Laptop medium: detections = Dark (0.0 %); draws 62–63 (51–52 before NIGHT-6), programs 26 (20), triangles 177 k (71 k), textures 14.9 MB, frame 1.9–2.1 ms (1.6). High −46.9 / −48.8 %, 260 k triangles; the first opening at high 5.7 s.
+- Files per level: high 1.76 MB, medium 0.81 MB, low 0.42 MB (all 2.66 MB of 30). Rows: data «FOREST wood (app)» 25; browser «FOREST wood» 22. Waiting for step 138.
+
 ### NIGHT-6 slice 4 (2026-11-10): the stream towards the viewer; soft edges at medium; the early fetch. Log: `docs/night/WORK-LOG.md`; as built: `docs/night/design/NIGHT-6-forest/PLAN.md` top
 - Step 136 checked by the user: the floor looks right and beautiful; the first opening is fine. KTX2: keep PNG, no CSP change (our own transcoder later if the Poco runs short of GPU memory).
 - Soft cut-out edges at medium (`patchSoftEdges`: alpha sharpened by its screen derivative, blended): plants, ferns, grass silhouettes. Cost within the noise (soft −1.8 / 0.0 %, hard −1.1 / −5.3 % detections vs Dark; same draws and programs). Shots: `tools/.ui-snap/n6-soft/`. The user decides by eye.
@@ -52,11 +61,6 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 - KTX2 measured (laptop): GPU memory a quarter (2048² 22.4 → 5.6 MB), the opening about the same (215 → 183 ms), UASTC 48.7 dB / ETC1S 40.4 dB; the official transcoder needs eval, which our CSP refuses — a decision for the user.
 - Rows: data «FOREST floor (app)» 30, «NIGHT forest files (app)» per level; browser «FOREST floor» 10. Waiting for step 136.
 
-### NIGHT-6 slice 2 (2026-11-09): the fireflies follow the melody. Log: `docs/night/WORK-LOG.md`; as built: `docs/night/design/NIGHT-6-forest/PLAN.md` top
-- Step 134 checked by the user: the forest answers look right; the Poco measurement comes later.
-- The firefly law takes `hold` (a long note: they close in, circle slower, breathe together, brighter) and `rate` (fast playing: wider rings, a quicker swirl); `fliesDart` sends the three nearest out on a note of fast playing. Both 0 = exactly the old step. The room eases them from the held seconds and its note times; a held note now keeps the flies gathered.
-- Rows: data «FOREST melody (app)» 21 cases (a long note 2.19 → 1.01 from the light; fast 3.87; CONTROL the old law meets neither); browser «FOREST melody» 8 (a held note 46 flies within 2 m against 4 released; fast playing 4.35 vs 2.50, darts 51 vs 0).
-- Checks: static PASS; [probe-data] PASS 42 / 0; P.night PASS 41 / 0; P.quick PASS 93 / 0. No GPU change. Waiting for step 135 (three checks by eye).
 ### NIGHT-6 stage 1 (2026-11-09): the forest, polished and alive — the comparison and the plan only. `docs/night/design/NIGHT-6-forest/PLAN.md`
 - No app code; tree hashes unchanged (core 14bd513ae15aa87e · apps/full d6b90cf2cb4be6da · apps/night 3279ec88c1f91059).
 - Compared item by item with the sketch «Живой лес»: the forest lacks most of the sketch's plant life (no leaves anywhere, no herb layer, one fern), the fallen wood, moss, the stream's banks and life, webs, dew, the moon's gap and stars, the painted distance, film. Today is ahead on the night cycle, moods, response, rare events.

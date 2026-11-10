@@ -30,6 +30,8 @@
   /* RUN 9: the moods' looks (the room record's looks) — Glow = the base set above + haze / cloud; Dusk and Mist their own sets */
   --cv-forest-haze:#8aa2c8; --cv-forest-cloud:#1a2234; --cv-forest-shroom:#7dffc4; --cv-forest-bloom:#b9a8ff;
   --cv-forest-stem:#3b3a30; --cv-forest-water:#03070c;   /* RUN 9 (slice 2): the mushrooms' stems, the stream's deep colour */
+  /* NIGHT-6 slice 5: the wood — lichen, end grain (light and its rings), bracket fungi (and their pale rim), dead wood's grey */
+  --cv-forest-lichen:#3f493c; --cv-forest-grain:#6b5236; --cv-forest-grain-dark:#33251a; --cv-forest-fungus:#5c4630; --cv-forest-fungus-rim:#8a7a60; --cv-forest-deadwood:#5e5950;
   --cv-forest-grass:#22361a; --cv-forest-grass-dry:#38381c; --cv-forest-leaf-fall:#2c2012; --cv-forest-moth:#d9d2bd; --cv-forest-sil:#020403;   /* slice 3 */
   --cv-forest-dusk-fog:#110c1c; --cv-forest-dusk-sky:#3a2c55; --cv-forest-dusk-under:#070508; --cv-forest-dusk-moon:#c79a78;
   --cv-forest-dusk-moonhalo:#e2b78f; --cv-forest-dusk-haze:#9c88b4; --cv-forest-dusk-cloud:#2a2238;

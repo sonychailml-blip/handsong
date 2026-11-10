@@ -8407,3 +8407,10 @@ not a control · run a "random" failure many times and print WHERE and HOW MUCH 
 - Laptop, an undisturbed run: medium −1.2 / −1.7 % hand detections vs Dark with the additions, −2.9 / 0.0 % without (noise); draws 53 vs 51–52, programs 22 vs 20; 0 dropouts; the first opening at high 3.2–3.6 s, later about 0.4 s. A second run was disturbed (Dark itself swung) and is not used.
 - Probes at 48 kHz: P.night PASS 40 / 0, P.quick PASS 93 / 0. At 44.1 kHz (a headset) three rows that render at the live rate failed with no code of theirs changed: CORE-13 pins them at 48 kHz (WORK-LOG).
 - Waiting for step 134: the user's look and the Poco text.
+
+# Moved from docs/night/HANDOFF.md at NIGHT-6 slice 5 (2026-11-10)
+### NIGHT-6 slice 2 (2026-11-09): the fireflies follow the melody. Log: `docs/night/WORK-LOG.md`; as built: `docs/night/design/NIGHT-6-forest/PLAN.md` top
+- Step 134 checked by the user: the forest answers look right; the Poco measurement comes later.
+- The firefly law takes `hold` (a long note: they close in, circle slower, breathe together, brighter) and `rate` (fast playing: wider rings, a quicker swirl); `fliesDart` sends the three nearest out on a note of fast playing. Both 0 = exactly the old step. The room eases them from the held seconds and its note times; a held note now keeps the flies gathered.
+- Rows: data «FOREST melody (app)» 21 cases (a long note 2.19 → 1.01 from the light; fast 3.87; CONTROL the old law meets neither); browser «FOREST melody» 8 (a held note 46 flies within 2 m against 4 released; fast playing 4.35 vs 2.50, darts 51 vs 0).
+- Checks: static PASS; [probe-data] PASS 42 / 0; P.night PASS 41 / 0; P.quick PASS 93 / 0. No GPU change. Waiting for step 135 (three checks by eye).

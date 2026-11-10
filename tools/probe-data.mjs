@@ -1129,6 +1129,51 @@ async function forestStreamCore(){
   { const a=JSON.stringify(S.streamRocks(20)), b=JSON.stringify(S.streamRocks(20)), c=JSON.stringify(S.streamRocks(20, 7)); n+=2; if(a!==b) miss('rocks: one seed gave two sets'); if(a===c) miss('CONTROL rocks: another seed gave the same set'); }
   return { cases:n, total:d.length, differences:d, notes };
 }
+/* NIGHT-6 slice 5: MOSS, ROOTS AND FALLEN WOOD (apps/night/rooms/forest/pure/wood.js, layout.js). Today's trunks replayed (95, each out of the
+   water); the foot's flare: widest at the foot, today's trunk above 3 m; the places at high: every count asked, the bridge spanning the water
+   (dry ends, its underside above the water), the bank log dry and clear of trunks, nothing in the water (the bridge's mushrooms excepted)
+   nor under the eye, stumps and dead trees clear of the trunks, ivy on the bark (outside it, close to it); medium a PART of high (its moss,
+   mushrooms and ivy the beginning of high's; roots, logs, stumps and dead trees the same) so the one contact-shadow file serves both — the
+   blobs equal at both levels; CONTROL a set with one stump fewer gives other blobs; repeatable — CONTROL another seed differs. */
+async function forestWoodCore(){
+  const d=[], notes=[]; let n=0; const miss=s=>d.push(s);
+  const W=await import(new URL('../apps/night/rooms/forest/pure/wood.js', import.meta.url).href), Lo=await import(new URL('../apps/night/rooms/forest/pure/layout.js', import.meta.url).href);
+  const L=await import(new URL('../apps/night/rooms/forest/pure/forestlife.js', import.meta.url).href), FR=(await import(new URL('../apps/night/rooms/forest/pure/room.js', import.meta.url).href)).FOREST_ROOM;
+  const H=L.STREAM.half, eye=(x,z)=>Math.hypot(x-W.WOOD.eye[0], z-W.WOOD.eye[1]), T=Lo.forestTrunks();
+  n+=2; if(T.length!==95) miss('trunks: '+T.length); if(T.some(([x,z,r])=>L.streamNear(x,z).d<H+r+0.35-1e-6)) miss('a trunk stands in the stream');
+  { const a=W.flareAt(0), b=W.flareAt(0.5), c=W.flareAt(3); n+=3; if(!(a>b && b>c)) miss(`the flare does not narrow upwards: ${a.toFixed(3)}, ${b.toFixed(3)}, ${c.toFixed(3)}`);
+    if(!(a>1.5)) miss('the foot flares only ×'+a.toFixed(2)); if(Math.abs(W.flareAt(16)-1)>0.001) miss('the flare reaches the top: ×'+W.flareAt(16).toFixed(4)); notes.push(`the flare: ×${a.toFixed(2)} at the foot, ×${b.toFixed(2)} at 0.5 m, ×${c.toFixed(3)} at 3 m`); }
+  const Lv=FR.levels, P=W.woodPlaces(Lv.full, T), Q=W.woodPlaces(Lv.reduced, T), want=Lv.full;
+  { n+=2; const got={ stumps:P.stumps.length, snags:P.snags.length, twigs:P.twigs.length, moss:P.moss.length, woodShrooms:P.shrooms.length, logs:P.logs.length };
+    for(const k of Object.keys(got)) if(got[k]!==want[k]) miss(`high: ${k} ${got[k]} of ${want[k]}`);
+    const trees=new Set(P.ivy.map(v=>v.tree)).size; if(!(trees>=Math.min(want.ivy, 8) && trees<=want.ivy)) miss('ivy on '+trees+' trees');
+    notes.push(`high: ${P.roots.length} roots, ${P.logs.length} logs, ${P.stumps.length} stumps, ${P.snags.length} dead trees, ${P.twigs.length} branches, ${P.moss.length} moss cushions, ivy ${P.ivy.length} cards on ${trees} trees, ${P.shrooms.length} mushrooms, ${P.brackets.length} bracket fungi`); }
+  { const B=P.logs.find(l=>l.bridge), K=P.logs.find(l=>!l.bridge); n+=4;
+    if(!B){ miss('no bridge'); } else { let wet=0, lo=Infinity; for(let t=0;t<=1.0001;t+=0.02){ const x=B.a[0]+(B.b[0]-B.a[0])*t, z=B.a[2]+(B.b[2]-B.a[2])*t, q=L.streamNear(x,z);
+        if(q.d<H){ wet++; lo=Math.min(lo, B.a[1]+(B.b[1]-B.a[1])*t-(B.r0+(B.r1-B.r0)*t)-L.streamAt(q.u).y); } }
+      if(!wet) miss('the bridge does not cross the water'); if(!(lo>=0.03)) miss('the bridge dips to '+lo.toFixed(3)+' m over the water');
+      if([B.a, B.b].some(e=>L.streamNear(e[0], e[2]).d<H+0.3)) miss('a bridge end stands in the water'); notes.push(`the bridge spans ${(wet*0.02*Math.hypot(B.b[0]-B.a[0], B.b[2]-B.a[2])).toFixed(2)} m of water, its underside ${(lo*100).toFixed(1)} cm above it`); }
+    if(!K) miss('no bank log'); else { let bad=0; for(let t=0;t<=1.0001;t+=0.05){ const x=K.a[0]+(K.b[0]-K.a[0])*t, z=K.a[2]+(K.b[2]-K.a[2])*t; if(L.streamNear(x,z).d<H+K.r0) bad++; if(T.some(([tx,tz,r])=>Math.hypot(x-tx,z-tz)<W.trunkOuter(r,0.2)+K.r0)) bad++; } if(bad) miss(bad+' points of the bank log in the water or in a trunk'); } }
+  { let wet=0, near=0, inTrunk=0; const dry=(x,z,m=0.1)=>L.streamNear(x,z).d>=H+m;
+    for(const rt of P.roots) for(const [x,,z] of rt.pts) if(!dry(x,z)) wet++;
+    for(const S of P.stumps){ if(!dry(S.x,S.z,0.9+S.r)) wet++; if(eye(S.x,S.z)<3.6) near++; if(T.some(([x,z,r])=>Math.hypot(S.x-x,S.z-z)<W.trunkOuter(r,0.2)+S.r)) inTrunk++; }
+    for(const S of P.snags){ if(!dry(S.x,S.z,2)) wet++; if(eye(S.x,S.z)<7) near++; if(T.some(([x,z,r])=>Math.hypot(S.x-x,S.z-z)<W.trunkOuter(r,0.2)+W.trunkOuter(S.s,0.2))) inTrunk++; }
+    for(const t of P.twigs){ if(!dry(t.x,t.z,0.3)) wet++; if(eye(t.x,t.z)<3.2) near++; }
+    for(const m of P.moss){ if(!dry(m.x,m.z)) wet++; if(eye(m.x,m.z)<2.6) near++; }
+    for(const m of P.shrooms) if(m.on!=='log' && !dry(m.x,m.z,0)) wet++;
+    n+=3; if(wet) miss(wet+' things in the water'); if(near) miss(near+' things under the eye'); if(inTrunk) miss(inTrunk+' stumps or dead trees inside a trunk'); }
+  { let off=0; for(const v of P.ivy){ const [x,z,r]=T[v.tree], hb=v.y-(L.bankGround(x,z,99)-0)-W.WOOD.trunk.foot, dd=Math.hypot(v.x-x, v.z-z); if(dd<W.trunkRadius(r, hb)+0.02 || dd>W.trunkOuter(r, hb)+0.06) off++; }
+    n++; if(off) miss(off+' ivy cards inside the bark or off it'); }
+  { const pre=(a,b)=>JSON.stringify(b)===JSON.stringify(a.slice(0, b.length)); n+=4;
+    if(!pre(P.moss, Q.moss) || Q.moss.length!==Lv.reduced.moss) miss('medium\'s moss is not the beginning of high\'s'); if(!pre(P.shrooms, Q.shrooms)) miss('medium\'s mushrooms are not the beginning of high\'s'); if(!pre(P.ivy, Q.ivy)) miss('medium\'s ivy is not the beginning of high\'s');
+    if(JSON.stringify([P.roots,P.logs,P.stumps,P.snags])!==JSON.stringify([Q.roots,Q.logs,Q.stumps,Q.snags])) miss('roots, logs, stumps or dead trees differ between the levels');
+    const R=W.woodPlaces(Lv.reduced, T, 12345); n++; if(pre(P.moss, R.moss)) miss('CONTROL: another seed\'s moss is also high\'s beginning — the check cannot fail'); }
+  { const bf=W.shadeBlobs(T, P), bm=W.shadeBlobs(T, Q), bc=W.shadeBlobs(T, { ...Q, stumps:Q.stumps.slice(1) }); n+=3;
+    if(JSON.stringify(bf)!==JSON.stringify(bm)) miss('the contact shadows differ between the levels (one file must serve both)'); if(JSON.stringify(bc)===JSON.stringify(bm)) miss('CONTROL: a stump fewer leaves the shadows the same');
+    if(!(W.blobDark(0)===1 && W.blobDark(1)===0 && W.blobDark(0.5)>W.blobDark(0.7))) miss('blobDark is not 1 → 0, falling'); notes.push(bf.length+' contact-shadow blobs, the same at both levels'); }
+  { const a=JSON.stringify(W.woodPlaces(Lv.full, T)), b=JSON.stringify(W.woodPlaces(Lv.full, T)), c=JSON.stringify(W.woodPlaces(Lv.full, T, 7)); n+=2; if(a!==b) miss('one seed gave two sets'); if(a===c) miss('CONTROL: another seed gave the same set'); }
+  return { cases:n, total:d.length, differences:d, notes };
+}
 /* NIGHT-6: THE FOREST'S FILES (tools/forest-bake.mjs). Every prepared file matches what the tool draws now, pixel for pixel (CONTROL a changed
    pixel is caught); the PNG writer and reader round-trip; the forest's files stay inside the user's budget (CONTROL 16 MB is over it). The
    sizes are printed every run (the user's rule: report the size in every slice). */
@@ -1288,6 +1333,7 @@ const ROWS=[
   ['FOREST melody (app)',       ()=>forestMelodyCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 2
   ['FOREST floor (app)',        ()=>forestFloorCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 3
   ['FOREST stream (app)',       ()=>forestStreamCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 4
+  ['FOREST wood (app)',         ()=>forestWoodCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 5
   ['NIGHT forest files (app)',  ()=>nightForestFiles(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 (the files rule, the size budget)
   ['OLD NAME gone',             ()=>oldNameGone(),  r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // SPLIT-2
   ['NIGHT rare events (core)',  ()=>rareCore(),     r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // RUN 9 (slice 4)

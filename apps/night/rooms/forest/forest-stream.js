@@ -27,20 +27,22 @@ export function buildStream(ctx){
   /* rocks and pebbles */
   const rockM=new T.MeshStandardMaterial({ color:new T.Color(C('forest-rock')), roughness:0.92 }), moss={ value:new T.Color(C('forest-moss')) };
   rockM.onBeforeCompile=sh=>{ sh.uniforms.uMoss=moss;
-    sh.vertexShader='attribute float aWater;\nvarying float vWater;\nvarying vec3 vWP5;\nvarying vec3 vWN5;\n'+sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+    sh.vertexShader='attribute float aWater;\nattribute float aMoss;\nvarying float vWater;\nvarying float vMoss;\nvarying vec3 vWP5;\nvarying vec3 vWN5;\n'+sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
   { vec4 w5=vec4(transformed,1.0); vec3 n5=objectNormal;
   #ifdef USE_INSTANCING
     w5=instanceMatrix*w5; n5=mat3(instanceMatrix)*n5;
   #endif
-    vWP5=(modelMatrix*w5).xyz; vWN5=normalize(mat3(modelMatrix)*n5); vWater=aWater; }`);
-    sh.fragmentShader='varying float vWater;\nvarying vec3 vWP5;\nvarying vec3 vWN5;\nuniform vec3 uMoss;\n'+NOISE+'\n'+sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
+    vWP5=(modelMatrix*w5).xyz; vWN5=normalize(mat3(modelMatrix)*n5); vWater=aWater; vMoss=aMoss; }`);
+    sh.fragmentShader='varying float vWater;\nvarying float vMoss;\nvarying vec3 vWP5;\nvarying vec3 vWN5;\nuniform vec3 uMoss;\n'+NOISE+'\n'+sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
   float wet=1.0-smoothstep(vWater, vWater+0.12, vWP5.y), mt=smoothstep(0.35,0.8,vWN5.y)*smoothstep(0.35,0.6,vn(vWP5.xz*3.0+vWP5.y))*(1.0-wet);
-  diffuseColor.rgb=mix(diffuseColor.rgb*(0.7+0.5*vn(vWP5.xy*6.0+vWP5.z)), uMoss*(0.7+0.6*vn(vWP5.xz*20.0)), mt); diffuseColor.rgb*=mix(1.0, 0.45, wet);`)
-      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  roughnessFactor=mix(roughnessFactor, 0.32, wet);'); };
-  rockM.customProgramCacheKey=()=>'handsong.streamRock'; own.push(rockM);
+  mt=max(mt, vMoss);   // NIGHT-6 slice 5: a moss cushion is moss all over, finer and patchier
+  vec3 mc=uMoss*(0.7+0.6*vn(vWP5.xz*20.0))*mix(1.0, (0.65+0.6*vn(vWP5.xz*5.0+vWP5.y*3.0))*(0.75+0.5*vn(vWP5.xz*55.0+vWP5.y*40.0))*0.42, vMoss);   // darker: night moss
+  diffuseColor.rgb=mix(diffuseColor.rgb*(0.7+0.5*vn(vWP5.xy*6.0+vWP5.z)), mc, mt); diffuseColor.rgb*=mix(1.0, 0.45, wet);`)
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  roughnessFactor=mix(mix(roughnessFactor, 0.32, wet), 1.0, vMoss);'); };
+  rockM.customProgramCacheKey=()=>'handsong.streamRock2'; own.push(rockM);   // 2: + aMoss (the moss cushions share it)
   const stones=(list, geo)=>{ const m=new T.InstancedMesh(geo, rockM, Math.max(1, list.length)), w=new Float32Array(Math.max(1, list.length));
     list.forEach((r,i)=>{ d.position.set(r.x, r.y, r.z); d.rotation.set((R()-0.5)*0.3, r.rot, (R()-0.5)*0.3); d.scale.set(r.s*1.3, r.s*0.72, r.s); d.updateMatrix(); m.setMatrixAt(i, d.matrix); w[i]=r.water; });
-    geo.setAttribute('aWater', new T.InstancedBufferAttribute(w, 1)); m.count=list.length; m.castShadow=m.receiveShadow=true; m.frustumCulled=false; own.push(geo); if(list.length) s.add(m); return m; };
+    geo.setAttribute('aWater', new T.InstancedBufferAttribute(w, 1)); geo.setAttribute('aMoss', new T.InstancedBufferAttribute(new Float32Array(w.length), 1)); m.count=list.length; m.castShadow=m.receiveShadow=true; m.frustumCulled=false; own.push(geo); if(list.length) s.add(m); return m; };
   const rocks=streamRocks(Math.max(0, lv.rocks|0)), pebbles=streamPebbles(Math.max(0, lv.pebbles|0));
   const rockMesh=stones(rocks, rockGeo(T, 2, 7)), pebMesh=stones(pebbles, rockGeo(T, 1, 11)); pebMesh.castShadow=false;
   /* the drifting leaves (the floor's material: its cells, its soft edges) */
@@ -63,5 +65,5 @@ export function buildStream(ctx){
     const U=mm.uniforms; U.uNow.value=t; U.uO.value=(0.7+0.3*Math.sin(t*0.09))*(0.6+0.6*(F.mist||0))*(F.deepMist||1); U.uCol.value.copy(pal.haze).multiplyScalar(0.55+0.45*(F.moonK==null ? 1 : F.moonK));
   }
   const state=()=>({ rocks:rocks.length, wetRocks:rocks.filter(r=>r.wet).length, pebbles:pebbles.length, floaters:pos.map(p=>({ x:p.x, z:p.z, u:p.u })), mistStrips:ms.length, mistO:mm.uniforms.uO.value });
-  return { update, state, parts:{ rocks:rockMesh, pebbles:pebMesh, floaters, mist } };   // parts: probes only
+  return { update, state, parts:{ rocks:rockMesh, pebbles:pebMesh, floaters, mist, rockMat:rockM } };   // parts: probes; rockMat: the moss cushions share it
 }

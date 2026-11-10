@@ -130,7 +130,7 @@
   },
   {
    "id": "forest-files",
-   "name": "The night forest's prepared files: textures that never change during play (a spider web; the floor's plant sheet), each a master with smaller copies",
+   "name": "The night forest's prepared files: textures that never change during play (a spider web; the floor's plant sheet; the contact shadows), each a master with smaller copies",
    "class": "image",
    "use": "shipped",
    "version": "—",
@@ -140,6 +140,9 @@
     "apps/night/rooms/forest/tex/floor-1024.png",
     "apps/night/rooms/forest/tex/floor-2048.png",
     "apps/night/rooms/forest/tex/floor-512.png",
+    "apps/night/rooms/forest/tex/shade-1024.png",
+    "apps/night/rooms/forest/tex/shade-2048.png",
+    "apps/night/rooms/forest/tex/shade-512.png",
     "apps/night/rooms/forest/tex/web-1024.png",
     "apps/night/rooms/forest/tex/web-256.png",
     "apps/night/rooms/forest/tex/web-512.png"

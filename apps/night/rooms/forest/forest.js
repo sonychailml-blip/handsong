@@ -22,8 +22,11 @@ import { buildStream } from './forest-stream.js';   // NIGHT-6 slice 4: rocks, p
 import { STREAM, STREAM_LINE, streamNear, bankGround } from './pure/forestlife.js';
 import { outOfWater } from './pure/stream.js';
 import { ANSWERS, swellAt } from './pure/answers.js';
+import { FOREST_SEED, ROCKS_TODAY } from './pure/layout.js';   // NIGHT-6 slice 5: the seed and today's rocks, shared with the bake tool
+import { woodPlaces } from './pure/wood.js';
+import { buildWood, patchBark, patchShade, trunkGeo, woodUniforms } from './forest-wood.js';   // NIGHT-6 slice 5: moss, roots, fallen wood, contact shadows
 
-export const FOREST_SEED=0x464F5231;
+export { FOREST_SEED };
 export const FOREST_LEVELS=FOREST_ROOM.levels;   // NIGHT-3: what each level draws lives in the record
 export const FOREST_BOUNDS=Object.freeze([-6, 6, 0.3, 4.2, -15, 3.8]);   // x, y, z ranges the light may reach (it saturates there)
 
@@ -34,8 +37,10 @@ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 /* NIGHT-6 (the user, 2026-11-09): each texture's MASTER serves high, a smaller copy medium (the low copies wait for a WebGL low level); a
    level fetches only its own files */
 const TEX=Object.freeze({ 'web-1024':new URL('./tex/web-1024.png', import.meta.url), 'web-512':new URL('./tex/web-512.png', import.meta.url),
-  'floor-2048':new URL('./tex/floor-2048.png', import.meta.url), 'floor-1024':new URL('./tex/floor-1024.png', import.meta.url) });
-export const FOREST_TEX=Object.freeze({ full:Object.freeze({ web:'web-1024', floor:'floor-2048' }), reduced:Object.freeze({ web:'web-512', floor:'floor-1024' }) });
+  'floor-2048':new URL('./tex/floor-2048.png', import.meta.url), 'floor-1024':new URL('./tex/floor-1024.png', import.meta.url),
+  'shade-2048':new URL('./tex/shade-2048.png', import.meta.url), 'shade-1024':new URL('./tex/shade-1024.png', import.meta.url) });
+export const FOREST_TEX=Object.freeze({ full:Object.freeze({ web:'web-1024', floor:'floor-2048', shade:'shade-2048' }), reduced:Object.freeze({ web:'web-512', floor:'floor-1024', shade:'shade-1024' }) });
+const WOOD_MEMO=new Map();   // NIGHT-6 slice 5: the wood's places per counts (pure, seeded): worked out once per session
 const IMG={}, LOADING={}, assetErr=[];
 async function fileImage(url){ const r=await fetch(url); if(!r.ok) throw new Error(r.status+' '+url.pathname);
   const u=URL.createObjectURL(await r.blob()), img=new Image(); try{ img.src=u; await img.decode(); } finally { URL.revokeObjectURL(u); } return img; }
@@ -67,7 +72,7 @@ export function buildForest(T, opt){
     reduce=!!opt.reduce, R=seeded(FOREST_SEED), V=(x,y,z)=>new T.Vector3(x,y,z);
   const col=n=>new T.Color(C('forest-'+n));
   const own=[];   // everything to dispose
-  const pick=FOREST_TEX[opt.level]||FOREST_TEX.full, files=opt.files||{ web:IMG[pick.web], floor:IMG[pick.floor] };   // NIGHT-6: this level's prepared files (opt.files: a probe's own)
+  const pick=FOREST_TEX[opt.level]||FOREST_TEX.full, files=opt.files||{ web:IMG[pick.web], floor:IMG[pick.floor], shade:IMG[pick.shade] };   // NIGHT-6: this level's prepared files (opt.files: a probe's own)
   const tex=(c,srgb,rx=1,ry=1)=>{ const t=new T.CanvasTexture(c); t.wrapS=t.wrapT=T.RepeatWrapping; t.repeat.set(rx,ry); t.anisotropy=8; if(srgb) t.encoding=T.sRGBEncoding; own.push(t); return t; };
   /* RUN 9: the PALETTE is the mood's look (the record's looks → tokens), eased towards a new mood's look (τ MOOD_TC s) */
   const looks=new Map(), lookCols=L=>{ let c=looks.get(L.pre); if(!c){ c={}; for(const [k,n] of Object.entries(L.tokens)) c[k]=new T.Color(C(n)); looks.set(L.pre,c); } return c; };
@@ -102,10 +107,11 @@ export function buildForest(T, opt){
     for(const dx of [-256,0,256]){ k.strokeStyle=C(dark?'forest-bark-dark':'forest-bark-light'); kk.strokeStyle=dark?rgba([0,0,0],0.7):rgba([255,255,255],0.35); k.lineWidth=kk.lineWidth=wd;
       for(const c of [k,kk]){ c.beginPath(); for(let y=0;y<=512;y+=16){ const xx=x+dx+Math.sin(y*0.03+ph)*4; if(y) c.lineTo(xx,y); else c.moveTo(xx,y); } c.stroke(); } } }
   const barkM=new T.MeshStandardMaterial({ map:tex(kc,true,2,5), bumpMap:tex(kb,false,2,5), bumpScale:0.035, roughness:0.95 }); own.push(barkM);
+  if(Lv.barkMoss) patchBark(barkM, woodUniforms(T, C));   // NIGHT-6 slice 5: moss low on the north side, lichen higher, darker at the foot
   const spots=[[-2.1,-2.2,0.34],[2.5,-4.6,0.42],[-1.3,-8.2,0.3],[3.6,0.4,0.28],[-4.2,-5,0.5],[1.1,-11.5,0.36],[-3.3,1.2,0.22],[4.6,-9,0.46]];
   while(spots.length<95){ const x=(R()*2-1)*22, z=4-R()*44; if(Math.hypot(x,z-5.5)<3.2 || (Math.abs(x)<1.1 && z>-7)) continue; spots.push([x,z,0.14+R()*0.42]); }
   for(const sp of spots){ const [x,z]=outOfWater(sp[0], sp[1], STREAM.half+sp[2]+0.35); sp[0]=x; sp[1]=z; }   // NIGHT-6 slice 4: none stands in the new stream (no random draw changes)
-  const trunkG=new T.CylinderGeometry(0.72,1,16,14), trunks=new T.InstancedMesh(trunkG, barkM, spots.length); own.push(trunkG);
+  const trunkG= Lv.flare ? trunkGeo(T) : new T.CylinderGeometry(0.72,1,16,14), trunks=new T.InstancedMesh(trunkG, barkM, spots.length); own.push(trunkG);
   const brs=[], d=new T.Object3D();
   spots.forEach(([x,z,r],i)=>{ d.position.set(x,gy(x,z)+7.8,z); d.rotation.set((R()-0.5)*0.06,R()*6.28,(R()-0.5)*0.06); d.scale.set(r,1,r); d.updateMatrix(); trunks.setMatrixAt(i,d.matrix);
     if(z>-24) for(let b2=0;b2<(R()*3|0);b2++) brs.push([x,z,r,1.2+R()*4.5,R()*6.28,0.7+R()*1.8]); });
@@ -127,7 +133,7 @@ export function buildForest(T, opt){
   fronds.castShadow=fronds.receiveShadow=true; s.add(fronds);
   /* mossy rocks */
   const rockM=new T.MeshStandardMaterial({ color:col('rock'), roughness:0.96, bumpMap:tex(gb,false,2,2), bumpScale:0.06 }); own.push(rockM);
-  for(const [x0,z0,sz] of [[-1.6,-1,0.5],[1.9,-2.8,0.35],[-2.8,-6.5,0.7],[2.2,-8,0.45],[0.6,-5.4,0.25],[-0.8,-12,0.6],[3.4,-12.5,0.5]]){ const [x,z]=outOfWater(x0, z0, STREAM.half+sz*1.1);   // NIGHT-6 slice 4: out of the water
+  for(const [x,z,sz] of ROCKS_TODAY){   // NIGHT-6 slices 4–5: out of the water (pure/layout.js, shared with the bake tool)
     const ig=new T.IcosahedronGeometry(1,2), pa=ig.attributes.position; own.push(ig);
     for(let i=0;i<pa.count;i++){ const v=V(pa.getX(i),pa.getY(i),pa.getZ(i)); v.multiplyScalar(1+0.18*Math.sin(v.x*4+v.z*3)+0.1*Math.sin(v.y*7)); pa.setXYZ(i,v.x,v.y,v.z); }
     ig.computeVertexNormals(); const m=new T.Mesh(ig,rockM); m.scale.set(sz*1.3,sz*0.6,sz); m.position.set(x,gy(x,z)+sz*0.12,z); m.rotation.y=R()*6; m.castShadow=m.receiveShadow=true; s.add(m); }
@@ -171,7 +177,10 @@ export function buildForest(T, opt){
   let music=0;
   /* RUN 9 (slice 2): THE LIFE — ground waves, mushrooms and flowers, the stream (Echo's rings), the ferns' sway / Wave's shimmer
      (./forest-life.js); the wild fireflies GATHER to the playing light while notes come (call) and scatter slowly when they stop */
-  const life=buildLife({ T, s, C, pal, own, canvas2, tex, lv:Lv }); patchGroundWaves(groundM, life.U); patchWetGround(groundM);   // NIGHT-6 slice 4: wet banks patchSway(frondM, life.U); patchSway(frondD, life.U);
+  /* NIGHT-6 slice 5: the wood's places (its mushrooms join today's in the life's draw) */
+  const wkey=JSON.stringify(['roots','logs','stumps','snags','twigs','moss','ivy','woodShrooms'].map(k=>Lv[k]||0)); if(!WOOD_MEMO.has(wkey)) WOOD_MEMO.set(wkey, woodPlaces(Lv, spots)); const WP=WOOD_MEMO.get(wkey);
+  const life=buildLife({ T, s, C, pal, own, canvas2, tex, lv:Lv, woodShrooms:WP.shrooms }); patchGroundWaves(groundM, life.U); patchWetGround(groundM);   // NIGHT-6 slice 4: wet banks
+  patchSway(frondM, life.U); patchSway(frondD, life.U);   // NIGHT-6 slice 5: restored (slice 4 had left these two behind a comment)
   const soft=!!Lv.softEdges && opt.gl2!==false; if(soft){ patchSoftEdges(frondM); fronds.renderOrder=-0.5; }   // NIGHT-6: soft cut-out edges (the level's switch; WebGL2)
   const detail=buildDetail({ T, s, C, pal, own, canvas2, tex, lv:Lv, U:life.U, fernT, reduce, soft });   // RUN 9 (slice 3)
   /* NIGHT-6 slice 3: the forest floor — the herb layer and the fine fern, placed around today's trunks and ferns */
@@ -179,6 +188,8 @@ export function buildForest(T, opt){
     floorTex=new T.Texture(files.floor); floorTex.encoding=T.sRGBEncoding; floorTex.anisotropy=4; floorTex.needsUpdate=true; own.push(floorTex); }
   const floor=buildFloor({ T, s, own, lv:Lv, trunks:spots, ferns, tex:floorTex, U:life.U, soft });
   const stream=buildStream({ T, s, C, pal, own, lv:Lv, floorMat:floorTex ? floor.parts.material : null });   // NIGHT-6 slice 4
+  const wood=buildWood({ T, s, C, own, P:WP, barkMap:barkM.map, bumpMap:barkM.bumpMap, rockMat:stream.parts.rockMat, floorMat:floorTex ? floor.parts.material : null, cast:SH>0 });   // NIGHT-6 slice 5
+  let shadeTex=null; if(files.shade && Lv.shade){ shadeTex=new T.Texture(files.shade); shadeTex.format= opt.gl2!==false ? T.RedFormat : T.RGBAFormat; shadeTex.needsUpdate=true; own.push(shadeTex); patchShade(groundM, shadeTex); }   // one channel where WebGL2 allows
   const rare=buildRare({ T, s, C, pal, own, canvas2, tex, halo:HALO });   // RUN 9 (slice 4)
   let gather=0, playing=false, rel=0;
   /* NIGHT-6 slice 2: THE MELODY — the held seconds of the playing note (the host), the note-on times of the last window, and their eased
@@ -311,14 +322,15 @@ export function buildForest(T, opt){
     melody:{ hold:holdE, rate:rateE, held:heldNow, darts },   // NIGHT-6 slice 2
     floor:(({ places, ...x })=>x)(floor.state()),   // NIGHT-6 slice 3
     stream:stream.state(), trunks:spots.map(x=>x.slice()), fernsAt:ferns.map(x=>x.slice()),   // NIGHT-6 slice 4
+    wood:{ ...wood.state(), shade:!!shadeTex, flare:!!Lv.flare, bark:!!Lv.barkMoss },   // NIGHT-6 slice 5
     answers:answers.state(), bed:{ queued:bedQ.length, fired:fired.map(x=>({ ...x })), twinkles:twinkles.map(w=>({ ...w, glow:glow1[w.i] })) }, files:{ web:!!files.web, floor:!!files.floor, errors:assetErr.slice() } });   // NIGHT-6 slice 1
   function dispose(){ for(const o of own) try{ o.dispose(); }catch(e){} own.length=0; }
   /* NIGHT-6 slice 1: a music bed event `it` ({ kind 'chord' | 'loop' | 'glass', lv, a, h, r, amp }) heard at room time `at` (the host maps it) */
   function bed(it, at){ if(!it || !(at>-1e9) || at-now>30) return; bedQ.push({ it, at }); if(bedQ.length>64) bedQ.shift(); }
   /* NIGHT-6 slice 0: the room's texture memory in bytes (its own textures: pixels × 4, mipmaps × 4/3) */
   function texBytes(){ let b=0; for(const o of own){ if(!o || !o.isTexture) continue; const im=o.image||{}, w=im.width||0, h=im.height||0, pot=!(w&(w-1)) && !(h&(h-1));
-    b+=w*h*4*(o.generateMipmaps!==false && pot ? 4/3 : 1); } return Math.round(b); }
+    b+=w*h*(o.format===T.RedFormat ? 1 : 4)*(o.generateMipmaps!==false && pot ? 4/3 : 1); } return Math.round(b); }   // NIGHT-6 slice 5: one byte a texel for one channel
   resize(W,H);
-  return { id:FOREST_ROOM.id, scene:s, camera, update, resize, place, glint, project, state, dispose, lightsOf, lifeDbg:life, detailDbg:detail, bed, texBytes, answersDbg:answers, floorDbg:floor, streamDbg:stream,
+  return { id:FOREST_ROOM.id, scene:s, camera, update, resize, place, glint, project, state, dispose, lightsOf, lifeDbg:life, detailDbg:detail, bed, texBytes, answersDbg:answers, floorDbg:floor, streamDbg:stream, woodDbg:wood, fernsDbg:{ fronds, frondM, frondD },
     held:sec=>{ heldNow= sec>0 ? sec : 0; rare.held(sec); }, rareDbg:kind=>rare.force(kind, now, { light:rigs[0].cur, flies }) };   // RUN 9 (slice 4): held — how long the playing note is held (host); rareDbg — probes / captures   // RUN 9: lifeDbg / detailDbg — probes only (uniforms, silhouette boxes)
 }

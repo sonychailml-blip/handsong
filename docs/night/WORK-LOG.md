@@ -4,6 +4,16 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`, `archive/NIGHT-RUN-LOG-2026-10.md`. New runs start at `NIGHT-1`.
 
+# NIGHT-6 — slice 5 (2026-11-10): moss, roots and fallen wood
+Tree hashes before: core 2b6fc141521883a3 · apps/full d6b90cf2cb4be6da · apps/night fbaf10ee97528d92. After: core 2b6fc141521883a3 (unchanged) · apps/full d6b90cf2cb4be6da (unchanged) · apps/night 5b23725cdc0d6d16.
+- Step 137 checked by the user: the stream good and easy to see; soft edges kept.
+- New: `rooms/forest/pure/layout.js` (`FOREST_SEED` moved here, `forestTrunks` replays forest.js's trunk draws after `PAINT_DRAWS`, `ROCKS_TODAY`), `rooms/forest/pure/wood.js` (flare, roots, two logs — a bridge and a bank log found by a search along the bank —, stumps, snags, twig shapes, moss, ivy, mushrooms on wood, brackets; each list drawn at its maximum, a level takes the beginning; `shadeBlobs`), `rooms/forest/forest-wood.js` (the merged wood with its own material, `patchBark`, `trunkGeo`, moss cushions on the stream rocks' material, ivy on the floor material, `patchShade`).
+- Changed: `forest.js` (flared trunks, bark moss, the wood, contact shadows as a one-channel texture, `texBytes` per format, the ferns' sway restored), `forest-life.js` (mushrooms on the wood after today's; the bed's clusters from today's only), `forest-stream.js` (`aMoss`: cushions all moss), `pure/floor.js` (cell `ivy`), `pure/room.js` (levels), `night.css` (six tokens), `shell.js` and the budget eval (baseline zeros), `tools/forest-bake.mjs` (the ivy sprig, `shade-*.png`), `tools/licences.json` (the shade files in `forest-files`).
+- Look rounds by capture: the moss cushions too pale (darkened, lumpier), lichen as a pale smear up a whole trunk at medium (now small spots 0.8–5 m up, dimmer), dead wood paler, ivy lighter, fungi larger.
+- Rows: data «FOREST wood (app)» (25; fix rounds: 2 — the bank log touched a trunk's flare, so the law now searches along the bank for a clear place; a note's arithmetic); browser «FOREST wood» (22; one round: its order number clashed with «FOREST detail»).
+- Checks: static PASS · `[probe-data] PASS — 45 checks, 0 differences` · `P.night: PASS — 44 checks, 0 differences` · `P.quick: PASS — 93 checks, 0 differences` · smoke paths with builds PASS. Budget (laptop): medium 0.0 % detections vs Dark in every step; draws 62–63, programs 26, triangles 177 k, textures 14.9 MB; high −46.9 / −48.8 %, 260 k triangles, first opening 5.7 s.
+- Files per level: high 1.76 MB, medium 0.81 MB, low 0.42 MB (2.66 MB of 30).
+
 # NIGHT-6 — slice 4 (2026-11-10): the stream towards the viewer; soft edges at medium; the early fetch
 Tree hashes before: core 2b6fc141521883a3 · apps/full d6b90cf2cb4be6da · apps/night f019a39aadeb647b. After: core 2b6fc141521883a3 (unchanged) · apps/full d6b90cf2cb4be6da (unchanged) · apps/night fbaf10ee97528d92.
 - Step 136 checked by the user. Decisions: soft edges at medium tried and measured (the user decides by eye); KTX2 stays PNG; the room's files fetched while the start card shows; the stream may change its path towards the viewer.

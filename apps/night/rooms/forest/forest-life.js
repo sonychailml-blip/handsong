@@ -107,8 +107,9 @@ export function buildLife(ctx){
     uSway:{ value:0.35 }, uShimmer:{ value:0 } };
   const ground=ringsNew(RINGS.ground.n), water=ringsNew(RINGS.water.n);
   /* mushrooms and flowers */
-  const places=lifePlaces(lv.shrooms, lv.blooms), N=places.length, pulse=new Float32Array(N), glow=new Float32Array(N);
-  const SHROOMS=places.map((p,i)=>i).filter(i=>places[i].kind==='shroom'), clusters=bedClusters(places), bedG=new Float32Array(N), bedEv=[];   // NIGHT-6 slice 1
+  /* NIGHT-6 slice 5: the mushrooms on the wood (ctx.woodShrooms) come after today's, which keep their places and the music bed's clusters */
+  const today=lifePlaces(lv.shrooms, lv.blooms), places=today.concat((ctx.woodShrooms||[]).map(p=>({ kind:'shroom', x:p.x, y:p.y, z:p.z, s:p.s, ph:p.ph, rot:p.rot, wood:true }))), N=places.length, pulse=new Float32Array(N), glow=new Float32Array(N);
+  const SHROOMS=places.map((p,i)=>i).filter(i=>places[i].kind==='shroom'), clusters=bedClusters(today), bedG=new Float32Array(N), bedEv=[];   // NIGHT-6 slice 1
   const d=new T.Object3D(), shrooms=places.filter(p=>p.kind==='shroom'), blooms=places.filter(p=>p.kind==='bloom');
   const capG=new T.SphereGeometry(1,10,5,0,Math.PI*2,0,Math.PI/2), stemG=new T.CylinderGeometry(0.16,0.22,1,6), bloomG=new T.PlaneGeometry(1,1); bloomG.rotateX(-Math.PI/2); own.push(capG, stemG, bloomG);
   const capM=new T.MeshBasicMaterial({ color:0xffffff }); capM.onBeforeCompile=sh=>{   // a dome's shading on an unlit cap: bright top, dark rim

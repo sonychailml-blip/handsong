@@ -106,10 +106,16 @@ RUN 9 (slice 4) — THE FOREST'S RARE EVENTS (every few minutes, never the same 
 NIGHT-6 slice 4 — THE STREAM'S SURROUNDINGS (parts of the night forest room; forest.js builds them; the water's own shader is in forest-life.js; the numbers are ./pure/stream.js): - WET MOSSY ROCKS…
 - fn (1): `buildStream`
 
+## apps/night/rooms/forest/forest-wood.js
+NIGHT-6 slice 5 — MOSS, ROOTS AND FALLEN WOOD (parts of the night forest room; forest.js builds them; the places are ./pure/wood.js): - THE WOOD: roots of the near trees, a log on the bank, a log a…
+- const (1): `patchBark`
+- fn (4): `woodUniforms`, `trunkGeo`, `buildWood`, `patchShade`
+
 ## apps/night/rooms/forest/forest.js
 VIS1c (RUN 6, Night plan §3) — THE NIGHT FOREST ROOM's picture: a scene module built with three.js r128 (vendored, loaded by the scene host apps/night/scene/host.js).
-- const (5): `FOREST_SEED`, `FOREST_LEVELS`, `FOREST_BOUNDS`, `FOREST_TEX`, `forestAssetsDbg`
+- const (4): `FOREST_LEVELS`, `FOREST_BOUNDS`, `FOREST_TEX`, `forestAssetsDbg`
 - fn (2): `forestAssets`, `buildForest`
+- → ./pure/layout.js (1): `FOREST_SEED`
 
 ## apps/night/rooms/forest/pure/answers.js
 NIGHT-6 slice 1 — THE FOREST ANSWERS, as numbers.
@@ -131,6 +137,11 @@ RUN 9 — THE FOREST'S LIFE, as numbers.
 - const (7): `STREAM`, `STREAM_LINE`, `CARVE`, `LIFE`, `pulseOf`, `RINGS`, `ringsNew`
 - fn (6): `streamAt`, `streamNear`, `bankGround`, `lifePlaces`, `ringAdd`, `ringsAge`
 
+## apps/night/rooms/forest/pure/layout.js
+NIGHT-6 slice 5 — TODAY'S FOREST'S PLACES, as numbers (pure, rule #36), for whoever needs them outside the room: the bake tool paints the contact shadows under the trunks and rocks (tools/forest-ba…
+- const (3): `FOREST_SEED`, `PAINT_DRAWS`, `ROCKS_TODAY`
+- fn (1): `forestTrunks`
+
 ## apps/night/rooms/forest/pure/room.js
 NIGHT-3: THE FOREST ROOM'S RECORD — what the room is, as data (pure, rule #36; checked by apps/night/pure/room.js, data row «NIGHT room records»).
 - const (1): `FOREST_ROOM`
@@ -139,6 +150,11 @@ NIGHT-3: THE FOREST ROOM'S RECORD — what the room is, as data (pure, rule #36;
 NIGHT-6 slice 4 — THE STREAM'S LIFE, as numbers.
 - const (2): `STREAM_LIFE`, `streamLength`
 - fn (6): `outOfWater`, `streamRocks`, `streamPebbles`, `floatersInit`, `floatAt`, `mistStrips`
+
+## apps/night/rooms/forest/pure/wood.js
+NIGHT-6 slice 5 — MOSS, ROOTS AND FALLEN WOOD, as numbers.
+- const (4): `WOOD`, `trunkRadius`, `trunkOuter`, `blobDark`
+- fn (5): `flareAt`, `nearTrees`, `twigShape`, `woodPlaces`, `shadeBlobs`
 
 ## apps/night/rooms/forest/standin.js
 NIGHT-3: the forest's 2D STAND-IN — the «low» level and the fallback without WebGL (or after a lost context): the night's two colours and a soft glow at each hand (the playing hand lime, the effect…
@@ -1015,7 +1031,7 @@ NIGHT-2 stage 2: row «NIGHT calibration screens» (quick; the probe clock throu
 
 ## tools/probes/night/forest.js
 VIS1c (RUN 6, Night plan §10, review 2026-10-17): two rows (quick and all).
-- fn (12): `checkForestRoom`, `checkBackgrounds`, `checkForestPicture`, `checkNightCycle`, `checkForestResponse`, `checkForestDetail`, `checkForestRare`, `checkForestLevels`, `checkForestAnswers`, `checkForestMelody`, `checkForestFloor`, `checkForestStream`
+- fn (13): `checkForestRoom`, `checkBackgrounds`, `checkForestPicture`, `checkNightCycle`, `checkForestResponse`, `checkForestDetail`, `checkForestRare`, `checkForestLevels`, `checkForestAnswers`, `checkForestMelody`, `checkForestFloor`, `checkForestStream`, `checkForestWood`
 
 ## tools/probes/night/headroom-calc.js
 NIGHT-1: the headroom page's sums, pure (runs in node: tools/probe-data.mjs, row «NIGHT-1 headroom sums»).
@@ -1065,7 +1081,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 - const (5): `TEST_ROOM_ID`, `TEST_ROOM`, `testRoomMode`, `testRoomInfo`, `testRoomFreeLeaks`
 - fn (2): `testRoomInstall`, `testRoomRemove`
 
-_207 modules, 2452 exported names._
+_210 modules, 2471 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

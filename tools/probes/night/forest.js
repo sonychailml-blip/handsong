@@ -23,6 +23,10 @@ import { FOREST_ROOM } from '../../../apps/night/rooms/forest/pure/room.js';   /
 const MOOD_LOOKS=FOREST_ROOM.looks;
 import { FOREST_LEVELS } from '../../../apps/night/rooms/forest/forest.js';
 import { streamNear } from '../../../apps/night/rooms/forest/pure/forestlife.js';   // RUN 9 (slice 2)
+import { lifePlaces } from '../../../apps/night/rooms/forest/pure/forestlife.js';   // NIGHT-6 slice 5
+import { woodPlaces } from '../../../apps/night/rooms/forest/pure/wood.js';
+import { forestTrunks, FOREST_SEED, PAINT_DRAWS } from '../../../apps/night/rooms/forest/pure/layout.js';
+import { seeded } from '../../../core/pure/dsp.js';
 import { stackList } from '../../../core/legacy-ui/draw.js';
 import { BUS } from '../../../core/pure/bus.js';
 import { profileApply, profileCurrent } from '../../../core/profile.js';
@@ -540,3 +544,47 @@ export async function checkForestStream(){
   return { cases:n, total:d.length, differences:d, notes };
 }
 row({ night:true, at:1008.639, name:'FOREST stream', drawn:true, run:()=>checkForestStream(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });
+/* NIGHT-6 slice 5: row «FOREST wood» — the room built without a renderer: its 95 trunks are pure/layout.js forestTrunks() number for number
+   (CONTROL the replay one draw late gives other trunks); the wood, moss and ivy at each level's counts and the baseline none (no flare, no bark
+   moss, no contact shadows); today's mushrooms first and where they were, the wood's after them; today's ferns sway again (their material's
+   shader has the sway — CONTROL a plain material has not); drawn (the opened forest at medium): the wood, the moss and the contact shadows
+   RENDER (one frame drawn twice: each part hidden, the shadow map swapped for white) — CONTROL the same frame twice differs by 0. */
+export async function checkForestWood(){
+  const d=[], notes=[]; let n=0; const miss=s=>d.push(s);
+  const was=profileCurrent(), keepLevel=sceneLevel();
+  try{
+    const T=await loadThree(); await forestAssets('full'); await forestAssets('reduced'); const w=844, h=390, rooms=[], mk=(lv, o={})=>{ const r=buildForest(T,{ C:cv, level:lv, w, h, ...o }); rooms.push(r); return r; };
+    const stub=m=>{ const sh={ uniforms:{}, vertexShader:'#include <begin_vertex>\n#include <uv_vertex>', fragmentShader:'#include <map_fragment>\n#include <roughnessmap_fragment>' }; if(m.onBeforeCompile) m.onBeforeCompile(sh, null); return sh.vertexShader; };
+    try{
+      const pureT=forestTrunks();
+      for(const lv of ['full','reduced']){ const r=mk(lv), st=r.state(), L=FOREST_LEVELS[lv], P=woodPlaces(L, pureT), Wd=st.wood; n+=6;
+        if(JSON.stringify(st.trunks)!==JSON.stringify(pureT)) miss(lv+': the room\'s trunks are not forestTrunks()');
+        const want={ roots:P.roots.length, logs:2, stumps:L.stumps, snags:L.snags, twigs:L.twigs, moss:L.moss };
+        for(const k of Object.keys(want)) if(Wd[k]!==want[k]) miss(`${lv}: ${k} ${Wd[k]} of ${want[k]}`);
+        if(!Wd.shade || !Wd.flare || !Wd.bark || !(Wd.ivy>0) || !(Wd.verts>0)) miss(lv+': '+JSON.stringify(Wd));
+        const today=lifePlaces(L.shrooms, L.blooms), pl=st.life.places, sh=pl.filter(p=>p.kind==='shroom').length;
+        if(pl.slice(0, today.length).some((p,i)=>p.kind!==today[i].kind || p.x!==today[i].x || p.z!==today[i].z)) miss(lv+': today\'s mushrooms moved');
+        if(sh!==L.shrooms+L.woodShrooms) miss(`${lv}: ${sh} mushrooms (${L.shrooms} + ${L.woodShrooms} expected)`);
+        if(!/uSway/.test(stub(r.fernsDbg.frondM)) || !/uSway/.test(stub(r.fernsDbg.frondD))) miss(lv+': today\'s ferns do not sway');
+        notes.push(`${lv}: ${Wd.roots} roots, ${Wd.logs} logs, ${Wd.stumps} stumps, ${Wd.snags} dead trees, ${Wd.twigs} branches, ${Wd.brackets} fungi, ${Wd.moss} moss, ${Wd.ivy} ivy cards, ${sh-L.shrooms} mushrooms on wood; ${Wd.verts} wood vertices`); }
+      { n+=2; const R=seeded(FOREST_SEED); for(let i=0;i<=PAINT_DRAWS;i++) R(); const x=(R()*2-1)*22; if(x===pureT[8][0]) miss('CONTROL: the replay one draw late gives the same trunk');
+        if(/uSway/.test(stub(new T.MeshStandardMaterial()))) miss('CONTROL: a plain material has the sway'); }
+      { const S=mk('reduced', { lv:{ roots:0, logs:0, stumps:0, snags:0, twigs:0, moss:0, ivy:0, woodShrooms:0, flare:false, barkMoss:false, shade:false } }).state(); n++;
+        if(S.wood.verts || S.wood.moss || S.wood.ivy || S.wood.shade || S.wood.flare || S.wood.bark) miss('the baseline still builds '+JSON.stringify(S.wood)); }
+    } finally { for(const r of rooms) r.dispose(); }
+    const why=profileApply('profile.night'); n++; if(why){ miss('Night refused: '+why); return { cases:n, total:d.length, differences:d, notes }; }
+    await setSceneLevel('reduced'); await setBackground('forest'); await frames(6);
+    const room=sceneRoomDbg(); if(!room || !sceneInfo().webgl){ notes.push('no WebGL room — the drawn checks do not apply'); return { cases:n, total:d.length, differences:d, notes }; }
+    const P=room.woodDbg.parts, gm=room.scene.children.find(o=>o.isMesh && o.material && o.material.userData && o.material.userData.shadeU), SU=gm && gm.material.userData.shadeU, keep=SU && SU.value;
+    const white=new (await loadThree()).DataTexture(new Uint8Array([255,255,255,255]), 1, 1); white.needsUpdate=true;
+    for(const [name, fn] of [['the wood', on=>{ P.wood.visible=!on; }], ['the moss', on=>{ P.moss.visible=!on; }], ['the contact shadows', on=>{ if(SU) SU.value= on ? white : keep; }]]){
+      const ab=await sceneSnapDbg(fn, true), cc=await sceneSnapDbg(()=>{}, true); n+=2;
+      if(!ab || !cc){ notes.push(name+': no frame rendered'); continue; }
+      notes.push(`${name} change the mean RGB sum of one frame by ${(ab[0]-ab[1]).toFixed(3)} (CONTROL ${(cc[0]-cc[1]).toFixed(4)})`);
+      if(!(Math.abs(ab[0]-ab[1])>0)) miss(name+' do not show in the picture'); if(cc[0]!==cc[1]) miss('CONTROL: one frame rendered twice differs by '+(cc[0]-cc[1])); }
+    white.dispose(); if(!SU) miss('the ground has no contact-shadow map');
+  } catch(e){ miss('error: '+(e&&e.stack||e)); }
+  finally{ try{ await setSceneLevel(keepLevel); }catch(e){} if(profileCurrent()!==was) profileApply(was); await setBackground('camera'); await sleep(30); }
+  return { cases:n, total:d.length, differences:d, notes };
+}
+row({ night:true, at:1008.6395, name:'FOREST wood', drawn:true, run:()=>checkForestWood(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });

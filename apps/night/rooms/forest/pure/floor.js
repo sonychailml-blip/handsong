@@ -15,9 +15,10 @@ const F=Object.freeze, clamp=(v,a,b)=>Math.max(a,Math.min(b,v)), smooth=(a,b,x)=
 export const FLOOR_ATLAS=F({ size:2048, derived:F([1024, 512]),
   cells:F({ fern2:F([0,0,512,1024]), nettle:F([512,0,512,1024]), sedge:F([1024,0,512,1024]),
     sorrel:F([0,1024,512,512]), forb:F([512,1024,512,512]), bilberry:F([1024,1024,512,512]), anemone:F([1536,1024,512,512]),
-    leaf0:F([0,1536,512,512]), leaf1:F([512,1536,512,512]), leaf2:F([1024,1536,512,512]), leaf3:F([1536,1536,512,512]) }),   // NIGHT-6 slice 4: fallen leaves (they drift on the stream)
+    leaf0:F([0,1536,512,512]), leaf1:F([512,1536,512,512]), leaf2:F([1024,1536,512,512]), leaf3:F([1536,1536,512,512]),   // NIGHT-6 slice 4: fallen leaves (they drift on the stream)
+    ivy:F([1536,0,512,1024]) }),   // NIGHT-6 slice 5: a climbing ivy sprig (drawn last: every earlier cell stays as it was)
   world:F({ fern2:F({ w:0.36, h:1.0 }), nettle:F({ w:0.42, h:0.85 }), sedge:F({ w:0.42, h:0.62 }), sorrel:F({ w:0.32, h:0.2 }), forb:F({ w:0.4, h:0.4 }),
-    bilberry:F({ w:0.8, h:0.62 }), anemone:F({ w:0.34, h:0.3 }), leaf:F({ w:0.13, h:0.13 }) }) });
+    bilberry:F({ w:0.8, h:0.62 }), anemone:F({ w:0.34, h:0.3 }), leaf:F({ w:0.13, h:0.13 }), ivy:F({ w:0.36, h:0.72 }) }) });
 export const HERBS=F(['sorrel','forb','bilberry','anemone','nettle','sedge']);
 /* a cell → [u0, v0, du, dv] (uv with the image's top at v 1, as three.js flips an image) */
 export function cellUv(sp){ const [x,y,w,h]=FLOOR_ATLAS.cells[sp], S=FLOOR_ATLAS.size; return [x/S, 1-(y+h)/S, w/S, h/S]; }
