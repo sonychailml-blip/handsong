@@ -8414,3 +8414,12 @@ not a control · run a "random" failure many times and print WHERE and HOW MUCH 
 - The firefly law takes `hold` (a long note: they close in, circle slower, breathe together, brighter) and `rate` (fast playing: wider rings, a quicker swirl); `fliesDart` sends the three nearest out on a note of fast playing. Both 0 = exactly the old step. The room eases them from the held seconds and its note times; a held note now keeps the flies gathered.
 - Rows: data «FOREST melody (app)» 21 cases (a long note 2.19 → 1.01 from the light; fast 3.87; CONTROL the old law meets neither); browser «FOREST melody» 8 (a held note 46 flies within 2 m against 4 released; fast playing 4.35 vs 2.50, darts 51 vs 0).
 - Checks: static PASS; [probe-data] PASS 42 / 0; P.night PASS 41 / 0; P.quick PASS 93 / 0. No GPU change. Waiting for step 135 (three checks by eye).
+
+# Moved from docs/night/HANDOFF.md at NIGHT-6 slice 6 (2026-11-10)
+### NIGHT-6 slice 3 (2026-11-09): the forest floor. Log: `docs/night/WORK-LOG.md`; as built and the KTX2 lab: `docs/night/design/NIGHT-6-forest/PLAN.md` top
+- Step 135 checked by the user: the fireflies look right. The user's texture rule: one master per texture at the highest quality (high), smaller copies derived for medium and low; sizes per level reported every slice; warn before 30 MB.
+- The plant sheet `rooms/forest/tex/floor-2048.png` (master) → 1024 / 512, and the web now a 1024 master → 512 / 256, drawn by `tools/forest-bake.mjs`: fine fern, nettle, sedge, wood sorrel, broad-leaved herb, bilberry with berries, wood anemone.
+- The herbs placed by damp and light (`pure/floor.js`), 3 m and more from the eye, in two instanced draws sharing one material (`forest-floor.js`); high about 3,800 plants, medium about 1,500. Each level fetches only its own files.
+- Files per level: high 1.37 MB, medium 0.61 MB, low 0.30 MB (all 2.1 MB of 30). Laptop: medium −6.2 / −1.4 % detections with, −1.7 / −2.6 % without (noise), 0 dropouts; textures medium 13.6 MB, high 33.6 MB; high −37.5 %; the cold opening at high 4.5 s (over the 4-s gate), medium first 2.3 s, later 0.4 s.
+- KTX2 measured (laptop): GPU memory a quarter (2048² 22.4 → 5.6 MB), the opening about the same (215 → 183 ms), UASTC 48.7 dB / ETC1S 40.4 dB; the official transcoder needs eval, which our CSP refuses — a decision for the user.
+- Rows: data «FOREST floor (app)» 30, «NIGHT forest files (app)» per level; browser «FOREST floor» 10. Waiting for step 136.

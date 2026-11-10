@@ -51,6 +51,13 @@ The plan is approved, with these answers to §8 and one addition.
 ### The user's texture rule (2026-11-09)
 Every texture is made as beautiful and detailed as it can be: ONE master at the highest quality (for example 2048² where it shows), smaller versions derived from it for the lower levels. There will be three graphics levels later: high uses the masters, medium and low the smaller versions. A master is never lowered to save size; size is saved with the smaller versions, mipmaps and GPU compression. The files budget may grow past 15 MB: every slice reports the files' size per level, and the user is told before the total passes 30 MB (the data row's limit). The web became a 1024² master (with dew beads) and 512² / 256² copies.
 
+### Slice 6 as built (2026-11-10): the effects hand moves the forest (picture only); high made cheaper
+- **High made cheaper (the user, 2026-11-10):** the wood stays out of the hand light's shadow pass; the moss cushions lighter (10×4 segments, still lumpy). Triangles at high 260 k → 218 k; detections within the noise (−47.6 / −45.0 % vs −46.9 / −48.8 %). Where high's cost is (measured): the light's shadow about 10 points (−36.5 % without it), the rest is its sharper picture (pixel ratio 0.85 vs 0.6). The cold first opening at high 6.0 s.
+- **The gust** (`pure/gust.js`, `forest-gust.js`): the effects hand's light steers it. Its strength rises with the hand's speed (nothing below 0.4 m/s; full at 4 m/s), its direction is the sweep's, it trails the light on its path and dies away about a second after the sweep stops.
+- **What it moves:** the grass, today's ferns, the floor's herbs and fine ferns and the ivy bend along the sweep and a little away from its centre — most at their tops, nothing at their feet, fading to exactly nothing two radii (3.2 m) away (one formula, in the shared sway shader and in `gustBend`). Up to 12 leaves (medium 6) shake loose, fly along the sweep and settle. Over the stream: cat's-paw ripples under it and a wake of rings.
+- **No gust = as before:** with no hand or a still or slow one the strength is exactly 0, so every bend and ripple adds exactly 0 (row «FOREST gust»: a gust of strength 0 changes no pixel).
+- **Measured** (laptop, medium): detections = Dark (0.0 %); draws 63–64, programs 26, triangles 156 k, textures 14.9 MB. Files unchanged.
+
 ### Slice 5 as built (2026-11-10): moss, roots and fallen wood (laptop numbers only)
 - **The foot of every trunk flares** into buttresses (`pure/wood.js flareAt`: ×1.67 at the foot, ×1.23 at 0.5 m, today's trunk above 3 m); the trunk geometry has its rows packed towards the foot.
 - **Roots** spread from the 14 near trees (2.8–13 m from the eye), 4–5 each, sinking into the ground, stopping before the water.

@@ -93,6 +93,10 @@ RUN 9 (slice 3) — THE FOREST'S DETAIL.
 NIGHT-6 slice 3 — THE FOREST FLOOR (parts of the night forest room; forest.js builds them; the places are ./pure/floor.js): the herb layer — wood sorrel, broad-leaved herbs, bilberry, wood anemones…
 - fn (1): `buildFloor`
 
+## apps/night/rooms/forest/forest-gust.js
+NIGHT-6 slice 6 — THE EFFECTS HAND MOVES THE FOREST (a part of the night forest room; forest.js builds it; the numbers are ./pure/gust.js).
+- fn (1): `buildGust`
+
 ## apps/night/rooms/forest/forest-life.js
 RUN 9 (slice 2) — THE FOREST ANSWERS THE PLAYING, softly (never busy).
 - fn (5): `patchGroundWaves`, `patchSway`, `patchWetGround`, `patchSoftEdges`, `buildLife`
@@ -136,6 +140,11 @@ NIGHT-6 slice 3 — THE FOREST FLOOR, as numbers.
 RUN 9 — THE FOREST'S LIFE, as numbers.
 - const (7): `STREAM`, `STREAM_LINE`, `CARVE`, `LIFE`, `pulseOf`, `RINGS`, `ringsNew`
 - fn (6): `streamAt`, `streamNear`, `bankGround`, `lifePlaces`, `ringAdd`, `ringsAge`
+
+## apps/night/rooms/forest/pure/gust.js
+NIGHT-6 slice 6 — THE EFFECTS HAND MOVES THE FOREST, as numbers.
+- const (2): `GUST`, `gustNew`
+- fn (5): `gustStep`, `gustBend`, `leafSpawn`, `leafAt`, `wakeOf`
 
 ## apps/night/rooms/forest/pure/layout.js
 NIGHT-6 slice 5 — TODAY'S FOREST'S PLACES, as numbers (pure, rule #36), for whoever needs them outside the room: the bake tool paints the contact shadows under the trunks and rocks (tools/forest-ba…
@@ -1081,7 +1090,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 - const (5): `TEST_ROOM_ID`, `TEST_ROOM`, `testRoomMode`, `testRoomInfo`, `testRoomFreeLeaks`
 - fn (2): `testRoomInstall`, `testRoomRemove`
 
-_210 modules, 2471 exported names._
+_212 modules, 2479 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

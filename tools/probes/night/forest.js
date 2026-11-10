@@ -588,3 +588,43 @@ export async function checkForestWood(){
   return { cases:n, total:d.length, differences:d, notes };
 }
 row({ night:true, at:1008.6395, name:'FOREST wood', drawn:true, run:()=>checkForestWood(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });
+/* NIGHT-6 slice 6: row «FOREST gust» — the room built without a renderer, the effects hand driven through its update: no hand and a still
+   hand leave the gust's strength (state and shader uniform) exactly 0 and shake no leaf; a sweep makes a gust along it, near the effects light,
+   shakes leaves loose; a sweep across the stream makes a wake — CONTROL the still hand none; the baseline (gust off) keeps the uniform at 0
+   through a sweep; the plants' materials carry the gust (today's ferns, the floor's) — CONTROL a plain material does not; drawn (medium):
+   a gust bends the picture, and with strength 0 its place changes nothing (exactly) — CONTROL one frame twice differs by 0. */
+export async function checkForestGust(){
+  const d=[], notes=[]; let n=0; const miss=s=>d.push(s);
+  const was=profileCurrent(), keepLevel=sceneLevel();
+  try{
+    const T=await loadThree(); await forestAssets('reduced'); const w=844, h=390, rooms=[], mk=(o={})=>{ const r=buildForest(T,{ C:cv, level:'reduced', w, h, ...o }); rooms.push(r); return r; };
+    const NIN={ mood:'major-penta', sleep:0 }, stub=m=>{ const sh={ uniforms:{}, vertexShader:'#include <begin_vertex>\n#include <project_vertex>', fragmentShader:'' }; if(m.onBeforeCompile) m.onBeforeCompile(sh, null); return sh.vertexShader; };
+    let track=[]; const drive=(r, sec, at, t0=1)=>{ let t=t0; track=[]; for(let i=0;i<Math.round(sec*60);i++){ t+=1/60; const p=at(i/60); r.update(1/60, t, p ? [{ x:p[0], y:p[1], d:p[2], play:false }] : [], null, NIN); const L=r.state().rigs[1]; track.push([L.x, L.z]); } return t; };
+    const offTrack=(x, z)=>{ let m=Infinity; for(let i=1;i<track.length;i++){ const [ax,az]=track[i-1], [bx,bz]=track[i], vx=bx-ax, vz=bz-az, u=Math.max(0, Math.min(1, ((x-ax)*vx+(z-az)*vz)/(vx*vx+vz*vz||1))); m=Math.min(m, Math.hypot(x-ax-vx*u, z-az-vz*u)); } return m; };   // the gust trails the light ON its path
+    try{
+      { const r=mk(); let t=drive(r, 2, ()=>null); const a=r.state().gust, ua=r.lifeDbg.U.uGust.value.w; t=drive(r, 2, ()=>[420, 260, 0.5], t); const b=r.state().gust, ub=r.lifeDbg.U.uGust.value.w; n+=2;
+        if(a.k!==0 || ua!==0 || b.k!==0 || ub!==0 || b.spawned) miss(`no hand ${a.k}/${ua}, a still hand ${b.k}/${ub}, leaves ${b.spawned}: not exactly 0`);
+        t=drive(r, 0.8, s=>[150+600*s/0.8, 260, 0.5], t); const c=r.state().gust, uc=r.lifeDbg.U.uGust.value, L=r.state().rigs[1], off=offTrack(c.x, c.z);
+        if(!(c.k>0.3) || uc.w!==c.k || !(c.dx>0.8) || !(off<0.25) || !(c.spawned>0)) miss(`a sweep: ${JSON.stringify({ k:c.k, w:uc.w, dx:c.dx, offTrack:off, leaves:c.spawned })}`);
+        notes.push(`a sweep across the picture: strength ${c.k.toFixed(2)}, direction ${c.dx.toFixed(2)}, ${c.dz.toFixed(2)}; the gust ${Math.hypot(c.x-L.x, c.z-L.z).toFixed(2)} m behind the light, ${off.toFixed(3)} m off its path; ${c.spawned} leaves shaken loose`); }
+      { let best=0, at=null; for(const dd of [0.3, 0.5, 0.7, 0.85]) for(const y of [220, 300]){ const r=mk(); drive(r, 0.6, ()=>[100, y, dd]); drive(r, 1.2, s=>[100+700*s/1.2, y, dd], 2); const k=r.state().gust.wakes; if(k>best){ best=k; at=[y, dd]; } }
+        const rc=mk(); drive(rc, 2, ()=>[420, 300, 0.5]); n+=2; if(!best) miss('no sweep across the picture made a wake on the stream'); if(rc.state().gust.wakes) miss('CONTROL: a still hand made a wake');
+        notes.push(`the wake: ${best} rings from a sweep at y ${at && at[0]}, depth ${at && at[1]}; a still hand none`); }
+      { const r=mk({ lv:{ gust:false, gustLeaves:0 } }); drive(r, 0.8, s=>[150+600*s/0.8, 260, 0.5]); n++; if(r.lifeDbg.U.uGust.value.w!==0 || r.state().gust.spawned) miss('the baseline keeps a gust: '+r.lifeDbg.U.uGust.value.w); }
+      { const r=mk(); n+=2; if(!/uGust/.test(stub(r.fernsDbg.frondM)) || !/uGust/.test(stub(r.floorDbg.parts.material))) miss('today\'s ferns or the floor\'s plants do not carry the gust');
+        if(/uGust/.test(stub(new T.MeshStandardMaterial()))) miss('CONTROL: a plain material carries the gust'); }
+    } finally { for(const r of rooms) r.dispose(); }
+    const why=profileApply('profile.night'); n++; if(why){ miss('Night refused: '+why); return { cases:n, total:d.length, differences:d, notes }; }
+    await setSceneLevel('reduced'); await setBackground('forest'); await frames(6);
+    const room=sceneRoomDbg(); if(!room || !sceneInfo().webgl){ notes.push('no WebGL room — the drawn checks do not apply'); return { cases:n, total:d.length, differences:d, notes }; }
+    const G=room.lifeDbg.U.uGust.value, keep=G.toArray();
+    const ab=await sceneSnapDbg(on=>{ if(on) G.set(0.3, 0.8, 1.6, 1); else G.fromArray(keep); }, true), z=await sceneSnapDbg(on=>{ if(on) G.set(0.3, 0.8, 1.6, 0); else G.fromArray(keep); }, true), cc=await sceneSnapDbg(()=>{}, true); n+=3;
+    G.fromArray(keep);
+    if(!ab || !z || !cc) notes.push('no frame rendered');
+    else { notes.push(`a gust in front changes the mean RGB sum of one frame by ${(ab[0]-ab[1]).toFixed(3)}; with strength 0 by ${(z[0]-z[1]).toFixed(4)} (CONTROL ${(cc[0]-cc[1]).toFixed(4)})`);
+      if(!(Math.abs(ab[0]-ab[1])>0)) miss('a gust does not show in the picture'); if(z[0]!==z[1]) miss('a gust of strength 0 changes the picture by '+(z[0]-z[1])); if(cc[0]!==cc[1]) miss('CONTROL: one frame rendered twice differs by '+(cc[0]-cc[1])); }
+  } catch(e){ miss('error: '+(e&&e.stack||e)); }
+  finally{ try{ await setSceneLevel(keepLevel); }catch(e){} if(profileCurrent()!==was) profileApply(was); await setBackground('camera'); await sleep(30); }
+  return { cases:n, total:d.length, differences:d, notes };
+}
+row({ night:true, at:1008.6397, name:'FOREST gust', drawn:true, run:()=>checkForestGust(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });

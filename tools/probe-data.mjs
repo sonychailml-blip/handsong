@@ -1174,6 +1174,41 @@ async function forestWoodCore(){
   { const a=JSON.stringify(W.woodPlaces(Lv.full, T)), b=JSON.stringify(W.woodPlaces(Lv.full, T)), c=JSON.stringify(W.woodPlaces(Lv.full, T, 7)); n+=2; if(a!==b) miss('one seed gave two sets'); if(a===c) miss('CONTROL: another seed gave the same set'); }
   return { cases:n, total:d.length, differences:d, notes };
 }
+/* NIGHT-6 slice 6: THE GUST (apps/night/rooms/forest/pure/gust.js). No hand and a still or slow hand: the strength exactly 0 and every bend
+   exactly [0, 0]; a sweep: a gust along it, centred near the hand, bending plants along the sweep (and away from its centre), most at the
+   centre and at the top, none a radius away or at a plant's foot; it dies away to exactly 0 once the hand stops; it FOLLOWS THE HAND'S PLACE —
+   a second sweep elsewhere moves it there, CONTROL the hand held still there makes none; loose leaves fly along the sweep and settle on the
+   ground, then are done; the wake only where the gust crosses the stream (CONTROL far from it: none); repeatable. */
+async function forestGustCore(){
+  const d=[], notes=[]; let n=0; const miss=s=>d.push(s);
+  const G=await import(new URL('../apps/night/rooms/forest/pure/gust.js', import.meta.url).href), L=await import(new URL('../apps/night/rooms/forest/pure/forestlife.js', import.meta.url).href);
+  const dt=1/60, run=(g, sec, at)=>{ for(let i=0;i<Math.round(sec/dt);i++){ const p=at(i*dt); G.gustStep(g, dt, p, p ? 1 : 0); } return g; };
+  { const a=run(G.gustNew(), 3, ()=>null), b=run(G.gustNew(), 3, ()=>[2, -3]), c=run(G.gustNew(), 3, t=>[2+0.2*t, -3]); n+=4;
+    if(a.k!==0 || b.k!==0 || c.k!==0) miss(`no hand ${a.k}, a still hand ${b.k}, a slow hand (0.2 m/s) ${c.k}: not exactly 0`);
+    const z=G.gustBend(b, 2, -3, 1); if(z[0]!==0 || z[1]!==0) miss('a still hand bends a plant: '+z);
+    const e=G.gustBend({ ...b, k:0.7 }, 2, -3, 0); if(e[0]!==0 || e[1]!==0) miss('a plant\'s foot bends: '+e);
+    if(G.gustBend({ ...b, k:0.7 }, 2, -3, 1)[0]===0) miss('CONTROL: a gust bends nothing — the check cannot fail'); }
+  const sweep=run(G.gustNew(), 1.2, t=>[-2+3*t, -3]);
+  { n+=3; if(!(sweep.k>0.5)) miss('a sweep at 3 m/s makes a gust of only '+sweep.k.toFixed(3)); if(!(sweep.dx>0.95)) miss('the gust does not point along the sweep: '+sweep.dx.toFixed(3));
+    const hx=-2+3*1.2; if(Math.hypot(sweep.x-hx, sweep.z+3)>0.6) miss(`the gust's centre ${sweep.x.toFixed(2)}, ${sweep.z.toFixed(2)} is far from the hand ${hx.toFixed(2)}, -3`);
+    notes.push(`a 3 m/s sweep: strength ${sweep.k.toFixed(2)}, direction ${sweep.dx.toFixed(2)}, ${sweep.dz.toFixed(2)}, centre ${Math.hypot(sweep.x-hx, sweep.z+3).toFixed(2)} m behind the hand`); }
+  { let back=0; for(let a=0;a<8;a++){ const x=sweep.x+Math.cos(a*Math.PI/4)*0.8, z=sweep.z+Math.sin(a*Math.PI/4)*0.8, [bx,bz]=G.gustBend(sweep, x, z, 0.8); if(!(bx*sweep.dx+bz*sweep.dz>0)) back++; }
+    const top=G.gustBend(sweep, sweep.x, sweep.z, 1)[0], low=G.gustBend(sweep, sweep.x, sweep.z, 0.2)[0], far=Math.hypot(...G.gustBend(sweep, sweep.x+G.GUST.R*2.2, sweep.z, 1));
+    n+=3; if(back) miss(back+' of 8 plants round the gust bend against the sweep'); if(!(top>low && low>0)) miss(`the top bends ${top.toFixed(3)}, low down ${low.toFixed(3)}`); if(far!==0) miss('the gust reaches '+(G.GUST.R*2.2).toFixed(1)+' m: '+far);
+    notes.push(`the bend at the centre: ${(top*100).toFixed(1)} cm at 1 m up, ${(low*100).toFixed(1)} cm at 0.2 m; ${(G.GUST.R*2.2).toFixed(1)} m away exactly ${far}`); }
+  { const g=run({ ...sweep }, 6, ()=>null); n++; if(g.k!==0) miss('six seconds after the sweep the gust is '+g.k); }
+  { const g=run(run({ ...sweep }, 4, ()=>null), 1.2, t=>[4, 2-3*t]), c=run(run({ ...sweep }, 4, ()=>null), 1.2, ()=>[4, 2]); n+=2;
+    if(!(g.k>0.5 && Math.hypot(g.x-4, g.z-(2-3.6))<0.6)) miss(`a second sweep elsewhere: strength ${g.k.toFixed(2)} at ${g.x.toFixed(2)}, ${g.z.toFixed(2)}`);
+    if(c.k!==0) miss('CONTROL: a hand held still at the new place makes a gust of '+c.k); }
+  { const ls=[0,1,2,3,4,5].map(i=>G.leafSpawn(sweep, i, 0)); let back=0, under=0, late=0;
+    for(const l of ls){ const p=G.leafAt(l, 1.5), e=G.leafAt(l, G.GUST.leaves.life+0.01); if((p.x-l.x)*sweep.dx+(p.z-l.z)*sweep.dz<=0) back++; if(p.y<L.bankGround(p.x,p.z)) under++; if(!e.done) late++;
+      for(let t=0;t<3;t+=0.25){ const q=G.leafAt(l, t); if(q.y<L.bankGround(q.x,q.z)) under++; } }
+    n+=3; if(back) miss(back+' leaves fly against the sweep'); if(under) miss(under+' leaf positions under the ground'); if(late) miss(late+' leaves never done');
+    if(JSON.stringify(G.leafSpawn(sweep, 3, 0))!==JSON.stringify(G.leafSpawn(sweep, 3, 0))) miss('a leaf is not repeatable'); }
+  { const p=L.streamAt(0.6), on={ ...sweep, x:p.x, z:p.z }, off={ ...sweep, x:p.x-p.tz*4, z:p.z+p.tx*4 }, w=G.wakeOf(on); n+=2;
+    if(!w || !(w.k>0.4)) miss('a gust over the stream makes no wake'); if(G.wakeOf(off)) miss('CONTROL: a gust 4 m from the stream makes a wake'); }
+  return { cases:n, total:d.length, differences:d, notes };
+}
 /* NIGHT-6: THE FOREST'S FILES (tools/forest-bake.mjs). Every prepared file matches what the tool draws now, pixel for pixel (CONTROL a changed
    pixel is caught); the PNG writer and reader round-trip; the forest's files stay inside the user's budget (CONTROL 16 MB is over it). The
    sizes are printed every run (the user's rule: report the size in every slice). */
@@ -1334,6 +1369,7 @@ const ROWS=[
   ['FOREST floor (app)',        ()=>forestFloorCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 3
   ['FOREST stream (app)',       ()=>forestStreamCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 4
   ['FOREST wood (app)',         ()=>forestWoodCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 5
+  ['FOREST gust (app)',         ()=>forestGustCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 6
   ['NIGHT forest files (app)',  ()=>nightForestFiles(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 (the files rule, the size budget)
   ['OLD NAME gone',             ()=>oldNameGone(),  r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // SPLIT-2
   ['NIGHT rare events (core)',  ()=>rareCore(),     r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // RUN 9 (slice 4)

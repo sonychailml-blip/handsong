@@ -12,6 +12,7 @@
    Colours: tokens through the room's palette (the moods' looks). Everything numeric is from the core (probe rows compare it). */
 import { STREAM, STREAM_LINE, streamNear, LIFE, lifePlaces, pulseOf, RINGS, ringsNew, ringAdd, ringsAge } from './pure/forestlife.js';
 import { ANSWERS, noteRingAmp, swellAt, bedClusters } from './pure/answers.js';   // NIGHT-6 slice 1: a note rings the stream; the music bed's swells
+import { GUST } from './pure/gust.js';   // NIGHT-6 slice 6: the gust's numbers (the sway's shader)
 
 const f=v=>Number(v).toFixed(4);
 /* the ground's material gains the ground waves: U = { uNow, uGW (6 × vec4: x, z, t0 (−1 free), amp), uGWCol, uGWK (gain: 1; a probe's control sets 0) } */
@@ -25,10 +26,22 @@ export function patchGroundWaves(mat, U){
   mat.customProgramCacheKey=()=>'handsong.groundWaves';
 }
 /* a fern frond material (and its shadow twin; RUN 9 slice 3: the grass, amp 2.2) gains the sway: U = { uNow, uSway, uShimmer } — the
-   height squared bends it; amp scales the bend (and is part of the program's key) */
+   height squared bends it; amp scales the bend (and is part of the program's key). NIGHT-6 slice 6: + the effects hand's GUST (U.uGust:
+   x, z, radius, strength; U.uGustDir) in world space after the instance — ./pure/gust.js gustBend, the same formula; 0 when the strength is 0 */
+const GUST_GLSL=`#ifdef USE_INSTANCING
+  { vec2 gq=mvPosition.xz-uGust.xy; float gh=max(mvPosition.y-instanceMatrix[3].y, 0.0), gl=length(gq);
+    float gf=uGust.w*exp(-dot(gq,gq)/(uGust.z*uGust.z))*(1.0-smoothstep(1.5*uGust.z, 2.0*uGust.z, gl))*${f(GUST.bend)}*gh*(gh/(gh+${f(GUST.h0)}));
+    mvPosition.xz+=(uGustDir+${f(GUST.away)}*gq/(gl+0.3))*gf; }
+  #endif`;
 export function patchSway(mat, U, amp=1){
   mat.onBeforeCompile=sh=>{ Object.assign(sh.uniforms, U);
-    sh.vertexShader='uniform float uNow, uSway, uShimmer;\n'+sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+    sh.vertexShader='uniform float uNow, uSway, uShimmer;\nuniform vec4 uGust;\nuniform vec2 uGustDir;\n'+sh.vertexShader.replace('#include <project_vertex>', `vec4 mvPosition=vec4(transformed, 1.0);
+  #ifdef USE_INSTANCING
+    mvPosition=instanceMatrix*mvPosition;
+  #endif
+  ${GUST_GLSL}
+  mvPosition=modelViewMatrix*mvPosition;
+  gl_Position=projectionMatrix*mvPosition;`).replace('#include <begin_vertex>', `#include <begin_vertex>
   { vec2 ip=vec2(0.0);
   #ifdef USE_INSTANCING
     ip=instanceMatrix[3].xz;
@@ -36,7 +49,7 @@ export function patchSway(mat, U, amp=1){
     float h=max(position.y,0.0), ph=ip.x*1.7+ip.y*1.3, h2=h*h*${f(amp)};
     transformed.x+=h2*(uSway*0.07*sin(uNow*1.3+ph)+uShimmer*0.035*sin(uNow*28.274+ph*3.0));
     transformed.z+=h2*(uSway*0.05*sin(uNow*0.9+ph*1.4)+uShimmer*0.02*cos(uNow*28.274+ph*2.0)); }`); };
-  mat.customProgramCacheKey=()=>'handsong.sway'+amp;
+  mat.customProgramCacheKey=()=>'handsong.sway'+amp+'.gust';
 }
 /* NIGHT-6 slice 4: WET BANKS — the ground's material gains a per-vertex wetness (aWet: 1 at the water, 0 0.7 m beyond the bank): darker
    (mud), and a little glossier, so the moon and the light glint on it. Chained after the ground waves' patch */
@@ -64,7 +77,8 @@ export function patchSoftEdges(mat){
    sparkle and glow; Echo's and the notes' rings as real ripples; a soft edge where it meets the carved bank. */
 const WATER_V=`attribute vec2 aTan; varying vec3 vW; varying vec2 vUv; varying vec2 vTan;
 void main(){ vUv=uv; vTan=aTan; vec4 w=modelMatrix*vec4(position,1.0); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }`;
-const WATER_F=W=>`uniform float uNow, uMoonK, uLightK, uFogD, uAlpha, uLen, uHalf, uWide; uniform vec3 uDeep, uSky, uMoonCol, uMoonPos, uLightPos, uLightCol, uRingCol, uFogCol; uniform vec4 uWR[${W.n}];
+const WATER_F=W=>`uniform vec4 uGust; uniform vec2 uGustDir;
+uniform float uNow, uMoonK, uLightK, uFogD, uAlpha, uLen, uHalf, uWide; uniform vec3 uDeep, uSky, uMoonCol, uMoonPos, uLightPos, uLightCol, uRingCol, uFogCol; uniform vec4 uWR[${W.n}];
 varying vec3 vW; varying vec2 vUv; varying vec2 vTan;
 float h21(vec2 p){ p=fract(p*vec2(123.34,456.21)); p+=dot(p,p+45.32); return fract(p.x*p.y); }
 float vn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(h21(i),h21(i+vec2(1.0,0.0)),f.x), mix(h21(i+vec2(0.0,1.0)),h21(i+vec2(1.0,1.0)),f.x), f.y); }
@@ -76,6 +90,8 @@ void main(){
   vec2 g=vec2(hx-h0, hy-h0)/e*str*0.09, Tn=normalize(vTan), Bn=vec2(-Tn.y, Tn.x), gw=g.x*Tn+g.y*Bn;
   float ring=0.0;
   for(int i=0;i<${W.n};i++){ vec4 r=uWR[i]; float age=t-r.z; if(r.z>=0.0 && age>0.0 && age<${f(W.life)}){ vec2 dv=p-r.xy; float d=length(dv); float x=(d-age*${f(W.speed)})/${f(W.width)}; float k=1.0-age/${f(W.life)}; float a=r.w*exp(-x*x)*k*k; ring+=a; gw+=dv/(d+1e-4)*a*0.25; } }
+  { vec2 gq=p-uGust.xy, nd=vec2(-uGustDir.y, uGustDir.x); float gf=uGust.w*exp(-dot(gq,gq)/(uGust.z*uGust.z));   // NIGHT-6 slice 6: cat's-paws under the gust (0 without it)
+    gw+=(nd*sin(dot(p,uGustDir)*16.0-t*10.0)*0.6+uGustDir*sin(dot(p,nd)*11.0+t*6.0)*0.4)*gf*0.22; }
   vec3 N=normalize(vec3(-gw.x,1.0,-gw.y)), R=reflect(V,N);
   float fres=0.04+0.96*pow(1.0-max(dot(-V,N),0.0),5.0);
   vec3 body=mix(uDeep*0.7, uDeep*1.5+vec3(0.003,0.006,0.003), smoothstep(0.35,1.0,eD)*0.6+0.15*vn(q*1.7));   // darker than the banks: night water
@@ -104,7 +120,7 @@ const GF=`varying float vA;varying vec3 vC;void main(){vec2 c=gl_PointCoord-.5;f
 export function buildLife(ctx){
   const { T, s, C, pal, own, canvas2, tex, lv }=ctx, V=(x,y,z)=>new T.Vector3(x,y,z);
   const U={ uNow:{ value:0 }, uGW:{ value:Array.from({ length:RINGS.ground.n }, ()=>new T.Vector4(0,0,-1,0)) }, uGWCol:{ value:new T.Color(C('forest-light')) }, uGWK:{ value:1 },
-    uSway:{ value:0.35 }, uShimmer:{ value:0 } };
+    uSway:{ value:0.35 }, uShimmer:{ value:0 }, uGust:{ value:new T.Vector4(0, 0, GUST.R, 0) }, uGustDir:{ value:new T.Vector2(1, 0) } };   // NIGHT-6 slice 6: the gust
   const ground=ringsNew(RINGS.ground.n), water=ringsNew(RINGS.water.n);
   /* mushrooms and flowers */
   /* NIGHT-6 slice 5: the mushrooms on the wood (ctx.woodShrooms) come after today's, which keep their places and the music bed's clusters */
@@ -143,7 +159,7 @@ export function buildLife(ctx){
     AC.forEach((a,k)=>{ const o=(a-0.5)*2*w, j=i*3+k; pos.set([p.x+nx*o, p.y, p.z+nz*o], j*3); uv.set([u, 0.5+(a-0.5)*w/WIDE], j*2); tan.set([p.tx, p.tz], j*2); });
     if(i) for(let k=0;k<2;k++){ const a=(i-1)*3+k, b=i*3+k; idx.push(a, a+1, b, a+1, b+1, b); } });
   const wg=new T.BufferGeometry(); wg.setAttribute('position', new T.BufferAttribute(pos,3)); wg.setAttribute('uv', new T.BufferAttribute(uv,2)); wg.setAttribute('aTan', new T.BufferAttribute(tan,2)); wg.setIndex(idx);
-  const WU={ uNow:U.uNow, uMoonK:{ value:1 }, uLightK:{ value:0 }, uFogD:{ value:0.06 }, uAlpha:{ value:0.95 }, uLen:{ value:len }, uHalf:{ value:STREAM.half }, uWide:{ value:WIDE }, uDeep:{ value:new T.Color(C('forest-water')) }, uSky:{ value:pal.sky }, uMoonCol:{ value:pal.moonhalo },
+  const WU={ uGust:U.uGust, uGustDir:U.uGustDir, uNow:U.uNow, uMoonK:{ value:1 }, uLightK:{ value:0 }, uFogD:{ value:0.06 }, uAlpha:{ value:0.95 }, uLen:{ value:len }, uHalf:{ value:STREAM.half }, uWide:{ value:WIDE }, uDeep:{ value:new T.Color(C('forest-water')) }, uSky:{ value:pal.sky }, uMoonCol:{ value:pal.moonhalo },
     uMoonPos:{ value:V(-14,23,-55) }, uLightPos:{ value:V(0,1,0) }, uLightCol:{ value:new T.Color(C('forest-light')) }, uRingCol:{ value:new T.Color(C('forest-light')) }, uFogCol:{ value:pal.fog },
     uWR:{ value:Array.from({ length:RINGS.water.n }, ()=>new T.Vector4(0,0,-1,0)) } };
   const wm=new T.ShaderMaterial({ uniforms:WU, vertexShader:WATER_V, fragmentShader:WATER_F(RINGS.water), transparent:true, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2 });
@@ -174,6 +190,7 @@ export function buildLife(ctx){
   /* an echo of a note struck at (x, z): a ring on the stream's nearest point */
   function echo(x, z, amp, t){ const q=streamNear(x, z); ringAdd(water, q.x, q.z, t, Math.min(1, amp), 'echo'); return q; }
   /* NIGHT-6 slice 1: a note struck with the light over (lx, lz) rings the stream at its nearest point → the ring's amplitude (0: too far, none) */
+  function wake(x, z, amp, t){ ringAdd(water, x, z, t, Math.min(1, amp), 'wake'); }   // NIGHT-6 slice 6: the gust's wake
   function noteRing(lx, lz, vel, t){ const q=streamNear(lx, lz), a=noteRingAmp(q.d, vel); if(a>0) ringAdd(water, q.x, q.z, t, a, 'note'); return a; }
   /* the music bed, heard at t0: a chord swells every mushroom; loop voice k glows in its cluster over its note's own envelope (a, h, r) */
   const B=ANSWERS.bed;
@@ -184,5 +201,5 @@ export function buildLife(ctx){
     bed:{ active:bedEv.length, clusters:clusters.map(c=>c.slice()) },   // NIGHT-6 slice 1
     sway:U.uSway.value, shimmer:U.uShimmer.value, waveCol:[U.uGWCol.value.r, U.uGWCol.value.g, U.uGWCol.value.b], shroomCol:[SH.r, SH.g, SH.b] });
   const resize=scale=>{ gm.uniforms.uScale.value=scale; };
-  return { U, update, glint, echo, noteRing, bedChord, bedLoop, state, resize, stream };
+  return { U, update, glint, echo, noteRing, wake, bedChord, bedLoop, state, resize, stream };
 }

@@ -35,6 +35,13 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 5. The falling star passes in front of the trees. Natural?
 
 ## Records (English, at most about 15 lines each; older ones go to `archive/HANDOFF-history.md`)
+### NIGHT-6 slice 6 (2026-11-10): the effects hand moves the forest; high made cheaper. Log: `docs/night/WORK-LOG.md`; as built: `docs/night/design/NIGHT-6-forest/PLAN.md` top
+- Step 138 checked by the user: the near forest, the bridge, the stumps and the bark look right; the ferns sway again.
+- High made cheaper as offered: the wood is out of the hand light's shadow pass, the moss cushions lighter (10×4 segments). Triangles 260 k → 218 k; detections within the noise (−47.6 / −45.0 %, before −46.9 / −48.8 %); the cold first opening 6.0 s. Measured: the light's shadow is about 10 points of high's cost (−36.5 % without it); the rest is high's sharper picture.
+- The gust (`pure/gust.js`, `forest-gust.js`): the effects hand's light, when it SWEEPS, bends the grass, today's ferns, the floor plants and the ivy along the sweep (the shared sway shader), stirs cat's-paws on the water, shakes leaves loose (12 / 6) and leaves a wake of rings on the stream. A still or slow hand: exactly nothing. Picture only.
+- Laptop medium: detections = Dark (0.0 %); draws 63–64, programs 26, triangles 156 k, textures 14.9 MB. Files unchanged (2.66 MB of 30).
+- Rows: data «FOREST gust (app)» 18; browser «FOREST gust» 11. Waiting for step 139.
+
 ### NIGHT-6 slice 5 (2026-11-10): moss, roots and fallen wood. Log: `docs/night/WORK-LOG.md`; as built: `docs/night/design/NIGHT-6-forest/PLAN.md` top
 - Step 137 checked by the user: the stream looks good and is easy to see; keep the soft edges; everything else as before.
 - The trunks flare at the foot; roots spread from the 14 near trees; a log across the stream (the bridge) and one on the bank; 5 stumps with cut tops (rings, cracks), 3 standing dead trees, bracket fungi; 56 fallen branches at high only: one merged geometry, one new material over today's bark (`forest-wood.js`, laws `pure/wood.js`).
@@ -52,14 +59,6 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 - Laptop medium: draws 59–60 (before NIGHT-6 51–52), programs 25 (20), triangles 94 k (71 k), textures 13.6 MB (as slice 3); detections −1.8 / 0.0 % (noise). High −43.7 / −37.9 %. First opening: high 4.9 s, medium 3.2 s (in a page that had opened high), later 0.4–1 s.
 - Files per level unchanged by this slice: high 1.46 MB, medium 0.67 MB, low 0.34 MB (all 2.21 MB of 30).
 - Rows: data «FOREST stream (app)» 27; browser «FOREST stream» 14. Waiting for step 137.
-
-### NIGHT-6 slice 3 (2026-11-09): the forest floor. Log: `docs/night/WORK-LOG.md`; as built and the KTX2 lab: `docs/night/design/NIGHT-6-forest/PLAN.md` top
-- Step 135 checked by the user: the fireflies look right. The user's texture rule: one master per texture at the highest quality (high), smaller copies derived for medium and low; sizes per level reported every slice; warn before 30 MB.
-- The plant sheet `rooms/forest/tex/floor-2048.png` (master) → 1024 / 512, and the web now a 1024 master → 512 / 256, drawn by `tools/forest-bake.mjs`: fine fern, nettle, sedge, wood sorrel, broad-leaved herb, bilberry with berries, wood anemone.
-- The herbs placed by damp and light (`pure/floor.js`), 3 m and more from the eye, in two instanced draws sharing one material (`forest-floor.js`); high about 3,800 plants, medium about 1,500. Each level fetches only its own files.
-- Files per level: high 1.37 MB, medium 0.61 MB, low 0.30 MB (all 2.1 MB of 30). Laptop: medium −6.2 / −1.4 % detections with, −1.7 / −2.6 % without (noise), 0 dropouts; textures medium 13.6 MB, high 33.6 MB; high −37.5 %; the cold opening at high 4.5 s (over the 4-s gate), medium first 2.3 s, later 0.4 s.
-- KTX2 measured (laptop): GPU memory a quarter (2048² 22.4 → 5.6 MB), the opening about the same (215 → 183 ms), UASTC 48.7 dB / ETC1S 40.4 dB; the official transcoder needs eval, which our CSP refuses — a decision for the user.
-- Rows: data «FOREST floor (app)» 30, «NIGHT forest files (app)» per level; browser «FOREST floor» 10. Waiting for step 136.
 
 ### NIGHT-6 stage 1 (2026-11-09): the forest, polished and alive — the comparison and the plan only. `docs/night/design/NIGHT-6-forest/PLAN.md`
 - No app code; tree hashes unchanged (core 14bd513ae15aa87e · apps/full d6b90cf2cb4be6da · apps/night 3279ec88c1f91059).

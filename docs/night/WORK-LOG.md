@@ -4,6 +4,14 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`, `archive/NIGHT-RUN-LOG-2026-10.md`. New runs start at `NIGHT-1`.
 
+# NIGHT-6 — slice 6 (2026-11-10): the effects hand moves the forest; high made cheaper
+Tree hashes before: core 2b6fc141521883a3 · apps/full d6b90cf2cb4be6da · apps/night 5b23725cdc0d6d16. After: core 2b6fc141521883a3 (unchanged) · apps/full d6b90cf2cb4be6da (unchanged) · apps/night 74ca4ff802dbf38b.
+- Step 138 checked by the user. High: the wood no longer casts the hand light's shadow (`forest.js`, cast:false), the moss cushions 10×4 segments (`forest-wood.js cushionGeo`). The budget eval gains a step «forest high, no light shadow» (`sceneShadowDbg`).
+- New: `rooms/forest/pure/gust.js` (`GUST`, `gustNew`, `gustStep`, `gustBend`, `leafSpawn`, `leafAt`, `wakeOf`), `rooms/forest/forest-gust.js` (`buildGust`: the uniforms, a pool of loose leaves in the floor's material, the wake). Changed: `forest-life.js` (`patchSway` + the gust in world space after the instance — the same formula as `gustBend`, cut off to exactly 0 at two radii —; the water's cat's-paws; `wake()`; `U.uGust`, `U.uGustDir`), `forest.js` (builds and steers it from the effects light), `pure/room.js` (gust, gustLeaves 12 / 6), `shell.js` and the budget eval (baseline off).
+- Rows: data «FOREST gust (app)» (18; one round — the gust's reach: the law said «gone a radius away» but a Gaussian never ends, so the law now fades to exactly 0 at two radii and the check demands exactly 0); browser «FOREST gust» (11; one round — the check bound the gust's distance from the light, which a fast sweep exceeds by design since the gust trails the hand; replaced by an exact one: the gust lies on the light's own path, within 0.25 m).
+- Checks: static PASS · `[probe-data] PASS — 46 checks, 0 differences` · `P.night: PASS — 45 checks, 0 differences` · `P.quick: PASS — 93 checks, 0 differences` · smoke paths with builds PASS. Budget (laptop): medium 0.0 % in every step; draws 63–64, programs 26, triangles 156 k (71 k before NIGHT-6), textures 14.9 MB; high −47.6 / −45.0 %, without the light's shadow −36.5 %; cold first opening at high 6.0 s, medium 3.6 s (in a page that opened high first).
+- Files unchanged: high 1.76 MB, medium 0.81 MB, low 0.42 MB.
+
 # NIGHT-6 — slice 5 (2026-11-10): moss, roots and fallen wood
 Tree hashes before: core 2b6fc141521883a3 · apps/full d6b90cf2cb4be6da · apps/night fbaf10ee97528d92. After: core 2b6fc141521883a3 (unchanged) · apps/full d6b90cf2cb4be6da (unchanged) · apps/night 5b23725cdc0d6d16.
 - Step 137 checked by the user: the stream good and easy to see; soft edges kept.
