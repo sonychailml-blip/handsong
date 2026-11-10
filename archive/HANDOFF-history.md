@@ -8423,3 +8423,13 @@ not a control · run a "random" failure many times and print WHERE and HOW MUCH 
 - Files per level: high 1.37 MB, medium 0.61 MB, low 0.30 MB (all 2.1 MB of 30). Laptop: medium −6.2 / −1.4 % detections with, −1.7 / −2.6 % without (noise), 0 dropouts; textures medium 13.6 MB, high 33.6 MB; high −37.5 %; the cold opening at high 4.5 s (over the 4-s gate), medium first 2.3 s, later 0.4 s.
 - KTX2 measured (laptop): GPU memory a quarter (2048² 22.4 → 5.6 MB), the opening about the same (215 → 183 ms), UASTC 48.7 dB / ETC1S 40.4 dB; the official transcoder needs eval, which our CSP refuses — a decision for the user.
 - Rows: data «FOREST floor (app)» 30, «NIGHT forest files (app)» per level; browser «FOREST floor» 10. Waiting for step 136.
+
+# Moved from docs/night/HANDOFF.md at NIGHT-6 slice 7 (2026-11-10)
+### NIGHT-6 slice 4 (2026-11-10): the stream towards the viewer; soft edges at medium; the early fetch. Log: `docs/night/WORK-LOG.md`; as built: `docs/night/design/NIGHT-6-forest/PLAN.md` top
+- Step 136 checked by the user: the floor looks right and beautiful; the first opening is fine. KTX2: keep PNG, no CSP change (our own transcoder later if the Poco runs short of GPU memory).
+- Soft cut-out edges at medium (`patchSoftEdges`: alpha sharpened by its screen derivative, blended): plants, ferns, grass silhouettes. Cost within the noise (soft −1.8 / 0.0 %, hard −1.1 / −5.3 % detections vs Dark; same draws and programs). Shots: `tools/.ui-snap/n6-soft/`. The user decides by eye.
+- The early fetch: `main.js` asks the room for its level's files while the start card shows (`rooms/index.js prefetch`); at minimal nothing.
+- The stream (the user's change to the plan): a new path that ends in the foreground, a carved bed (`CARVE`, `bankGround`), a wet darker glossy bank; the water's own shader (flow towards the viewer, foam at the edges, the moon's broken glints, the light's glints and glow, the note rings); wet mossy rocks, pebbles, drifting leaves, mist strips (`forest-stream.js`, `pure/stream.js`). Trunks, ferns and today's rocks in the water move out sideways (`outOfWater`); fireflies, mushrooms and floor as before.
+- Laptop medium: draws 59–60 (before NIGHT-6 51–52), programs 25 (20), triangles 94 k (71 k), textures 13.6 MB (as slice 3); detections −1.8 / 0.0 % (noise). High −43.7 / −37.9 %. First opening: high 4.9 s, medium 3.2 s (in a page that had opened high), later 0.4–1 s.
+- Files per level unchanged by this slice: high 1.46 MB, medium 0.67 MB, low 0.34 MB (all 2.21 MB of 30).
+- Rows: data «FOREST stream (app)» 27; browser «FOREST stream» 14. Waiting for step 137.

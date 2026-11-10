@@ -35,6 +35,14 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 5. The falling star passes in front of the trees. Natural?
 
 ## Records (English, at most about 15 lines each; older ones go to `archive/HANDOFF-history.md`)
+### NIGHT-6 slice 7 (2026-11-10): the canopy and the moon's window. Log: `docs/night/WORK-LOG.md`; as built: `docs/night/design/NIGHT-6-forest/PLAN.md` top
+- Step 139 checked by the user: the gust looks right. High stays as it is (for stronger devices; levels per device later).
+- Crowns on all 95 trees (limbs split twice, leaf sprays of four kinds from a new prepared sheet), young trees and hazel-like shrubs outside the light's reach, saplings at the sides; stars; the moon's face (a prepared file); dappled moonlight drifting on the floor (a prepared pattern), dimmed by clouds.
+- The gap: no leaf on any ray from the eye to the moon's path or down the stream's far reach. The light: the understorey hides 1.4 % of its reach (it hid 18 % before the law kept young trees and shrubs out of it).
+- Darkness, measured (medium, landscape, light at three places): the top third with / without the canopy 7.98 / 8.12, 8.30 / 8.30, 8.45 / 8.57; round the light unchanged (±0.2). The leaves carry a faint moonlit glow (a value; a stronger one made them pale cut-outs).
+- Laptop medium: detections = Dark (0.0 / −0.2 %); draws 66–67, programs 27, triangles 189 k, textures 16.9 MB; first opening 4.1 s (after high in the page). High −54.4 / −52.6 % (left as is). Files: high 2.15, medium 1.00, low 0.50 MB (3.29 of 30).
+- Rows: data «FOREST canopy (app)» 18; browser «FOREST canopy» 14. Waiting for step 140.
+
 ### NIGHT-6 slice 6 (2026-11-10): the effects hand moves the forest; high made cheaper. Log: `docs/night/WORK-LOG.md`; as built: `docs/night/design/NIGHT-6-forest/PLAN.md` top
 - Step 138 checked by the user: the near forest, the bridge, the stumps and the bark look right; the ferns sway again.
 - High made cheaper as offered: the wood is out of the hand light's shadow pass, the moss cushions lighter (10×4 segments). Triangles 260 k → 218 k; detections within the noise (−47.6 / −45.0 %, before −46.9 / −48.8 %); the cold first opening 6.0 s. Measured: the light's shadow is about 10 points of high's cost (−36.5 % without it); the rest is high's sharper picture.
@@ -50,15 +58,6 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 - Fixed: today's ferns had stopped swaying in slice 4 (two calls left behind a comment); a row now checks it.
 - Laptop medium: detections = Dark (0.0 %); draws 62–63 (51–52 before NIGHT-6), programs 26 (20), triangles 177 k (71 k), textures 14.9 MB, frame 1.9–2.1 ms (1.6). High −46.9 / −48.8 %, 260 k triangles; the first opening at high 5.7 s.
 - Files per level: high 1.76 MB, medium 0.81 MB, low 0.42 MB (all 2.66 MB of 30). Rows: data «FOREST wood (app)» 25; browser «FOREST wood» 22. Waiting for step 138.
-
-### NIGHT-6 slice 4 (2026-11-10): the stream towards the viewer; soft edges at medium; the early fetch. Log: `docs/night/WORK-LOG.md`; as built: `docs/night/design/NIGHT-6-forest/PLAN.md` top
-- Step 136 checked by the user: the floor looks right and beautiful; the first opening is fine. KTX2: keep PNG, no CSP change (our own transcoder later if the Poco runs short of GPU memory).
-- Soft cut-out edges at medium (`patchSoftEdges`: alpha sharpened by its screen derivative, blended): plants, ferns, grass silhouettes. Cost within the noise (soft −1.8 / 0.0 %, hard −1.1 / −5.3 % detections vs Dark; same draws and programs). Shots: `tools/.ui-snap/n6-soft/`. The user decides by eye.
-- The early fetch: `main.js` asks the room for its level's files while the start card shows (`rooms/index.js prefetch`); at minimal nothing.
-- The stream (the user's change to the plan): a new path that ends in the foreground, a carved bed (`CARVE`, `bankGround`), a wet darker glossy bank; the water's own shader (flow towards the viewer, foam at the edges, the moon's broken glints, the light's glints and glow, the note rings); wet mossy rocks, pebbles, drifting leaves, mist strips (`forest-stream.js`, `pure/stream.js`). Trunks, ferns and today's rocks in the water move out sideways (`outOfWater`); fireflies, mushrooms and floor as before.
-- Laptop medium: draws 59–60 (before NIGHT-6 51–52), programs 25 (20), triangles 94 k (71 k), textures 13.6 MB (as slice 3); detections −1.8 / 0.0 % (noise). High −43.7 / −37.9 %. First opening: high 4.9 s, medium 3.2 s (in a page that had opened high), later 0.4–1 s.
-- Files per level unchanged by this slice: high 1.46 MB, medium 0.67 MB, low 0.34 MB (all 2.21 MB of 30).
-- Rows: data «FOREST stream (app)» 27; browser «FOREST stream» 14. Waiting for step 137.
 
 ### NIGHT-6 stage 1 (2026-11-09): the forest, polished and alive — the comparison and the plan only. `docs/night/design/NIGHT-6-forest/PLAN.md`
 - No app code; tree hashes unchanged (core 14bd513ae15aa87e · apps/full d6b90cf2cb4be6da · apps/night 3279ec88c1f91059).

@@ -84,6 +84,10 @@ NIGHT-3: THE ROOM RECORD's shape and validator (pure, rule #36; data row «NIGHT
 NIGHT-6 slice 1 — THE FOREST ANSWERS (parts of the night forest room; forest.js builds them; the numbers are ./pure/answers.js): - DEW: points on the low leaves in view, one draw; each twinkles on …
 - fn (1): `buildAnswers`
 
+## apps/night/rooms/forest/forest-canopy.js
+NIGHT-6 slice 7 — THE CANOPY AND THE MOON'S WINDOW (a part of the night forest room; forest.js builds it; the numbers are ./pure/canopy.js): - CROWNS on the trees and the UNDERSTOREY (young trees, …
+- fn (2): `buildCanopy`, `patchDapple`
+
 ## apps/night/rooms/forest/forest-detail.js
 RUN 9 (slice 3) — THE FOREST'S DETAIL.
 - const (1): `DETAIL`
@@ -91,7 +95,7 @@ RUN 9 (slice 3) — THE FOREST'S DETAIL.
 
 ## apps/night/rooms/forest/forest-floor.js
 NIGHT-6 slice 3 — THE FOREST FLOOR (parts of the night forest room; forest.js builds them; the places are ./pure/floor.js): the herb layer — wood sorrel, broad-leaved herbs, bilberry, wood anemones…
-- fn (1): `buildFloor`
+- fn (2): `plantMaterial`, `buildFloor`
 
 ## apps/night/rooms/forest/forest-gust.js
 NIGHT-6 slice 6 — THE EFFECTS HAND MOVES THE FOREST (a part of the night forest room; forest.js builds it; the numbers are ./pure/gust.js).
@@ -113,7 +117,7 @@ NIGHT-6 slice 4 — THE STREAM'S SURROUNDINGS (parts of the night forest room; f
 ## apps/night/rooms/forest/forest-wood.js
 NIGHT-6 slice 5 — MOSS, ROOTS AND FALLEN WOOD (parts of the night forest room; forest.js builds them; the places are ./pure/wood.js): - THE WOOD: roots of the near trees, a log on the bank, a log a…
 - const (1): `patchBark`
-- fn (4): `woodUniforms`, `trunkGeo`, `buildWood`, `patchShade`
+- fn (5): `woodUniforms`, `trunkGeo`, `limbGeo`, `buildWood`, `patchShade`
 
 ## apps/night/rooms/forest/forest.js
 VIS1c (RUN 6, Night plan §3) — THE NIGHT FOREST ROOM's picture: a scene module built with three.js r128 (vendored, loaded by the scene host apps/night/scene/host.js).
@@ -125,6 +129,11 @@ VIS1c (RUN 6, Night plan §3) — THE NIGHT FOREST ROOM's picture: a scene modul
 NIGHT-6 slice 1 — THE FOREST ANSWERS, as numbers.
 - const (3): `ANSWERS`, `dewLight`, `webLight`
 - fn (5): `dewPlaces`, `webPlaces`, `noteRingAmp`, `swellAt`, `bedClusters`
+
+## apps/night/rooms/forest/pure/canopy.js
+NIGHT-6 slice 7 — THE CANOPY AND THE MOON'S WINDOW, as numbers.
+- const (3): `CANOPY`, `CROWN_ATLAS`, `MOON_VIEW`
+- fn (4): `crownCellUv`, `viewAngles`, `inGap`, `canopyPlaces`
 
 ## apps/night/rooms/forest/pure/fireflies.js
 VIS1c (RUN 6, Night plan §3.1) — the night forest's WILD FIREFLIES and its ground, as numbers.
@@ -1040,7 +1049,7 @@ NIGHT-2 stage 2: row «NIGHT calibration screens» (quick; the probe clock throu
 
 ## tools/probes/night/forest.js
 VIS1c (RUN 6, Night plan §10, review 2026-10-17): two rows (quick and all).
-- fn (13): `checkForestRoom`, `checkBackgrounds`, `checkForestPicture`, `checkNightCycle`, `checkForestResponse`, `checkForestDetail`, `checkForestRare`, `checkForestLevels`, `checkForestAnswers`, `checkForestMelody`, `checkForestFloor`, `checkForestStream`, `checkForestWood`
+- fn (15): `checkForestRoom`, `checkBackgrounds`, `checkForestPicture`, `checkNightCycle`, `checkForestResponse`, `checkForestDetail`, `checkForestRare`, `checkForestLevels`, `checkForestAnswers`, `checkForestMelody`, `checkForestFloor`, `checkForestStream`, `checkForestWood`, `checkForestGust`, `checkForestCanopy`
 
 ## tools/probes/night/headroom-calc.js
 NIGHT-1: the headroom page's sums, pure (runs in node: tools/probe-data.mjs, row «NIGHT-1 headroom sums»).
@@ -1090,7 +1099,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 - const (5): `TEST_ROOM_ID`, `TEST_ROOM`, `testRoomMode`, `testRoomInfo`, `testRoomFreeLeaks`
 - fn (2): `testRoomInstall`, `testRoomRemove`
 
-_212 modules, 2479 exported names._
+_214 modules, 2492 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

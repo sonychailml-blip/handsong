@@ -30,7 +30,7 @@ export function patchGroundWaves(mat, U){
    x, z, radius, strength; U.uGustDir) in world space after the instance — ./pure/gust.js gustBend, the same formula; 0 when the strength is 0 */
 const GUST_GLSL=`#ifdef USE_INSTANCING
   { vec2 gq=mvPosition.xz-uGust.xy; float gh=max(mvPosition.y-instanceMatrix[3].y, 0.0), gl=length(gq);
-    float gf=uGust.w*exp(-dot(gq,gq)/(uGust.z*uGust.z))*(1.0-smoothstep(1.5*uGust.z, 2.0*uGust.z, gl))*${f(GUST.bend)}*gh*(gh/(gh+${f(GUST.h0)}));
+    float gf=uGust.w*exp(-dot(gq,gq)/(uGust.z*uGust.z))*(1.0-smoothstep(1.5*uGust.z, 2.0*uGust.z, gl))*(1.0-smoothstep(2.5, 4.5, instanceMatrix[3].y))*${f(GUST.bend)}*gh*(gh/(gh+${f(GUST.h0)}));
     mvPosition.xz+=(uGustDir+${f(GUST.away)}*gq/(gl+0.3))*gf; }
   #endif`;
 export function patchSway(mat, U, amp=1){

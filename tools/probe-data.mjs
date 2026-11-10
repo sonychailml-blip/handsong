@@ -1209,6 +1209,50 @@ async function forestGustCore(){
     if(!w || !(w.k>0.4)) miss('a gust over the stream makes no wake'); if(G.wakeOf(off)) miss('CONTROL: a gust 4 m from the stream makes a wake'); }
   return { cases:n, total:d.length, differences:d, notes };
 }
+/* NIGHT-6 slice 7: THE CANOPY (apps/night/rooms/forest/pure/canopy.js). The moon's window: rays from the eye to 64 points of the moon's path
+   meet no leaf (a leaf a sphere of half its size) — CONTROL the same leaves placed without the gap block some; the view down the stream: rays
+   to its far reach meet no leaf; the light stays visible: of a grid over the light's whole reach, the understorey's leaves block under 4 % —
+   CONTROL a sapling in the middle of the view blocks more; the counts (stars exactly, each on the dome; crowns on every trunk; the understorey
+   at least 70 % of what is asked); medium's leaves all among high's; the understorey by ecology (young trees and saplings lighter, shrubs damper
+   than free floor points); none in the water, the aisle or under the eye; the gust stays low (nothing from 4.5 m up); repeatable. */
+async function forestCanopyCore(){
+  const d=[], notes=[]; let n=0; const miss=s=>d.push(s);
+  const Cn=await import(new URL('../apps/night/rooms/forest/pure/canopy.js', import.meta.url).href), Lo=await import(new URL('../apps/night/rooms/forest/pure/layout.js', import.meta.url).href);
+  const L=await import(new URL('../apps/night/rooms/forest/pure/forestlife.js', import.meta.url).href), Fl=await import(new URL('../apps/night/rooms/forest/pure/floor.js', import.meta.url).href);
+  const N=(await import(new URL('../apps/night/pure/cycle.js', import.meta.url).href)).NIGHT, G=await import(new URL('../apps/night/rooms/forest/pure/gust.js', import.meta.url).href);
+  const FR=(await import(new URL('../apps/night/rooms/forest/pure/room.js', import.meta.url).href)).FOREST_ROOM, B=(await import(new URL('../apps/night/rooms/forest/forest.js', import.meta.url).href).catch(()=>null));
+  const T=Lo.forestTrunks(), Lv=FR.levels, E=Cn.CANOPY.eye, P=Cn.canopyPlaces(Lv.full, T), Q=Cn.canopyPlaces(Lv.reduced, T), X=Cn.canopyPlaces(Lv.full, T, Cn.CANOPY.seed, true);
+  /* a ray from the eye to (x, y, z): the leaves (spheres) it passes through, up to `far` */
+  const blocks=(sprays, x, y, z, k=0.5)=>{ const dx=x-E[0], dy=y-E[1], dz=z-E[2], l=Math.hypot(dx,dy,dz), ux=dx/l, uy=dy/l, uz=dz/l; let c=0;
+    for(const s of sprays){ const px=s.x-E[0], py=s.y-E[1], pz=s.z-E[2], t=px*ux+py*uy+pz*uz; if(t<0 || t>l) continue; if(Math.hypot(px-ux*t, py-uy*t, pz-uz*t)<s.s*k) c++; } return c; };
+  { const M=N.moon; let hit=0, hitX=0; for(let k=0;k<64;k++){ const th=k/64*2*Math.PI, x=M.x+M.ax*Math.sin(th), y=M.y+M.ay*Math.sin(2*th+0.7); hit+=blocks(P.sprays, x, y, M.z)>0; hitX+=blocks(X.sprays, x, y, M.z)>0; }
+    n+=2; if(hit) miss(hit+' of 64 rays to the moon\'s path meet a leaf'); if(!hitX) miss('CONTROL: the leaves without the gap block no ray to the moon — the check cannot fail');
+    notes.push(`the moon's window: 0 of 64 rays blocked (without the gap ${hitX}); seen from the eye the path spans azimuth ${Cn.MOON_VIEW.az.map(v=>v.toFixed(1)).join('…')}°, elevation ${Cn.MOON_VIEW.el.map(v=>v.toFixed(1)).join('…')}°`); }
+  { let hit=0; for(let u=0;u<=0.3;u+=0.03){ const p=L.streamAt(u); for(const h of [0.6, 1.5, 2.5]) hit+=blocks(P.sprays, p.x, h, p.z)>0; } n++; if(hit) miss(hit+' rays down the stream meet a leaf'); }
+  { const und=s=>s.filter(p=>p.of!=='crown'), grid=[]; for(let x=-6;x<=6;x+=1) for(let y=0.3;y<=4.2;y+=0.65) for(let z=-15;z<=3.8;z+=1.2) grid.push([x,y,z]);
+    const frac=sp=>grid.filter(([x,y,z])=>blocks(sp, x, y, z, 0.4)>0).length/grid.length, f=frac(und(P.sprays)), fc=frac(und(P.sprays).concat([{ x:0, y:1.6, z:1, s:1.2 }, { x:0.6, y:2.2, z:-1, s:1.2 }]));
+    n+=2; if(!(f<0.04)) miss(`the understorey hides ${(f*100).toFixed(1)} % of the light's reach`); if(!(fc>f)) miss('CONTROL: two saplings in the middle of the view hide no more');
+    notes.push(`the light's reach hidden by the understorey: ${(f*100).toFixed(2)} % of ${grid.length} places (two saplings in the view: ${(fc*100).toFixed(2)} %)`); }
+  { const by=o=>P.sprays.filter(s=>s.of===o).length; n+=5;
+    if(P.stars.length!==Lv.full.stars || Q.stars.length!==Lv.reduced.stars) miss(`stars ${P.stars.length} / ${Q.stars.length}`);
+    if(P.stars.some(s=>Math.abs(Math.hypot(s[0]-E[0], s[1]-E[1], s[2]-E[2])-Cn.CANOPY.stars.r)>1e-6 || Cn.viewAngles(s[0], s[1], s[2])[1]<Cn.CANOPY.stars.el[0]-1e-6)) miss('a star off the dome or below it');
+    const trees=new Set(P.limbs.map(l=>Math.round(l[0]*10)+','+Math.round(l[2]*10))).size; if(!(by('crown')>1500)) miss('only '+by('crown')+' crown sprays');
+    for(const k of ['young','shrubs','saplings']) if(P[k].length<Math.ceil(Lv.full[k]*0.7) || P[k].length>Lv.full[k]) miss(`${k}: ${P[k].length} of ${Lv.full[k]}`);
+    const key=s=>[s.x,s.y,s.z].map(v=>v.toFixed(6)).join(), high=new Set(P.sprays.map(key)); if(Q.sprays.some(s=>s.of==='crown' && !high.has(key(s)))) miss('a medium crown spray not among high\'s');
+    notes.push(`high: ${by('crown')} crown sprays, ${P.young.length} young trees (${by('young')}), ${P.shrubs.length} shrubs (${by('shrub')}), ${P.saplings.length} saplings (${by('sapling')}), ${P.limbs.length} limbs, ${P.stars.length} stars; medium ${Q.sprays.length} sprays`); }
+  { /* each kind against free floor where IT may grow (the same rules but light and damp): young trees and shrubs outside the light's reach
+       (shrubs not in the view down the stream), saplings at the sides near the viewer */
+    const R=(await import(new URL('../core/pure/dsp.js', import.meta.url).href)).seeded(77), C=Cn.CANOPY, out=(x,z)=>Math.abs(x)>C.reach.x || z<C.reach.z;
+    const free=(ok, gx, gz0, gz1)=>{ const a=[]; for(let g=0; a.length<300 && g<200000; g++){ const x=(R()*2-1)*gx, z=gz0-R()*(gz0-gz1); if(L.streamNear(x,z).d>L.STREAM.half+0.6 && Math.hypot(x-E[0], z-E[2])>3.4 && ok(x,z)) a.push([x,z]); } return a; };
+    const mean=(a,f)=>a.reduce((s,p)=>s+f(p),0)/a.length, fy=free(out, 16, 2, -26), fs=free((x,z)=>out(x,z) && !Cn.inGap(x, 1.2, z), 14, 3, -23), fp=free((x,z)=>Math.abs(x)>=C.reach.sapX && Math.hypot(x-E[0], z-E[2])<=C.saplings.eye[1] && z<E[2], 9, 5.5, -4);
+    const ly=mean(P.young, p=>Fl.lightAt(p.x,p.z)), ls=mean(P.saplings, p=>Fl.lightAt(p.x,p.z)), ms=mean(P.shrubs, p=>Fl.moistAt(p.x,p.z)), lfy=mean(fy, ([x,z])=>Fl.lightAt(x,z)), lfp=mean(fp, ([x,z])=>Fl.lightAt(x,z)), mfs=mean(fs, ([x,z])=>Fl.moistAt(x,z)); n+=3;
+    if(!(ly>lfy)) miss(`young trees not lighter: ${ly.toFixed(2)} vs ${lfy.toFixed(2)}`); if(!(ls>lfp)) miss(`saplings not lighter: ${ls.toFixed(2)} vs ${lfp.toFixed(2)}`); if(!(ms>mfs)) miss(`shrubs not damper: ${ms.toFixed(2)} vs ${mfs.toFixed(2)}`);
+    notes.push(`light: young trees ${ly.toFixed(2)} vs ${lfy.toFixed(2)}, saplings ${ls.toFixed(2)} vs ${lfp.toFixed(2)}; damp: shrubs ${ms.toFixed(2)} vs ${mfs.toFixed(2)} (free floor where each may grow)`); }
+  { let bad=0; for(const p of [...P.young, ...P.shrubs, ...P.saplings]){ if(L.streamNear(p.x,p.z).d<L.STREAM.half+0.4) bad++; if(Math.hypot(p.x-E[0], p.z-E[2])<3.4) bad++; if(Math.abs(p.x)<Cn.CANOPY.aisle && p.z>-8) bad++; } n++; if(bad) miss(bad+' understorey places in the water, under the eye or in the aisle'); }
+  { const g={ x:0, z:0, dx:1, dz:0, k:1 }; n+=2; if(G.gustBend(g, 0.3, 0, 1, 4.5)[0]!==0) miss('the gust reaches a crown at 4.5 m'); if(!(G.gustBend(g, 0.3, 0, 1, 0)[0]>0)) miss('the gust lost the ground plants'); }
+  { const a=JSON.stringify(Cn.canopyPlaces(Lv.reduced, T)), b=JSON.stringify(Cn.canopyPlaces(Lv.reduced, T)), c=JSON.stringify(Cn.canopyPlaces(Lv.reduced, T, 99)); n+=2; if(a!==b) miss('one seed gave two canopies'); if(a===c) miss('CONTROL: another seed gave the same'); }
+  void B; return { cases:n, total:d.length, differences:d, notes };
+}
 /* NIGHT-6: THE FOREST'S FILES (tools/forest-bake.mjs). Every prepared file matches what the tool draws now, pixel for pixel (CONTROL a changed
    pixel is caught); the PNG writer and reader round-trip; the forest's files stay inside the user's budget (CONTROL 16 MB is over it). The
    sizes are printed every run (the user's rule: report the size in every slice). */
@@ -1370,6 +1414,7 @@ const ROWS=[
   ['FOREST stream (app)',       ()=>forestStreamCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 4
   ['FOREST wood (app)',         ()=>forestWoodCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 5
   ['FOREST gust (app)',         ()=>forestGustCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 6
+  ['FOREST canopy (app)',       ()=>forestCanopyCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 7
   ['NIGHT forest files (app)',  ()=>nightForestFiles(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 (the files rule, the size budget)
   ['OLD NAME gone',             ()=>oldNameGone(),  r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // SPLIT-2
   ['NIGHT rare events (core)',  ()=>rareCore(),     r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // RUN 9 (slice 4)

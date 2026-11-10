@@ -43,6 +43,7 @@ THERE in full and here as one index entry):
   137 The stream towards the viewer, soft edges at medium, the early fetch (NIGHT-6 slice 4)
   138 Moss, roots and fallen wood; contact shadows; the ferns sway again (NIGHT-6 slice 5)
   139 The effects hand moves the forest: the gust, loose leaves, the stream's wake (NIGHT-6 slice 6)
+  140 The canopy and the moon's window: crowns, the understorey, stars, the moon's face, dappled moonlight (NIGHT-6 slice 7)
 
 ## Moved to `archive/CLAUDE-history.md` at DOC1 (grep by title; read only what the slice needs)
 - «Module map (full, moved at DOC1)» — every module's detailed paragraph (AUD1a … IDS1, SONG1, AUTOSAVE1, PACK1 …).

@@ -25,7 +25,8 @@ import { ANSWERS, swellAt } from './pure/answers.js';
 import { FOREST_SEED, ROCKS_TODAY } from './pure/layout.js';   // NIGHT-6 slice 5: the seed and today's rocks, shared with the bake tool
 import { woodPlaces } from './pure/wood.js';
 import { buildWood, patchBark, patchShade, trunkGeo, woodUniforms } from './forest-wood.js';
-import { buildGust } from './forest-gust.js';   // NIGHT-6 slice 6: the effects hand moves the forest   // NIGHT-6 slice 5: moss, roots, fallen wood, contact shadows
+import { buildGust } from './forest-gust.js';   // NIGHT-6 slice 6: the effects hand moves the forest
+import { buildCanopy, patchDapple } from './forest-canopy.js';   // NIGHT-6 slice 7: the canopy, the stars, the dappled moonlight   // NIGHT-6 slice 5: moss, roots, fallen wood, contact shadows
 
 export { FOREST_SEED };
 export const FOREST_LEVELS=FOREST_ROOM.levels;   // NIGHT-3: what each level draws lives in the record
@@ -39,8 +40,12 @@ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
    level fetches only its own files */
 const TEX=Object.freeze({ 'web-1024':new URL('./tex/web-1024.png', import.meta.url), 'web-512':new URL('./tex/web-512.png', import.meta.url),
   'floor-2048':new URL('./tex/floor-2048.png', import.meta.url), 'floor-1024':new URL('./tex/floor-1024.png', import.meta.url),
-  'shade-2048':new URL('./tex/shade-2048.png', import.meta.url), 'shade-1024':new URL('./tex/shade-1024.png', import.meta.url) });
-export const FOREST_TEX=Object.freeze({ full:Object.freeze({ web:'web-1024', floor:'floor-2048', shade:'shade-2048' }), reduced:Object.freeze({ web:'web-512', floor:'floor-1024', shade:'shade-1024' }) });
+  'shade-2048':new URL('./tex/shade-2048.png', import.meta.url), 'shade-1024':new URL('./tex/shade-1024.png', import.meta.url),
+  'crown-1024':new URL('./tex/crown-1024.png', import.meta.url), 'crown-512':new URL('./tex/crown-512.png', import.meta.url),
+  'dapple-1024':new URL('./tex/dapple-1024.png', import.meta.url), 'dapple-512':new URL('./tex/dapple-512.png', import.meta.url),
+  'moon-512':new URL('./tex/moon-512.png', import.meta.url), 'moon-256':new URL('./tex/moon-256.png', import.meta.url) });
+export const FOREST_TEX=Object.freeze({ full:Object.freeze({ web:'web-1024', floor:'floor-2048', shade:'shade-2048', crown:'crown-1024', dapple:'dapple-1024', moon:'moon-512' }),
+  reduced:Object.freeze({ web:'web-512', floor:'floor-1024', shade:'shade-1024', crown:'crown-512', dapple:'dapple-512', moon:'moon-256' }) });
 const WOOD_MEMO=new Map();   // NIGHT-6 slice 5: the wood's places per counts (pure, seeded): worked out once per session
 const IMG={}, LOADING={}, assetErr=[];
 async function fileImage(url){ const r=await fetch(url); if(!r.ok) throw new Error(r.status+' '+url.pathname);
@@ -73,7 +78,7 @@ export function buildForest(T, opt){
     reduce=!!opt.reduce, R=seeded(FOREST_SEED), V=(x,y,z)=>new T.Vector3(x,y,z);
   const col=n=>new T.Color(C('forest-'+n));
   const own=[];   // everything to dispose
-  const pick=FOREST_TEX[opt.level]||FOREST_TEX.full, files=opt.files||{ web:IMG[pick.web], floor:IMG[pick.floor], shade:IMG[pick.shade] };   // NIGHT-6: this level's prepared files (opt.files: a probe's own)
+  const pick=FOREST_TEX[opt.level]||FOREST_TEX.full, files=opt.files||{ web:IMG[pick.web], floor:IMG[pick.floor], shade:IMG[pick.shade], crown:IMG[pick.crown], dapple:IMG[pick.dapple], moon:IMG[pick.moon] };   // NIGHT-6: this level's prepared files (opt.files: a probe's own)
   const tex=(c,srgb,rx=1,ry=1)=>{ const t=new T.CanvasTexture(c); t.wrapS=t.wrapT=T.RepeatWrapping; t.repeat.set(rx,ry); t.anisotropy=8; if(srgb) t.encoding=T.sRGBEncoding; own.push(t); return t; };
   /* RUN 9: the PALETTE is the mood's look (the record's looks → tokens), eased towards a new mood's look (τ MOOD_TC s) */
   const looks=new Map(), lookCols=L=>{ let c=looks.get(L.pre); if(!c){ c={}; for(const [k,n] of Object.entries(L.tokens)) c[k]=new T.Color(C(n)); looks.set(L.pre,c); } return c; };
@@ -151,7 +156,8 @@ export function buildForest(T, opt){
   /* RUN 9 (slice 1): THE MOON — a small bright disc inside its halo, drifting on the night's path (apps/night/pure/cycle.js); CLOUDS pass over it (soft
      dark sprites in front of it, normal blending: they hide the halo) and the moon's light dims with them and returns */
   const [dc,dx]=canvas2(64,64); { const gr=dx.createRadialGradient(32,32,0,32,32,32); gr.addColorStop(0,C('halo-a100')); gr.addColorStop(0.62,C('halo-a100')); gr.addColorStop(0.8,C('halo-a10')); gr.addColorStop(1,C('halo-a0')); dx.fillStyle=gr; dx.fillRect(0,0,64,64); }
-  const moonD=new T.Sprite(new T.SpriteMaterial({ map:tex(dc,true), color:pal.moonhalo.clone(), transparent:true, depthWrite:false, blending:T.AdditiveBlending, fog:false })); own.push(moonD.material);
+  let moonTex=null; if(files.moon && Lv.moonFace){ moonTex=new T.Texture(files.moon); moonTex.encoding=T.sRGBEncoding; moonTex.needsUpdate=true; own.push(moonTex); }   // NIGHT-6 slice 7: the moon's face (a prepared file)
+  const moonD=new T.Sprite(new T.SpriteMaterial({ map:moonTex || tex(dc,true), color:pal.moonhalo.clone(), transparent:true, depthWrite:false, blending:T.AdditiveBlending, fog:false })); own.push(moonD.material);
   moonD.scale.set(2.6,2.6,1); s.add(moonD);
   const [cc,cx]=canvas2(256,128); for(let i=0;i<26;i++){ const x=50+R()*156, y=40+R()*48, r=18+R()*34, gr=cx.createRadialGradient(x,y,0,x,y,r); gr.addColorStop(0,C('halo-a45')); gr.addColorStop(1,C('halo-a0')); cx.fillStyle=gr; cx.fillRect(x-r,y-r,2*r,2*r); }
   const cloudT=tex(cc,true); cloudT.wrapS=cloudT.wrapT=T.ClampToEdgeWrapping;
@@ -190,6 +196,11 @@ export function buildForest(T, opt){
   const floor=buildFloor({ T, s, own, lv:Lv, trunks:spots, ferns, tex:floorTex, U:life.U, soft });
   const stream=buildStream({ T, s, C, pal, own, lv:Lv, floorMat:floorTex ? floor.parts.material : null });   // NIGHT-6 slice 4
   const wood=buildWood({ T, s, C, own, P:WP, barkMap:barkM.map, bumpMap:barkM.bumpMap, rockMat:stream.parts.rockMat, floorMat:floorTex ? floor.parts.material : null, cast:false });   // NIGHT-6 slice 5; the wood stays out of the light's shadow pass (the user, 2026-11-10: high made cheaper)
+  /* NIGHT-6 slice 7: the canopy (crowns, the understorey, the stars) and the dappled moonlight on the ground */
+  let crownTex=null; if(files.crown && Lv.crowns){ crownTex=new T.Texture(files.crown); crownTex.encoding=T.sRGBEncoding; crownTex.anisotropy=4; crownTex.needsUpdate=true; own.push(crownTex); }
+  const canopy=buildCanopy({ T, s, C, own, lv:Lv, trunks:spots, U:life.U, crownTex, woodMat:wood.parts.material, soft });
+  let dapTex=null; const DU={ uDap:{ value:null }, uDapK:{ value:0 }, uDapT:{ value:0 }, uDapCol:{ value:pal.moonhalo } };
+  if(files.dapple && Lv.dapple){ dapTex=new T.Texture(files.dapple); dapTex.wrapS=dapTex.wrapT=T.RepeatWrapping; dapTex.format= opt.gl2!==false ? T.RedFormat : T.RGBAFormat; dapTex.needsUpdate=true; own.push(dapTex); DU.uDap.value=dapTex; patchDapple(groundM, DU); }
   const gust=buildGust({ T, s, own, lv:Lv, U:life.U, floorMat:floorTex ? floor.parts.material : null, life, reduce });   // NIGHT-6 slice 6
   let shadeTex=null; if(files.shade && Lv.shade){ shadeTex=new T.Texture(files.shade); shadeTex.format= opt.gl2!==false ? T.RedFormat : T.RGBAFormat; shadeTex.needsUpdate=true; own.push(shadeTex); patchShade(groundM, shadeTex); }   // one channel where WebGL2 allows
   const rare=buildRare({ T, s, C, pal, own, canvas2, tex, halo:HALO });   // RUN 9 (slice 4)
@@ -209,7 +220,7 @@ export function buildForest(T, opt){
   let W=opt.w||800, H=opt.h||600, pxH=H;
   function aimCamera(){ camera.position.copy(camPos).add(camOff); look.copy(camLook).addScaledVector(camOff,-1.2); camera.lookAt(look); camera.updateMatrixWorld(); }
   function resize(w,h,bufH){ W=w; H=h; pxH=bufH||h; camera.aspect=w/h; camera.fov= w/h<0.8 ? 68 : 55; camera.updateProjectionMatrix();
-    fm.uniforms.uScale.value=pxH/(2*Math.tan(camera.fov*Math.PI/360)); life.resize(fm.uniforms.uScale.value); aimCamera(); detail.resize(w, h, camera, fm.uniforms.uScale.value); answers.resize(fm.uniforms.uScale.value); }
+    fm.uniforms.uScale.value=pxH/(2*Math.tan(camera.fov*Math.PI/360)); life.resize(fm.uniforms.uScale.value); canopy.resize(fm.uniforms.uScale.value); aimCamera(); detail.resize(w, h, camera, fm.uniforms.uScale.value); answers.resize(fm.uniforms.uScale.value); }
   /* the hand's play point (canvas pixels px, py) and depth 0…1 → the light's world place on THIS camera's ray (it projects back onto the
      point); saturates at the room's bounds and the ground → out; returns true when it saturated */
   function place(px, py, d01, out){
@@ -298,6 +309,7 @@ export function buildForest(T, opt){
       sway, shimmer:reduce ? 0 : fxv.wave, dim:deep.light });   // RUN 9 (slice 2)
     detail.update(dt, t, { light:rigs[0].cur, lightOn:rigs[0].on, moon:nt.moon, moonK:nt.moonLight*deep.light, mist:nt.mist.reduce((a,b)=>a+b,0)/nt.mist.length, wind:sway, cam:camera.position });
     gust.update(dt, t, rigs[1].on>0.05 ? rigs[1].cur : null, rigs[1].on);   // NIGHT-6 slice 6: the effects hand's gust
+    canopy.update(dt, t, { cover:nt.cover, mist:nt.mist.reduce((a,b)=>a+b,0)/nt.mist.length, light:deep.light }); DU.uDapK.value=2.2*nt.moonLight*deep.light; DU.uDapT.value=t;   // NIGHT-6 slice 7
     stream.update(dt, t, { moonK:nt.moonLight*deep.light, mist:nt.mist.reduce((a,b)=>a+b,0)/nt.mist.length, deepMist:deep.mist, motion:kk });   // NIGHT-6 slice 4
     answers.update(dt, t, { light:rigs[0].cur, on:rigs[0].on, light1:rigs[1].cur, on1:rigs[1].on, lightCol:rigs[0].light.color, fxCol:rigs[1].light.color, moonCol:pal.moonhalo,
       moonK:nt.moonLight*deep.light, dim:deep.light, fogD:s.fog.density, cam:camera.position });   // NIGHT-6 slice 1
@@ -327,6 +339,7 @@ export function buildForest(T, opt){
     stream:stream.state(), trunks:spots.map(x=>x.slice()), fernsAt:ferns.map(x=>x.slice()),   // NIGHT-6 slice 4
     wood:{ ...wood.state(), shade:!!shadeTex, flare:!!Lv.flare, bark:!!Lv.barkMoss },   // NIGHT-6 slice 5
     gust:gust.state(),   // NIGHT-6 slice 6
+    canopy:{ ...canopy.state(), dapple:!!dapTex, moonFace:!!moonTex },   // NIGHT-6 slice 7
     answers:answers.state(), bed:{ queued:bedQ.length, fired:fired.map(x=>({ ...x })), twinkles:twinkles.map(w=>({ ...w, glow:glow1[w.i] })) }, files:{ web:!!files.web, floor:!!files.floor, errors:assetErr.slice() } });   // NIGHT-6 slice 1
   function dispose(){ for(const o of own) try{ o.dispose(); }catch(e){} own.length=0; }
   /* NIGHT-6 slice 1: a music bed event `it` ({ kind 'chord' | 'loop' | 'glass', lv, a, h, r, amp }) heard at room time `at` (the host maps it) */
@@ -335,6 +348,6 @@ export function buildForest(T, opt){
   function texBytes(){ let b=0; for(const o of own){ if(!o || !o.isTexture) continue; const im=o.image||{}, w=im.width||0, h=im.height||0, pot=!(w&(w-1)) && !(h&(h-1));
     b+=w*h*(o.format===T.RedFormat ? 1 : 4)*(o.generateMipmaps!==false && pot ? 4/3 : 1); } return Math.round(b); }   // NIGHT-6 slice 5: one byte a texel for one channel
   resize(W,H);
-  return { id:FOREST_ROOM.id, scene:s, camera, update, resize, place, glint, project, state, dispose, lightsOf, lifeDbg:life, detailDbg:detail, bed, texBytes, answersDbg:answers, floorDbg:floor, streamDbg:stream, woodDbg:wood, gustDbg:gust, fernsDbg:{ fronds, frondM, frondD },
+  return { id:FOREST_ROOM.id, scene:s, camera, update, resize, place, glint, project, state, dispose, lightsOf, lifeDbg:life, detailDbg:detail, bed, texBytes, answersDbg:answers, floorDbg:floor, streamDbg:stream, woodDbg:wood, gustDbg:gust, canopyDbg:canopy, dappleDbg:DU, fernsDbg:{ fronds, frondM, frondD },
     held:sec=>{ heldNow= sec>0 ? sec : 0; rare.held(sec); }, rareDbg:kind=>rare.force(kind, now, { light:rigs[0].cur, flies }) };   // RUN 9 (slice 4): held — how long the playing note is held (host); rareDbg — probes / captures   // RUN 9: lifeDbg / detailDbg — probes only (uniforms, silhouette boxes)
 }

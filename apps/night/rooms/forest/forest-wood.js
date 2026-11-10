@@ -113,6 +113,8 @@ function woodGeo(T, P){ const B=builder();
   for(const K of P.brackets) B.shelf(K.x, K.y, K.z, K.a, K.s);
   return B.count() ? B.geo(T) : null; }
 
+/* NIGHT-6 slice 7: limbs [[x0,y0,z0, x1,y1,z1, r0, r1]] → one merged geometry of thin tubes (5 sides) with the wood's look W (or null) */
+export function limbGeo(T, limbs, W=[0, 0, 0]){ if(!limbs.length) return null; const B=builder(); for(const [x0,y0,z0,x1,y1,z1,r0,r1] of limbs) B.tube([[x0,y0,z0,r0], [x1,y1,z1,r1]], 5, W); return B.geo(T); }
 /* a moss cushion: a bumpy half dome */
 function cushionGeo(T){ const g=new T.SphereGeometry(1, 10, 4, 0, TAU, 0, Math.PI/2), p=g.attributes.position;   // light (the user, 2026-11-10: high made cheaper)
   for(let i=0;i<p.count;i++){ const x=p.getX(i), y=p.getY(i), z=p.getZ(i), k=1+0.2*Math.sin(x*5.1+z*3.3)+0.12*Math.sin(x*11+z*9+y*4)+0.06*Math.sin(x*23+z*19+y*7); p.setXYZ(i, x*k, y*k*(0.75+0.25*y), z*k); }   // lumpy, flatter on top

@@ -18,6 +18,14 @@ function crossGeo(T){ const g=new T.BufferGeometry(), pos=[], uv=[], nor=[], idx
 /* a frond: a plane bent backwards along its height */
 function frondGeo(T, w, h){ const g=new T.PlaneGeometry(w, h, 1, 8); g.translate(0, h/2, 0); const p=g.attributes.position;
   for(let i=0;i<p.count;i++){ const t=p.getY(i)/h; p.setZ(i, -t*t*0.5*h); p.setY(i, p.getY(i)*(1-t*0.1)); } g.computeVertexNormals(); return g; }
+/* the plants' material over a sheet `tex`: swaying (and the gust), each instance reading its cell (aCell); soft edges where asked. NIGHT-6
+   slice 7: shared by the crowns' leaf sprays (another sheet, the same shader program) */
+export function plantMaterial(T, tex, U, soft){
+  const mat=new T.MeshStandardMaterial({ map:tex||null, alphaTest:0.45, side:T.DoubleSide, roughness:0.85 }); patchSway(mat, U, 1);
+  const sway=mat.onBeforeCompile;
+  mat.onBeforeCompile=sh=>{ sway(sh); sh.vertexShader='attribute vec4 aCell;\n'+sh.vertexShader.replace('#include <uv_vertex>', '#include <uv_vertex>\n  vUv=vUv*aCell.zw+aCell.xy;'); };
+  mat.customProgramCacheKey=()=>'handsong.sway1.cell'; if(soft) patchSoftEdges(mat);   // NIGHT-6: soft edges at medium
+  return mat; }
 /* ctx: { T, s, own, lv (the level's counts), trunks [[x, z, r]], ferns (today's [[x, z, s]]), tex (the sheet's texture or null), U (the sway
    uniforms) } → { state() } */
 export function buildFloor(ctx){
@@ -25,10 +33,7 @@ export function buildFloor(ctx){
   for(const k of [...HERBS, 'fern2']) counts[k]=Math.max(0, lv[k]|0);
   const key=JSON.stringify(counts); if(!MEMO.has(key)) MEMO.set(key, floorPlaces(counts, trunks, ferns)); const P=MEMO.get(key);
   const herbs=P.filter(p=>p.sp!=='fern2'), fern2=P.filter(p=>p.sp==='fern2'), R=seeded(0x464C5232), d=new T.Object3D(), c=new T.Color();
-  const mat=new T.MeshStandardMaterial({ map:tex||null, alphaTest:0.45, side:T.DoubleSide, roughness:0.85 }); patchSway(mat, U, 1);
-  const sway=mat.onBeforeCompile;
-  mat.onBeforeCompile=sh=>{ sway(sh); sh.vertexShader='attribute vec4 aCell;\n'+sh.vertexShader.replace('#include <uv_vertex>', '#include <uv_vertex>\n  vUv=vUv*aCell.zw+aCell.xy;'); };
-  mat.customProgramCacheKey=()=>'handsong.sway1.cell'; own.push(mat); if(ctx.soft) patchSoftEdges(mat);   // NIGHT-6: soft edges at medium
+  const mat=plantMaterial(T, tex, U, ctx.soft); own.push(mat);
   const cells=(n, sp)=>{ const a=new Float32Array(Math.max(1,n)*4); for(let i=0;i<n;i++) a.set(cellUv(typeof sp==='function' ? sp(i) : sp), i*4); return new T.InstancedBufferAttribute(a, 4); };
   /* the herbs */
   const hg=crossGeo(T); hg.setAttribute('aCell', cells(herbs.length, i=>herbs[i].sp)); own.push(hg);

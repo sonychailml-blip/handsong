@@ -12,6 +12,9 @@
      (an iterated-function fern), nettle, sedge, wood sorrel, a broad-leaved herb, bilberry with berries, wood anemone. Colours are the
      sketch «Живой лес»'s, each leaf jittered. Transparent pixels carry their neighbours' colour (no dark fringes when filtered).
      Slice 4 added four fallen leaves, slice 5 an ivy sprig (each drawn after the others, so every earlier cell stays as it was).
+   - crown-1024 → 512, 256 (slice 7): four LEAF SPRAYS for the crowns and the understorey (layout: pure/canopy.js CROWN_ATLAS);
+   - dapple-1024 → 512, 256 (slice 7): a tileable pattern of the moonlight's spots through the leaves (the ground moves two copies of it);
+   - moon-512 → 256, 128 (slice 7): the moon's face — darker seas, soft craters, a slightly darker limb — inside today's soft glow edge;
    - shade-2048 → 1024, 512 (slice 5): the CONTACT SHADOWS, the darkness on the ground under the trunks, roots, rocks, logs, stumps and dead
      trees, painted from the same laws the room places them by (apps/night/rooms/forest/pure/wood.js shadeBlobs; the area WOOD.shade). */
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, statSync, existsSync, rmSync } from 'node:fs';
@@ -24,13 +27,15 @@ import { WOOD, woodPlaces, shadeBlobs, blobDark } from '../apps/night/rooms/fore
 import { forestTrunks } from '../apps/night/rooms/forest/pure/layout.js';
 import { streamRocks } from '../apps/night/rooms/forest/pure/stream.js';
 import { FOREST_ROOM } from '../apps/night/rooms/forest/pure/room.js';
+import { CROWN_ATLAS } from '../apps/night/rooms/forest/pure/canopy.js';
 
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const FOREST_DIR='apps/night/rooms/forest', TEX_DIR=FOREST_DIR+'/tex';
 /* the user's size budget for the forest's files, every level together (2026-11-09: warn before 30 MB) */
 export const FOREST_BUDGET=30*1048576;
 /* which file each level loads (high = the masters); the room's own table is forest.js FILES */
-export const LEVEL_FILES=Object.freeze({ high:['web-1024.png','floor-2048.png','shade-2048.png'], medium:['web-512.png','floor-1024.png','shade-1024.png'], low:['web-256.png','floor-512.png','shade-512.png'] });
+export const LEVEL_FILES=Object.freeze({ high:['web-1024.png','floor-2048.png','shade-2048.png','crown-1024.png','dapple-1024.png','moon-512.png'], medium:['web-512.png','floor-1024.png','shade-1024.png','crown-512.png','dapple-512.png','moon-256.png'],
+  low:['web-256.png','floor-512.png','shade-512.png','crown-256.png','dapple-256.png','moon-128.png'] });
 
 /* ---------------- grey drawing (the web): coverage 0…1, lines blend by max ---------------- */
 function line(img, S, x0, y0, x1, y1, w, v){
@@ -164,6 +169,41 @@ function drawShade(S=2048){ const A=WOOD.shade, Lv=FOREST_ROOM.levels, T=forestT
   for(const [x,z,rx,rz,rot,a] of B){ const c=Math.cos(rot), s=Math.sin(rot), Rr=Math.max(rx,rz), i0=Math.max(0, Math.floor((x-Rr-A.x0)*px)), i1=Math.min(S-1, Math.ceil((x+Rr-A.x0)*px)), j0=Math.max(0, Math.floor((z-Rr-A.z0)*pz)), j1=Math.min(S-1, Math.ceil((z+Rr-A.z0)*pz));
     for(let j=j0;j<=j1;j++) for(let i=i0;i<=i1;i++){ const dx=A.x0+(i+0.5)/px-x, dz=A.z0+(j+0.5)/pz-z, u=(dx*c+dz*s)/rx, w=(-dx*s+dz*c)/rz, q=Math.hypot(u, w); if(q<1) v[j*S+i]*=1-a*blobDark(q); } }
   return v; }
+/* NIGHT-6 slice 7: a leaf spray (w × h cell) of kind k — a twig from the lower middle, its side twigs, leaves along them back to front
+   (the back ones darker): 0 beech-like ovals, 1 hazel (round, toothed), 2 lobed, 3 small-leaved */
+function drawSpray(r, w, h, R, k){
+  const L=[[0.15, 0.075, 0.25, 105, 0.34, 0.15], [0.14, 0.095, 0.6, 96, 0.32, 0.17], [0.16, 0.07, 0, 112, 0.3, 0.13], [0.085, 0.045, 0.3, 88, 0.38, 0.19]][k];
+  const main=bez(w*0.5, h*0.98, w*(0.45+R()*0.1), h*0.65, w*(0.5+(R()-0.5)*0.2), h*0.35, w*(0.5+(R()-0.5)*0.15), h*0.2, 30), twigs=[main];   // the tip low enough that the top leaves stay inside the cell
+  for(let i=0;i<5;i++){ const p=main[6+Math.floor(R()*20)], sd=i%2 ? 1 : -1, l=w*(0.18+R()*0.16); twigs.push(quad(p[0], p[1], p[0]+sd*l*0.5, p[1]-l*0.25, p[0]+sd*l, Math.max(h*0.2, p[1]-l*(0.2+R()*0.4)), 10)); }
+  for(const t of twigs) r.stroke(t, w*0.009, hsl(25, 0.25, 0.13), w*0.004);
+  for(let pass=0;pass<2;pass++) for(const t of twigs) for(let i=2;i<t.length;i+=k===3 ? 1 : 2){ if(R()<0.15) continue;
+    const [x,y]=t[i], [px,py]=t[i-1], ta=Math.atan2(y-py, x-px), sd=(i%4<2) ? 1 : -1, a=ta+sd*(0.7+R()*0.5), len=w*L[0]*(0.75+R()*0.5), wid=w*L[1]*(0.8+R()*0.4);
+    const col=hsl(L[3]+(R()-0.5)*16, L[4]+(R()-0.5)*0.1, L[5]*(pass ? 1 : 0.7)+(R()-0.5)*0.04);
+    if(k===2){ for(let j=-2;j<=2;j++) r.ellipse(x+Math.cos(a)*len*(0.45+0.12*Math.abs(j)), y+Math.sin(a)*len*(0.45+0.12*Math.abs(j)), len*0.38, wid*(0.6+0.15*(2-Math.abs(j))), a+j*0.42, col); }
+    else leaf(r, x, y, len, wid, a, col, pass ? shade(col, 1.35, -0.4) : null, L[2]); }
+}
+function crownMaster(){ const A=CROWN_ATLAS, S=A.size, sheet=new Float32Array(S*S*4), R=seeded(0x43524F57), SS=3;
+  for(let k=0;k<4;k++){ const r=new Ras(A.cell, A.cell, SS); drawSpray(r, A.cell, A.cell, R, k); const c=r.down(), X=(k%2)*A.cell, Y=Math.floor(k/2)*A.cell;
+    for(let y=0;y<c.h;y++) sheet.set(c.p.subarray(y*c.w*4, (y+1)*c.w*4), ((Y+y)*S+X)*4); }
+  return sheet; }
+/* the moonlight's spots through the leaves: soft ellipses scattered on a torus (tileable), summed and shaped into bright patches on dark */
+function drawDapple(S=1024){ const R=seeded(0x44415050), v=new Float32Array(S*S);
+  for(let i=0;i<260;i++){ const cx=R()*S, cy=R()*S, rx=S*(0.012+Math.pow(R(),2)*0.05), ry=rx*(0.5+R()*0.7), a=R()*Math.PI, c=Math.cos(a), s=Math.sin(a), Rr=Math.max(rx, ry), w=0.5+R()*0.6;
+    for(let y=Math.floor(cy-Rr);y<=Math.ceil(cy+Rr);y++) for(let x=Math.floor(cx-Rr);x<=Math.ceil(cx+Rr);x++){ const dx=x+0.5-cx, dy=y+0.5-cy, u=(dx*c+dy*s)/rx, q=(-dx*s+dy*c)/ry, d=u*u+q*q; if(d<1) v[((y%S+S)%S)*S+((x%S+S)%S)]+=w*(1-d)*(1-d); } }
+  for(let i=0;i<S*S;i++){ const t=Math.max(0, Math.min(1, (v[i]-0.12)/0.7)); v[i]=t*t*(3-2*t); }
+  return v; }
+/* the moon's face (S²): solid to 0.62 of the radius with seas, craters and a darker limb, then today's soft edge (1 → 0.1 at 0.8 → 0 at 1) */
+function drawMoon(S=512){ const R=seeded(0x4D4F4F4E), v=new Float32Array(S*S), c=S/2, seas=[], craters=[];
+  for(let i=0;i<9;i++) seas.push([(R()-0.5)*1.2, (R()-0.5)*1.2, 0.14+R()*0.2, 0.1+R()*0.12]);   // spread over the face (its own unit radius)
+  for(let i=0;i<26;i++) craters.push([(R()-0.5)*1.05, (R()-0.5)*1.05, 0.015+Math.pow(R(),2)*0.06]);
+  for(let y=0;y<S;y++) for(let x=0;x<S;x++){ const u=(x+0.5-c)/c, w=(y+0.5-c)/c, r=Math.hypot(u, w); let b;
+    if(r<0.62){ const q=r/0.62; b=0.86+0.14*Math.sqrt(Math.max(0, 1-q*q)); const nu=u/0.62, nw=w/0.62;
+      for(const [sx,sy,sr,sk] of seas){ const d=Math.hypot(nu-sx, nw-sy)/sr; if(d<1.4) b-=sk*(d<1 ? 1-0.35*d*d : Math.max(0, 1.4-d)/0.4*0.65); }
+      for(const [cx,cy,cr] of craters){ const d=Math.hypot(nu-cx, nw-cy)/cr; if(d<1.3) b+= d<0.85 ? -0.07 : 0.06*(1.3-d)/0.45; }
+      b=Math.max(0.45, Math.min(1, b)); if(q>0.96) b*=1-(q-0.96)/0.04*0.08; }
+    else if(r<0.8) b=0.86*(1-(r-0.62)/0.18*0.9); else b=r<1 ? 0.086*(1-(r-0.8)/0.2) : 0;   // the glow goes on from the limb's own brightness (no bright ring)
+    v[y*S+x]=b; }
+  return v; }
 function drawFern2(w, h, seed=9){
   const maps=[[0,0,0,0.25,0,-0.4,0.02],[0.95,0.005,-0.005,0.93,-0.002,0.5,0.84],[0.035,-0.2,0.16,0.04,-0.09,0.02,0.07],[-0.04,0.2,0.16,0.04,0.083,0.12,0.07]];
   const R=seeded(seed), cum=[]; let acc=0; for(const m of maps){ acc+=m[6]; cum.push(acc); }
@@ -206,6 +246,10 @@ export function bakeAll(){
   out.push({ name:'web-1024.png', w:1024, h:1024, ch:1, px:wg }, { name:'web-512.png', w:512, h:512, ch:1, px:greyDown(wg,1024,2) }, { name:'web-256.png', w:256, h:256, ch:1, px:greyDown(wg,1024,4) });
   const S=FLOOR_ATLAS.size, m=floorMaster(); out.push({ name:`floor-${S}.png`, w:S, h:S, ch:4, px:toRGBA(m, S) });
   for(const d of FLOOR_ATLAS.derived) out.push({ name:`floor-${d}.png`, w:d, h:d, ch:4, px:toRGBA(boxDown(m, S, S/d), d, 3) });
+  { const C=CROWN_ATLAS, m=crownMaster(); out.push({ name:`crown-${C.size}.png`, w:C.size, h:C.size, ch:4, px:toRGBA(m, C.size) });   // NIGHT-6 slice 7
+    for(const d of C.derived) out.push({ name:`crown-${d}.png`, w:d, h:d, ch:4, px:toRGBA(boxDown(m, C.size, C.size/d), d, 3) }); }
+  { const dg=toGrey(drawDapple(1024)); out.push({ name:'dapple-1024.png', w:1024, h:1024, ch:1, px:dg }, { name:'dapple-512.png', w:512, h:512, ch:1, px:greyDown(dg,1024,2) }, { name:'dapple-256.png', w:256, h:256, ch:1, px:greyDown(dg,1024,4) }); }
+  { const mg=toGrey(drawMoon(512)); out.push({ name:'moon-512.png', w:512, h:512, ch:1, px:mg }, { name:'moon-256.png', w:256, h:256, ch:1, px:greyDown(mg,512,2) }, { name:'moon-128.png', w:128, h:128, ch:1, px:greyDown(mg,512,4) }); }
   const sg=toGrey(drawShade(2048)); out.push({ name:'shade-2048.png', w:2048, h:2048, ch:1, px:sg }, { name:'shade-1024.png', w:1024, h:1024, ch:1, px:greyDown(sg,2048,2) }, { name:'shade-512.png', w:512, h:512, ch:1, px:greyDown(sg,2048,4) });   // NIGHT-6 slice 5
   return out;
 }

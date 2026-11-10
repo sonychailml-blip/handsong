@@ -28,9 +28,10 @@ export function gustStep(g, dt, p, on=1){ const G=GUST; let target=0;
   } else { g.px=g.pz=null; g.v=0; }
   g.k+=(target-g.k)*Math.min(1, dt*(target>g.k ? G.rise : G.fall)); if(target===0 && g.k<1e-3) g.k=0;
   return g; }
-/* a point at (x, z), hgt metres above its plant's foot → its bend [dx, dz] (metres) */
-export function gustBend(g, x, z, hgt){ if(!(g.k>0) || !(hgt>0)) return [0, 0]; const G=GUST, qx=x-g.x, qz=z-g.z, q=Math.hypot(qx, qz);
-  const f=g.k*Math.exp(-(qx*qx+qz*qz)/(G.R*G.R))*(1-smooth(1.5*G.R, 2*G.R, q))*G.bend*hgt*(hgt/(hgt+G.h0)), ax=g.dx+G.away*qx/(q+0.3), az=g.dz+G.away*qz/(q+0.3);
+/* a point at (x, z), hgt metres above its plant's foot (baseY: the foot's height; a gust stays low — nothing from 4.5 m up, NIGHT-6 slice 7:
+   the crowns) → its bend [dx, dz] (metres) */
+export function gustBend(g, x, z, hgt, baseY=0){ if(!(g.k>0) || !(hgt>0)) return [0, 0]; const G=GUST, qx=x-g.x, qz=z-g.z, q=Math.hypot(qx, qz);
+  const f=g.k*Math.exp(-(qx*qx+qz*qz)/(G.R*G.R))*(1-smooth(1.5*G.R, 2*G.R, q))*(1-smooth(2.5, 4.5, baseY))*G.bend*hgt*(hgt/(hgt+G.h0)), ax=g.dx+G.away*qx/(q+0.3), az=g.dz+G.away*qz/(q+0.3);
   return [ax*f, az*f]; }
 /* a loose leaf, seeded by its number i: where it starts (round the gust's centre, among the plants) and how it flies */
 export function leafSpawn(g, i, t0){ const L=GUST.leaves, R=seeded(0x4C454146+i*7919), a=R()*6.283, r=R()*GUST.R*0.6, x=g.x+Math.cos(a)*r, z=g.z+Math.sin(a)*r, sp=L.speed[0]+R()*(L.speed[1]-L.speed[0])*g.k;

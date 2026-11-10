@@ -1878,6 +1878,12 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
     2. During a fast sweep a few leaves shake loose, fly along it and settle on the floor.
     3. Sweep across the stream: cat's-paw ripples under the hand and a few rings (the wake).
     4. Hold the effects hand still: nothing moves but the usual wind. Everything else as before.
+140. The canopy and the moon's window (NIGHT-6 slice 7), at most five checks; the rest is in the rows «FOREST canopy (app)» (rays from the eye to the moon's whole path meet no leaf — CONTROL the leaves without the gap block 59 of 64; rays down the stream meet none; the understorey hides under 4 % of the light's reach — CONTROL two saplings in the view hide ~15 %; stars on the dome; the understorey by light and damp where each may grow; nothing in the water, the aisle or under the eye; the gust stays low) and «FOREST canopy» (the room's leaves and stars per level, the baseline none; the crown leaves share the floor plants' program; the leaves, stars, dapple and the moon's face render — CONTROL one frame twice). Laptop: Live Server; `http://127.0.0.1:5500/apps/night/`, the room's picture on (medium, the default).
+    1. Portrait and landscape: crowns overhead (more in portrait), young trees and hazel-like shrubs at the sides and further back, saplings at the sides near you. Does the forest feel taller and closed above, without getting too dark?
+    2. The moon in its window: always in the open, its face with darker seas; stars in the gaps between the leaves (fewer under a cloud and in the mist).
+    3. Your light anywhere in its reach: it should stay clearly visible (the understorey keeps out of its way).
+    4. The floor: soft patches of moonlight drifting slowly; they fade when a cloud covers the moon.
+    5. Everything else as before: the stream, the wood, the floor plants, the fireflies, the gust.
 
 ## Superseded at DOC1 (old lines verbatim, replaced in place above by a later slice)
 - NIGHT-2 stage 3 (2026-11-03, the rule of at most five manual checks) updated this line of CLAUDE.md's report format:

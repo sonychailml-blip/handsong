@@ -13,11 +13,13 @@ export const FOREST_ROOM=F({
   levels:F({ full:F({ flies:70, trail:16, shadow:1024, shadowSmall:512, mist:true, shrooms:28, blooms:10, grass:3500, leaves:60, moths:6, beams:4, dew:1100, webs:9,
       sorrel:1500, forb:600, bilberry:260, anemone:500, nettle:140, sedge:580, fern2:110, softEdges:false,
       rocks:30, pebbles:260, floaters:28, mistStrips:5,
-      roots:5, logs:2, stumps:5, snags:3, twigs:56, moss:400, ivy:12, woodShrooms:30, flare:true, barkMoss:true, shade:true, gust:true, gustLeaves:12 }),   // NIGHT-6 slice 5: moss, roots, fallen wood (ivy: trees)   // NIGHT-6 slice 4: the stream's surroundings   // NIGHT-6 slice 3: the floor (fern2: rosettes)
+      roots:5, logs:2, stumps:5, snags:3, twigs:56, moss:400, ivy:12, woodShrooms:30, flare:true, barkMoss:true, shade:true, gust:true, gustLeaves:12,
+      crowns:true, crownShare:1, young:10, shrubs:16, saplings:10, stars:500, dapple:true, moonFace:true }),   // NIGHT-6 slice 7: the canopy   // NIGHT-6 slice 5: moss, roots, fallen wood (ivy: trees)   // NIGHT-6 slice 4: the stream's surroundings   // NIGHT-6 slice 3: the floor (fern2: rosettes)
     reduced:F({ flies:35, trail:8, shadow:0, shadowSmall:0, mist:false, shrooms:14, blooms:5, grass:1400, leaves:24, moths:3, beams:2, dew:500, webs:5,
       sorrel:600, forb:240, bilberry:100, anemone:200, nettle:50, sedge:230, fern2:45, softEdges:true,
       rocks:18, pebbles:120, floaters:14, mistStrips:3,
-      roots:5, logs:2, stumps:5, snags:3, twigs:0, moss:200, ivy:6, woodShrooms:16, flare:true, barkMoss:true, shade:true, gust:true, gustLeaves:6 }) }),   // NIGHT-6 slice 5: no fallen branches at medium   // NIGHT-6: soft cut-out edges at medium (no antialiasing there)   // NIGHT-6 slice 1: dew, webs
+      roots:5, logs:2, stumps:5, snags:3, twigs:0, moss:200, ivy:6, woodShrooms:16, flare:true, barkMoss:true, shade:true, gust:true, gustLeaves:6,
+      crowns:true, crownShare:0.35, young:6, shrubs:10, saplings:6, stars:250, dapple:true, moonFace:true }) }),   // NIGHT-6 slice 7: a third of each crown's sprays beyond the first   // NIGHT-6 slice 5: no fallen branches at medium   // NIGHT-6: soft cut-out edges at medium (no antialiasing there)   // NIGHT-6 slice 1: dew, webs
   looks:F({
     glow:LOOK('forest-', 0.06, 1, 1),            // Glow: the base tokens
     dusk:LOOK('forest-dusk-', 0.052, 0.8, 0.9),  // Dusk: violet sky, a warm low moon, less mist

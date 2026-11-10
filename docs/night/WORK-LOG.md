@@ -4,6 +4,16 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`, `archive/NIGHT-RUN-LOG-2026-10.md`. New runs start at `NIGHT-1`.
 
+# NIGHT-6 — slice 7 (2026-11-10): the canopy and the moon's window
+Tree hashes before: core 2b6fc141521883a3 · apps/full d6b90cf2cb4be6da · apps/night 74ca4ff802dbf38b. After: core 2b6fc141521883a3 (unchanged) · apps/full d6b90cf2cb4be6da (unchanged) · apps/night 4e48f17877f46829.
+- Step 139 checked by the user; high left as it is.
+- New: `rooms/forest/pure/canopy.js` (`CANOPY`, `CROWN_ATLAS`, `crownCellUv`, `viewAngles`, `MOON_VIEW`, `inGap`, `canopyPlaces` — a probe-only `noGap` for the control), `rooms/forest/forest-canopy.js` (`buildCanopy`, `patchDapple`). Prepared files (tools/forest-bake.mjs, register `forest-files`): `crown-1024` → 512, 256 (four leaf sprays), `dapple-1024` → 512, 256, `moon-512` → 256, 128.
+- Changed: `forest-floor.js` (`plantMaterial`, shared), `forest-wood.js` (`limbGeo`), `pure/gust.js` + `forest-life.js` (the gust stays low: nothing from 4.5 m up — the crowns), `forest.js` (files, the moon's face, the canopy, the dapple), `pure/room.js` (levels), `night.css` (tokens star, leafglow), `shell.js` and the budget eval (baseline off).
+- Look rounds: the crown sheet's top leaves were cut by the cells (the twigs now end lower); the moon had one central sea and a bright ring (seas spread, the glow continues from the limb); the leaf glow at first made the understorey pale cut-outs (now a quarter).
+- Rows: data «FOREST canopy (app)» (18; rounds: 4 — shrubs' and saplings' leaves skipped the gap (17 rays down the stream blocked); the understorey hid 18 % of the light's reach, so young trees and shrubs now grow outside it and saplings at the sides (1.4 %); the shrubs then found too few places with a hard damp threshold (weighted now); the ecology check compared each kind with all the floor, now with the floor where it may grow — and the shrubs' preference was then made real (0.18 vs 0.16) rather than the check loosened); browser «FOREST canopy» (14; first run PASS).
+- Checks: static PASS · `[probe-data] PASS — 47 checks, 0 differences` · `P.night: PASS — 46 checks, 0 differences` · `P.quick: PASS — 93 checks, 0 differences` · smoke paths with builds PASS. Budget (laptop): medium 0.0 / −0.2 %; draws 66–67, programs 27, triangles 189 k, textures 16.9 MB, first opening 4.1 s; high −54.4 / −52.6 %, without the light's shadow −40.5 %, opening 6.3 s.
+- Files per level: high 2.15 MB, medium 1.00 MB, low 0.50 MB (3.29 MB of 30).
+
 # NIGHT-6 — slice 6 (2026-11-10): the effects hand moves the forest; high made cheaper
 Tree hashes before: core 2b6fc141521883a3 · apps/full d6b90cf2cb4be6da · apps/night 5b23725cdc0d6d16. After: core 2b6fc141521883a3 (unchanged) · apps/full d6b90cf2cb4be6da (unchanged) · apps/night 74ca4ff802dbf38b.
 - Step 138 checked by the user. High: the wood no longer casts the hand light's shadow (`forest.js`, cast:false), the moss cushions 10×4 segments (`forest-wood.js cushionGeo`). The budget eval gains a step «forest high, no light shadow» (`sceneShadowDbg`).
