@@ -418,7 +418,7 @@ async function uiNightStale(page, label){
 /* the music measure judged: on = audible within 6 s of the tap, playing in the live view, started once (no restart when the face came) */
 function musicJudge(h, on, what, lines, bad){
   if(on){ if(h.first!=null && h.first<=6000 && h.view.same && h.view.starts===1) lines.push(`music ${what}: audible ${h.first} ms after Begin, ${h.at4} dBFS at 4 s, ${h.last} at 10 s; in the live view, started once`);
-    else bad.push(`music ${what}: first audible ${h.first==null ? 'never' : h.first+' ms'} (6000 at most), live view ${h.view.same}, started ${h.view.starts} times (once wanted), audio ${h.ac}`); }
+    else bad.push(`music ${what}: first audible ${h.first==null ? 'never' : h.first+' ms'} (6000 at most), live view ${h.view.same} ${JSON.stringify(h.view)}, started ${h.view.starts} times (once wanted), audio ${h.ac}`); }
   else { if(h.first==null && h.ac==='running') lines.push(`music ${what}: silent for 10 s with the audio running`); else bad.push(`music ${what}: audible ${h.first} ms after Begin (audio ${h.ac})`); }
 }
 /* NIGHT-7c — the music on a FRESH profile (everything cleared), and the CONTROLS: a stored «off» (the person's own choice) must fail the

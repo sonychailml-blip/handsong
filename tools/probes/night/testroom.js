@@ -11,8 +11,8 @@ import { sceneRoomAdd, sceneRoomRemove } from '../../../apps/night/scene/host.js
 
 export const TEST_ROOM_ID='room.dev-test';
 const F=Object.freeze;
-export const TEST_ROOM=F({ ...FOREST_ROOM, id:TEST_ROOM_ID, name:F({ en:'Test room', ru:'Тестовая комната' }),
-  nature:F({ id:'ambience.dev-test',   // silent: no drone, no wind, no crickets (every gain 0; the shape the validator asks for)
+export const TEST_ROOM=F({ ...FOREST_ROOM, id:TEST_ROOM_ID, name:F({ en:'Test room', ru:'Тестовая комната' }), icon:'depth',   // NIGHT-8: its own Room-sounds icon (the row checks the slider shows it)
+  nature:F({ id:'ambience.dev-test',   // silent: no drone, no wind, no crickets, no stream (every gain 0; the shape the validator asks for)
     drone:F({ root:0, fifth:0, tc:1.2, send:0 }),
     wind:F({ hz:300, q:0.8, sweep:120, rate:0.11, gain:0, send:0, sec:2, seed:0x54455354 }),
     crickets:F({ ...FOREST_ROOM.nature.crickets, n:1, gain:0, send:0, pans:F([0.2]) }),

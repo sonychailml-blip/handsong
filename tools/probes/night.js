@@ -28,6 +28,7 @@ export { checkNightCalib } from './night/calib.js';   // NIGHT-2 stage 2
 export { checkNightCards } from './night/cards.js';   // NIGHT-7
 export { checkNightBed } from './night/bed.js';   // NIGHT-3 stage 4: the music bed
 export { checkNightRoomSwitch } from './night/roomswitch.js';   // NIGHT-3 stage 5 part 2: the switching machinery
+export { checkNightStream } from './night/stream.js';   // NIGHT-8: the stream's sound, the water, the rocks, the ground
 export { testRoomInstall, testRoomRemove, testRoomMode } from './night/testroom.js';   // its development room
 export const api=guardApi;
 

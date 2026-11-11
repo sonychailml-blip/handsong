@@ -18,6 +18,8 @@
    - ground-2048 → 1024, 512 and groundn-2048 → 1024, 512 (NIGHT-7): the BARE FOREST FLOOR, tileable — dark soil with its blotches, a few
      soft moss patches, fallen leaves (each with its stalk, veins and a darker rim; brown, ochre, rust), needles, twigs, moss crumbs and seeds —
      its colour, and a normal map from the same shapes' heights (the later on top; smaller copies get their normals from the boxed-down heights);
+   - groundm-1024 → 512, 256 (NIGHT-8): the bare ground's LARGE SCALE over the whole floor, as data (damp, moss, leaf drifts, where the turned
+     second copy shows) — apps/night/rooms/forest/pure/ground.js macroAt;
    - shade-2048 → 1024, 512 (slice 5): the CONTACT SHADOWS, the darkness on the ground under the trunks, roots, rocks, logs, stumps and dead
      trees, painted from the same laws the room places them by (apps/night/rooms/forest/pure/wood.js shadeBlobs; the area WOOD.shade). */
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, statSync, existsSync, rmSync } from 'node:fs';
@@ -31,15 +33,16 @@ import { forestTrunks } from '../apps/night/rooms/forest/pure/layout.js';
 import { streamRocks } from '../apps/night/rooms/forest/pure/stream.js';
 import { FOREST_ROOM } from '../apps/night/rooms/forest/pure/room.js';
 import { CROWN_ATLAS } from '../apps/night/rooms/forest/pure/canopy.js';
+import { MACRO, macroAt } from '../apps/night/rooms/forest/pure/ground.js';   // NIGHT-8: the bare ground's large scale
 
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const FOREST_DIR='apps/night/rooms/forest', TEX_DIR=FOREST_DIR+'/tex';
 /* the user's size budget for the forest's files, every level together (2026-11-09: warn before 30 MB) */
 export const FOREST_BUDGET=30*1048576;
 /* which file each level loads (high = the masters); the room's own table is forest.js FILES */
-export const LEVEL_FILES=Object.freeze({ high:['web-1024.png','floor-2048.png','shade-2048.png','crown-1024.png','dapple-1024.png','moon-512.png','ground-2048.png','groundn-2048.png'],
-  medium:['web-512.png','floor-1024.png','shade-1024.png','crown-512.png','dapple-512.png','moon-256.png','ground-1024.png','groundn-1024.png'],
-  low:['web-256.png','floor-512.png','shade-512.png','crown-256.png','dapple-256.png','moon-128.png','ground-512.png','groundn-512.png'] });
+export const LEVEL_FILES=Object.freeze({ high:['web-1024.png','floor-2048.png','shade-2048.png','crown-1024.png','dapple-1024.png','moon-512.png','ground-2048.png','groundn-2048.png','groundm-1024.png'],
+  medium:['web-512.png','floor-1024.png','shade-1024.png','crown-512.png','dapple-512.png','moon-256.png','ground-1024.png','groundn-1024.png','groundm-512.png'],
+  low:['web-256.png','floor-512.png','shade-512.png','crown-256.png','dapple-256.png','moon-128.png','ground-512.png','groundn-512.png','groundm-256.png'] });
 
 /* ---------------- grey drawing (the web): coverage 0…1, lines blend by max ---------------- */
 function line(img, S, x0, y0, x1, y1, w, v){
@@ -231,6 +234,14 @@ function drawGround(S=GROUND.size){ const SS=2, R=seeded(0x47524E44), C=new Ras(
   for(let i=0;i<500;i++){ const x=R()*S, y=R()*S, r=S*(0.0008+R()*0.0016), c=hsl(30+R()*20, 0.12+R()*0.15, 0.12+R()*0.12);   // seeds and grit
     wrap(x, y, r, (dx,dy)=>{ C.ellipse(x+dx, y+dy, r, r*0.75, R()*3, c, 10); H.ellipse(x+dx, y+dy, r, r*0.75, 0, g(0.92), 8); }); }
   return { col:C.down(), hgt:H.down() }; }
+/* NIGHT-8: THE GROUND'S MACRO MAP (S², RGBA as data: damp, moss, drift, the second copy's share) — apps/night/rooms/forest/pure/ground.js macroAt at
+   every texel's centre over the floor's 90-m square; row 0 is the far edge (three.js flips an image: v = (z − z0) / size in the room) */
+function drawGroundMacro(S=MACRO.files.size){ const T=forestTrunks(), o=new Uint8Array(S*S*4);
+  for(let j=0;j<S;j++){ const z=MACRO.z0+MACRO.size*(1-(j+0.5)/S);
+    for(let i=0;i<S;i++){ const x=MACRO.x0+MACRO.size*(i+0.5)/S, m=macroAt(x, z, T), k=(j*S+i)*4; for(let c=0;c<4;c++) o[k+c]=Math.round(255*m[c]); } }
+  return o; }
+/* an RGBA8 data image boxed down by f (each channel its mean) */
+function dataDown(px, S, f){ const T=S/f, o=new Uint8Array(T*T*4); for(let y=0;y<T;y++) for(let x=0;x<T;x++) for(let c=0;c<4;c++){ let s=0; for(let j=0;j<f;j++) for(let i=0;i<f;i++) s+=px[((y*f+j)*S+x*f+i)*4+c]; o[(y*T+x)*4+c]=Math.round(s/(f*f)); } return o; }
 /* heights (premultiplied floats, opaque) of S² → an RGBA8 normal map (tangent space, +y up the picture), tileable; k: the relief's strength */
 function normalOf(hgt, S, k){ const h=new Float32Array(S*S), o=new Uint8Array(S*S*4);
   for(let i=0;i<S*S;i++) h[i]=hgt[i*4];
@@ -287,6 +298,8 @@ export function bakeAll(){
   { const G=GROUND, S=G.size, gr=drawGround(S), k=G.normal*S/1024;   // NIGHT-7: the bare floor (k: the relief per pixel of this size)
     out.push({ name:`ground-${S}.png`, w:S, h:S, ch:4, px:toRGBA(gr.col.p, S, 0) }, { name:`groundn-${S}.png`, w:S, h:S, ch:4, px:normalOf(gr.hgt.p, S, k) });
     for(const d of G.derived){ out.push({ name:`ground-${d}.png`, w:d, h:d, ch:4, px:toRGBA(boxDown(gr.col.p, S, S/d), d, 0) }, { name:`groundn-${d}.png`, w:d, h:d, ch:4, px:normalOf(boxDown(gr.hgt.p, S, S/d), d, k*d/S) }); } }
+  { const S=MACRO.files.size, m=drawGroundMacro(S); out.push({ name:`groundm-${S}.png`, w:S, h:S, ch:4, px:m });   // NIGHT-8
+    for(const d of MACRO.files.derived) out.push({ name:`groundm-${d}.png`, w:d, h:d, ch:4, px:dataDown(m, S, S/d) }); }
   const sg=toGrey(drawShade(2048)); out.push({ name:'shade-2048.png', w:2048, h:2048, ch:1, px:sg }, { name:'shade-1024.png', w:1024, h:1024, ch:1, px:greyDown(sg,2048,2) }, { name:'shade-512.png', w:512, h:512, ch:1, px:greyDown(sg,2048,4) });   // NIGHT-6 slice 5
   return out;
 }

@@ -49,6 +49,7 @@ THERE in full and here as one index entry):
   143 The test version: the bare floor, the players' build, the first cards, both languages, the picture choice, the privacy line; the Poco and an iPhone (NIGHT-7)
   144 The test version's fixes: room-neutral shared texts, the cards close and replace the ghost, stale saved values, `?release`, the start screen (NIGHT-7b)
   145 Music from the first moment and full screen: music on Begin, full screen and its toggle, the home screen (iOS, Android), room-neutral icons (NIGHT-7c)
+  146 The forest closer to real: the stream's murmur by ear (two samples), the water, the ground, the rounded rocks, the room's own slider icon (NIGHT-8)
 
 ## Moved to `archive/CLAUDE-history.md` at DOC1 (grep by title; read only what the slice needs)
 - «Module map (full, moved at DOC1)» — every module's detailed paragraph (AUD1a … IDS1, SONG1, AUTOSAVE1, PACK1 …).

@@ -259,6 +259,8 @@ const NET_LISTED={
   'tools/probes/night/headroom.js': { addModule:[4,'probe only (?probe&headroom): loads our own dyn-worklet.js and headroom-worklet.js into offline contexts and the live one (NIGHT-1)'] },
   'tools/probes/core/profile.js': { fetch:[1,'probe only (?probe): reads its test record fixture.profile.json from the own origin (C0)'] },
   'apps/night/rooms/forest/forest.js': { fetch:[1,'reads the forest\'s own prepared files (rooms/forest/tex/*.png, own origin; NIGHT-6, drawn by tools/forest-bake.mjs, register entry forest-files) once per session'] },
+  'tools/probes/night/stream.js': { addModule:[1,'probe only (?probe): loads our own apps/night/worklets/nature-worklet.js into the offline contexts of the row «NIGHT stream, water and ground» (NIGHT-8)'] },
+  'apps/night/roomswitch.js': { addModule:[1,'loads our own apps/night/worklets/nature-worklet.js (own origin; it imports apps/night/pure/brook.js) into the live audio context once, when the nature sound is first built (NIGHT-8, the stream)'] },
   'apps/night/bed2.js': { addModule:[1,'loads our own apps/night/worklets/bed-worklet.js (own origin) into an audio context once: the live one when the music bed v2 first plays, an offline one for the probes (NIGHT-4)'] },
   'core/render.js':     { addModule:[1,'track renders: lets the engine copy load only the worklets the track needs (own origin) into its offline context'] },
   'core/clip.js':       { share:[1,'hands the person\'s own clip to the system share sheet — only on their tap (explicit action)'] },

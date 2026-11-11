@@ -52,3 +52,15 @@ export function floatAt(f, t){ const L=STREAM_LIFE, span=(L.uTo-L.uFrom)*LEN, k=
 /* the mist strips over the water: n of them, evenly along the stream → [{ x, y, z, w, h, seed }] (each faces the eye in the room) */
 export function mistStrips(n){ const M=STREAM_LIFE.mist, R=seeded(0x4D495354); return Array.from({ length:n }, (_,i)=>{ const u=M.uFrom+(i+0.5)/n*(M.uTo-M.uFrom), p=streamAt(u);
   return { x:p.x, y:p.y+M.y, z:p.z, w:M.w[0]+R()*(M.w[1]-M.w[0]), h:M.h, seed:R()*10 }; }); }
+/* NIGHT-8: THE STREAM'S SOUND PLACES — points along the water as the listener at the camera hears them (apps/night/pure/brook.js voices): pan
+   from the direction (the screen's width is about ±30°, so directions are widened ×1.8 into the stereo field), loudness 1/distance (the
+   nearest = 1), the far water darker (air and leaves) and narrower, the near water wide — it runs from the left in front to the right
+   behind, under the eye. Pure: the room's record takes them once. */
+export const STREAM_SOUND=F({ us:F([0.42, 0.58, 0.72, 0.84, 0.93, 0.99]), ear:1.55, widen:1.8, near:1.6 });
+export function streamVoices(){ const S=STREAM_SOUND, E=STREAM_LIFE.eye;
+  const raw=S.us.map(u=>{ const p=streamAt(u), dx=p.x-E[0], dz=E[1]-p.z, d=Math.max(S.near, Math.hypot(dx, dz, S.ear)), az=Math.atan2(dx, Math.max(0.3, Math.abs(dz))), back=dz<0,
+    hd=Math.hypot(dx, dz);   // straight below the ear the direction fades to the middle
+    return { d, pan:clamp(S.widen*Math.sin(az)*hd/(hd+0.8)*(back ? 0.8 : 1), -0.85, 0.85) }; });
+  const dn=Math.min(...raw.map(x=>x.d)), r3=x=>Math.round(x*1000)/1000;
+  return raw.map(({ d, pan })=>F({ pan:r3(pan), w:r3(clamp(1.3/d, 0.08, 0.8)), gain:r3(dn/d), lp:Math.round(clamp(11000/(1+0.3*(d-dn)), 1800, 11000)),
+    rate:r3(7+10*dn/d), f:F([Math.round(clamp(300+14*d, 300, 520)), Math.round(clamp(3400-70*d, 1800, 3400))]), rush:r3(clamp(0.35+0.4*dn/d, 0, 1)) })); }

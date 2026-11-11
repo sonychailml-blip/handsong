@@ -30,6 +30,8 @@ import { buildCanopy, patchDapple } from './forest-canopy.js';   // NIGHT-6 slic
 import { buildPaint } from './forest-paint.js';   // NIGHT-6 slice 8: the painted distance and the film
 import { buildHidden, foxUniforms } from './forest-hidden.js';   // NIGHT-6 slice 9: hidden things the light finds
 import { breathAt } from './pure/paint.js';   // NIGHT-6 slice 5: moss, roots, fallen wood, contact shadows
+import { patchGroundMacro } from './forest-ground.js';   // NIGHT-8: the bare ground's large scale
+import { litterPlaces } from './pure/ground.js';   // NIGHT-8: leaves, pebbles and twigs on the ground
 
 export { FOREST_SEED };
 export const FOREST_LEVELS=FOREST_ROOM.levels;   // NIGHT-3: what each level draws lives in the record
@@ -48,11 +50,12 @@ const TEX=Object.freeze({ 'web-1024':new URL('./tex/web-1024.png', import.meta.u
   'dapple-1024':new URL('./tex/dapple-1024.png', import.meta.url), 'dapple-512':new URL('./tex/dapple-512.png', import.meta.url),
   'moon-512':new URL('./tex/moon-512.png', import.meta.url), 'moon-256':new URL('./tex/moon-256.png', import.meta.url),
   'ground-2048':new URL('./tex/ground-2048.png', import.meta.url), 'ground-1024':new URL('./tex/ground-1024.png', import.meta.url),
-  'groundn-2048':new URL('./tex/groundn-2048.png', import.meta.url), 'groundn-1024':new URL('./tex/groundn-1024.png', import.meta.url) });
+  'groundn-2048':new URL('./tex/groundn-2048.png', import.meta.url), 'groundn-1024':new URL('./tex/groundn-1024.png', import.meta.url),
+  'groundm-1024':new URL('./tex/groundm-1024.png', import.meta.url), 'groundm-512':new URL('./tex/groundm-512.png', import.meta.url) });   // NIGHT-8: the ground's large scale
 const GROUND_TILE=6;   // NIGHT-7: metres of floor one copy of the ground's files covers (tools/forest-bake.mjs GROUND.tile)
-export const FOREST_TEX=Object.freeze({ full:Object.freeze({ web:'web-1024', floor:'floor-2048', shade:'shade-2048', crown:'crown-1024', dapple:'dapple-1024', moon:'moon-512', ground:'ground-2048', groundN:'groundn-2048' }),
-  reduced:Object.freeze({ web:'web-512', floor:'floor-1024', shade:'shade-1024', crown:'crown-512', dapple:'dapple-512', moon:'moon-256', ground:'ground-1024', groundN:'groundn-1024' }) });
-const WOOD_MEMO=new Map();   // NIGHT-6 slice 5: the wood's places per counts (pure, seeded): worked out once per session
+export const FOREST_TEX=Object.freeze({ full:Object.freeze({ web:'web-1024', floor:'floor-2048', shade:'shade-2048', crown:'crown-1024', dapple:'dapple-1024', moon:'moon-512', ground:'ground-2048', groundN:'groundn-2048', groundM:'groundm-1024' }),
+  reduced:Object.freeze({ web:'web-512', floor:'floor-1024', shade:'shade-1024', crown:'crown-512', dapple:'dapple-512', moon:'moon-256', ground:'ground-1024', groundN:'groundn-1024', groundM:'groundm-512' }) });
+const WOOD_MEMO=new Map(), LITTER_MEMO=new Map();   // NIGHT-8: + the litter's places per counts   // NIGHT-6 slice 5: the wood's places per counts (pure, seeded): worked out once per session
 const IMG={}, LOADING={}, assetErr=[];
 async function fileImage(url){ const r=await fetch(url); if(!r.ok) throw new Error(r.status+' '+url.pathname);
   const u=URL.createObjectURL(await r.blob()), img=new Image(); try{ img.src=u; await img.decode(); } finally { URL.revokeObjectURL(u); } return img; }
@@ -84,7 +87,7 @@ export function buildForest(T, opt){
     reduce=!!opt.reduce, R=seeded(FOREST_SEED), V=(x,y,z)=>new T.Vector3(x,y,z);
   const col=n=>new T.Color(C('forest-'+n));
   const own=[];   // everything to dispose
-  const pick=FOREST_TEX[opt.level]||FOREST_TEX.full, files=opt.files||{ web:IMG[pick.web], floor:IMG[pick.floor], shade:IMG[pick.shade], crown:IMG[pick.crown], dapple:IMG[pick.dapple], moon:IMG[pick.moon], ground:IMG[pick.ground], groundN:IMG[pick.groundN] };   // NIGHT-6: this level's prepared files (opt.files: a probe's own)
+  const pick=FOREST_TEX[opt.level]||FOREST_TEX.full, files=opt.files||{ web:IMG[pick.web], floor:IMG[pick.floor], shade:IMG[pick.shade], crown:IMG[pick.crown], dapple:IMG[pick.dapple], moon:IMG[pick.moon], ground:IMG[pick.ground], groundN:IMG[pick.groundN], groundM:IMG[pick.groundM] };   // NIGHT-6: this level's prepared files (opt.files: a probe's own)
   const tex=(c,srgb,rx=1,ry=1)=>{ const t=new T.CanvasTexture(c); t.wrapS=t.wrapT=T.RepeatWrapping; t.repeat.set(rx,ry); t.anisotropy=8; if(srgb) t.encoding=T.sRGBEncoding; own.push(t); return t; };
   /* RUN 9: the PALETTE is the mood's look (the record's looks → tokens), eased towards a new mood's look (τ MOOD_TC s) */
   const looks=new Map(), lookCols=L=>{ let c=looks.get(L.pre); if(!c){ c={}; for(const [k,n] of Object.entries(L.tokens)) c[k]=new T.Color(C(n)); looks.set(L.pre,c); } return c; };
@@ -131,9 +134,13 @@ export function buildForest(T, opt){
   const brs=[], d=new T.Object3D();
   spots.forEach(([x,z,r],i)=>{ d.position.set(x,gy(x,z)+7.8,z); d.rotation.set((R()-0.5)*0.06,R()*6.28,(R()-0.5)*0.06); d.scale.set(r,1,r); d.updateMatrix(); trunks.setMatrixAt(i,d.matrix);
     if(z>-24) for(let b2=0;b2<(R()*3|0);b2++) brs.push([x,z,r,1.2+R()*4.5,R()*6.28,0.7+R()*1.8]); });
-  const brG=new T.CylinderGeometry(0.6,1,1,6), branches=new T.InstancedMesh(brG, barkM, brs.length); own.push(brG);
+  /* NIGHT-8: THE LITTER — fallen leaves (with the drifting ones), pebbles (with the stream's stones), twigs (with the branches: no extra draw), placed by
+     the ground's law (./pure/ground.js, its own seeded draws) */
+  const lkey=[Lv.litterLeaves||0, Lv.litterPebbles||0, Lv.litterTwigs||0].join(); if(!LITTER_MEMO.has(lkey)) LITTER_MEMO.set(lkey, litterPlaces({ leaves:Lv.litterLeaves||0, pebbles:Lv.litterPebbles||0, twigs:Lv.litterTwigs||0 }, spots)); const litter=LITTER_MEMO.get(lkey);
+  const brG=new T.CylinderGeometry(0.6,1,1,6), branches=new T.InstancedMesh(brG, barkM, brs.length+litter.twigs.length); own.push(brG);
   brs.forEach(([x,z,r,h,a,l],i)=>{ d.rotation.set(0,a,1.05+R()*0.35,'YXZ'); d.scale.set(0.035+r*0.06,l,0.035+r*0.06);
     const dirv=V(0,1,0).applyEuler(d.rotation); d.position.set(x,gy(x,z)+h,z).addScaledVector(dirv,l*0.5); d.updateMatrix(); branches.setMatrixAt(i,d.matrix); });
+  litter.twigs.forEach((tw,i)=>{ d.rotation.set(0, tw.rot, Math.PI/2, 'YXZ'); d.scale.set(tw.r, tw.len, tw.r); d.position.set(tw.x, tw.y+tw.r*0.6, tw.z); d.updateMatrix(); branches.setMatrixAt(brs.length+i, d.matrix); });   // NIGHT-8: lying twigs
   for(const m of [trunks,branches]){ m.castShadow=m.receiveShadow=true; s.add(m); }
   /* ferns: instanced fronds with an alpha leaf texture */
   const [fc,f]=canvas2(128,512), FROND=rgbOf(C('forest-frond')); f.strokeStyle=C('forest-fern'); f.lineWidth=3; f.beginPath(); f.moveTo(64,512); f.quadraticCurveTo(70,260,62,8); f.stroke();
@@ -147,12 +154,9 @@ export function buildForest(T, opt){
   const fronds=new T.InstancedMesh(frondG, frondM, ferns.length*7); fronds.customDistanceMaterial=frondD; own.push(frondM, frondD);
   let fi=0; for(const [x,z,sc] of ferns){ const a0=R()*6.28; for(let j=0;j<7;j++){ d.position.set(x,gy(x,z)-0.02,z); d.rotation.set(0.75+R()*0.5,a0+j*0.9+R()*0.3,0,'YXZ'); d.scale.set(sc,sc*(0.8+R()*0.4),sc); d.updateMatrix(); fronds.setMatrixAt(fi++,d.matrix); } }
   fronds.castShadow=fronds.receiveShadow=true; s.add(fronds);
-  /* mossy rocks */
-  const rockM=new T.MeshStandardMaterial({ color:col('rock'), roughness:0.96, bumpMap:tex(gb,false,2,2), bumpScale:0.06 }); own.push(rockM);
-  for(const [x,z,sz] of ROCKS_TODAY){   // NIGHT-6 slices 4–5: out of the water (pure/layout.js, shared with the bake tool)
-    const ig=new T.IcosahedronGeometry(1,2), pa=ig.attributes.position; own.push(ig);
-    for(let i=0;i<pa.count;i++){ const v=V(pa.getX(i),pa.getY(i),pa.getZ(i)); v.multiplyScalar(1+0.18*Math.sin(v.x*4+v.z*3)+0.1*Math.sin(v.y*7)); pa.setXYZ(i,v.x,v.y,v.z); }
-    ig.computeVertexNormals(); const m=new T.Mesh(ig,rockM); m.scale.set(sz*1.3,sz*0.6,sz); m.position.set(x,gy(x,z)+sz*0.12,z); m.rotation.y=R()*6; m.castShadow=m.receiveShadow=true; s.add(m); }
+  /* today's aisle rocks: NIGHT-8 drawn with the stream's rounded stones (buildStream, ctx.aisle); each still takes its one draw of the seeded
+     stream here, so everything drawn after keeps its look */
+  const aisle=ROCKS_TODAY.map(([x,z,sz])=>({ x, y:gy(x,z)+sz*0.12, z, s:sz, sx:sz*1.3, sy:sz*0.6, sz, rot:R()*6, water:-9, wet:false }));   // NIGHT-6 slices 4–5: out of the water (pure/layout.js, shared with the bake tool)
   /* ground mist sheets at four depths */
   const [mc,mx]=canvas2(256,128);
   for(let i=0;i<70;i++){ const x=R()*256, y=40+R()*50, r=14+R()*30; for(const dx of [-256,0,256]){ const gr=mx.createRadialGradient(x+dx,y,0,x+dx,y,r); gr.addColorStop(0,C('mist-a12')); gr.addColorStop(1,C('halo-a0')); mx.fillStyle=gr; mx.fillRect(x+dx-r,y-r,r*2,r*2); } }
@@ -204,7 +208,8 @@ export function buildForest(T, opt){
   let floorTex=null; if(files.floor && Object.keys(Lv).some(k=>['sorrel','forb','bilberry','anemone','nettle','sedge','fern2'].includes(k) && Lv[k]>0)){
     floorTex=new T.Texture(files.floor); floorTex.encoding=T.sRGBEncoding; floorTex.anisotropy=4; floorTex.needsUpdate=true; own.push(floorTex); }
   const floor=buildFloor({ T, s, own, lv:Lv, trunks:spots, ferns, tex:floorTex, U:life.U, soft });
-  const stream=buildStream({ T, s, C, pal, own, lv:Lv, floorMat:floorTex ? floor.parts.material : null });   // NIGHT-6 slice 4
+  const stream=buildStream({ T, s, C, pal, own, lv:Lv, floorMat:floorTex ? floor.parts.material : null, aisle, litter });   // NIGHT-6 slice 4; NIGHT-8 today's aisle rocks join its stones, the litter's leaves and pebbles its draws
+  life.waterRocks(stream.inWater);   // NIGHT-8: white water round the rocks in the stream
   const wood=buildWood({ T, s, C, own, P:WP, barkMap:barkM.map, bumpMap:barkM.bumpMap, rockMat:stream.parts.rockMat, floorMat:floorTex ? floor.parts.material : null, cast:false, FU });   // NIGHT-6 slice 5; the wood stays out of the light's shadow pass (the user, 2026-11-10: high made cheaper)
   /* NIGHT-6 slice 7: the canopy (crowns, the understorey, the stars) and the dappled moonlight on the ground */
   let crownTex=null; if(files.crown && Lv.crowns){ crownTex=new T.Texture(files.crown); crownTex.encoding=T.sRGBEncoding; crownTex.anisotropy=4; crownTex.needsUpdate=true; own.push(crownTex); }
@@ -213,6 +218,8 @@ export function buildForest(T, opt){
   if(files.dapple && Lv.dapple){ dapTex=new T.Texture(files.dapple); dapTex.wrapS=dapTex.wrapT=T.RepeatWrapping; dapTex.format= opt.gl2!==false ? T.RedFormat : T.RGBAFormat; dapTex.needsUpdate=true; own.push(dapTex); DU.uDap.value=dapTex; patchDapple(groundM, DU); }
   const gust=buildGust({ T, s, own, lv:Lv, U:life.U, floorMat:floorTex ? floor.parts.material : null, life, reduce });   // NIGHT-6 slice 6
   let shadeTex=null; if(files.shade && Lv.shade){ shadeTex=new T.Texture(files.shade); shadeTex.format= opt.gl2!==false ? T.RedFormat : T.RGBAFormat; shadeTex.needsUpdate=true; own.push(shadeTex); patchShade(groundM, shadeTex); }   // one channel where WebGL2 allows
+  /* NIGHT-8: the ground's large scale — LAST of the ground's patches (it takes the map's own line; the contact shadows' patch keeps its place after it) */
+  let macroTex=null, macroU=null; if(files.groundM && Lv.groundMacro && Lv.groundTex && files.ground){ macroTex=new T.Texture(files.groundM); macroTex.needsUpdate=true; own.push(macroTex); macroU=patchGroundMacro(T, groundM, macroTex, C); }
   const rare=buildRare({ T, s, C, pal, own, canvas2, tex, halo:HALO });   // RUN 9 (slice 4)
   let gather=0, playing=false, rel=0;
   /* NIGHT-6 slice 2: THE MELODY — the held seconds of the playing note (the host), the note-on times of the last window, and their eased
@@ -228,7 +235,8 @@ export function buildForest(T, opt){
   const bedQ=[], fired=[], twinkles=[], glow1=new Float32Array(flies.length); let glassN=0, tLast=-Infinity;
   const ray=new T.Raycaster(), ndc=new T.Vector2(), fwd=V(0,0,0), tmp=V(0,0,0);
   let W=opt.w||800, H=opt.h||600, pxH=H;
-  function aimCamera(){ camera.position.copy(camPos).add(camOff); look.copy(camLook).addScaledVector(camOff,-1.2); camera.lookAt(look); camera.updateMatrixWorld(); }
+  let viewOver=null;   // NIGHT-8, captures only: { pos, look } — a fixed close view (viewDbg)
+  function aimCamera(){ if(viewOver){ camera.position.set(...viewOver.pos); camera.lookAt(...viewOver.look); camera.updateMatrixWorld(); return; } camera.position.copy(camPos).add(camOff); look.copy(camLook).addScaledVector(camOff,-1.2); camera.lookAt(look); camera.updateMatrixWorld(); }
   function resize(w,h,bufH){ W=w; H=h; pxH=bufH||h; camera.aspect=w/h; camera.fov= w/h<0.8 ? 68 : 55; camera.updateProjectionMatrix();
     fm.uniforms.uScale.value=pxH/(2*Math.tan(camera.fov*Math.PI/360)); life.resize(fm.uniforms.uScale.value); canopy.resize(fm.uniforms.uScale.value); aimCamera(); detail.resize(w, h, camera, fm.uniforms.uScale.value); answers.resize(fm.uniforms.uScale.value); }
   /* the hand's play point (canvas pixels px, py) and depth 0…1 → the light's world place on THIS camera's ray (it projects back onto the
@@ -316,7 +324,7 @@ export function buildForest(T, opt){
     /* RUN 9 (slice 3): the leaves sway with the ambience's WIND (its level, the gust of its sweep); a still air without it */
     const wi=(nin && nin.wind) || { level:0, gust:0 }, sway=(0.25+0.75*wi.level*(0.65+0.35*wi.gust))*deep.sway*(reduce?0.4:1);
     life.update(dt, t, { light:rigs[0].cur, lightOn:rigs[0].on, lightCol:rigs[0].light.color, moon:nt.moon, moonK:nt.moonLight*deep.light, fogD:s.fog.density,
-      sway, shimmer:reduce ? 0 : fxv.wave, dim:deep.light });   // RUN 9 (slice 2)
+      sway, shimmer:reduce ? 0 : fxv.wave, dim:deep.light, flies, flyK:fk*mg, flyCol:fm.uniforms.uColor.value });   // RUN 9 (slice 2); NIGHT-8 the fireflies the water reflects
     detail.update(dt, t, { light:rigs[0].cur, lightOn:rigs[0].on, moon:nt.moon, moonK:nt.moonLight*deep.light, mist:nt.mist.reduce((a,b)=>a+b,0)/nt.mist.length, wind:sway, cam:camera.position });
     gust.update(dt, t, rigs[1].on>0.05 ? rigs[1].cur : null, rigs[1].on);   // NIGHT-6 slice 6: the effects hand's gust
     hidden.update(dt, t, rigs[0].on>0.05 ? rigs[0].cur : null, rigs[0].on, deep.light);   // NIGHT-6 slice 9
@@ -327,7 +335,7 @@ export function buildForest(T, opt){
     /* parallax: the camera leans a little towards the playing light (near and far things slide past each other) */
     const f0=rigs[0].on>0.05 ? rigs[0].cur : camLook;
     camGoal.set(clamp(f0.x,-4,4)*0.16, (clamp(f0.y,0,5)-1.7)*0.1, 0); if(reduce) camGoal.multiplyScalar(0.3);
-    camOff.lerp(camGoal, 1-Math.exp(-dt*1.6)); aimCamera(); if(!reduce){ camera.position.y+=Math.sin(t*0.23)*0.025; if(Lv.breath) camera.position.x+=breathAt(t); camera.updateMatrixWorld(); }   // NIGHT-6 slice 8: + the sideways breath
+    camOff.lerp(camGoal, 1-Math.exp(-dt*1.6)); aimCamera(); if(!reduce && !viewOver){ camera.position.y+=Math.sin(t*0.23)*0.025; if(Lv.breath) camera.position.x+=breathAt(t); camera.updateMatrixWorld(); }   // NIGHT-6 slice 8: + the sideways breath
   }
   /* a note began on this rig's hand (from the bus `notes` ring) */
   const glint=(i,vel)=>{ const r=rigs[i]; if(r) r.glint=Math.max(r.glint, clamp(vel==null?0.6:vel,0.18,1)); music=Math.min(1.5, music+0.35*clamp(vel==null?0.6:vel,0.18,1));
@@ -346,7 +354,7 @@ export function buildForest(T, opt){
       clouds:clouds.map(c=>c.visible ? c.material.opacity : 0), mist:mists.map(x=>x[3].opacity), mistY:mists.map(x=>x[2].position.y), fog:s.fog.density, deep:deep.e, mood:moodId,
       fogHex:pal.fog.getHexString(), flies:fkNow }, life:{ ...life.state(), gather, playing, release:rel }, detail:detail.state(), rare:rare.state(flies),   // RUN 9 (slice 2)
     melody:{ hold:holdE, rate:rateE, held:heldNow, darts },   // NIGHT-6 slice 2
-    floor:(({ places, ...x })=>x)(floor.state()),   // NIGHT-6 slice 3
+    floor:(({ places, ...x })=>x)(floor.state()), ground:{ macro:!!macroTex, leaves:litter.leaves.length, pebbles:litter.pebbles.length, twigs:litter.twigs.length },   // NIGHT-6 slice 3; NIGHT-8 the ground
     stream:stream.state(), trunks:spots.map(x=>x.slice()), fernsAt:ferns.map(x=>x.slice()),   // NIGHT-6 slice 4
     wood:{ ...wood.state(), shade:!!shadeTex, flare:!!Lv.flare, bark:!!Lv.barkMoss },   // NIGHT-6 slice 5
     gust:gust.state(),   // NIGHT-6 slice 6
@@ -364,6 +372,6 @@ export function buildForest(T, opt){
   const paint=buildPaint({ T, scene:s, camera, lv:Lv, gl2:opt.gl2, own });   // NIGHT-6 slice 8: after every object is in the scene (it sorts the glowing ones into their pass)
   const render=r=>paint.render(r, now);   // the room's own frame time: one frame drawn twice is the same picture (the grain too)
   resize(W,H);
-  return { id:FOREST_ROOM.id, scene:s, camera, update, resize, place, glint, project, state, dispose, lightsOf, lifeDbg:life, detailDbg:detail, bed, texBytes, answersDbg:answers, floorDbg:floor, streamDbg:stream, woodDbg:wood, gustDbg:gust, canopyDbg:canopy, dappleDbg:DU, render, paintDbg:paint, hiddenDbg:hidden, foxDbg:FU, fernsDbg:{ fronds, frondM, frondD },
-    held:sec=>{ heldNow= sec>0 ? sec : 0; rare.held(sec); }, rareDbg:kind=>rare.force(kind, now, { light:rigs[0].cur, flies }) };   // RUN 9 (slice 4): held — how long the playing note is held (host); rareDbg — probes / captures   // RUN 9: lifeDbg / detailDbg — probes only (uniforms, silhouette boxes)
+  return { id:FOREST_ROOM.id, scene:s, camera, update, resize, place, glint, project, state, dispose, lightsOf, lifeDbg:life, detailDbg:detail, bed, texBytes, answersDbg:answers, floorDbg:floor, streamDbg:stream, woodDbg:wood, gustDbg:gust, canopyDbg:canopy, dappleDbg:DU, render, paintDbg:paint, hiddenDbg:hidden, foxDbg:FU, fernsDbg:{ fronds, frondM, frondD }, groundDbg:{ U:macroU, branches, brs:brs.length, litter },   // NIGHT-8: probes
+    held:sec=>{ heldNow= sec>0 ? sec : 0; rare.held(sec); }, rareDbg:kind=>rare.force(kind, now, { light:rigs[0].cur, flies }), viewDbg:o=>{ viewOver=o||null; aimCamera(); return viewOver; } };   // RUN 9 (slice 4): held — how long the playing note is held (host); rareDbg — probes / captures   // RUN 9: lifeDbg / detailDbg — probes only (uniforms, silhouette boxes)
 }

@@ -1,4 +1,4 @@
-/* THE ROOMS' AMBIENCE (RUN 7, C4c; Night's own since CORE-7): drone + wind + distant crickets + one soft echo, built from a room's NATURE
+/* THE ROOMS' AMBIENCE (RUN 7, C4c; Night's own since CORE-7): drone + wind + distant crickets + one soft echo (NIGHT-8: + the stream), built from a room's NATURE
    recipe (the forest's: apps/night/rooms/forest/pure/room.js). Registered by main.js through core/soundmods.js, so both engine instances use it —
    hence stateless (rule #38, static check 13): every engine value comes from E, the ambience object it builds (nodes, the recipe, the crickets'
    cursors) is kept by the engine instance. Every source starts once and is gated (rule #3); chirps are scheduled ahead at explicit times
@@ -38,7 +38,9 @@ function buildSlot(E, bus, seed, A, now, ns){
   for(let k=0;k<Math.max(C.n, NATURE_CRICKETS);k++){ const st=cricketStream(C, (C.seed+seed)>>>0, k), o=ac.createOscillator(), g=ac.createGain(), p=ac.createStereoPanner();
     o.frequency.value=st.freq; g.gain.value=0; p.pan.value=C.pans[k%C.pans.length]; o.connect(g); g.connect(p); p.connect(clp); o.start(now);
     crickets.push({ st, g, osc:o, p, next:st.next(), on:k<C.n }); }
-  return { A, mix, ns, dl, elp, efb, dGate, dSend, dRoot, dRootA, dFifth, dFifthA, bp, lfo, lg, wg, ws, clp, cg, cs, crickets, origin:now, corigin:now, parked:false, parkAt:0 };
+  /* NIGHT-8: the stream — its gain in this slot's mix and a little into the echo; the nature worklet's output joins it once loaded (ambienceBrook) */
+  const S=A.stream, sg=ac.createGain(), ss=ac.createGain(); sg.gain.value= S ? S.gain : 0; ss.gain.value= S ? S.send : 0; sg.connect(mix); sg.connect(ss); ss.connect(roomIn);
+  return { A, mix, ns, dl, elp, efb, dGate, dSend, dRoot, dRootA, dFifth, dFifthA, bp, lfo, lg, wg, ws, clp, cg, cs, sg, ss, crickets, origin:now, corigin:now, parked:false, parkAt:0 };
 }
 /* build into `dest` (the master's input) from the recipe A; `seed` shifts every seeded part (a probe's control) → the ambience object.
    slots 2 (NIGHT-3 stage 5 part 2): a second, parked slot for room switches; 1 = the first slot alone */
@@ -48,8 +50,26 @@ function buildAmbience(E, dest, seed=0, A, slots=1){
   const s0=buildSlot(E, bus, seed, A, now, null); s0.mix.connect(bus);
   const S=[s0]; if(slots>1){ const s1=buildSlot(E, bus, seed, A, now, s0.ns); s1.mix.gain.value=0; s1.parked=true; S.push(s1); }   // parked and silent
   return { A, bus, dGate:s0.dGate, dRoot:s0.dRoot, dFifth:s0.dFifth, crickets:s0.crickets, origin:s0.origin, corigin:s0.corigin, on:false, hz:[0,0], level:0,
-    slots:S, cur:0, seed, drone:true };
+    slots:S, cur:0, seed, drone:true, brook:null };
 }
+/* NIGHT-8: THE STREAM'S NODE — the nature worklet «night-nature» (apps/night/worklets/nature-worklet.js), built ONCE per ambience when its module
+   is in the context (the caller loads it: apps/night/roomswitch.js natureLoad) and never torn down (rule #3); its output feeds every slot's
+   stream gain. voices: the room's stream voices; asleep while the ambience is off (ambienceSet) → amb.brook, or null (already built / no voices) */
+export const NATURE_WORKLET=new URL('../worklets/nature-worklet.js', import.meta.url).href;
+export const BROOK_SLEEP_S=6;   // after the ambience's fade-out (τ 0.8 s): asleep, nothing computed
+function ambienceBrook(E, amb, voices, seed=0){
+  if(amb.brook || !voices || !voices.length) return null;
+  const node=new AudioWorkletNode(E.ac, 'night-nature', { numberOfInputs:0, numberOfOutputs:1, outputChannelCount:[2], processorOptions:{ voices, seed:(0x42524F4B+seed)>>>0, sleep:!amb.on } });
+  for(const sl of amb.slots) node.connect(sl.sg);
+  amb.brook={ node, sleep:!amb.on, light:false }; return amb.brook;
+}
+/* the stream's sleep (from AC time t) and the Lighter mode */
+function brookSleep(amb, v, t){ const b=amb.brook; if(!b || b.sleep===v) return; b.sleep=v; b.node.port.postMessage([{ k:'sleep', v, t }]); }
+function ambienceBrookLight(E, amb, v){ const b=amb.brook; if(!b || b.light===!!v) return; b.light=!!v; b.node.port.postMessage([{ k:'light', v:!!v }]); }
+/* the worklet's counters → a promise (null after ms) */
+function ambienceBrookStats(E, amb, ms=2000){ const b=amb.brook; if(!b) return Promise.resolve(null);
+  return new Promise(res=>{ const p=b.node.port, f=e=>{ if(e.data && e.data.stats){ p.removeEventListener('message', f); res(e.data.stats); } };
+    p.addEventListener('message', f); p.start(); p.postMessage([{ k:'stats' }]); setTimeout(()=>{ p.removeEventListener('message', f); res(null); }, ms); }); }
 /* the crossfade's time constants (s): the sounding room out, the new one in (about 2 s to full); a faded room parks after `park` × out */
 export const AMB_SWAP=Object.freeze({ out:1, in:0.7, park:8 });
 /* the idle slot n takes recipe B at AC time t while silent: every number is an AudioParam or a cricket stream — no node is made */
@@ -61,6 +81,7 @@ function retune(E, amb, n, B, t){
   const W=B.wind; sp(n.bp.frequency, W.hz); sp(n.bp.Q, W.q); sp(n.lg.gain, W.sweep); sp(n.wg.gain, W.gain); sp(n.ws.gain, W.send);
   /* the wind sweep keeps its phase: the origin moves so that rate × (time − origin) runs on from where the old rate left it */
   if(W.rate!==old.wind.rate){ sp(n.lfo.frequency, W.rate); n.origin=t-old.wind.rate*(t-n.origin)/W.rate; }
+  sp(n.sg.gain, B.stream ? B.stream.gain : 0); sp(n.ss.gain, B.stream ? B.stream.send : 0);   // NIGHT-8: the stream's level in the new room (none: 0)
   const C=B.crickets; sp(n.clp.frequency, C.lp); sp(n.cg.gain, C.gain); sp(n.cs.gain, C.send);
   n.crickets.forEach((c,k)=>{ if(k<C.n){ c.st=cricketStream(C, (C.seed+amb.seed)>>>0, k); c.next=c.st.next(); sp(c.osc.frequency, c.st.freq); sp(c.p.pan, C.pans[k%C.pans.length]); c.on=true; }
     else { c.on=false; sp(c.g.gain, 0); } });
@@ -80,6 +101,7 @@ function ambienceRoom(E, amb, B, when, o={}){
   if(o.instant){ n.mix.gain.setValueAtTime(1, t); a.mix.gain.setValueAtTime(0, t); }
   else { n.mix.gain.setValueAtTime(0, t); n.mix.gain.setTargetAtTime(1, t, AMB_SWAP.in); a.mix.gain.setValueAtTime(1, t); a.mix.gain.setTargetAtTime(0, t, AMB_SWAP.out); }
   if(amb.on) amb.bus.gain.setTargetAtTime(B.master*amb.level*amb.level, t, AMB_SWAP.in);
+  if(B.stream && amb.on && amb.level>0) brookSleep(amb, false, null); else brookSleep(amb, true, t+BROOK_SLEEP_S);   // NIGHT-8: a room without a stream lets it sleep after the fade
   amb.cur=1-amb.cur; Object.assign(amb, { A:B, dGate:n.dGate, dRoot:n.dRoot, dFifth:n.dFifth, crickets:n.crickets, origin:n.origin, corigin:n.corigin });
   return true;
 }
@@ -108,5 +130,6 @@ function ambienceSet(E, amb, on, level, when, drone=true){
   amb.on=!!on; amb.level=v; amb.drone=!!drone;
   amb.bus.gain.setTargetAtTime(on ? amb.A.master*v*v : 0, t, on ? 0.6 : 0.8);
   amb.dGate.gain.setTargetAtTime(on && drone ? 1 : 0, t, on && drone ? amb.A.drone.tc : 0.8);
+  if(on && v>0 && amb.A.stream) brookSleep(amb, false, null); else brookSleep(amb, true, t+BROOK_SLEEP_S);   // NIGHT-8: the stream sleeps once faded out (or in a room without one)
 }
-export { buildAmbience, ambienceSchedule, ambienceTune, ambienceSet, ambienceRoom };
+export { buildAmbience, ambienceSchedule, ambienceTune, ambienceSet, ambienceRoom, ambienceBrook, ambienceBrookLight, ambienceBrookStats };

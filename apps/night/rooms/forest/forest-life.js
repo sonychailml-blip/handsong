@@ -56,8 +56,8 @@ export function patchSway(mat, U, amp=1){
 export function patchWetGround(mat){ const prev=mat.onBeforeCompile, k=mat.customProgramCacheKey.call(mat);
   mat.onBeforeCompile=(sh, r)=>{ if(prev) prev.call(mat, sh, r);
     sh.vertexShader='attribute float aWet;\nvarying float vWet;\n'+sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vWet=aWet;');
-    sh.fragmentShader='varying float vWet;\n'+sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n  diffuseColor.rgb*=mix(vec3(1.0), vec3(0.3,0.27,0.24), smoothstep(0.0,1.0,vWet));')
-      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  roughnessFactor=mix(roughnessFactor, 0.62, smoothstep(0.5,1.0,vWet));'); };
+    sh.fragmentShader='varying float vWet;\n'+sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n  diffuseColor.rgb*=mix(vec3(1.0), vec3(0.22,0.2,0.18), smoothstep(0.0,1.0,vWet));')
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  roughnessFactor=mix(roughnessFactor, 0.36, smoothstep(0.45,1.0,vWet));'); };   // NIGHT-8: darker mud, glossier at the water
   mat.customProgramCacheKey=()=>k+'.wet'; return mat; }
 /* NIGHT-6: SOFT CUT-OUT EDGES (the user's choice: the cheapest way at medium, which has no antialiasing). A cut-out's alpha is sharpened to
    a one-pixel ramp by its own screen-space rate (fwidth) and blended, instead of cut hard at 0.45 — one derivative a pixel, no extra pass.
@@ -72,39 +72,70 @@ export function patchSoftEdges(mat){
   return mat;
 }
 /* NIGHT-6 slice 4: THE WATER (after the sketch «Живой лес», our own shader): two layers of noise flow towards the viewer along the stream
-   (its own along / across coordinates, turned to the world by each vertex's tangent) and bend the surface; nearer the banks it stirs more and
-   soft foam lines run; the sky by the Fresnel law; the moon's sharp reflection and a glitter streak the ripples break up; the playing light's
-   sparkle and glow; Echo's and the notes' rings as real ripples; a soft edge where it meets the carved bank. */
+   (its own along / across coordinates, turned to the world by each vertex's tangent) and bend the surface; Echo's and the notes' rings as real
+   ripples; a soft edge where it meets the carved bank.
+   NIGHT-8 (the user: a night stream is mostly dark): the body near black, the sky only at grazing angles; the MOON broken into sparkles by the
+   ripples (no sheet of light); the REFLECTIONS of the nearest glowing things (fireflies, mushrooms: uGl, each a small trembling image); small
+   bright GLINTS that ride the flow downstream; the SHALLOWS see-through towards the banks (stones on the bed, refracted by the ripples, fading
+   with depth); WHITE WATER and ripples round the rocks that stand in it (uRk: a collar on the upstream side, a wake of streaks downstream); the
+   playing light's sparkle and glow as before. Quiet: everything slow and small. */
 const WATER_V=`attribute vec2 aTan; varying vec3 vW; varying vec2 vUv; varying vec2 vTan;
 void main(){ vUv=uv; vTan=aTan; vec4 w=modelMatrix*vec4(position,1.0); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }`;
+export const WATER_GL=8, WATER_RK=12;   // NIGHT-8: glowing things reflected, rocks in the water
 const WATER_F=W=>`uniform vec4 uGust; uniform vec2 uGustDir;
-uniform float uNow, uMoonK, uLightK, uFogD, uAlpha, uLen, uHalf, uWide; uniform vec3 uDeep, uSky, uMoonCol, uMoonPos, uLightPos, uLightCol, uRingCol, uFogCol; uniform vec4 uWR[${W.n}];
+uniform float uNow, uMoonK, uLightK, uFogD, uAlpha, uLen, uHalf, uWide; uniform vec3 uDeep, uSky, uMoonCol, uMoonPos, uLightPos, uLightCol, uRingCol, uFogCol, uBed; uniform vec4 uWR[${W.n}];
+uniform vec4 uGl[${WATER_GL}]; uniform vec3 uGlC[${WATER_GL}]; uniform vec4 uRk[${WATER_RK}];
 varying vec3 vW; varying vec2 vUv; varying vec2 vTan;
 float h21(vec2 p){ p=fract(p*vec2(123.34,456.21)); p+=dot(p,p+45.32); return fract(p.x*p.y); }
 float vn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(h21(i),h21(i+vec2(1.0,0.0)),f.x), mix(h21(i+vec2(0.0,1.0)),h21(i+vec2(1.0,1.0)),f.x), f.y); }
 float hgt(vec2 q, float t){ return vn(q*vec2(0.9,2.4)-vec2(t*0.55,0.0))*0.65+vn(q*vec2(2.3,4.8)-vec2(t*1.1,t*0.05))*0.35; }
+/* the bed's stones: the nearest cell centre's distance (a rounded stone in each cell, darker gaps) */
+float stones(vec2 p){ vec2 i=floor(p), f=fract(p); float d=1.0, id=0.0;
+  for(int y=-1;y<=1;y++) for(int x=-1;x<=1;x++){ vec2 g=vec2(float(x),float(y)), o=vec2(h21(i+g), h21(i+g+17.3))*0.8+0.1; float e=length(g+o-f); if(e<d){ d=e; id=h21(i+g+3.1); } }
+  return (1.0-smoothstep(0.25,0.48,d))*(0.55+0.45*id); }
 void main(){
   float t=uNow, acr=(vUv.y-0.5)*2.0*uWide, eD=abs(acr)/uHalf; vec2 q=vec2(vUv.x*uLen, acr), p=vW.xz;
   vec3 V=normalize(vW-cameraPosition); float dist=length(vW-cameraPosition);
-  float e=0.05, h0=hgt(q,t), hx=hgt(q+vec2(e,0.0),t), hy=hgt(q+vec2(0.0,e),t), str=(0.55+0.7*smoothstep(0.5,1.0,eD))/(1.0+dist*0.1);
-  vec2 g=vec2(hx-h0, hy-h0)/e*str*0.09, Tn=normalize(vTan), Bn=vec2(-Tn.y, Tn.x), gw=g.x*Tn+g.y*Bn;
+  vec2 Tn=normalize(vTan), Bn=vec2(-Tn.y, Tn.x);
+  float e=0.05, h0=hgt(q,t), hx=hgt(q+vec2(e,0.0),t), hy=hgt(q+vec2(0.0,e),t), str=(0.45+0.6*smoothstep(0.5,1.0,eD))/(1.0+dist*0.1);
+  vec2 g=vec2(hx-h0, hy-h0)/e*str*0.09, gw=g.x*Tn+g.y*Bn;
   float ring=0.0;
   for(int i=0;i<${W.n};i++){ vec4 r=uWR[i]; float age=t-r.z; if(r.z>=0.0 && age>0.0 && age<${f(W.life)}){ vec2 dv=p-r.xy; float d=length(dv); float x=(d-age*${f(W.speed)})/${f(W.width)}; float k=1.0-age/${f(W.life)}; float a=r.w*exp(-x*x)*k*k; ring+=a; gw+=dv/(d+1e-4)*a*0.25; } }
   { vec2 gq=p-uGust.xy, nd=vec2(-uGustDir.y, uGustDir.x); float gf=uGust.w*exp(-dot(gq,gq)/(uGust.z*uGust.z));   // NIGHT-6 slice 6: cat's-paws under the gust (0 without it)
     gw+=(nd*sin(dot(p,uGustDir)*16.0-t*10.0)*0.6+uGustDir*sin(dot(p,nd)*11.0+t*6.0)*0.4)*gf*0.22; }
+  /* NIGHT-8: the rocks in the water — a pale collar upstream, ripples round them, a wake of flowing streaks downstream */
+  float foam=0.0;
+  for(int i=0;i<${WATER_RK};i++){ vec4 k=uRk[i]; if(k.z<=0.0) continue; vec2 dv=p-k.xy; float d=length(dv), sd=d-k.z; if(sd>1.2) continue;
+    float al=dot(dv,Tn), ac=dot(dv,Bn), up=smoothstep(0.2,-0.6,al/(d+1e-4));
+    float col=exp(-sd*sd/(0.0012+0.012*k.z))*(0.15+0.85*up)*smoothstep(0.35,0.75,vn(vec2(atan(dv.y,dv.x)*4.0+t*0.7, sd*30.0-t*3.0)));
+    float wl=max(al, 0.0), wake=exp(-ac*ac/((k.z*0.6+wl*0.25)*(k.z*0.6+wl*0.25)))*exp(-wl/(0.35+k.z*2.0))*step(0.0, al)*smoothstep(0.62,0.85,vn(vec2(wl*7.0-t*2.4, ac*16.0)));
+    foam+=col*0.8+wake*0.6; gw+=dv/(d+1e-4)*sin(sd*38.0-t*5.0)*exp(-sd*4.0)*0.05; }
+  foam=min(foam, 1.0);
   vec3 N=normalize(vec3(-gw.x,1.0,-gw.y)), R=reflect(V,N);
-  float fres=0.04+0.96*pow(1.0-max(dot(-V,N),0.0),5.0);
-  vec3 body=mix(uDeep*0.7, uDeep*1.5+vec3(0.003,0.006,0.003), smoothstep(0.35,1.0,eD)*0.6+0.15*vn(q*1.7));   // darker than the banks: night water
-  vec3 sky=mix(uFogCol, uSky, clamp(R.y*2.0,0.0,1.0))*0.16;
-  vec3 col=mix(body, sky, fres);   // dark water: the scene's output is sRGB-encoded (a linear 0.1 already reads as 0.35)
-  vec3 M=normalize(uMoonPos-vW); float mk=max(dot(R,M),0.0), gl=smoothstep(0.55,0.82,vn(q*vec2(3.0,7.0)-vec2(t*1.4,0.0)));
-  float sp=smoothstep(0.62,0.95,vn(q*vec2(5.0,11.0)-vec2(t*2.0,0.0)));   // the moon path as separate sparkles, not a sheet
-  col+=uMoonCol*uMoonK*(pow(mk,600.0)*1.8*sp+pow(mk,90.0)*0.01+pow(mk,160.0)*0.25*gl*gl*sp);   // the moon, and its glitter broken by the ripples
-  vec3 Ld=uLightPos-vW; float ld=length(Ld); float lk=max(dot(R,Ld/ld),0.0); col+=uLightCol*uLightK*(pow(lk,90.0)*1.2+pow(lk,10.0)*0.08)/(1.0+ld*ld*0.08)+uLightCol*uLightK*0.025/(1.0+ld*ld*0.6);
-  col+=uRingCol*ring*0.55;
-  float fe=smoothstep(0.6,1.0,eD)*(1.0-smoothstep(1.0,1.3,eD)), fn=smoothstep(0.62,0.9,vn(q*vec2(1.6,6.0)-vec2(t*0.9,0.0)));
-  col+=uMoonCol*fe*fn*(0.05+0.12*uMoonK)+uLightCol*fe*fn*uLightK*0.05/(1.0+ld*ld*0.3);   // foam at the edges
-  float a=(1.0-smoothstep(1.05,1.45,eD))*smoothstep(0.0,0.03,vUv.x);
+  float fres=0.03+0.97*pow(1.0-max(dot(-V,N),0.0),5.0);
+  /* the body: near black; towards the banks the shallow bed shows through (stones, refracted, fading with depth) */
+  float shallow=smoothstep(0.35,0.95,eD);
+  vec2 bp=p*4.1+gw*1.8+vec2(0.37*sin(p.y*1.7), 0.37*sin(p.x*1.3));   // the cells bent a little (no grid)
+  float stn=stones(bp)*(0.7+0.3*vn(bp*0.37));
+  vec3 bed=uBed*(0.5+0.5*stn)*(0.04+0.11*uMoonK+0.5*uLightK/(1.0+dot(uLightPos-vW,uLightPos-vW)*0.5));   // dim: the tokens are drawn as linear (sRGB out)
+  vec3 body=mix(uDeep*0.45, bed, shallow*0.5);
+  vec3 sky=mix(uFogCol, uSky, clamp(R.y*2.0,0.0,1.0))*0.11;
+  vec3 col=mix(body, sky, fres*(1.0-0.5*shallow));
+  /* the moon: its image broken by the ripples into sparkles along its path; and small bright glints that ride the flow */
+  vec3 M=normalize(uMoonPos-vW); float mk=max(dot(R,M),0.0);
+  float sp=smoothstep(0.7,0.97,vn(q*vec2(5.0,12.0)-vec2(t*1.6,0.0)));
+  float gn=smoothstep(0.86,0.99,vn(q*vec2(9.0,22.0)-vec2(t*2.3,t*0.07)))*smoothstep(0.75,0.98,vn(q*vec2(3.1,7.0)-vec2(t*0.9,0.0)));
+  col+=uMoonCol*uMoonK*(pow(mk,700.0)*2.2*sp+pow(mk,140.0)*0.22*sp*sp+pow(mk,12.0)*0.35*gn*(1.0-shallow*0.5)+pow(mk,40.0)*0.012);
+  /* NIGHT-8: the glowing things nearby, each a small trembling image on the water */
+  for(int i=0;i<${WATER_GL};i++){ vec4 L=uGl[i]; if(L.w<=0.0) continue; vec3 Ld=L.xyz-vW; float ld=length(Ld), lk=max(dot(R,Ld/ld),0.0);
+    col+=uGlC[i]*L.w*(pow(lk,500.0)*1.4*(0.5+sp)+pow(lk,160.0)*0.03)/(1.0+ld*ld*0.25); }
+  vec3 Ld=uLightPos-vW; float ld=length(Ld); float lk=max(dot(R,Ld/ld),0.0); col+=uLightCol*uLightK*(pow(lk,90.0)*1.2+pow(lk,10.0)*0.06)/(1.0+ld*ld*0.08)+uLightCol*uLightK*0.02/(1.0+ld*ld*0.6);
+  col+=uRingCol*ring*0.5;
+  /* white water: pale, lit by the moon and the light (never glowing by itself); the edges' faint foam lines */
+  float fe=smoothstep(0.75,1.0,eD)*(1.0-smoothstep(1.0,1.3,eD)), fn=smoothstep(0.7,0.92,vn(q*vec2(1.6,6.0)-vec2(t*0.9,0.0)));
+  vec3 lit=uMoonCol*(0.04+0.16*uMoonK)+uLightCol*uLightK*0.12/(1.0+ld*ld*0.3);
+  col=mix(col, lit*(0.9+0.4*vn(q*vec2(14.0,30.0)-vec2(t*3.0,0.0))), foam*0.8)+lit*fe*fn*0.35;
+  float a=(1.0-smoothstep(1.05,1.45,eD))*smoothstep(0.0,0.03,vUv.x)*mix(1.0, 0.7, shallow*(1.0-foam));
   col=mix(col,uFogCol,1.0-exp(-uFogD*uFogD*dist*dist));
   gl_FragColor=vec4(col, a*uAlpha);
   #include <tonemapping_fragment>
@@ -126,6 +157,7 @@ export function buildLife(ctx){
   /* NIGHT-6 slice 5: the mushrooms on the wood (ctx.woodShrooms) come after today's, which keep their places and the music bed's clusters */
   const today=lifePlaces(lv.shrooms, lv.blooms), places=today.concat((ctx.woodShrooms||[]).map(p=>({ kind:'shroom', x:p.x, y:p.y, z:p.z, s:p.s, ph:p.ph, rot:p.rot, wood:true }))), N=places.length, pulse=new Float32Array(N), glow=new Float32Array(N);
   const SHROOMS=places.map((p,i)=>i).filter(i=>places[i].kind==='shroom'), clusters=bedClusters(today), bedG=new Float32Array(N), bedEv=[];   // NIGHT-6 slice 1
+  const NEAR=places.map((p,i)=>[i, streamNear(p.x, p.z).d]).filter(x=>x[1]<2.2).sort((a,b)=>a[1]-b[1]).map(x=>x[0]); let glFrame=0, glFirst=true, glPick=[], glD=new Float32Array(0), glNext=0;   // NIGHT-8: what the water may reflect
   const d=new T.Object3D(), shrooms=places.filter(p=>p.kind==='shroom'), blooms=places.filter(p=>p.kind==='bloom');
   const capG=new T.SphereGeometry(1,10,5,0,Math.PI*2,0,Math.PI/2), stemG=new T.CylinderGeometry(0.16,0.22,1,6), bloomG=new T.PlaneGeometry(1,1); bloomG.rotateX(-Math.PI/2); own.push(capG, stemG, bloomG);
   const capM=new T.MeshBasicMaterial({ color:0xffffff }); capM.onBeforeCompile=sh=>{   // a dome's shading on an unlit cap: bright top, dark rim
@@ -161,7 +193,9 @@ export function buildLife(ctx){
   const wg=new T.BufferGeometry(); wg.setAttribute('position', new T.BufferAttribute(pos,3)); wg.setAttribute('uv', new T.BufferAttribute(uv,2)); wg.setAttribute('aTan', new T.BufferAttribute(tan,2)); wg.setIndex(idx);
   const WU={ uGust:U.uGust, uGustDir:U.uGustDir, uNow:U.uNow, uMoonK:{ value:1 }, uLightK:{ value:0 }, uFogD:{ value:0.06 }, uAlpha:{ value:0.95 }, uLen:{ value:len }, uHalf:{ value:STREAM.half }, uWide:{ value:WIDE }, uDeep:{ value:new T.Color(C('forest-water')) }, uSky:{ value:pal.sky }, uMoonCol:{ value:pal.moonhalo },
     uMoonPos:{ value:V(-14,23,-55) }, uLightPos:{ value:V(0,1,0) }, uLightCol:{ value:new T.Color(C('forest-light')) }, uRingCol:{ value:new T.Color(C('forest-light')) }, uFogCol:{ value:pal.fog },
-    uWR:{ value:Array.from({ length:RINGS.water.n }, ()=>new T.Vector4(0,0,-1,0)) } };
+    uWR:{ value:Array.from({ length:RINGS.water.n }, ()=>new T.Vector4(0,0,-1,0)) },
+    uGl:{ value:Array.from({ length:WATER_GL }, ()=>new T.Vector4(0,0,0,0)) }, uGlC:{ value:Array.from({ length:WATER_GL }, ()=>new T.Color()) }, uRk:{ value:Array.from({ length:WATER_RK }, ()=>new T.Vector4(0,0,0,0)) },
+    uBed:{ value:new T.Color(C('forest-streambed')) } };   // NIGHT-8
   const wm=new T.ShaderMaterial({ uniforms:WU, vertexShader:WATER_V, fragmentShader:WATER_F(RINGS.water), transparent:true, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2 });
   const stream=new T.Mesh(wg, wm); stream.renderOrder=-1; s.add(stream); own.push(wg, wm);
   const SH=new T.Color(), BL=new T.Color();
@@ -172,6 +206,13 @@ export function buildLife(ctx){
     ground.forEach((r,i)=>U.uGW.value[i].set(r.x, r.z, r.t0, r.amp)); water.forEach((r,i)=>WU.uWR.value[i].set(r.x, r.z, r.t0, r.amp));
     WU.uMoonPos.value.set(F.moon[0], F.moon[1], F.moon[2]); WU.uMoonK.value=F.moonK; WU.uFogD.value=F.fogD; WU.uLightPos.value.copy(F.light); WU.uLightK.value=F.lightOn;
     WU.uLightCol.value.copy(F.lightCol); WU.uRingCol.value.copy(F.lightCol);
+    /* NIGHT-8: the glowing things the water reflects — the mushrooms nearest the stream, then the wild fireflies nearest it (every 4th frame) */
+    { let j=0; for(const i of NEAR){ if(j>=WATER_GL/2) break; WU.uGl.value[j].set(places[i].x, places[i].y+places[i].s*2.2, places[i].z, glow[i]*0.6); WU.uGlC.value[j].copy(places[i].kind==='shroom' ? SH : BL); j++; }
+      if(F.flies){ const nf=F.flies.length; if(glD.length!==nf){ glD=new Float32Array(nf).fill(99); glFirst=true; }   // each fly's distance to the water: a few a frame (all at the first)
+        for(let k=0;k<(glFirst ? nf : 8);k++){ const i=(glNext++)%nf, q=F.flies[i]; glD[i]=streamNear(q.p[0], q.p[2]).d; }
+        if(++glFrame%4===0 || glFirst){ glFirst=false; const sc=F.flies.map((q,i)=>[i, q.glow/(1+Math.max(0, glD[i]-0.5)**2)]).sort((a,b)=>b[1]-a[1]); glPick=sc.slice(0, WATER_GL-j).map(x=>x[0]); } }
+      for(const i of glPick){ if(j>=WATER_GL) break; const q=F.flies[i]; WU.uGl.value[j].set(q.p[0], q.p[1], q.p[2], q.glow*(F.flyK==null ? 1 : F.flyK)); WU.uGlC.value[j].copy(F.flyCol||SH); j++; }
+      for(;j<WATER_GL;j++) WU.uGl.value[j].w=0; }
     SH.copy(pal.shroom); BL.copy(pal.bloom);
     const k=Math.exp(-dt/LIFE.tau), ga=gg.attributes.aGlow.array, ca=gg.attributes.aCol.array;
     /* NIGHT-6 slice 1: the bed's swells, each an envelope from the moment it is heard; their sum capped under a note's pulse */
@@ -201,5 +242,7 @@ export function buildLife(ctx){
     bed:{ active:bedEv.length, clusters:clusters.map(c=>c.slice()) },   // NIGHT-6 slice 1
     sway:U.uSway.value, shimmer:U.uShimmer.value, waveCol:[U.uGWCol.value.r, U.uGWCol.value.g, U.uGWCol.value.b], shroomCol:[SH.r, SH.g, SH.b] });
   const resize=scale=>{ gm.uniforms.uScale.value=scale; };
-  return { U, update, glint, echo, noteRing, wake, bedChord, bedLoop, state, resize, stream, glowMat:gm };   // glowMat: NIGHT-6 slice 9 (the night flowers' glow shares it)
+  /* NIGHT-8: the rocks that stand in the water ([{ x, z, s }]): white water and ripples round each (at most WATER_RK, the largest first) */
+  function waterRocks(list){ const L=list.slice().sort((a,b)=>b.s-a.s).slice(0, WATER_RK); WU.uRk.value.forEach((v,i)=>{ const r=L[i]; if(r) v.set(r.x, r.z, r.s*1.05, 0); else v.set(0,0,0,0); }); return L.length; }
+  return { U, update, glint, echo, noteRing, wake, bedChord, bedLoop, state, resize, stream, glowMat:gm, waterRocks, WU };   // glowMat: NIGHT-6 slice 9 (the night flowers' glow shares it); WU: probes
 }

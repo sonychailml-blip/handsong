@@ -9,14 +9,14 @@ import { sceneSwitch, sceneRoom, sceneRoomSet, sceneRooms, backgroundOf } from '
 import { ROOMS, roomById } from './rooms/index.js';
 import { ROOM_IDS } from './pure/room.js';
 import { bedHold, bedResume, bedTakesDrone } from './bed.js';
-import { buildAmbience, ambienceSchedule, ambienceTune, ambienceSet, ambienceRoom } from './sound/ambience.js';
+import { buildAmbience, ambienceSchedule, ambienceTune, ambienceSet, ambienceRoom, ambienceBrook, ambienceBrookLight, NATURE_WORKLET } from './sound/ambience.js';
 
 export const ROOM_KEY='handsong.nightRoom';
 export const ROOM_NAME_MS=1500, ROOM_QUIET_MS=2500;   // the name's time on screen; without the room's picture, the bed waits out the nature crossfade
 const load=k=>{ try{ return localStorage.getItem(k); }catch(e){ return null; } };
 const save=(k,v)=>{ try{ localStorage.setItem(k,v); }catch(e){} };
 const wait=ms=>new Promise(r=>setTimeout(r, ms));
-let seq=0, nameT=0, last=null, liveAmb=null;
+let seq=0, nameT=0, last=null, liveAmb=null, brookLight=false;
 /* the current room's record (the host's current room; the first room before any is set) */
 export const roomCurrent=()=>(roomById(sceneRoom())||ROOMS[0]).record;
 /* the nature recipe the ambience should play now (main.js's ambience module asks at build and at every set) */
@@ -25,8 +25,21 @@ export const roomNature=()=>roomCurrent().nature;
    plays the CURRENT room's recipe, so after a switch the slots crossfade. The live drone steps aside while the music bed plays (a render copy
    keeps it). N0 — the first room's recipe: the module's default level and look-ahead */
 export const natureModule=N0=>({ level:N0.level, ahead:N0.ahead, schedule:ambienceSchedule, tune:ambienceTune,
-  build:(E, dest, seed)=>{ const a=buildAmbience(E, dest, seed, roomNature(), 2); if(!E.offline) liveAmb=a; return a; },
+  build:(E, dest, seed)=>{ const a=buildAmbience(E, dest, seed, roomNature(), 2); if(!E.offline){ liveAmb=a; natureBrook(E, a, seed); } return a; },
   set:(E, amb, on, level, when)=>{ ambienceRoom(E, amb, roomNature(), when); ambienceSet(E, amb, on, level, when, E.offline || !bedTakesDrone()); } });
+/* NIGHT-8: THE STREAM'S WORKLET — its module into a context once (→ a promise of true; false: no AudioWorklet or it failed — the nature plays
+   without the stream), then the node joins the live ambience (the first room with a stream gives the voices; built once, rule #3) */
+const loads=new WeakMap();
+export function natureLoad(ac){
+  let p=loads.get(ac);
+  if(!p){ p= ac && ac.audioWorklet ? ac.audioWorklet.addModule(NATURE_WORKLET).then(()=>true, e=>{ console.warn('[night] the stream sound could not load:', e); return false; }) : Promise.resolve(false); loads.set(ac, p); }   // eslint-disable-line no-console
+  return p;
+}
+const brookVoices=()=>{ const R=[roomCurrent(), ...ROOMS.map(r=>r.record)].find(r=>r.nature.stream); return R ? R.nature.stream.voices : null; };
+function natureBrook(E, a, seed){ const v=brookVoices(); if(!v) return;
+  natureLoad(E.ac).then(ok=>{ if(ok && ambienceBrook(E, a, v, seed)) ambienceBrookLight(E, a, brookLight); }); }
+/* the Lighter mode (the shell): fewer bubbles, the nearest voices only */
+export function natureLight(v){ brookLight=!!v; if(liveAmb && liveAmb.brook) ambienceBrookLight(null, liveAmb, brookLight); }
 /* at the start, before the first picture: the remembered room, if it is a real one this app has */
 export function roomRestore(){ const id=load(ROOM_KEY); if(id && ROOM_IDS.includes(id) && roomById(id)) sceneRoomSet(id); return sceneRoom(); }
 /* the next room in order (the Room button) */
@@ -53,4 +66,6 @@ export async function roomSwitch(id, o={}){
 export const roomSwitchDbg=()=>({ room:sceneRoom(), rooms:sceneRooms(), stored:load(ROOM_KEY), last, seq,
   nature:liveAmb ? { id:liveAmb.A.id, cur:liveAmb.cur, parked:liveAmb.slots.map(x=>x.parked),
     /* each slot as the live graph has it now: its recipe, its fade, the gains it plays (the probes read that the old room really went) */
-    slots:liveAmb.slots.map(x=>({ id:x.A.id, parked:x.parked, mix:x.mix.gain.value, wind:x.wg.gain.value, crickets:x.cg.gain.value, drone:[x.dRootA.gain.value, x.dFifthA.gain.value] })) } : null });
+    slots:liveAmb.slots.map(x=>({ id:x.A.id, parked:x.parked, mix:x.mix.gain.value, wind:x.wg.gain.value, crickets:x.cg.gain.value, stream:x.sg.gain.value, drone:[x.dRootA.gain.value, x.dFifthA.gain.value] })),
+    brook:liveAmb.brook ? { sleep:liveAmb.brook.sleep, light:liveAmb.brook.light } : null } : null });   // NIGHT-8: the stream
+export const natureAmbDbg=()=>liveAmb;   // probe only (the stream's node, its stats)

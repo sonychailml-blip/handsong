@@ -4,7 +4,7 @@
    chordRowFreq of the scale, its tonic and A4), and the pad tones' slots mirrored here (a tone whose PITCH stays keeps its slot; after a
    Mood change the same step is another pitch, so it changes). bed2Plan lays a whole timeline into any context (the probes' and the cost
    measurement's offline renders) through the same message path (msgsOf) the live tick uses. */
-import { CUR, chordRowFreq, droneSecondHz } from '../../core/scales.js';
+import { CUR, chordRowFreq, droneSecondHz, viewKeyIdOf } from '../../core/scales.js';
 import { seeded } from '../../core/pure/dsp.js';
 import { BUS } from '../../core/pure/bus.js';   // NIGHT-6 slice 1: the bed's events for the room (bus «bed»)
 import { BED2_SEED, bed2Init, bed2Step, bed2Soon, bed2Tables, bed2Density } from './pure/bed2.js';
@@ -107,7 +107,7 @@ export const bed2Dbg=()=>({ ready:S.ready, fail:S.fail, built:!!S.b, on:S.on, pa
   loops:S.st ? S.st.loops.map(L=>({ len:L.len, active:L.active, notes:L.phrase ? L.phrase.length : 0, cycles:L.cycles })) : [], origin:S.origin, tick:S.tick });
 export const bed2StatsLive=()=> S.b ? bed2Stats(S.E, S.b) : Promise.resolve(null);
 export const bed2NodeDbg=()=> S.b ? S.b.node : null;   // probe only (NIGHT-7c): the bed's own output, to hear it alone
-export const bed2ViewDbg=()=>({ same:S.view===CUR(), over:!!over, starts:S.ons });   // probe only: whether it plays in the live view, how often it (re)started
+export const bed2ViewDbg=()=>({ same:S.view===CUR(), over:!!over, starts:S.ons, playing:S.view ? viewKeyIdOf(S.view) : null, live:viewKeyIdOf(CUR()), on:S.on, ticked:S.tick ? 1 : 0 });   // probe only: whether it plays in the live view, how often it (re)started
 
 /* ---- offline ---- */
 /* a whole timeline into an engine context E (an offline render): preset `preset` of recipe R for `sec` s from 0, everything posted up front

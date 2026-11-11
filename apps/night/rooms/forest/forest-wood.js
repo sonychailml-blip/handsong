@@ -145,7 +145,7 @@ export function buildWood(ctx){
   const wood=wg ? new T.Mesh(wg, woodM) : null; own.push(woodM); if(wood){ own.push(wg); wood.castShadow=!!ctx.cast; wood.receiveShadow=true; s.add(wood); }
   /* moss cushions (the stream rocks' material: all moss) */
   const mg=cushionGeo(T), n=P.moss.length, mo=new T.InstancedMesh(mg, rockMat, Math.max(1, n));
-  mg.setAttribute('aWater', new T.InstancedBufferAttribute(new Float32Array(Math.max(1,n)).fill(-9), 1)); mg.setAttribute('aMoss', new T.InstancedBufferAttribute(new Float32Array(Math.max(1,n)).fill(1), 1)); own.push(mg);
+  mg.setAttribute('aWater', new T.InstancedBufferAttribute(new Float32Array(Math.max(1,n)).fill(-9), 1)); mg.setAttribute('aMoss', new T.InstancedBufferAttribute(new Float32Array(Math.max(1,n)).fill(1), 1)); mg.setAttribute('aRock', new T.InstancedBufferAttribute(new Float32Array(Math.max(1,n)*4), 4)); own.push(mg);   // NIGHT-8: aRock 0 — the cushion keeps its own shape
   P.moss.forEach((m,i)=>{ d.position.set(m.x, m.y, m.z); d.rotation.set(0, m.rot, 0); d.scale.set(m.s, m.h, m.s*m.sq); d.updateMatrix(); mo.setMatrixAt(i, d.matrix); });
   mo.count=n; mo.receiveShadow=true; mo.frustumCulled=false; if(n) s.add(mo);
   /* ivy (the floor's material and its sheet's ivy cell) */

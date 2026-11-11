@@ -1,13 +1,14 @@
 /* NIGHT-3: THE FOREST ROOM'S RECORD — what the room is, as data (pure, rule #36; checked by apps/night/pure/room.js, data row «NIGHT room
    records»). levels: what each quality level draws (forest.js reads them); looks: each mood's colours (token names for palette.cv, defined in
    night.css) and its fog / mist / firefly amounts, eased by the room (τ MOOD_TC); moods: a mode id → its look; nature: the ambience recipe
-   (drone, wind, distant crickets, one soft echo — RUN 7's numbers), built by apps/night/sound/ambience.js. */
+   (drone, wind, distant crickets, one soft echo — RUN 7's numbers; NIGHT-8 the stream), built by apps/night/sound/ambience.js. */
+import { streamVoices } from './stream.js';   // NIGHT-8: the stream's sound places, from its path
 const LOOK=(pre, fog, mist, flies)=>Object.freeze({ pre, fog, mist, flies,
   tokens:Object.freeze({ fog:pre+'fog', sky:pre+'sky', under:pre+'under', moon:pre+'moon', moonhalo:pre+'moonhalo', haze:pre+'haze', cloud:pre+'cloud',
     shroom:pre+'shroom', bloom:pre+'bloom' }) });
 const F=Object.freeze;
 export const FOREST_ROOM=F({
-  format:'handsong/room', version:1, id:'room.forest', name:F({ en:'Forest', ru:'Лес' }), tokens:'forest-',
+  format:'handsong/room', version:1, id:'room.forest', name:F({ en:'Forest', ru:'Лес' }), icon:'forest', tokens:'forest-',   // NIGHT-8: icon — its Room-sounds slider keeps the leaf
   /* full: real shadows (hand light 1024², 512² on small screens), 70 wild fireflies, 16-step trails, moving mist; reduced: no shadow, 35 fireflies,
      8-step trails, still mist; «minimal» has no WebGL (the room's 2D stand-in) */
   levels:F({ full:F({ flies:70, trail:16, shadow:1024, shadowSmall:512, mist:true, shrooms:28, blooms:10, grass:3500, leaves:60, moths:6, beams:4, dew:1100, webs:9,
@@ -15,13 +16,15 @@ export const FOREST_ROOM=F({
       rocks:30, pebbles:260, floaters:28, mistStrips:5,
       roots:5, logs:2, stumps:5, snags:3, twigs:56, moss:400, ivy:12, woodShrooms:30, flare:true, barkMoss:true, shade:true, gust:true, gustLeaves:12,
       crowns:true, crownShare:1, young:10, shrubs:16, saplings:10, stars:500, dapple:true, moonFace:true,
-      paint:true, paintR:3, vignette:true, grain:true, breath:true, foxfire:12, flowers:14, groundTex:true }),   // NIGHT-7: the bare floor's prepared files   // NIGHT-6 slice 9: the light's trail points, the night flowers   // NIGHT-6 slice 8: the painted distance and the film   // NIGHT-6 slice 7: the canopy   // NIGHT-6 slice 5: moss, roots, fallen wood (ivy: trees)   // NIGHT-6 slice 4: the stream's surroundings   // NIGHT-6 slice 3: the floor (fern2: rosettes)
+      paint:true, paintR:3, vignette:true, grain:true, breath:true, foxfire:12, flowers:14, groundTex:true,
+      groundMacro:true, litterLeaves:900, litterPebbles:220, litterTwigs:160 }),   // NIGHT-8: the ground's large scale and its litter   // NIGHT-7: the bare floor's prepared files   // NIGHT-6 slice 9: the light's trail points, the night flowers   // NIGHT-6 slice 8: the painted distance and the film   // NIGHT-6 slice 7: the canopy   // NIGHT-6 slice 5: moss, roots, fallen wood (ivy: trees)   // NIGHT-6 slice 4: the stream's surroundings   // NIGHT-6 slice 3: the floor (fern2: rosettes)
     reduced:F({ flies:35, trail:8, shadow:0, shadowSmall:0, mist:false, shrooms:14, blooms:5, grass:1400, leaves:24, moths:3, beams:2, dew:500, webs:5,
       sorrel:600, forb:240, bilberry:100, anemone:200, nettle:50, sedge:230, fern2:45, softEdges:true,
       rocks:18, pebbles:120, floaters:14, mistStrips:3,
       roots:5, logs:2, stumps:5, snags:3, twigs:0, moss:200, ivy:6, woodShrooms:16, flare:true, barkMoss:true, shade:true, gust:true, gustLeaves:6,
       crowns:true, crownShare:0.35, young:6, shrubs:10, saplings:6, stars:250, dapple:true, moonFace:true,
-      paint:true, paintR:2.5, vignette:true, grain:false, breath:true, foxfire:8, flowers:8, groundTex:true }) }),   // NIGHT-6 slice 8: smaller strokes, no grain at medium   // NIGHT-6 slice 7: a third of each crown's sprays beyond the first   // NIGHT-6 slice 5: no fallen branches at medium   // NIGHT-6: soft cut-out edges at medium (no antialiasing there)   // NIGHT-6 slice 1: dew, webs
+      paint:true, paintR:2.5, vignette:true, grain:false, breath:true, foxfire:8, flowers:8, groundTex:true,
+      groundMacro:true, litterLeaves:380, litterPebbles:90, litterTwigs:60 }) }),   // NIGHT-8   // NIGHT-6 slice 8: smaller strokes, no grain at medium   // NIGHT-6 slice 7: a third of each crown's sprays beyond the first   // NIGHT-6 slice 5: no fallen branches at medium   // NIGHT-6: soft cut-out edges at medium (no antialiasing there)   // NIGHT-6 slice 1: dew, webs
   looks:F({
     glow:LOOK('forest-', 0.06, 1, 1),            // Glow: the base tokens
     dusk:LOOK('forest-dusk-', 0.052, 0.8, 0.9),  // Dusk: violet sky, a warm low moon, less mist
@@ -34,6 +37,9 @@ export const FOREST_ROOM=F({
     crickets:F({ n:3, fLo:4300, fHi:4900, pulsesLo:3, pulsesHi:5, pulse:0.012, gap:0.016, every:F([0.6, 1.8]), lp:7000,
       gain:0.014, send:0.6, pans:F([-0.6, 0.35, 0.8]), seed:0x43524B54 }),
     echo:F({ time:0.13, fb:0.38, lp:2800 }),
+    /* NIGHT-8: the stream's murmur (apps/night/pure/brook.js, the nature worklet): its voices along the water, its gain in the nature mix (under
+       the wind's own level, so it sits under the music), a little of it into the echo */
+    stream:F({ voices:F(streamVoices()), gain:0.25, send:0.06 }),   // gain: measured ≈ 5 dB under the wind and crickets (K-like; row «NIGHT stream, water and ground»)
     level:0.6,     // the default room volume (0…1, the shell's slider)
     master:0.42,   // the ambience bus at level 1: at the default level ≈ 12 dB under the Night sounds (measured, RUN 7)
     ahead:0.35,    // seconds of chirps scheduled ahead

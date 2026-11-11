@@ -9,7 +9,7 @@ Index: `/HANDOFF.md`. Rules: `CLAUDE.md`. Open items: `docs/night/BACKLOG.md`. P
 `handsong-night`'s Production branch is `night-release`, a stopper branch that is a copy of the old `main`. Merging `dev` into `main` does not touch Night's production. The new Night does not go public yet, and its public home (Vercel or another host) is not decided. `dev` pushes give previews, which keep `?probe`: use those for phone checks. NIGHT-7 (user, 2026-11-11): the test version for the first testers goes to `night-release` (the user pushes; Full's `main` untouched); a Vercel production build of Night is the release edition by itself.
 
 ## Where it stands
-Stage 4: RUN 6 ✅ C0, VIS1a–c, listening page, design proposals · RUN 7 ✅ sound pass, C11, C6, C4b, C4c, C7, C5 · RUN 8 ✅ the user's fixes, the forest picture, C8 part (Lighter forest) · RUN 9 ✅ the living forest · SPLIT-2 ✅ its own app and name. **Next:** the user's checks below, then C8 rest (phone numbers, auto-proposal), C9 offline, C10 release, C12 release candidate. Plus the new items in the backlog. `NIGHT-1` (sound headroom) stage 1 done, waiting for the user's decision and the Poco numbers.
+Stage 4: RUN 6 ✅ C0, VIS1a–c, listening page, design proposals · RUN 7 ✅ sound pass, C11, C6, C4b, C4c, C7, C5 · RUN 8 ✅ the user's fixes, the forest picture, C8 part (Lighter forest) · RUN 9 ✅ the living forest · SPLIT-2 ✅ its own app and name. **Next:** the user's checks below, then C8 rest (phone numbers, auto-proposal), C9 offline, C10 release, C12 release candidate. Plus the new items in the backlog. `NIGHT-8` (the forest closer to real) built, waiting for step 146. `NIGHT-1` (sound headroom) stage 1 done, waiting for the user's decision and the Poco numbers.
 
 ## The user's open checks, with today's addresses
 Old step texts use the old address and `src/…`; these are the current forms. Live Server, headphones, a lamp beside you.
@@ -25,6 +25,7 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 - **Not done by a machine:** ears, hands, phones. Old setting names do not carry over to the new `handsong-night` address, so first-run steps may appear again there.
 
 - **Step 145, music and full screen** (five checks; covers step 144's and 143's phone parts): `archive/CLAUDE-history.md`, step 145. Steps 143 (1), (3) and 144 (1)–(4) still stand on the laptop.
+- **Step 146, the forest closer to real** (five checks: the two stream samples by ear, the stream in the app, the water, the ground and rocks, the Poco): `archive/CLAUDE-history.md`, step 146.
 - **Step 127, the quiet floor by ear:** `http://127.0.0.1:5500/apps/night/?probe&tails=off` and `…&tails=on`; `archive/CLAUDE-history.md`.
 - **The Poco headroom page, later:** `<Night preview>/?probe&headroom`, about 25 minutes (user, 2026-11-03).
 
@@ -36,6 +37,15 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 5. The falling star passes in front of the trees. Natural?
 
 ## Records (English, at most about 15 lines each; older ones go to `archive/HANDOFF-history.md`)
+### NIGHT-8 (2026-11-11): the forest, closer to real. Log: `docs/night/WORK-LOG.md`
+- The stream's murmur: synthesized, endless (`pure/brook.js`: bubble resonances in clusters over a soft rush, each voice's flow drifting; no loop), run by the nature worklet (`worklets/nature-worklet.js`) in the nature sound under the Room-sounds slider; six voices along the water from its path (near: wide, bright, close; far: narrow, dark). Measured 5.3 dB under the wind and crickets (K-like), the nature sound +0.9 dB; asleep when the room's sound is off; the Lighter mode thins it. Cost ≈ 1 % of a core (node, half rate).
+- Listening samples: `tools/.listen/brook-a-synth.wav` (shipped) and `brook-b-recording.wav` (CC0, «stream-river-water-up-close» by jackthemurray, Freesound #433589 via Wikimedia Commons, looped with a 3-s equal-power join; not shipped). (a) ships until the user chooses by ear.
+- The water: near black, the sky only at grazing angles, the moon broken into sparkles, the nearest fireflies and mushrooms reflected, glints riding downstream, stones in the see-through shallows, white water and wakes round the rocks in it; darker, glossier banks.
+- The ground: a prepared macro map (`tex/groundm-*`, `pure/ground.js macroAt`: damp, moss, leaf drifts, the turned second copy of the floor texture) breaks the 6-m tile; litter from the same law (900 / 380 leaves, 220 / 90 pebbles, 160 / 60 twigs) inside existing draws.
+- The rocks: smooth spheres shaped per instance in the shader (every stone different), grey or brownish, mottled, lichen spots, moss on top, half buried, wet and glossy at the water; today's seven aisle rocks joined the stones' draw (−7 draws, −1 program).
+- A room gives its own Room-sounds icon (`icon` in the record; the forest keeps the leaf; the test room shows another).
+- Laptop (HD 4000), Standard: detections = Dark (before −1.1 / +5.7 %, after −0.6 / −0.1 %), frame 3.3–3.4 ms (2.4–3.9), draws 62 (69–70), programs 28 (29), triangles 199 k (189 k), textures 24.9 MB (=). Detailed: −55.4 / −51.4 % (−59.1 / −50.7 %), draws 104–105 (117–120), programs 30 (32), triangles 622 k (533 k), textures 90.9 MB (86.9). Files 17.86 MB of 30.
+- Rows: data «NIGHT stream sound (app)», «FOREST ground (app)»; browser «NIGHT stream, water and ground». Waiting for step 146.
 ### NIGHT-7c (2026-11-11): music from the first moment, and full screen (+ CORE-15, an icon door). Log: `docs/night/WORK-LOG.md`
 - Music is on by default («Покой» / Still) and starts on the tap on Begin: once the audio engine is up (about 1 s; the camera, its prompt and the model still loading) the bed plays in the Night profile's own view, fades in (level ~3 s, ground 2.5 s), and plays on under the calibration and the cards; the face does not restart it. Turning it off is remembered. New storage names (`handsong.nightMusicMode`, `…MusicLevel`): an old «off» or volume 0 from development runs never silences a new player.
 - iPhone: `navigator.audioSession.type='playback'` on Begin where it exists (Safari 16.4+); elsewhere nothing changes (on older iOS the silent switch mutes Web Audio).
@@ -83,30 +93,3 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 - Costs by RUN 9's method (hand detections vs Dark) and NIGHT-1's (µs per quantum): medium has 3.8 points left (−6.2 → −10 %), split into allowances; the opening (textures, programs) is the main Poco risk. No Poco number exists yet: slice 0 measures it.
 - New sound kinds (rain, the stream, owl, splash) need no core change: Night's nature module gains parts (native nodes for hiss, one nature worklet for events), one seeded schedule shared with the picture.
 - 14 slices proposed (0 the yardstick; 1 answers to notes and the bed; 2 fireflies follow the melody; … 11 sound and rain; 12 animals) and 8 decisions. Waiting for the user's approval.
-### NIGHT-3 stage 5 part 2 (2026-11-09): the switching machinery (CORE-12). Log: `docs/night/WORK-LOG.md`; as built: PLAN.md top
-- `apps/night/roomswitch.js` switches a room: the bed fades and holds, the picture fades out, the new room opens in the dark, the nature crossfades on its second slot, the name shows, the bed comes back. The room is remembered (real rooms only).
-- Every opening (Dark/Camera → Room too) pauses hand detection until the room has drawn two frames, then fades in; a failed opening shows the room's stand-in; past 8 s the stand-in shows. No audio node is made in a switch.
-- The Room button shows only with two rooms or more (players: one room, five buttons as before). A development test room (`?probe&testroom`) exercises it all.
-- Row «NIGHT room switch»: the four exact controls pass; dropouts printed (0 on the laptop).
-- «Облегчённый режим» replaces «Лёгкий лес»; its text says the music gets lighter too.
-- Step 133 checked by the user: all works, except the forest's sounds stayed in the test room (its nature was wind and a cricket too). Fixed: the test room's nature is silent; the row proves the forest's slot fades, parks and is gone (−115 dB). Next: the user's call.
-### NIGHT-5 (2026-11-09): the user's fixes from play (CORE-11). Log: `docs/night/WORK-LOG.md`
-- Part A of the window that continues with stage 5 part 2 (Part B, after the user's check).
-- Night never offers Full's song: a profile that records nothing runs no autosave and no offer; Night's page declares its own storage names (`<meta name="handsong-store">`, `core/storens.js`): language, autosave flag, user files, «warned once». Device facts stay shared. The runner's storage census proves it every session, with controls.
-- The playing hand's depth has the whole range: reach 1 (was 0.6), the bar fills 0…100 %, no mark. Far end: ~3.4 dB more room than the old stop, darker, loudness within ±1.5 dB. Not retuned (by ear: step 132).
-- The bar reads «Глубина». v1 has v2's gap rule (no burst after a hidden tab).
-- Approved and committed by the user (2026-11-09); step 132 taken as OK (its answers came blank): the far end not retuned, the leaf icon kept.
-### NIGHT-4 (2026-11-09): the music bed, version 2. Log: `docs/night/WORK-LOG.md`; design and «as built»: `docs/night/design/NIGHT-3-rooms/PLAN.md` §4b
-- The user put it before stage 5 part 2 (switching), which still waits.
-- One AudioWorklet (`apps/night/worklets/bed-worklet.js`) holds every voice and the bed's own long stereo room, at half rate. Measured first: native convolution 66–696 µs for 0.26–6 s IRs; a native 8-line network 72 µs; per native node 1–4.4 µs.
-- The law (`pure/bed2.js`, node row «NIGHT music bed v2 law (app)», 174 cases):
-  - 2–4 loop voices, each repeating a phrase of 2–4 long notes on its own loop length (17 / 23 / 29 / 31 s), sometimes changed by a note; kept in steps, so a Mood change keeps the melodies;
-  - an open-voiced pad over 2–2.6 octaves; a warm ground that takes the drone over; soft glass; air above the note field;
-  - a breath about 6 a minute; an arc sparse → full → sparse over 5–10 min.
-- Timbres: bowed-string pad, loop voices «voices» (formant vowels, the default) or «horns» (blooming low-pass).
-- Presets: «Покой» dark and deep, «Течение» melodies in the middle, «Мерцание» bright with glass and air.
-- Lighter (the «Лёгкий лес» switch, or ≤ 2 GB / ≤ 2 cores): two loops, a 3-tone pad, no air, half the glass.
-- Cost (laptop, the bed alone): 1.9–2.7 % of a quantum at the arc's fullest (v1: 1.9–2.4 %). The census gate is 133 µs = 5 %; its peaks are 53 / 71 / 85 µs.
-- Level near the nature sound (K-like −1.0 / +1.1 / +1.9 dB).
-- v1 is unchanged behind the dev A/B pills `?probe&bed=v1|v2&voices=a|b`, and plays by itself if AudioWorklet is missing.
-- Accepted by ear (user, 2026-11-09): v2 with the «voices» palette stays the default; v1 stays as the fallback (NIGHT-5 gave it v2's gap rule).

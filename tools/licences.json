@@ -130,7 +130,7 @@
   },
   {
    "id": "forest-files",
-   "name": "The night forest's prepared files: textures that never change during play (a spider web; the floor's plant sheet; the contact shadows; the crowns' leaf sprays; the moonlight's dapple; the moon's face; the bare floor's colour and relief), each a master with smaller copies",
+   "name": "The night forest's prepared files: textures that never change during play (a spider web; the floor's plant sheet; the contact shadows; the crowns' leaf sprays; the moonlight's dapple; the moon's face; the bare floor's colour and relief; NIGHT-8 the bare ground's large scale as data), each a master with smaller copies",
    "class": "image",
    "use": "shipped",
    "version": "—",
@@ -152,6 +152,9 @@
     "apps/night/rooms/forest/tex/groundn-1024.png",
     "apps/night/rooms/forest/tex/groundn-2048.png",
     "apps/night/rooms/forest/tex/groundn-512.png",
+    "apps/night/rooms/forest/tex/groundm-1024.png",
+    "apps/night/rooms/forest/tex/groundm-256.png",
+    "apps/night/rooms/forest/tex/groundm-512.png",
     "apps/night/rooms/forest/tex/moon-128.png",
     "apps/night/rooms/forest/tex/moon-256.png",
     "apps/night/rooms/forest/tex/moon-512.png",

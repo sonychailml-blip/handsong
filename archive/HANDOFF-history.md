@@ -8481,3 +8481,32 @@ not a control · run a "random" failure many times and print WHERE and HOW MUCH 
 - The Music button (Music · Sound / Mood · Notes · Sleep, 3 + 3 places): off → «Покой» → «Течение» → «Мерцание»; off at first start, remembered. Settings → Music: volume, «Музыка отвечает моим нотам» (off by default).
 - One generator, the forest's recipe as data: chords of the scale's own degrees under the playing, two detuned oscillators per voice, slow filter drift, a ground that takes the drone over, rare glimmer; its own slow clock (no stepping back). The response leans only which chord comes next, never when.
 - Cost on the laptop 2.1–2.5 % of a quantum (gate 3 %); level 0.3 dB from the nature sound. Step 130 checked by the user (2026-11-08): all works; the response stays off by default.
+
+## Moved from docs/night/HANDOFF.md at NIGHT-8 (2026-11-11), word for word
+### NIGHT-3 stage 5 part 2 (2026-11-09): the switching machinery (CORE-12). Log: `docs/night/WORK-LOG.md`; as built: PLAN.md top
+- `apps/night/roomswitch.js` switches a room: the bed fades and holds, the picture fades out, the new room opens in the dark, the nature crossfades on its second slot, the name shows, the bed comes back. The room is remembered (real rooms only).
+- Every opening (Dark/Camera → Room too) pauses hand detection until the room has drawn two frames, then fades in; a failed opening shows the room's stand-in; past 8 s the stand-in shows. No audio node is made in a switch.
+- The Room button shows only with two rooms or more (players: one room, five buttons as before). A development test room (`?probe&testroom`) exercises it all.
+- Row «NIGHT room switch»: the four exact controls pass; dropouts printed (0 on the laptop).
+- «Облегчённый режим» replaces «Лёгкий лес»; its text says the music gets lighter too.
+- Step 133 checked by the user: all works, except the forest's sounds stayed in the test room (its nature was wind and a cricket too). Fixed: the test room's nature is silent; the row proves the forest's slot fades, parks and is gone (−115 dB). Next: the user's call.
+### NIGHT-5 (2026-11-09): the user's fixes from play (CORE-11). Log: `docs/night/WORK-LOG.md`
+- Part A of the window that continues with stage 5 part 2 (Part B, after the user's check).
+- Night never offers Full's song: a profile that records nothing runs no autosave and no offer; Night's page declares its own storage names (`<meta name="handsong-store">`, `core/storens.js`): language, autosave flag, user files, «warned once». Device facts stay shared. The runner's storage census proves it every session, with controls.
+- The playing hand's depth has the whole range: reach 1 (was 0.6), the bar fills 0…100 %, no mark. Far end: ~3.4 dB more room than the old stop, darker, loudness within ±1.5 dB. Not retuned (by ear: step 132).
+- The bar reads «Глубина». v1 has v2's gap rule (no burst after a hidden tab).
+- Approved and committed by the user (2026-11-09); step 132 taken as OK (its answers came blank): the far end not retuned, the leaf icon kept.
+### NIGHT-4 (2026-11-09): the music bed, version 2. Log: `docs/night/WORK-LOG.md`; design and «as built»: `docs/night/design/NIGHT-3-rooms/PLAN.md` §4b
+- The user put it before stage 5 part 2 (switching), which still waits.
+- One AudioWorklet (`apps/night/worklets/bed-worklet.js`) holds every voice and the bed's own long stereo room, at half rate. Measured first: native convolution 66–696 µs for 0.26–6 s IRs; a native 8-line network 72 µs; per native node 1–4.4 µs.
+- The law (`pure/bed2.js`, node row «NIGHT music bed v2 law (app)», 174 cases):
+  - 2–4 loop voices, each repeating a phrase of 2–4 long notes on its own loop length (17 / 23 / 29 / 31 s), sometimes changed by a note; kept in steps, so a Mood change keeps the melodies;
+  - an open-voiced pad over 2–2.6 octaves; a warm ground that takes the drone over; soft glass; air above the note field;
+  - a breath about 6 a minute; an arc sparse → full → sparse over 5–10 min.
+- Timbres: bowed-string pad, loop voices «voices» (formant vowels, the default) or «horns» (blooming low-pass).
+- Presets: «Покой» dark and deep, «Течение» melodies in the middle, «Мерцание» bright with glass and air.
+- Lighter (the «Лёгкий лес» switch, or ≤ 2 GB / ≤ 2 cores): two loops, a 3-tone pad, no air, half the glass.
+- Cost (laptop, the bed alone): 1.9–2.7 % of a quantum at the arc's fullest (v1: 1.9–2.4 %). The census gate is 133 µs = 5 %; its peaks are 53 / 71 / 85 µs.
+- Level near the nature sound (K-like −1.0 / +1.1 / +1.9 dB).
+- v1 is unchanged behind the dev A/B pills `?probe&bed=v1|v2&voices=a|b`, and plays by itself if AudioWorklet is missing.
+- Accepted by ear (user, 2026-11-09): v2 with the «voices» palette stays the default; v1 stays as the fallback (NIGHT-5 gave it v2's gap rule).

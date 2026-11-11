@@ -1092,6 +1092,86 @@ async function forestFloorCore(){
    the water below the bank's top; outOfWater moves a point exactly to its clearance and leaves a clear one alone; the rocks, pebbles, drifting
    leaves and mist strips: their counts, places (none under the eye; wet rocks in the water, the others on the bank), the leaves ride
    downstream and start again upstream; repeatable. */
+/* NIGHT-8: row «NIGHT stream sound (app)» — the stream's murmur law (apps/night/pure/brook.js) with the forest's voices: (1) the same seed twice is
+   the same sound, CONTROL another seed differs; (2) finite, its peak under −6 dBFS, its RMS in a sane window; (3) NO LOOP: the 50-ms energy
+   envelope's normalised autocorrelation stays under 0.5 at every lag 1…20 s — CONTROL a render built by repeating one 6-s stretch shows ≥ 0.9;
+   (4) the near water wider than the far: the inter-channel correlation of the nearest voice alone is lower than the farthest's — CONTROL the
+   nearest with no spread and in the middle correlates ≥ 0.98; the voices: the nearest loudest and widest, the farthest darkest; (5) the Lighter
+   mode makes ≤ 65 % of the bubbles; asleep, zeros; (6) the voices validator: the forest's pass, damaged ones are refused; (7) the worklet imports
+   this very law and registers the name the sound module builds. */
+async function nightStreamSound(){
+  const d=[], notes=[]; let n=0; const miss=s=>d.push(s);
+  const B=await import(new URL('../apps/night/pure/brook.js', import.meta.url).href), FR=(await import(new URL('../apps/night/rooms/forest/pure/room.js', import.meta.url).href)).FOREST_ROOM, S=await import(new URL('../apps/night/rooms/forest/pure/stream.js', import.meta.url).href);
+  const fs=await import('node:fs'), RATE=48000, V=FR.nature.stream.voices;
+  const render=(voices, sec, seed, o={})=>{ const st=B.brookNew(RATE, voices, seed); if(o.light) st.light=true; if(o.sleep) st.sleep=true; const N=Math.round(RATE*sec), L=new Float32Array(N), R=new Float32Array(N);
+    for(let i=0;i<N;i+=128) B.brookOut(st, L, R, i, Math.min(128, N-i)); return { L, R, st }; };
+  const rms=(x, y)=>{ let s=0; for(let i=0;i<x.length;i++) s+=x[i]*x[i]+y[i]*y[i]; return Math.sqrt(s/(2*x.length)); };
+  const corr=(x, y)=>{ let a=0, b=0, c=0; for(let i=0;i<x.length;i++){ a+=x[i]*y[i]; b+=x[i]*x[i]; c+=y[i]*y[i]; } return a/Math.sqrt(b*c||1); };
+  const selfSim=(L, R)=>{ const h=RATE/20, m=Math.floor(L.length/h), e=new Float64Array(m); for(let k=0;k<m;k++){ let s=0; for(let i=k*h;i<(k+1)*h;i++) s+=L[i]*L[i]+R[i]*R[i]; e[k]=Math.sqrt(s/h); }
+    const mu=e.reduce((a,b)=>a+b,0)/m; for(let k=0;k<m;k++) e[k]-=mu; let best=0, at=0;
+    for(let lag=20;lag<=Math.min(400, m-40);lag++){ let s=0, a=0, b=0; for(let k=0;k+lag<m;k++){ s+=e[k]*e[k+lag]; a+=e[k]*e[k]; b+=e[k+lag]*e[k+lag]; } const c=s/Math.sqrt(a*b||1); if(c>best){ best=c; at=lag/20; } } return { best, at }; };
+  const t0=performance.now(), A=render(V, 40, B.BROOK.seed), ms=performance.now()-t0;
+  { const A2=render(V, 4, B.BROOK.seed), C=render(V, 4, B.BROOK.seed+1); let rep=0, ctl=0; for(let i=0;i<A2.L.length;i++){ rep=Math.max(rep, Math.abs(A.L[i]-A2.L[i]), Math.abs(A.R[i]-A2.R[i])); ctl=Math.max(ctl, Math.abs(A.L[i]-C.L[i])); } n+=2;
+    if(rep!==0) miss('the same seed twice differs by '+rep.toExponential(2)); if(!(ctl>1e-3)) miss('CONTROL: another seed gave the same stream'); }
+  { let pk=0, bad=0; for(let i=0;i<A.L.length;i++){ const a=Math.abs(A.L[i]), b=Math.abs(A.R[i]); if(!Number.isFinite(a+b)) bad++; pk=Math.max(pk, a, b); } const r=rms(A.L, A.R), db=x=>(20*Math.log10(x)).toFixed(1); n+=2;
+    if(bad || !(pk<0.5)) miss(`${bad} samples not finite, peak ${db(pk)} dBFS (under −6 wanted)`); if(!(r>0.005 && r<0.1)) miss(`RMS ${db(r)} dBFS (−46…−20 wanted)`);
+    notes.push(`40 s: RMS ${db(r)} dBFS, peak ${db(pk)} dBFS, ${A.st.made} bubbles (${(A.st.made/40).toFixed(0)}/s), ${A.st.dropped} dropped; rendered in ${(ms/400).toFixed(2)} % of real time on this machine (not judged)`); }
+  { const ss=selfSim(A.L, A.R); const P=Math.round(RATE*6), L2=new Float32Array(A.L.length), R2=new Float32Array(A.L.length); for(let i=0;i<L2.length;i++){ L2[i]=A.L[i%P]; R2[i]=A.R[i%P]; } const sc=selfSim(L2, R2); n+=2;
+    if(!(ss.best<0.5)) miss(`the stream repeats: envelope self-similarity ${ss.best.toFixed(3)} at ${ss.at.toFixed(2)} s (under 0.5 wanted)`); if(!(sc.best>=0.9)) miss(`CONTROL: a 6-s loop reads only ${sc.best.toFixed(3)} — the measure cannot see a loop`);
+    notes.push(`no loop: the longest self-similarity ${ss.best.toFixed(3)} at ${ss.at.toFixed(2)} s; CONTROL a 6-s loop ${sc.best.toFixed(3)} at ${sc.at.toFixed(2)} s`); }
+  { const near=V.reduce((a,v,i)=>v.gain>V[a].gain ? i : a, 0), far=V.reduce((a,v,i)=>v.gain<V[a].gain ? i : a, 0);
+    const solo=(v, o={})=>render([{ ...v, gain:1, ...o }], 6, 7), cn=corr(...Object.values(solo(V[near])).slice(0,2)), cf=corr(...Object.values(solo(V[far])).slice(0,2)), cc=corr(...Object.values(solo(V[near], { w:0, pan:0 })).slice(0,2)); n+=3;
+    if(!(cn<cf)) miss(`the near water is not wider than the far: correlation near ${cn.toFixed(3)}, far ${cf.toFixed(3)}`); if(!(cc>=0.98)) miss(`CONTROL: the near voice with no spread correlates only ${cc.toFixed(3)}`);
+    if(!(V[near].w>=Math.max(...V.map(v=>v.w))-1e-9 && V[far].lp<=Math.min(...V.map(v=>v.lp))+1e-9)) miss('the voices: the nearest is not the widest or the farthest not the darkest '+JSON.stringify(V.map(v=>[v.gain, v.w, v.lp])));
+    notes.push(`stereo: correlation near ${cn.toFixed(3)} (CONTROL no spread ${cc.toFixed(3)}), far ${cf.toFixed(3)}; voices pan ${V.map(v=>v.pan).join(' / ')}, gain ${V.map(v=>v.gain).join(' / ')}`); }
+  { const Lt=render(V, 10, 3, { light:true }), Nm=render(V, 10, 3), Z=render(V, 1, 3, { sleep:true }); n+=2;
+    if(!(Lt.st.made<=0.65*Nm.st.made)) miss(`the Lighter mode made ${Lt.st.made} bubbles against ${Nm.st.made}`); if(Z.L.some(x=>x!==0) || Z.R.some(x=>x!==0)) miss('asleep, the stream still sounds'); }
+  { const bad=[['lp', v=>{ v[0]={ ...v[0], lp:50 }; }], ['f', v=>{ v[1]={ ...v[1], f:[900, 300] }; }], ['pan', v=>{ v[2]={ ...v[2], pan:2 }; }]]; n+=1+bad.length;
+    if(B.checkBrookVoices(V)) miss('the forest\'s voices refused: '+B.checkBrookVoices(V));
+    for(const [k, f] of bad){ const w=V.slice(); f(w); const why=B.checkBrookVoices(w); if(!why || !why.includes('.'+k)) miss(`a damaged ${k} was not refused by name: ${why}`); }
+    n++; if(JSON.stringify(V)!==JSON.stringify(S.streamVoices())) miss('the record\'s voices are not the stream\'s geometry (streamVoices)'); }
+  { const w=fs.readFileSync(new URL('../apps/night/worklets/nature-worklet.js', import.meta.url), 'utf8'), a=fs.readFileSync(new URL('../apps/night/sound/ambience.js', import.meta.url), 'utf8'); n+=2;
+    if(!/from '\.\.\/pure\/brook\.js'/.test(w) || !/brookOut\(/.test(w)) miss('the nature worklet does not run apps/night/pure/brook.js brookOut');
+    if(!/registerProcessor\('night-nature'/.test(w) || !/AudioWorkletNode\(E\.ac, 'night-nature'/.test(a)) miss('the worklet\'s name and the sound module\'s node differ'); }
+  return { cases:n, total:d.length, differences:d, notes };
+}
+/* NIGHT-8: row «FOREST ground (app)» — the bare ground's law (apps/night/rooms/forest/pure/ground.js): (1) every macro value in 0…1; the stream's
+   bed is damp; moss is thicker at the trunks' feet than 3 m away; drifts lie on the trunks' LEE side — CONTROL the same sums with the wind turned
+   round favour the other side; (2) the large scale does not repeat with the floor's 6-m tile: macro(x, z) against macro(x + 6, z) correlates
+   under 0.6 — CONTROL a field with that period correlates 1; the second copy's share (sel) covers both ends; (3) the litter at each level's
+   counts, none in the water, none under the eye; the leaves lie where the drifts are (mean drift above that of uniform points by 0.1 — CONTROL
+   uniform points against themselves 0); the twigs nearer the trunks; (4) seeded: the same twice; more leaves move no pebble. */
+async function forestGroundCore(){
+  const d=[], notes=[]; let n=0; const miss=s=>d.push(s);
+  const G=await import(new URL('../apps/night/rooms/forest/pure/ground.js', import.meta.url).href), L=await import(new URL('../apps/night/rooms/forest/pure/forestlife.js', import.meta.url).href);
+  const T=(await import(new URL('../apps/night/rooms/forest/pure/layout.js', import.meta.url).href)).forestTrunks(), FR=(await import(new URL('../apps/night/rooms/forest/pure/room.js', import.meta.url).href)).FOREST_ROOM;
+  { let out=0, wetBed=0, bed=0; for(let k=0;k<900;k++){ const x=-12+(k%30)*0.8, z=-20+Math.floor(k/30)*0.85, m=G.macroAt(x, z, T); if(m.some(v=>!(v>=0 && v<=1))) out++; }
+    for(let u=0.2;u<0.98;u+=0.02){ const p=L.streamAt(u); bed++; if(G.macroAt(p.x, p.z, T)[0]>0.99) wetBed++; } n+=2;
+    if(out) miss(out+' macro values outside 0…1'); if(wetBed!==bed) miss(`the stream's bed is damp at ${wetBed} of ${bed} points`); }
+  { const ring=(dist, wind)=>{ let moss=0, lee=0, win=0, k=0; for(const [tx, tz, r] of T.slice(0, 40)) for(let a=0;a<16;a++){ const c=Math.cos(a/16*6.283), s2=Math.sin(a/16*6.283), x=tx+c*(r+dist), z=tz+s2*(r+dist), m=G.macroAt(x, z, T); moss+=m[1]; k++;
+      const side=c*wind[0]+s2*wind[1]; if(side>0.5) lee+=m[2]; else if(side<-0.5) win+=m[2]; } return { moss:moss/k, lee, win }; };
+    const W=G.MACRO.wind, a=ring(0.4, W), b=ring(3, W), c=ring(0.4, [-W[0], -W[1]]); n+=3;
+    if(!(a.moss>b.moss+0.15)) miss(`moss at the trunks' feet ${a.moss.toFixed(2)}, 3 m away ${b.moss.toFixed(2)}`);
+    if(!(a.lee>a.win)) miss(`the drifts are not on the lee side: lee ${a.lee.toFixed(1)}, windward ${a.win.toFixed(1)}`); if(!(c.lee<c.win)) miss('CONTROL: with the wind turned round the lee side still wins — the measure cannot fail');
+    notes.push(`moss at the feet ${a.moss.toFixed(2)} vs 3 m away ${b.moss.toFixed(2)}; drift lee ${a.lee.toFixed(1)} vs windward ${a.win.toFixed(1)}`); }
+  { const cor=(f)=>{ const A=[], B=[]; for(let k=0;k<1600;k++){ const x=-20+(k%40)*1.03, z=-30+Math.floor(k/40)*0.91; A.push(f(x, z)); B.push(f(x+6, z)); } const ma=A.reduce((s,v)=>s+v,0)/A.length, mb=B.reduce((s,v)=>s+v,0)/B.length;
+      let s=0, a=0, b=0; for(let i=0;i<A.length;i++){ s+=(A[i]-ma)*(B[i]-mb); a+=(A[i]-ma)**2; b+=(B[i]-mb)**2; } return s/Math.sqrt(a*b||1); };
+    const cs=[0,1,2,3].map(c=>cor((x, z)=>G.macroAt(x, z, T)[c])), ct=cor((x, z)=>Math.sin(x/6*6.283)+Math.cos(z)); const sel=[]; for(let k=0;k<400;k++) sel.push(G.macroAt(-10+(k%20)*1.1, -15+Math.floor(k/20)*1.1, T)[3]); n+=3;
+    if(cs.some(c=>!(Math.abs(c)<0.6))) miss('the large scale repeats with the 6-m tile: correlations '+cs.map(c=>c.toFixed(2)).join(' / ')); if(!(ct>0.99)) miss('CONTROL: a 6-m periodic field correlates only '+ct.toFixed(3));
+    if(!(Math.min(...sel)<0.05 && Math.max(...sel)>0.95)) miss(`the second copy's share spans only ${Math.min(...sel).toFixed(2)}…${Math.max(...sel).toFixed(2)}`);
+    notes.push(`against the 6-m shift: damp ${cs[0].toFixed(2)}, moss ${cs[1].toFixed(2)}, drift ${cs[2].toFixed(2)}, sel ${cs[3].toFixed(2)} (CONTROL periodic ${ct.toFixed(2)})`); }
+  for(const lv of ['full','reduced']){ const V=FR.levels[lv], P=G.litterPlaces({ leaves:V.litterLeaves, pebbles:V.litterPebbles, twigs:V.litterTwigs }, T), E=G.LITTER.eye; n+=3;
+    if(P.leaves.length!==V.litterLeaves || P.pebbles.length!==V.litterPebbles || P.twigs.length!==V.litterTwigs) miss(`${lv}: ${P.leaves.length} / ${P.pebbles.length} / ${P.twigs.length} placed`);
+    const all=[...P.leaves, ...P.pebbles, ...P.twigs]; if(all.some(q=>L.streamNear(q.x, q.z).d<L.STREAM.half+0.08-1e-9)) miss(lv+': litter in the water'); if(all.some(q=>Math.hypot(q.x-E[0], q.z-E[1])<G.LITTER.eyeR)) miss(lv+': litter under the eye');
+    if(lv==='full'){ const R=(await import(new URL('../core/pure/dsp.js', import.meta.url).href)).seeded(5), U=[], U2=[]; for(let k=0;k<600;k++){ U.push([G.LITTER.x[0]+R()*15, G.LITTER.z[0]+R()*19.6]); U2.push([G.LITTER.x[0]+R()*15, G.LITTER.z[0]+R()*19.6]); }
+      const md=a=>a.reduce((s,[x,z])=>s+G.macroAt(x, z, T)[2], 0)/a.length, ml=md(P.leaves.map(q=>[q.x, q.z])), mu=md(U), mu2=md(U2), tn=a=>a.reduce((s,[x,z])=>s+Math.min(...T.map(([tx,tz,r])=>Math.hypot(x-tx, z-tz)-r)), 0)/a.length; n+=3;
+      if(!(ml>mu+0.1)) miss(`the leaves do not follow the drifts: mean drift ${ml.toFixed(2)} at the leaves, ${mu.toFixed(2)} at uniform points`); if(!(Math.abs(mu-mu2)<0.1)) miss(`CONTROL: two uniform samples differ by ${Math.abs(mu-mu2).toFixed(2)}`);
+      const tt=tn(P.twigs.map(q=>[q.x, q.z])), tu=tn(U); if(!(tt<tu)) miss(`the twigs are not nearer the trunks: ${tt.toFixed(2)} m vs ${tu.toFixed(2)} m`);
+      notes.push(`high: ${P.leaves.length} leaves (mean drift ${ml.toFixed(2)} vs uniform ${mu.toFixed(2)} / ${mu2.toFixed(2)}), ${P.pebbles.length} pebbles, ${P.twigs.length} twigs (${tt.toFixed(2)} m from a trunk vs ${tu.toFixed(2)})`);
+      const P2=G.litterPlaces({ leaves:V.litterLeaves, pebbles:V.litterPebbles, twigs:V.litterTwigs }, T), P3=G.litterPlaces({ leaves:V.litterLeaves+50, pebbles:V.litterPebbles, twigs:V.litterTwigs }, T); n+=2;
+      if(JSON.stringify(P2)!==JSON.stringify(P)) miss('the litter twice differs'); if(JSON.stringify(P3.pebbles)!==JSON.stringify(P.pebbles)) miss('more leaves moved the pebbles'); } }
+  return { cases:n, total:d.length, differences:d, notes };
+}
 async function forestStreamCore(){
   const d=[], notes=[]; let n=0; const miss=s=>d.push(s);
   const L=await import(new URL('../apps/night/rooms/forest/pure/forestlife.js', import.meta.url).href), S=await import(new URL('../apps/night/rooms/forest/pure/stream.js', import.meta.url).href);
@@ -1537,6 +1617,8 @@ const ROWS=[
   ['FOREST melody (app)',       ()=>forestMelodyCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 2
   ['FOREST floor (app)',        ()=>forestFloorCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 3
   ['FOREST stream (app)',       ()=>forestStreamCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 4
+  ['FOREST ground (app)',       ()=>forestGroundCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-8
+  ['NIGHT stream sound (app)',  ()=>nightStreamSound(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-8
   ['FOREST wood (app)',         ()=>forestWoodCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 5
   ['FOREST gust (app)',         ()=>forestGustCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 6
   ['FOREST canopy (app)',       ()=>forestCanopyCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 7

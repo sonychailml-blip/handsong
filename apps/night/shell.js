@@ -23,7 +23,7 @@ import { fsBegin, fsStarted, fsFlowTap, fsFlowEnd, fsToggle, fsOn, fsOnChange, f
 import { devItems } from './edition.js';   // NIGHT-7b: the release edition (a players' build, or ?release) hides the development items
 import { calWire, calOfferIfNew, calActive, calSideApply, calSideSet, calSettingsRender, calAbort } from './calib.js';   // NIGHT-2: the hand's calibration (its picture is drawn by the loop: main.js afterDraw)
 import { setSceneLevel, sceneLevel, setBackground, backgroundOf, sceneInfo, sceneRoom, sceneRooms, sceneOptDbg } from './scene/host.js';   // RUN 8 (slice 4): the scene's quality (development switch); C8 the measurement
-import { roomSwitch, roomNext } from './roomswitch.js';   // NIGHT-3 stage 5 part 2: the Room button
+import { roomSwitch, roomNext, natureLight } from './roomswitch.js';   // NIGHT-3 stage 5 part 2: the Room button
 import { latReport } from '../../core/legacy-ui/latmeter.js';   // C8: the device measurement reads the latency meter
 import { cardsWire, cardsShow, cardsOpen, cardsDue, cardsDone } from './cards.js';   // NIGHT-7: the first cards
 
@@ -99,6 +99,8 @@ function render(){
   $('nightSceneTg').hidden=!devItems(); $('nightSceneTg').textContent=t('night.scene', { lvl:t('night.scene.'+sceneLevel()) });
   for(const b of $('nightQualSeg').children) b.classList.toggle('on', b.dataset.q===sceneLevel());   // NIGHT-7: the players' picture choice
   $('nightRoomSoundRow').hidden= !amb; $('nightRoomSound').value=String(roomSound());
+  { const ic=$('nightRoomSoundRow').querySelector('.night-vico'), name=room().icon||'forest';   // NIGHT-8: the room gives its own Room-sounds icon (the forest keeps the leaf)
+    if(ic && ic.dataset.svg!==name){ const g=svgIcon(document, name); if(g){ ic.dataset.svg=name; ic.replaceChildren(g); } } }
   $('nightMusicVol').value=String(bedVolumeOf()); $('nightMusicAnswerTg').classList.toggle('on', bedAnswerOf());
   { const b=$('nightFsBtn'), full=fsOn(), tt=t(full ? 'night.fs.exit' : 'night.fs.enter'); b.hidden=!fsCanToggle();   // NIGHT-7c: the full-screen toggle shows its state
     if(b.dataset.svg!==(full ? 'fs-exit' : 'fs-enter')){ b.dataset.svg= full ? 'fs-exit' : 'fs-enter'; const g=svgIcon(document, b.dataset.svg); if(g) b.replaceChildren(g); }
@@ -114,7 +116,7 @@ function sleepSet(mins){
 function infoShow(v){ info=v; $('nightInfo').hidden=!v; if(v) render(); }
 function wire(){
   const tap=(id,f)=>{ $(id).onclick=()=>{ if(!D) return; f(); glint($(id)); render(); }; };
-  tap('nightRoom', ()=>{ const id=roomNext(); if(id) roomSwitch(id).then(()=>render()); });   // NIGHT-3 stage 5 part 2: the next room
+  tap('nightRoom', ()=>{ const id=roomNext(); if(id){ roomSwitch(id).then(()=>render()); render(); } });   // NIGHT-8: the slider's icon follows at once   // NIGHT-3 stage 5 part 2: the next room
   tap('nightMusic', ()=>{ const m=bedNext(bedModeOf()); bedSetMode(m, room().bed, room().bed2); save(MUSIC_KEYS.mode, m); if(amb) ambienceOn(true, roomSound()); });   // NIGHT-3 stage 4: off → still → drift → glimmer → off; the drone hands over
   tap('nightSound', ()=>D.setTimbre(nextOf(D.timbres(), D.timbre())));
   tap('nightMood', ()=>D.setMood(nextOf(D.moods(), D.mood())));
@@ -226,7 +228,7 @@ function bars(now, hv, fxv){
    largest fixed cost), struck sounds ring at most 60 % of their caps (audio.setLowPower), the forest picture at medium (the level chosen
    before is remembered and comes back when it is off), no glass blur. `boot` = applied with the face (the scene level only if it differs). */
 function lightApply(v, boot){
-  setLowPower(v); bedSetLight(v || WEAK); const I=fxInstance(chainKeyOf('ld'),'fdepth'); if(I && I.params[4]) I.params[4].setNorm(v ? 1 : 0);   // NIGHT-4: the music bed's lighter variant too (also on a weak device)
+  setLowPower(v); bedSetLight(v || WEAK); natureLight(v || WEAK); const I=fxInstance(chainKeyOf('ld'),'fdepth'); if(I && I.params[4]) I.params[4].setNorm(v ? 1 : 0);   // NIGHT-4: the music bed's lighter variant too (also on a weak device); NIGHT-8 the stream's
   if(v){ const cur=sceneLevel(); if(cur==='full'){ if(!boot || load(KEY.lightScene)==null) save(KEY.lightScene, cur); setSceneLevel('reduced'); } }
   else if(!boot){ const back=load(KEY.lightScene); if(back && sceneLevel()==='reduced') setSceneLevel(back); }
 }
@@ -245,7 +247,7 @@ export const nightClockDbg=fn=>{ clockOver=typeof fn==='function' ? fn : null; r
    NIGHT-6 slice 0: the room's frame time, draw calls, triangles, shader programs and texture memory per step, every opening of the session
    (the first is the cold one) and the device. The person's choices come back after it. */
 let measuring=false;
-const BEFORE_N6=Object.freeze({ dew:0, webs:0, sorrel:0, forb:0, bilberry:0, anemone:0, nettle:0, sedge:0, fern2:0, softEdges:false, rocks:0, pebbles:0, floaters:0, mistStrips:0, roots:0, logs:0, stumps:0, snags:0, twigs:0, moss:0, ivy:0, woodShrooms:0, flare:false, barkMoss:false, shade:false, gust:false, gustLeaves:0, crowns:false, crownShare:0, young:0, shrubs:0, saplings:0, stars:0, dapple:false, moonFace:false, paint:false, paintR:0, vignette:false, grain:false, breath:false, foxfire:0, flowers:0, groundTex:false });   // NIGHT-6: the counts its slices added, left out for the baseline step
+const BEFORE_N6=Object.freeze({ dew:0, webs:0, sorrel:0, forb:0, bilberry:0, anemone:0, nettle:0, sedge:0, fern2:0, softEdges:false, rocks:0, pebbles:0, floaters:0, mistStrips:0, roots:0, logs:0, stumps:0, snags:0, twigs:0, moss:0, ivy:0, woodShrooms:0, flare:false, barkMoss:false, shade:false, gust:false, gustLeaves:0, crowns:false, crownShare:0, young:0, shrubs:0, saplings:0, stars:0, dapple:false, moonFace:false, paint:false, paintR:0, vignette:false, grain:false, breath:false, foxfire:0, flowers:0, groundTex:false, groundMacro:false, litterLeaves:0, litterPebbles:0, litterTwigs:0 });   // NIGHT-6: the counts its slices added, left out for the baseline step
 async function measure(){
   if(measuring || !AC) return; measuring=true; const out=$('nightMeasureOut'), wait=ms=>new Promise(r=>setTimeout(r,ms)), SEC=20;
   const keep={ bg:backgroundOf(), level:sceneLevel(), light:load(KEY.light)==='1' }, i=timbreIdx('ld', D.timbre()), rows=[];

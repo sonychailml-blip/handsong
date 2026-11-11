@@ -79,6 +79,11 @@ NIGHT-4: THE MUSIC BED v2's LAW — what plays and when, as numbers (pure, rule 
 - const (4): `BED2_SEED`, `bed2Reg`, `BED2_WORK`, `BED2_TABLE`
 - fn (9): `bed2Fold`, `bed2Density`, `bed2Init`, `bed2Soon`, `bed2LoopReg`, `bed2Voice`, `bed2Step`, `bed2Work`, `bed2Tables`
 
+## apps/night/pure/brook.js
+NIGHT-8: THE STREAM'S MURMUR — the law and the synthesis, pure (rule #36; data row «NIGHT stream sound (app)»), run unchanged by the nature worklet (apps/night/worklets/nature-worklet.js) and by th…
+- const (2): `BROOK`, `brookStats`
+- fn (4): `checkBrookVoices`, `brookNew`, `brookRender`, `brookOut`
+
 ## apps/night/pure/cycle.js
 RUN 9 — THE NIGHT over the forest, as numbers.
 - const (7): `NIGHT`, `CLOUD_PASSES`, `sleepProgress`, `MOOD_TC`, `RARE`, `EMBLEM_AT`, `emblemPoints`
@@ -114,6 +119,10 @@ RUN 9 (slice 3) — THE FOREST'S DETAIL.
 NIGHT-6 slice 3 — THE FOREST FLOOR (parts of the night forest room; forest.js builds them; the places are ./pure/floor.js): the herb layer — wood sorrel, broad-leaved herbs, bilberry, wood anemones…
 - fn (2): `plantMaterial`, `buildFloor`
 
+## apps/night/rooms/forest/forest-ground.js
+NIGHT-8 — THE BARE GROUND'S LARGE SCALE (a part of the night forest room; forest.js applies it to the ground's material, after the ground waves and the wet banks).
+- fn (1): `patchGroundMacro`
+
 ## apps/night/rooms/forest/forest-gust.js
 NIGHT-6 slice 6 — THE EFFECTS HAND MOVES THE FOREST (a part of the night forest room; forest.js builds it; the numbers are ./pure/gust.js).
 - fn (1): `buildGust`
@@ -124,6 +133,7 @@ NIGHT-6 slice 9 — HIDDEN THINGS THE LIGHT FINDS (a part of the night forest ro
 
 ## apps/night/rooms/forest/forest-life.js
 RUN 9 (slice 2) — THE FOREST ANSWERS THE PLAYING, softly (never busy).
+- const (1): `WATER_GL`
 - fn (5): `patchGroundWaves`, `patchSway`, `patchWetGround`, `patchSoftEdges`, `buildLife`
 
 ## apps/night/rooms/forest/forest-paint.js
@@ -175,6 +185,11 @@ RUN 9 — THE FOREST'S LIFE, as numbers.
 - const (7): `STREAM`, `STREAM_LINE`, `CARVE`, `LIFE`, `pulseOf`, `RINGS`, `ringsNew`
 - fn (6): `streamAt`, `streamNear`, `bankGround`, `lifePlaces`, `ringAdd`, `ringsAge`
 
+## apps/night/rooms/forest/pure/ground.js
+NIGHT-8 — THE BARE GROUND'S LARGE SCALE and its SMALL THINGS, as numbers.
+- const (2): `MACRO`, `LITTER`
+- fn (2): `macroAt`, `litterPlaces`
+
 ## apps/night/rooms/forest/pure/gust.js
 NIGHT-6 slice 6 — THE EFFECTS HAND MOVES THE FOREST, as numbers.
 - const (2): `GUST`, `gustNew`
@@ -201,8 +216,8 @@ NIGHT-3: THE FOREST ROOM'S RECORD — what the room is, as data (pure, rule #36;
 
 ## apps/night/rooms/forest/pure/stream.js
 NIGHT-6 slice 4 — THE STREAM'S LIFE, as numbers.
-- const (2): `STREAM_LIFE`, `streamLength`
-- fn (6): `outOfWater`, `streamRocks`, `streamPebbles`, `floatersInit`, `floatAt`, `mistStrips`
+- const (3): `STREAM_LIFE`, `streamLength`, `STREAM_SOUND`
+- fn (7): `outOfWater`, `streamRocks`, `streamPebbles`, `floatersInit`, `floatAt`, `mistStrips`, `streamVoices`
 
 ## apps/night/rooms/forest/pure/wood.js
 NIGHT-6 slice 5 — MOSS, ROOTS AND FALLEN WOOD, as numbers.
@@ -219,8 +234,8 @@ NIGHT-3: THE ROOMS — the order a player meets them (ids, rule #37) and each ro
 
 ## apps/night/roomswitch.js
 NIGHT-3 stage 5 part 2: THE ROOM SWITCH — one door for everything a room change touches, in this order: the music bed fades out and holds (it takes the new room's recipes while silent); the picture…
-- const (7): `ROOM_KEY`, `ROOM_NAME_MS`, `roomCurrent`, `roomNature`, `natureModule`, `roomNext`, `roomSwitchDbg`
-- fn (2): `roomRestore`, `roomSwitch`
+- const (8): `ROOM_KEY`, `ROOM_NAME_MS`, `roomCurrent`, `roomNature`, `natureModule`, `roomNext`, `roomSwitchDbg`, `natureAmbDbg`
+- fn (4): `natureLoad`, `natureLight`, `roomRestore`, `roomSwitch`
 
 ## apps/night/scene/host.js
 THE SCENE HOST and Night's BACKGROUNDS (VIS1b, RUN 6; Night's own since CORE-8 — the shared UI reaches it through hooks.scene).
@@ -233,9 +248,9 @@ RUN 7 (C6 + C11, Night plan §5; docs/night/QUALITY.md points 4, 5, 6, 9, 10) �
 - fn (3): `nightShellWire`, `nightShellFace`, `nightMusicHoldDbg`
 
 ## apps/night/sound/ambience.js
-THE ROOMS' AMBIENCE (RUN 7, C4c; Night's own since CORE-7): drone + wind + distant crickets + one soft echo, built from a room's NATURE recipe (the forest's: apps/night/rooms/forest/pure/room.js).
-- const (1): `AMB_SWAP`
-- fn (5): `buildAmbience`, `ambienceSchedule`, `ambienceTune`, `ambienceSet`, `ambienceRoom`
+THE ROOMS' AMBIENCE (RUN 7, C4c; Night's own since CORE-7): drone + wind + distant crickets + one soft echo (NIGHT-8: + the stream), built from a room's NATURE recipe (the forest's: apps/night/room…
+- const (3): `NATURE_WORKLET`, `BROOK_SLEEP_S`, `AMB_SWAP`
+- fn (8): `buildAmbience`, `ambienceSchedule`, `ambienceTune`, `ambienceSet`, `ambienceRoom`, `ambienceBrook`, `ambienceBrookLight`, `ambienceBrookStats`
 
 ## apps/night/sound/bed.js
 NIGHT-3 stage 4: THE MUSIC BED's SOUND — built once on the first On into the master's input (the sleep fade and the limiter cover it; live sound, never a track — rule #31), from a room's bed recipe B.
@@ -253,6 +268,10 @@ NIGHT-7 — NIGHT'S OWN TEXTS, both languages.
 
 ## apps/night/worklets/bed-worklet.js
 NIGHT-4: THE MUSIC BED v2 — one AudioWorklet processor «night-bed» holding every voice of the bed and its own reverb (design: docs/night/design/NIGHT-3-rooms/PLAN.md §4b; the law apps/night/pure/be…
+- exports: none
+
+## apps/night/worklets/nature-worklet.js
+NIGHT-8: THE NATURE WORKLET «night-nature» — the stream's murmur (the law and the synthesis: apps/night/pure/brook.js, imported unchanged, so the listening render tools/brook-render.mjs hears exact…
 - exports: none
 
 ## core/arrange.js
@@ -1073,6 +1092,7 @@ SPLIT-2: the probe entry of the Night page: its own rows and the core rows flagg
 - → ./night/nightmigrate.js (1): `checkNightMigrate`
 - → ./night/nightprofile.js (1): `checkNightProfile`
 - → ./night/roomswitch.js (1): `checkNightRoomSwitch`
+- → ./night/stream.js (1): `checkNightStream`
 - → ./night/testroom.js (3): `testRoomInstall`, `testRoomRemove`, `testRoomMode`
 
 ## tools/probes/night/bed.js
@@ -1134,6 +1154,10 @@ SPLIT-2: row «NIGHT profile round trip» on Night's page: the checks of C0 that
 NIGHT-3 stage 5 part 2: row «NIGHT room switch» (P.night, drawn) — the switching machinery, on the test room (./testroom.js), judged on EXACT controls (the user, 2026-11-09): (1) hand detection tak…
 - fn (1): `checkNightRoomSwitch`
 
+## tools/probes/night/stream.js
+NIGHT-8: row «NIGHT stream, water and ground» — (1) BUILT without a renderer, at each level: today's seven aisle rocks are instances of the stream's stones (no rock mesh of their own), every stone …
+- fn (1): `checkNightStream`
+
 ## tools/probes/night/tailsw.js
 NIGHT-1 stage 3: the dev switch for the quiet floor.
 - fn (1): `mountTailSwitch`
@@ -1143,7 +1167,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 - const (5): `TEST_ROOM_ID`, `TEST_ROOM`, `testRoomMode`, `testRoomInfo`, `testRoomFreeLeaks`
 - fn (2): `testRoomInstall`, `testRoomRemove`
 
-_224 modules, 2538 exported names._
+_229 modules, 2562 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 
@@ -1165,3 +1189,5 @@ CORE-8 / NIGHT-3 stage 3 (2026-11-03; mover step `N3` in `tools/split-move.mjs`)
 NIGHT-3 stage 3 (2026-11-03): `apps/night/pure/cycle.js` `MOOD_LOOKS`, `MOOD_OF`, `moodLook` → the room record's `looks` / `moods` + `apps/night/pure/room.js` `roomLook`; `apps/night/pure/ambience.js` `AMB` → the room record's `nature` (`cricketStream(C, seed, k)`, `chirpShape(C, t, pulses, amp)`, `windNoise(rate, seed, sec)` take the recipe); `--cv-forest-*` tokens moved from `core/tokens.css` to `apps/night/night.css`; body class `bg-forest` → `bg-room`; `sceneRoomAdd(id, { build, three })` → `sceneRoomAdd(id, { load, standIn, three })`; the profile's `scene` «forest» → «room.forest».
 
 NIGHT-7b (2026-11-11): `apps/night/ghost.js` deleted (`GHOST`, `ghostArm`, `ghostStop`, `ghostOn`, `ghostAt`, `ghostFrame`; Night's `frameFilter`); row «NIGHT ghost light» removed; `#nightFirstRun`, key `night.firstRun`; keys `night.stepPhones`, `night.stepCamera`; storage `handsong.nightSeen` (no longer read; the cards' own key is `handsong.nightCards`); body class `night-seen`; ui-snap screen `night-ghost` → `night-cards`. Moved from `core/i18n.js` to `apps/night/texts.js` (reworded): `night.phones`, `night.cal.offerB`, `night.cal.doneB`.
+
+NIGHT-7c (2026-11-11): storage `handsong.nightMusic` and `handsong.nightMusicVol` no longer read (now `handsong.nightMusicMode`, `handsong.nightMusicLevel`); the cards' version `1` → `2`; the forest icon on the Depth bar and the Lightweight switch → `depth`, `lightweight`.
