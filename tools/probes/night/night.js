@@ -272,44 +272,6 @@ export async function checkNightAmbience(){
   return { cases:n, total:d.length, differences:d, notes };
 }
 row({ at:1009.65, night:true, name:'NIGHT ambience', slow:true, run:()=>checkNightAmbience(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });
-/* RUN 7 (C7): row «NIGHT ghost light» (quick; the probe clock, no sound check): in Night, the armed ghost fed frame by frame (30 fps) through
-   the REAL gestures.processHands (the HAND1 door) plays exactly FOUR solo notes (counted as attacks: a leadOn after nothing or after a
-   leadOff), each on a degree of the mood, its light seen by the scene (handsView non-empty while it plays), then it leaves (disarmed, no
-   hand); armed again, a REAL hand in the frame ends it at once (CONTROL: without the real hand it would still be on). Start card: Full shows
-   none of the Night start parts (.night-only hidden). RUN 8: each ghost note plays at a NORMAL level — its volume (the gesture's own output)
-   ≥ GHOST_VOL (CONTROL: RUN 7's path around the middle, x 0.5 ± 0.24, pinches below it). */
-const GHOST_VOL=0.55;
-export async function checkNightGhost(){
-  const d=[]; let n=0; const miss=s=>d.push(s);
-  const PR=await import('../../../core/profile.js'), G=await import('../../../core/gestures.js'), REC=await import('../../../core/recorder.js'), GH=await import('../../../apps/night/ghost.js'), P=await import('../../../core/gestures/pose.js'), ST=await import('../../../core/state.js');
-  const was=PR.profileCurrent(), clk={ t:0, W:1000, H:600 }, calls=[];   // the probe clock carries the play field (as HAND1's)
-  const empty=()=>({ landmarks:[], handednesses:[] });
-  try{
-    { const el=document.querySelector('.night-only'); n++; if(el && !document.body.classList.contains('night-boot') && getComputedStyle(el).display!=='none') miss('a Night start part shows in Full'); }
-    const why=PR.profileApply('profile.night'); n++; if(why){ miss('Night did not apply: '+why); return { cases:n, total:d.length, differences:d }; }
-    const nDeg=ST.scaleId && (await import('../../../core/scales.js')).CUR().iv.length+1;
-    G.handsProbe(clk, ()=>true); REC.wTapSet((name,args)=>calls.push([name,args]));
-    GH.ghostArm(); let seen=0, frames=0;
-    for(let f=0; f<30*16 && GH.ghostOn(); f++){ clk.t+=1000/30; frames++; G.processHandsProbe(GH.ghostFrame(empty(), clk.t, 'Right')); if(G.handsView().length) seen++; }
-    let attacks=0, open=new Set(), degs=[], vols=[];
-    for(const [name,args] of calls){ const own=args[0]; if(name==='leadOn'){ if(!open.has(own)){ attacks++; open.add(own); const p=args[1]; if(p && p.deg!=null) degs.push(p.deg); if(p) vols.push(p.vol); } } else if(name==='leadOff') open.delete(own); }
-    n+=2; if(!vols.length || vols.some(v=>!(v>=GHOST_VOL))) miss('a ghost note too quiet: volumes '+vols.map(v=>(+v).toFixed(2)).join(', ')+' (≥ '+GHOST_VOL+' expected)');
-    { const G=GH.GHOST, old=[]; for(let k=0;k<G.notes;k++) old.push(0.5+0.24*Math.sin(2*Math.PI*(k*G.every+G.down)/G.px));   // RUN 7's x at each pinch = its volume (Night: volume = x)
-      if(!old.some(x=>x<GHOST_VOL)) miss('CONTROL: the RUN 7 ghost path would pass the volume check — it cannot fail'); }
-    n+=4; if(attacks!==4) miss(`the ghost played ${attacks} notes (4 expected)`);
-    if(degs.some(x=>!(x>=0 && x<nDeg))) miss('a ghost note off the mood: degrees '+degs.join(','));
-    if(!(seen>frames*0.5)) miss(`the scene saw the ghost in ${seen} of ${frames} frames`);
-    if(GH.ghostOn()) miss('the ghost did not leave after its four notes');
-    /* a real hand ends it at once */
-    GH.ghostArm(); for(let f=0;f<20;f++){ clk.t+=1000/30; G.processHandsProbe(GH.ghostFrame(empty(), clk.t, 'Right')); }
-    n++; if(!GH.ghostOn()) miss('CONTROL: the re-armed ghost was not on (the real-hand check could not fail)');
-    clk.t+=1000/30; G.processHandsProbe(GH.ghostFrame({ landmarks:[P.pose({ x:0.3, y:0.5 })], handednesses:[[{ categoryName:'Right' }]] }, clk.t, 'Right'));
-    n++; if(GH.ghostOn()) miss('a real hand did not end the ghost');
-  } catch(e){ miss('error: '+(e&&e.stack||e)); }
-  finally{ GH.ghostStop(); REC.wTapSet(null); G.handsProbe(null); REC.liveAllOff(); PR.profileApply(was||'profile.full'); }
-  return { cases:n, total:d.length, differences:d };
-}
-row({ at:1009.8, night:true, name:'NIGHT ghost light', run:()=>checkNightGhost(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences }) });
 /* RUN 7 (the user's choice on the listening page, 2026-10-18): row «NIGHT timbre set» (quick): the Night profile offers EXACTLY four solo
    timbres in this order — Firefly (solo.firefly, the page's «Firefly · Светлячок»), Breath flute, Handpan, Singing bowl — the first is the
    default (row «C0 profile round trip» checks Night starts on it); each exists in the engine, its record loaded (not skipped) and one short note

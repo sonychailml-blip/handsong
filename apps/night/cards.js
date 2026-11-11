@@ -2,11 +2,11 @@
    drawn pictures, written from the real gestures (core/gestures/hands.js; the profile apps/night/data/night.json):
    1. Play — the playing hand's thumb touches a fingertip: a note (each finger its own; the hand's height picks the notes); holding the touch
       keeps it sounding (Notes: follow / stay put is in the controls);
-   2. Near and far — the hand's size in the picture is its depth: farther, the forest's echo deeper and the light deeper among the trees;
+   2. Near and far — the hand's size in the picture is its depth: farther, more space and a deeper echo around the sound (room-neutral, NIGHT-7b);
    3. Your other hand — touch a finger to the thumb and move it up or down: index Echo, middle Warm or Bright, ring Wave; it stays;
    4. Music — the Music button: a quiet accompaniment (Still, Drift, Glimmer), off again on a further tap.
-   Skippable at every card; the ghost hint plays after them on a first start (shell.js). The pictures are our own line drawings (inline SVG,
-   currentColor and the accent token); no image files. */
+   Skippable at every card. NIGHT-7b: they replace the old ghost hand (deleted); whether they are due is a key of their own (CARDS_KEY), written
+   only once they close — no older flag decides it. The pictures are our own line drawings (inline SVG, currentColor and the accent token). */
 import { t, onLangChange } from '../../core/i18n.js';
 import { svgIcon } from '../../core/icons.js';
 
@@ -20,17 +20,18 @@ function handSvg(x, y, s, o={}){ const m=o.left ? -1 : 1, P=(dx,dy)=>`${(x+dx*s*
   const touch= o.pinch!=null ? `<circle cx="${P(-18,-43).split(',')[0]}" cy="${P(-18,-43).split(',')[1]}" r="${(5*s).toFixed(1)}" class="np-glow"/>` : '';
   const tips=(o.tips||[]).map(([i,cls])=>{ const q=P(fx[i]+(i-1.5)*1.6, -32-fl[i]).split(','); return `<circle cx="${q[0]}" cy="${q[1]}" r="${(4.5*s).toFixed(1)}" class="${cls}"/>`; }).join('');
   return `<g class="np-hand"><path d="${palm}" class="np-palm"/>${fin}${thumb}</g>${touch}${tips}`; }
-const tree=(x, y, h)=>`<path d="M${x},${y} l${-h*0.28},0 l${h*0.28},${-h} l${h*0.28},${h} Z" class="np-tree"/>`;
+/* the space around a sound: arcs opening to the right of (x, y), wider and fainter */
+const arcs=(x, y)=>[14, 24, 34].map((r,k)=>`<path d="M${x+r*0.5},${y-r*0.87} A${r},${r} 0 0 1 ${x+r*0.5},${y+r*0.87}" class="np-wave${k ? ' np-faint' : ''}"/>`).join('');
 const arrowV=(x, y0, y1)=>`<path d="M${x},${y0} L${x},${y1} M${x-5},${y0+6} L${x},${y0} L${x+5},${y0+6} M${x-5},${y1-6} L${x},${y1} L${x+5},${y1-6}" class="np-line"/>`;
 const PICS=[
   /* play: the touch makes a note; holding it, a long one; higher hand, higher notes */
   ()=>`${arrowV(20, 18, 102)}<circle cx="34" cy="26" r="3" class="np-dot"/><circle cx="34" cy="60" r="3" class="np-dot"/><circle cx="34" cy="94" r="3" class="np-dot"/>
     ${handSvg(92, 112, 1.25, { pinch:0 })}
     <circle cx="150" cy="40" r="5" class="np-glow"/><path d="M150,58 L192,58" class="np-hold"/><circle cx="150" cy="58" r="5" class="np-glow"/>`,
-  /* near and far: a big hand near the camera, a small one farther; the light deeper among the trees */
+  /* near and far: a big hand near the camera, a small one farther; the sound with more space around it */
   ()=>`<rect x="6" y="48" width="20" height="14" rx="3" class="np-line"/><circle cx="16" cy="55" r="4" class="np-line"/>
     ${handSvg(58, 108, 1.15)}${handSvg(118, 92, 0.6)}<path d="M80,54 L104,54" class="np-dash"/><path d="M98,49 L104,54 L98,59" class="np-line"/>
-    ${tree(150, 104, 40)}${tree(172, 104, 54)}${tree(192, 104, 34)}<circle cx="168" cy="72" r="5" class="np-glow"/>`,
+    <circle cx="156" cy="66" r="5" class="np-glow"/>${arcs(156, 66)}`,
   /* the other hand: three fingertips, three effects, up and down */
   ()=>`${handSvg(90, 112, 1.25, { left:true, tips:[[0,'np-t1'],[1,'np-t2'],[2,'np-t3']] })}${arrowV(146, 16, 96)}
     <rect x="164" y="22" width="6" height="70" rx="3" class="np-bar"/><rect x="176" y="22" width="6" height="70" rx="3" class="np-bar"/><rect x="188" y="22" width="6" height="70" rx="3" class="np-bar"/>
@@ -40,8 +41,13 @@ const PICS=[
     <path d="M40,40 q15,-12 30,0 t30,0 t30,0 t30,0" class="np-wave"/><path d="M52,24 q12,-9 24,0 t24,0 t24,0 t24,0" class="np-wave np-faint"/>`,
 ];
 const CARDS=['play','depth','fx','music'];
+/* NIGHT-7b: due on a Begin unless this exact value is stored (a new card set raises CARDS_V); anything else stored — old, unknown — means due */
+export const CARDS_KEY='handsong.nightCards', CARDS_V='1';
+export const cardsDue=store=>{ try{ return store.getItem(CARDS_KEY)!==CARDS_V; }catch(e){ return true; } };
+export const cardsDone=store=>{ try{ store.setItem(CARDS_KEY, CARDS_V); }catch(e){} };
 let open=false, i=0, done=null;
-function render(){ if(!open) return; const k=CARDS[i];
+/* always filled (open or not): a closed card never holds blank labels */
+function render(){ const k=CARDS[i];
   $('nightCardTitle').textContent=t(`night.card.${k}.t`);
   $('nightCardText').textContent=t(`night.card.${k}.b`, { still:t('night.music.still'), drift:t('night.music.drift'), glimmer:t('night.music.glimmer') });
   $('nightCardStep').textContent=t('night.card.of', { n:i+1, m:CARDS.length });
@@ -58,6 +64,6 @@ export function cardsWire(){
   $('nightCardNext').onclick=()=>{ if(i<CARDS.length-1){ i++; render(); } else close(); };
   $('nightCardSkip').onclick=()=>close();
   document.addEventListener('keydown', e=>{ if(open && e.key==='Escape') close(); });
-  onLangChange(render); }
+  onLangChange(render); render(); }
 /* probe only: which card, how many */
 export const cardsDbg=()=>({ open, i, n:CARDS.length, title:open ? $('nightCardTitle').textContent : '' });

@@ -1316,7 +1316,8 @@ async function forestHiddenCore(){
 /* NIGHT-7: every Night text in BOTH languages. The keys the Night page uses (data-i18n, data-i18n-title) and the keys its code writes as t('…')
    (apps/night/**), with Night's own texts (apps/night/texts.js) joined: each has an English and a Russian text, every «night.*» key is in both
    dictionaries, the Russian ones are Russian; no element of the Night page's own parts shows words without a key (the brand mark and the
-   development items excepted). CONTROL: a made-up key is reported missing. */
+   development items excepted). CONTROL: a made-up key is reported missing. NIGHT-7b: no «night.*» text names a room or its things (forest, trees,
+   moon, fireflies, mushrooms; both languages) — CONTROL: the old words are caught and look-alike words are not. */
 async function nightTextsCore(){
   const d=[], notes=[]; let n=0; const miss=s=>d.push(s);
   const fs=await import('node:fs'), path=await import('node:path'), ROOT=new URL('..', import.meta.url).pathname.replace(/^\/(\w:)/,'$1');
@@ -1338,7 +1339,12 @@ async function nightTextsCore(){
       && !/night-word|night-sub|night-dev|night-measure/.test(a)); n++;
     if(own.length) miss(own.length+' Night elements with words but no key: '+own.slice(0,6).map(m=>m[3].trim().slice(0,30)).join(' | ')); }
   { n++; if(has(en,'night.__control')) miss('CONTROL: a made-up key exists'); const k2=new Set(keys); k2.add('night.__control'); if(![...k2].some(k=>!has(en,k))) miss('CONTROL: a made-up key is not reported missing'); }
-  notes.push(`${keys.size} keys used by the Night page and its code, ${night.length} «night.*» keys: all in English and Russian`);
+  /* NIGHT-7b (the user): the shared Night texts never name a room or its things — a room's own words live in its record */
+  { const ROOMW=/\bforest|\btrees?\b|\bmoon|firefl|mushroom|(^|[^а-яё])лес|дерев|(^|[^а-яё])лун[аеуыо]|светляч|гриб/i, named=new Set(); n+=2;
+    for(const k of night) for(const L of [en,ru]) if(has(L,k) && ROOMW.test(L[k])) named.add(k);
+    if(named.size) miss('shared texts that name a room or its things: '+[...named].join(', '));
+    if(!ROOMW.test('Дальше — эхо леса глубже') || !ROOMW.test('then the forest will follow') || ROOMW.test('Облегчённый режим: полезно, чудесно')) miss('CONTROL: the room words are not told from other words'); }
+  notes.push(`${keys.size} keys used by the Night page and its code, ${night.length} «night.*» keys: all in English and Russian, none names a room`);
   return { cases:n, total:d.length, differences:d, notes };
 }
 /* NIGHT-6: THE FOREST'S FILES (tools/forest-bake.mjs). Every prepared file matches what the tool draws now, pixel for pixel (CONTROL a changed

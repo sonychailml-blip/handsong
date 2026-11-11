@@ -10,8 +10,7 @@ import { BUS } from '../../core/pure/bus.js';
 import { t, onLangChange } from '../../core/i18n.js';
 import { cv } from '../../core/palette.js';
 import { sx, sy, viewRect, mirrored } from '../../core/state.js';
-import { EDITION } from '../../core/edition.js';
-import { ghostStop } from './ghost.js';
+import { devItems } from './edition.js';   // NIGHT-7b: the side's vote count is a development line
 
 const $=id=>document.getElementById(id);
 export const CAL_KEY=Object.freeze({ side:'handsong.nightCalSide', offered:'handsong.nightCalOffered' });
@@ -52,7 +51,7 @@ function stepShow(s){ last=s; const say= s.phase==='holdNear' ? (s.advice ? 'nig
 function card(title, text, note, no, yes){ $('nightCalTitle').textContent=t(title); $('nightCalText').textContent=text; $('nightCalNote').textContent=note; $('nightCalNote').hidden=!note;
   $('nightCalNo').textContent=t(no); $('nightCalYes').textContent=t(yes); }
 function sideNote(){ const a=side ? t(side==='left' ? 'night.cal.doneL' : 'night.cal.doneR') : '', f=shaky(handCalState().result) ? t('night.cal.farNote') : '';
-  const b= EDITION==='dev' && votes.m ? t(votes.L>votes.R ? 'night.cal.votesL' : 'night.cal.votesR', { n:Math.max(votes.L, votes.R), m:votes.m }) : '';   // development: how sure the side was
+  const b= devItems() && votes.m ? t(votes.L>votes.R ? 'night.cal.votesL' : 'night.cal.votesR', { n:Math.max(votes.L, votes.R), m:votes.m }) : '';   // development: how sure the side was
   return [a,f,b].filter(Boolean).join('\n'); }
 function show(m, why=null){
   mode=m; reason=why; $('nightCal').hidden=false; document.body.classList.add('night-cal');
@@ -64,9 +63,9 @@ function show(m, why=null){
   if(OPT.changed) OPT.changed();
 }
 function finish(){ mode=null; reason=null; last=null; $('nightCal').hidden=true; document.body.classList.remove('night-cal'); const f=onEnd; onEnd=null; if(f) f(); if(OPT.changed) OPT.changed(); }
-/* the ghost's last frame may still be on the bus: a marked hand refuses the start, so it tries again a few frames later */
+/* a synthetic hand's last frame may still be on the bus: a marked hand refuses the start, so it tries again a few frames later */
 function begin(tries=5){
-  ghostStop(); votes={ L:0, R:0, m:0 }; side=null; swapped=null; last=null;
+  votes={ L:0, R:0, m:0 }; side=null; swapped=null; last=null;
   show('step'); const why=startFn();
   if(why==='synthetic' && tries>0){ setTimeout(()=>{ if(mode==='step') begin(tries-1); }, 120); return; }
   if(why) show('fail', why);

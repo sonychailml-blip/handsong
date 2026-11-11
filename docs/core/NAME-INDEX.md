@@ -39,16 +39,15 @@ NIGHT-2 stage 2: the hand's calibration screens over CORE-1's engine (core/handc
 
 ## apps/night/cards.js
 NIGHT-7 — THE FIRST CARDS: after the calibration offer on a first start (and from Settings → «How to play»), four short cards with simple drawn pictures, written from the real gestures (core/gestur…
-- const (2): `cardsOpen`, `cardsDbg`
+- const (5): `CARDS_KEY`, `cardsDue`, `cardsDone`, `cardsOpen`, `cardsDbg`
 - fn (2): `cardsShow`, `cardsWire`
 
-## apps/night/ghost.js
-RUN 7 (C7, Night plan §6; docs/night/QUALITY.md points 4, 5, 6) — THE GHOST LIGHT: on the first run (and from ⓘ «Show the first steps again»), while no real hand has appeared, a ghost hand drifts s…
-- const (4): `GHOST`, `ghostArm`, `ghostStop`, `ghostOn`
-- fn (2): `ghostAt`, `ghostFrame`
+## apps/night/edition.js
+NIGHT-7b — NIGHT'S EDITION: the build's (core/edition.js: 'release' in a players' build) or, on any page, «?release» in the address — so the players' settings can be checked on Live Server without …
+- const (2): `NIGHT_EDITION`, `devItems`
 
 ## apps/night/main.js
-SPLIT-2: the Night app's entry: its shell, its ghost light, its rooms, its profile.
+SPLIT-2: the Night app's entry: its shell, its rooms, its profile (NIGHT-7b: the ghost light is gone — the first cards replace it).
 - exports: none
 
 ## apps/night/migrate.js
@@ -1104,7 +1103,7 @@ NIGHT-1 stage 2: row «NIGHT lean path» (P.night; slow: offline renders).
 ## tools/probes/night/night.js
 C4a (RUN 6, Night plan §4.1, §10): row «C4a solo Firefly» (quick and all; three short offline renders through the engine copy).
 - const (2): `NIGHT_TIMBRES`, `NIGHT_SET`
-- fn (16): `checkSoloFirefly`, `kLoud`, `clickOf`, `checkNightTimbres`, `checkNightShell`, `checkNightDepth`, `checkNightAmbience`, `checkNightGhost`, `checkNightSet`, `checkNightFx`, `checkNightFxTimbres`, `checkNightStress`, `checkNightDepthLoud`, `checkNightBars`, `checkNightLowPower`, `checkNightVolume`
+- fn (15): `checkSoloFirefly`, `kLoud`, `clickOf`, `checkNightTimbres`, `checkNightShell`, `checkNightDepth`, `checkNightAmbience`, `checkNightSet`, `checkNightFx`, `checkNightFxTimbres`, `checkNightStress`, `checkNightDepthLoud`, `checkNightBars`, `checkNightLowPower`, `checkNightVolume`
 
 ## tools/probes/night/nightguard.js
 SPLIT-2: row «NIGHT untouched» — the mirror of «FULL untouched»: a change elsewhere must not move this app.
@@ -1131,7 +1130,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 - const (5): `TEST_ROOM_ID`, `TEST_ROOM`, `testRoomMode`, `testRoomInfo`, `testRoomFreeLeaks`
 - fn (2): `testRoomInstall`, `testRoomRemove`
 
-_221 modules, 2517 exported names._
+_221 modules, 2515 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 
@@ -1151,3 +1150,5 @@ CORE-7 (2026-11-03): `core/modules/ambience/forest.js` → `apps/night/sound/amb
 CORE-8 / NIGHT-3 stage 3 (2026-11-03; mover step `N3` in `tools/split-move.mjs`): `core/legacy-ui/views/scene/host.js` → `apps/night/scene/host.js`; `apps/night/scene/forest{,-life,-detail,-rare}.js` → `apps/night/rooms/forest/`; `apps/night/pure/{forestlife,fireflies}.js` → `apps/night/rooms/forest/pure/`. `draw.js` no longer re-exports `setBackground`, `backgroundOf`, `sceneInfo`, `BACKGROUNDS`, `setSceneLevel`, `sceneLevel`.
 
 NIGHT-3 stage 3 (2026-11-03): `apps/night/pure/cycle.js` `MOOD_LOOKS`, `MOOD_OF`, `moodLook` → the room record's `looks` / `moods` + `apps/night/pure/room.js` `roomLook`; `apps/night/pure/ambience.js` `AMB` → the room record's `nature` (`cricketStream(C, seed, k)`, `chirpShape(C, t, pulses, amp)`, `windNoise(rate, seed, sec)` take the recipe); `--cv-forest-*` tokens moved from `core/tokens.css` to `apps/night/night.css`; body class `bg-forest` → `bg-room`; `sceneRoomAdd(id, { build, three })` → `sceneRoomAdd(id, { load, standIn, three })`; the profile's `scene` «forest» → «room.forest».
+
+NIGHT-7b (2026-11-11): `apps/night/ghost.js` deleted (`GHOST`, `ghostArm`, `ghostStop`, `ghostOn`, `ghostAt`, `ghostFrame`; Night's `frameFilter`); row «NIGHT ghost light» removed; `#nightFirstRun`, key `night.firstRun`; keys `night.stepPhones`, `night.stepCamera`; storage `handsong.nightSeen` (no longer read; the cards' own key is `handsong.nightCards`); body class `night-seen`; ui-snap screen `night-ghost` → `night-cards`. Moved from `core/i18n.js` to `apps/night/texts.js` (reworded): `night.phones`, `night.cal.offerB`, `night.cal.doneB`.

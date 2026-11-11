@@ -4,7 +4,7 @@
    (CONTROL: another camera is offered again); (4) a step held with the LEFT label in most frames: the result card, the roles swapped to the left,
    «Play» saves the record and the side; (5) «Again» from a right-hand result puts the left back; Cancel keeps the record; (6) a failure words its
    reason; every reason has words in both languages (CONTROL: a made-up code has none); (7) the saved side comes back on the face; reset clears the
-   record, the side and the roles; (8) the ghost armed after the calibration waits for the hand to leave (CONTROL: a plain arm ends at a hand);
+   record, the side and the roles; (8) gone at NIGHT-7b with the ghost light (the first cards replace it);
    (9) the hand's points: the segment switches fingertips ↔ all points; (10, stage 3) a far but steady hand is accepted (CORE-6 farHold) with the
    note when it is far or shaky (CONTROLS: a near quiet hand has no note; without farHold the far hand is refused as before); too small asks to
    come closer; a far shaking hand is worded as shaking; (11) the picture is drawn by the loop (afterDraw) on every frame, a closed picture keeps
@@ -26,7 +26,7 @@ const real=p=>[...pose(p)];   // unmarked, as a camera's hand
 const S=0.334/0.95, OPENH={ x:0.75, y:0.6, s:S };
 export async function checkNightCalib(){
   const d=[], notes=[]; let n=0; const ok=(what,c)=>{ n++; if(!c) d.push(what); }, $=id=>document.getElementById(id);
-  const PR=await import('../../../core/profile.js'), C=await import('../../../apps/night/calib.js'), GH=await import('../../../apps/night/ghost.js');
+  const PR=await import('../../../core/profile.js'), C=await import('../../../apps/night/calib.js');
   const was=PR.profileCurrent(), keep=calKeep(), busK=BUS.get('hands'), D=shellDoors(), KEYS=[C.CAL_KEY.side, C.CAL_KEY.offered, 'handsong.nightJoints'], kept={};
   for(const k of KEYS){ try{ kept[k]=localStorage.getItem(k); localStorage.removeItem(k); }catch(e){} }
   let hand0=null, tips0=null, cam=CAM;
@@ -81,12 +81,6 @@ export async function checkNightCalib(){
     /* (7) the side on the face, then reset */
     D.setHand('right'); C.calSideApply(); ok('the saved side comes back', D.hand()==='left');
     C.calResetAll(); ok('reset clears the record, the side and the roles', !handCalRead().calibrated && localStorage.getItem(C.CAL_KEY.side)===null && D.hand()==='right');
-    /* (8) the ghost after the calibration */
-    { const f=h=>({ landmarks:h, handednesses:h.map(()=>[{ categoryName:'Right' }]) }); let tg=5e6;
-      GH.ghostArm({ wait:300 }); GH.ghostFrame(f([real(OPENH)]), tg); tg+=100; GH.ghostFrame(f([real(OPENH)]), tg); ok('the waiting ghost stays while the hand is there', GH.ghostOn());
-      tg+=100; const r=GH.ghostFrame(f([]), tg); ok('...and plays once it leaves', GH.ghostOn() && r && r.landmarks && r.landmarks.length===1 && r.landmarks[0].synthetic);
-      GH.ghostArm({ wait:300 }); for(let k=0;k<5;k++){ tg+=100; GH.ghostFrame(f([real(OPENH)]), tg); } ok('a hand that stays past the wait ends it', !GH.ghostOn());
-      GH.ghostArm(); GH.ghostFrame(f([real(OPENH)]), tg+100); ok('CONTROL: a plain arm ends at a hand', !GH.ghostOn()); GH.ghostStop(); }
     /* (9) the hand's points */
     { const seg=v=>$('nightDotsSeg').querySelector(`[data-dots="${v}"]`); seg('all').click(); const a=ST.nightView && ST.nightView.tips; seg('tips').click(); const b=ST.nightView && ST.nightView.tips;
       ok('the points segment: all → tips', a===false && b===true); }

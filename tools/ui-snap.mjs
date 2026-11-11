@@ -91,10 +91,11 @@ const cardTo=async (p, f)=>{ await p.evaluate(f=>{ const c=document.getElementBy
 const SCREENS_NIGHT=[
   ['night-start',     async p=>{}],
   ['night-offer',     async p=>{ await p.click('#nightBegin'); await p.waitForFunction(()=>{ const c=document.getElementById('nightCal'); return c && !c.hidden; }, null, { timeout:180e3 }); await p.waitForTimeout(600); }],   // NIGHT-2: Begin → the calibration offer
-  ['night-ghost',     async p=>{ await p.click('#nightCalNo');   // C7 + NIGHT-2: skip the offer (the first run: then the ghost light plays four notes)
+  ['night-cards',     async p=>{ await p.click('#nightCalNo');   // NIGHT-2 + NIGHT-7b: skip the offer; a first run then shows the first cards (the ghost light is gone)
                        await p.waitForFunction(()=>{ const s=document.getElementById('start'); return s && !s.classList.contains('on'); }, null, { timeout:180e3 });
-                       await p.evaluate(async ()=>{ const Q=await import('/core/frzqueue.js'); Q.afPause('runner', true); document.querySelector('#nightBgSeg [data-bg="dark"]').click(); }); await p.waitForTimeout(5500); }],
-  ['night-dark',      async p=>{ await p.waitForFunction(async ()=>{ const G=await import('/apps/night/ghost.js'); return !G.ghostOn(); }, null, { timeout:30e3, polling:250 }); await p.waitForTimeout(1800); }],
+                       await p.evaluate(async ()=>{ const Q=await import('/core/frzqueue.js'); Q.afPause('runner', true); document.querySelector('#nightBgSeg [data-bg="dark"]').click(); });
+                       await p.waitForFunction(async ()=>{ const C=await import('/apps/night/cards.js'); return C.cardsOpen(); }, null, { timeout:30e3, polling:250 }); await p.waitForTimeout(600); }],
+  ['night-dark',      async p=>{ for(let k=0;k<4;k++) await p.click('#nightCardNext'); await p.waitForTimeout(1800); }],   // the last «Play» closes them
   ['night-info',      async p=>{ await p.click('#nightInfoBtn'); await p.waitForTimeout(500); }],
   ['night-info-mid',  async p=>{ await cardTo(p, 0.5); }],
   ['night-info-end',  async p=>{ await cardTo(p, 1); }],
@@ -138,7 +139,7 @@ const roomNotes=async (p, n, every, fx)=>{ await p.evaluate(async ([n,every,fx])
   const R=H.sceneRoomDbg(); for(let k=0;k<n;k++){ if(R) R.glint(0, 0.85); await new Promise(r=>setTimeout(r, every)); } }, [n, every, fx||null]); };
 const SCREENS_FOREST=[
   ['f-start',        async p=>{ await p.click('#nightBegin'); await p.waitForFunction(()=>{ const s=document.getElementById('start'); return s && !s.classList.contains('on'); }, null, { timeout:180e3 }); await p.waitForFunction(()=>{ const c=document.getElementById('nightCal'); return c && !c.hidden; }, null, { timeout:180e3 }); await p.click('#nightCalNo');
-                       await p.evaluate(async ()=>{ const Q=await import('/core/frzqueue.js'); Q.afPause('runner', true); const G=await import('/apps/night/ghost.js'); if(G.ghostOn && G.ghostOn() && G.ghostStop) G.ghostStop(); document.querySelector('#nightBgSeg [data-bg="forest"]').click(); });
+                       await p.evaluate(async ()=>{ const Q=await import('/core/frzqueue.js'); Q.afPause('runner', true); const C=await import('/apps/night/cards.js'); if(C.cardsOpen()) document.getElementById('nightCardSkip').click(); document.querySelector('#nightBgSeg [data-bg="forest"]').click(); });
                        await forestAt(p, 60); await p.waitForTimeout(3000); await playHands(p, false); await p.waitForTimeout(1500); }],
   ['f-moon',         async p=>{ await forestAt(p, 60); await playHands(p); await p.waitForTimeout(900); }],
   /* NIGHT-7: the first cards (each one, portrait) and the settings card's View section (the picture choice) */

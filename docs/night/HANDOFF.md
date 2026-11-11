@@ -24,7 +24,7 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 - **Eye check from the split:** `tools/split-baseline/side-by-side-E/`, the four structure-only screens.
 - **Not done by a machine:** ears, hands, phones. Old setting names do not carry over to the new `handsong-night` address, so first-run steps may appear again there.
 
-- **Step 143, the test version** (five checks, the Poco, an iPhone): `archive/CLAUDE-history.md`, step 143.
+- **Step 144, the test version's fixes** (five checks; replaces step 143's (2) and (4)): `archive/CLAUDE-history.md`, step 144. Step 143's (1), (3), (5) still stand.
 - **Step 127, the quiet floor by ear:** `http://127.0.0.1:5500/apps/night/?probe&tails=off` and `…&tails=on`; `archive/CLAUDE-history.md`.
 - **The Poco headroom page, later:** `<Night preview>/?probe&headroom`, about 25 minutes (user, 2026-11-03).
 
@@ -36,6 +36,13 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 5. The falling star passes in front of the trees. Natural?
 
 ## Records (English, at most about 15 lines each; older ones go to `archive/HANDOFF-history.md`)
+### NIGHT-7b (2026-11-11): fixes from the user's first look at the test version (+ CORE-14, texts). Log: `docs/night/WORK-LOG.md`
+- The empty card and the card that would not close had ONE cause: `.night-card.night-cards{display:block}` beat `[hidden]`, so the cards stayed on screen whatever the attribute said. In a window that had begun before (old `handsong.nightSeen`), no first run filled them: four dots, two blank buttons. The NIGHT-7 row checked the attribute, so it could not fail. Fixed: `#nightShell [hidden]` always hides; the cards are labelled from load; the row judges the computed style (CONTROL).
+- The cards are due by their own key `handsong.nightCards` (written when they close); no older flag decides. The ghost hand is deleted (`ghost.js`, its row, «first steps again»): the cards replace it.
+- Shared texts are room-neutral (6 keys, both languages; the data row checks every «night.*» text). Three of them moved from core to `texts.js` (CORE-14).
+- Start screen: the title with a real space («hand·song night»), two tips (always shown), Begin, the privacy line.
+- `?release` shows the players' edition on Live Server (`apps/night/edition.js`); it hides Measure this device, Room picture, the Sound panel and diagnostics, the calibration's side-vote line. Smoke test checks it.
+- New runner check «NIGHT stale saved values» (18 stale values, reload, the real start card and first launch). Waiting for step 144.
 ### NIGHT-7 (2026-11-11): the test version. Log: `docs/night/WORK-LOG.md`
 - Steps 141 and 142 checked by the user: the painted middle distance is right, no grain at medium; foxfire and the night flowers look right. The forest's remaining slices (a changing night, sounds and rain, animals) wait in the backlog.
 - The bare floor: soil, fallen leaves, needles, twigs, moss crumbs and seeds, with relief — `tools/forest-bake.mjs drawGround` (a 2048 master, 1024 / 512 copies; colour + normal map, tiled every 6 m). Files: high 9.99 MB, medium 4.23 MB, low 1.56 MB (15.35 MB of 30).
@@ -104,12 +111,3 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 - The Music button (Music · Sound / Mood · Notes · Sleep, 3 + 3 places): off → «Покой» → «Течение» → «Мерцание»; off at first start, remembered. Settings → Music: volume, «Музыка отвечает моим нотам» (off by default).
 - One generator, the forest's recipe as data: chords of the scale's own degrees under the playing, two detuned oscillators per voice, slow filter drift, a ground that takes the drone over, rare glimmer; its own slow clock (no stepping back). The response leans only which chord comes next, never when.
 - Cost on the laptop 2.1–2.5 % of a quantum (gate 3 %); level 0.3 dB from the nature sound. Step 130 checked by the user (2026-11-08): all works; the response stays off by default.
-### NIGHT-3 stage 3 (2026-11-03): the forest is the first room module (CORE-8). Log: `docs/night/WORK-LOG.md`
-- A room = `apps/night/rooms/<name>/`: its record (`pure/room.js`: levels, mood looks, nature recipe), its 2D stand-in, its scene code (loaded on first open); the list is `rooms/index.js`, the validator `pure/room.js`. The scene host is Night's (`apps/night/scene/host.js`), the forest's colours are in `night.css`.
-- Nothing seen or heard changed (picture hash, GOLD ambience, NIGHT untouched). Next: the music bed (stage 4 in the user's order).
-### RUN 9 (2026-10-19/20): the living forest. Log and plain summary: `archive/WORK-LOG-before-split.md` «RUN 9» (old name)
-- NIGHT (`apps/night/pure/cycle.js`): a 24-min seamless cycle: the moon drifts, 7 cloud passes dim it, four mist layers; the sleep timer deepens and stills the night; moods Glow / Dusk / Mist recolour the forest (token sets). Bus `nightSky` { mood, sleep, wind } from the shell.
-- RESPONSE (`apps/night/pure/forestlife.js`, `apps/night/scene/forest-life.js`): a ring of light per note; mushrooms / flowers pulse; fireflies gather while you play; a stream with the moon's reflection: Echo = rings on the water, Wave = the leaves shimmer, Warmth = the light's colour.
-- DETAIL (`apps/night/scene/forest-detail.js`): instanced grass + ferns sway with the ambience's wind (its level and audible gust); falling leaves (shader); moths at the light; moonbeams; foreground silhouettes. RARE (`apps/night/scene/forest-rare.js`): a falling star or the five-dot emblem every few minutes, a flower on a note held ~3 s; never the same twice in a row.
-- BUDGET (Intel HD 4000, two synthetic hands, vs Dark): medium −6 % hand detections (in budget), high −34…−36 % (breaks it; cost follows resolution and frame rate, not content) → DEFAULT = MEDIUM (high stays a dev choice); 0 dropouts. Opening the forest compiles ~20 shaders (2–3 s first time, then ~0.4 s), now inside the opening; the hand lights never change the light count (no recompile on the first hand).
-- Rows: core «NIGHT cycle», «FOREST life», «NIGHT rare events»; browser «FOREST night cycle / response / detail / rare events / levels». Captures: `ui-snap --forest`.

@@ -2,8 +2,7 @@
    Shown only in the Night face (nightShellFace from the profile's face door). Hands in view → only the scene; no hand for 1.5 s → the controls
    fade in: (Room, only with two rooms or more —) Music · Sound / Mood · Notes (follow / stay put) · Sleep, and the settings card (NIGHT-2, was ⓘ:
    Hand — calibration, playing hand, two sliders, the hand's points; Music — volume, the room's sounds, response; View — what is on screen, the
-   note field, the Lightweight mode;
-   the first steps again). Each round button cycles its values; a tap glints (micro-feedback). Every value is written through the DOORS ui.js
+   note field, the Lightweight mode; How to play). Each round button cycles its values; a tap glints (micro-feedback). Every value is written through the DOORS ui.js
    wires (the same setters the Full panels use) — this module holds no musical state. The sleep timer fades the output (audio.outputFade,
    session only) and dims the scene with a black veil together; a tap on the veil wakes. The choices are remembered on this device (localStorage). */
 import { BUS } from '../../core/pure/bus.js';
@@ -18,24 +17,23 @@ import { bedSetMode, bedModeOf, bedSetVolume, bedVolumeOf, bedSetAnswer, bedAnsw
 import { t, L, onLangChange } from '../../core/i18n.js';
 import { svgIcon } from '../../core/icons.js';
 import { nightView, setNightView, chainKeyOf, setVolFloor } from '../../core/state.js';
-import { EDITION } from '../../core/edition.js';
-import { ghostArm } from './ghost.js';   // C7: the ghost light
+import { devItems } from './edition.js';   // NIGHT-7b: the release edition (a players' build, or ?release) hides the development items
 import { calWire, calOfferIfNew, calActive, calSideApply, calSideSet, calSettingsRender, calAbort } from './calib.js';   // NIGHT-2: the hand's calibration (its picture is drawn by the loop: main.js afterDraw)
 import { setSceneLevel, sceneLevel, setBackground, backgroundOf, sceneInfo, sceneRoom, sceneRooms, sceneOptDbg } from './scene/host.js';   // RUN 8 (slice 4): the scene's quality (development switch); C8 the measurement
 import { roomSwitch, roomNext } from './roomswitch.js';   // NIGHT-3 stage 5 part 2: the Room button
 import { latReport } from '../../core/legacy-ui/latmeter.js';   // C8: the device measurement reads the latency meter
-import { cardsWire, cardsShow, cardsOpen } from './cards.js';   // NIGHT-7: the first cards
+import { cardsWire, cardsShow, cardsOpen, cardsDue, cardsDone } from './cards.js';   // NIGHT-7: the first cards
 
 const $=id=>document.getElementById(id), READ=BUS.reader();
 /* NIGHT-1 stage 2: what this app never plays leaves the graph (the sound stays the same to rounding; row «NIGHT lean path»). Its chain has no drive, brightness or tremolo; its one role is solo */
 export const LEAN_PATH=Object.freeze({ expr:true, voice:true, roles:true, closedFx:true, park:true });
-const KEY={ field:'handsong.nightField', roomSound:'handsong.nightForest', seen:'handsong.nightSeen', fxHint:'handsong.nightFxHint', joints:'handsong.nightJoints', light:'handsong.nightLight', lightScene:'handsong.nightLightScene',
+const KEY={ field:'handsong.nightField', roomSound:'handsong.nightForest', fxHint:'handsong.nightFxHint', joints:'handsong.nightJoints', light:'handsong.nightLight', lightScene:'handsong.nightLightScene',
   music:'handsong.nightMusic', musicVol:'handsong.nightMusicVol', musicAnswer:'handsong.nightMusicAnswer' };   // NIGHT-3 stage 4: the bed's mode (off at first start), volume, response
 const load=k=>{ try{ return localStorage.getItem(k); }catch(e){ return null; } };
 const save=(k,v)=>{ try{ localStorage.setItem(k,v); }catch(e){} };
+const STORE={ getItem:load, setItem:save };   // the cards' key through the same guarded doors
 let D=null, on=false, st=null, raf=0, info=false, sleep={ mins:0, t0:0 }, asleep=false, lastFade=1, amb=false;
-let begun=false, firstRun=false, startDue=false, defHand='right';   // NIGHT-2: a person's Begin, its first start, the offer due on the next frame, the profile's playing hand
-const GHOST_WAIT=10000;   // after the calibration the ghost waits this long for the hand to leave the frame
+let begun=false, firstRun=false, startDue=false, defHand='right';   // NIGHT-2: a person's Begin, the cards due on it (NIGHT-7b), the offer due on the next frame, the profile's playing hand
 /* «Room sounds» (Music section; was «Forest» under View) — the room's own sounds (the ambience's level), remembered on this device under the old
    key. NIGHT-3 stage 5: it no longer sets the hand's reach (RUN 8 had coupled them). NIGHT-5: the reach is the whole range (it was the slider's
    old default 0.6, which stopped the hand at 60 % of its bar). */
@@ -83,13 +81,13 @@ function render(){
   const nm=D.noteMode(); val('nightNotes', t(nm==='hold' ? 'night.notesStay' : 'night.notesFollow')); setIcon('nightNotes', nm==='hold' ? 'note-stay' : 'note-follow');
   sleepLabel(performance.now());
   $('nightFieldTg').classList.toggle('on', !!(nightView && nightView.fieldAll));
-  $('nightLightTg').classList.toggle('on', load(KEY.light)==='1'); $('nightMeasure').hidden= EDITION!=='dev';
-  $('nightFirstRun').hidden=false; $('nightToSound').hidden= EDITION!=='dev';
+  $('nightLightTg').classList.toggle('on', load(KEY.light)==='1'); $('nightMeasure').hidden=!devItems(); if(!devItems()) $('nightMeasureOut').hidden=true;
+  $('nightToSound').hidden=!devItems();
   { const bgs=D.backgrounds(), bg=D.bg(); for(const b of $('nightBgSeg').children){ b.hidden=!bgs.includes(b.dataset.bg); b.classList.toggle('on', b.dataset.bg===bg); } }   // NIGHT-2: settings
   for(const b of $('nightDotsSeg').children) b.classList.toggle('on', (b.dataset.dots==='tips')===!!(nightView && nightView.tips));
   for(const b of $('nightHandSeg').children) b.classList.toggle('on', b.dataset.hand===D.hand());   // NIGHT-2 stage 3: «Play with» moved here from the main screen
   calSettingsRender();
-  $('nightSceneTg').hidden= EDITION!=='dev'; $('nightSceneTg').textContent=t('night.scene', { lvl:t('night.scene.'+sceneLevel()) });
+  $('nightSceneTg').hidden=!devItems(); $('nightSceneTg').textContent=t('night.scene', { lvl:t('night.scene.'+sceneLevel()) });
   for(const b of $('nightQualSeg').children) b.classList.toggle('on', b.dataset.q===sceneLevel());   // NIGHT-7: the players' picture choice
   $('nightRoomSoundRow').hidden= !amb; $('nightRoomSound').value=String(roomSound());
   $('nightMusicVol').value=String(bedVolumeOf()); $('nightMusicAnswerTg').classList.toggle('on', bedAnswerOf());
@@ -112,7 +110,6 @@ function wire(){
   tap('nightSleep', ()=>sleepSet(nextOf(NIGHT_UI.sleepMins, sleep.mins)));
   $('nightInfoBtn').onclick=()=>infoShow(true); $('nightInfoClose').onclick=()=>infoShow(false);
   $('nightFieldTg').onclick=()=>{ const all=!(nightView && nightView.fieldAll); save(KEY.field, all ? '1' : '0'); if(nightView) setNightView({ ...nightView, fieldAll:all }); render(); };
-  $('nightFirstRun').onclick=()=>{ infoShow(false); save(KEY.seen,'0'); ghostArm(); };   // C7: the steps show on the next start; the ghost plays now
   $('nightToSound').onclick=()=>{ infoShow(false); if(D.sound) D.sound(); };   // dev: the Sound panel (Diagnostics → Latency meter — step 105)
   $('nightMusicVol').oninput=e=>{ const v=+e.target.value; save(KEY.musicVol, String(v)); bedSetVolume(v); };
   $('nightMusicAnswerTg').onclick=()=>{ const v=!bedAnswerOf(); save(KEY.musicAnswer, v ? '1' : '0'); bedSetAnswer(v); render(); };
@@ -152,15 +149,16 @@ function tick(now){
     if(st.shown && Math.floor(now/1000)!==Math.floor((now-17)/1000)) sleepLabel(now); }
   raf=requestAnimationFrame(tick);
 }
-/* RUN 7 (C7): THE NIGHT START — the start card is Night's (body.night-boot; the
-   first steps only until this device has begun once — body.night-seen). «Begin» runs the very same start handler as Play, inside this click
-   (rule #1); a FIRST start also arms the ghost light. Only a person's own tap arms it (never a profile switch — the probes switch). */
-document.body.classList.add('night-boot'); if(load(KEY.seen)==='1') document.body.classList.add('night-seen');
-$('nightBegin').onclick=()=>{ const go=$('startBtn').onclick; begun=true; if(load(KEY.seen)!=='1'){ save(KEY.seen,'1'); firstRun=true; } if(go) go(); };
-/* NIGHT-2: once the camera runs after a Begin: the calibration offer for a camera not offered yet, then (a first start) the ghost; without an offer the ghost comes at once, as before */
+/* RUN 7 (C7): THE NIGHT START — the start card is Night's (body.night-boot): the title, two setup tips (NIGHT-7b: always; no saved flag hides
+   them), Begin, the privacy line. «Begin» runs the very same start handler as Play, inside this click (rule #1). Only a person's own tap leads
+   to the first cards (never a profile switch — the probes switch). */
+document.body.classList.add('night-boot');
+$('nightBegin').onclick=()=>{ const go=$('startBtn').onclick; begun=true; firstRun=cardsDue(STORE); if(go) go(); };
+/* NIGHT-2: once the camera runs after a Begin: the calibration offer for a camera not offered yet, then the first cards when due. NIGHT-7b: the
+   cards alone — the old ghost hand is gone; they count as seen only once they close (finished or skipped) */
 function startFlow(){ const first=firstRun; firstRun=false;
-  const then=after=>{ if(first) cardsShow(()=>ghostArm(after ? { wait:GHOST_WAIT } : {})); };   // NIGHT-7: a first start shows the cards, then the ghost
-  if(!calOfferIfNew(()=>then(true))) then(false); }
+  const then=()=>{ if(first) cardsShow(()=>cardsDone(STORE)); };
+  if(!calOfferIfNew(then)) then(); }
 /* RUN 8 (slice 3): THE BARS while the hands play — the hand's depth («Глубина»: the room and the light; NIGHT-5 no mark) on the playing hand's side, the
    three effects (Echo · Warmth ↔ Brightness from the middle · Wave) on the effects hand's side; the bar of the finger in use glows; each set
    fades in with its hand and out when it leaves; a set's side follows where its hand is on the screen (40 / 60 % of the width, hysteresis),

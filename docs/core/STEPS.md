@@ -47,6 +47,7 @@ THERE in full and here as one index entry):
   141 The painted distance (brush strokes by depth) and the film (vignette, grain), the camera's breath (NIGHT-6 slice 8)
   142 Hidden things the light finds: foxfire veins on the wood, night flowers among the herbs (NIGHT-6 slice 9)
   143 The test version: the bare floor, the players' build, the first cards, both languages, the picture choice, the privacy line; the Poco and an iPhone (NIGHT-7)
+  144 The test version's fixes: room-neutral shared texts, the cards close and replace the ghost, stale saved values, `?release`, the start screen (NIGHT-7b)
 
 ## Moved to `archive/CLAUDE-history.md` at DOC1 (grep by title; read only what the slice needs)
 - «Module map (full, moved at DOC1)» — every module's detailed paragraph (AUD1a … IDS1, SONG1, AUTOSAVE1, PACK1 …).

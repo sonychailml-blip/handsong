@@ -1,4 +1,5 @@
-/* NIGHT-7 — NIGHT'S OWN TEXTS, both languages. Night-only strings live in this app, not in core (core rule 3): imported first by main.js, they
+/* NIGHT-7 — NIGHT'S OWN TEXTS, both languages. NIGHT-7b: shared texts (start, calibration, cards, settings, hints) never name a room — the room's
+   own words live in its record; the data row checks it. Night-only strings live in this app, not in core (core rule 3): imported first by main.js, they
    join the shared dictionaries (core/i18n.js DICTS — t() and [data-i18n] read them like any other key). Every key here has an English and a
    Russian text (data row «NIGHT texts both languages (app)» checks it, with every key the Night page and its code use). */
 import { DICTS } from '../../core/i18n.js';
@@ -17,11 +18,14 @@ export const NIGHT_TEXTS=Object.freeze({
     'night.card.play.t':'Play',
     'night.card.play.b':'Touch your thumb to a fingertip and a note sounds — each finger has its own. Raise or lower your hand for higher or lower notes. Hold the touch and the note goes on; let go and it fades.',
     'night.card.depth.t':'Near and far',
-    'night.card.depth.b':'Bring your playing hand closer to the camera or move it away. Farther: the forest’s echo grows deeper and your light drifts deeper between the trees. Closer: the sound comes near and clear.',
+    'night.card.depth.b':'Bring your playing hand closer to the camera or move it away. Farther: the space around the sound opens up and its echo grows deeper. Closer: the sound comes near and clear.',
     'night.card.fx.t':'Your other hand',
     'night.card.fx.b':'Your other hand shapes the sound: touch a finger to your thumb and move it up or down — index Echo, middle Warm or Bright, ring Wave. The sound stays where you leave it.',
     'night.card.music.t':'Music',
     'night.card.music.b':'The Music button below adds a quiet accompaniment under your notes — {still}, {drift} or {glimmer}. Tap it to change, again to turn it off.',
+    'night.phones':'Headphones help: everything here plays quietly.',
+    'night.cal.offerB':'One step, about 10 seconds: show the camera the hand you play with. Then the sound will follow its movement more closely.',
+    'night.cal.doneB':'Your hand is remembered. Closer to the camera, the sound is near and clear; farther, the space around it opens up and the echo grows.',
   }),
   ru:Object.freeze({
     'night.privacyLine':'Изображение с камеры никогда не покидает это устройство.',
@@ -36,11 +40,14 @@ export const NIGHT_TEXTS=Object.freeze({
     'night.card.play.t':'Игра',
     'night.card.play.b':'Коснитесь большим пальцем кончика другого пальца — прозвучит нота; у каждого пальца своя. Выше или ниже рука — выше или ниже ноты. Держите касание — нота звучит дальше; отпустите — она затихнет.',
     'night.card.depth.t':'Ближе и дальше',
-    'night.card.depth.b':'Поднесите играющую руку ближе к камере или отведите дальше. Дальше — эхо леса глубже, а ваш огонёк уходит дальше между деревьями. Ближе — звук рядом и чище.',
+    'night.card.depth.b':'Поднесите играющую руку ближе к камере или отведите дальше. Дальше — вокруг звука больше простора, а эхо глубже. Ближе — звук рядом и чище.',
     'night.card.fx.t':'Вторая рука',
     'night.card.fx.b':'Другая рука меняет звук: прижмите палец к большому и ведите вверх или вниз — указательный: эхо, средний: тепло или яркость, безымянный: волна. Звук остаётся таким, как вы оставили.',
     'night.card.music.t':'Музыка',
     'night.card.music.b':'Кнопка «Музыка» внизу добавляет тихое сопровождение под ваши ноты — {still}, {drift} или {glimmer}. Нажмите, чтобы сменить, ещё раз — чтобы выключить.',
+    'night.phones':'С наушниками лучше: здесь всё звучит тихо.',
+    'night.cal.offerB':'Один шаг, около 10 секунд: покажите камере руку, которой играете. Тогда звук будет точнее следовать за её движением.',
+    'night.cal.doneB':'Рука запомнена. Ближе к камере — звук рядом и чище; дальше — вокруг него больше простора и эха.',
   }),
 });
 for(const [lang, T] of Object.entries(NIGHT_TEXTS)) if(DICTS[lang]) Object.assign(DICTS[lang], T);

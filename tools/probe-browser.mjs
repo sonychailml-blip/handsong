@@ -334,6 +334,67 @@ async function uiSongFile(page, label){
   return { pass:!bad.length, lines:[...lines.map(l=>`${label}: ${l}`), ...bad.map(b=>`${label}: NOT A PASS — ${b}`)] };
 }
 
+/* NIGHT-7b — «stale saved values → the start card still fully labelled» (Night page, the END of a session: it reloads the page). The page's
+   store is filled with what old runs and the old handsong-night site leave behind (an unknown language, the old «seen» flags, broken numbers,
+   an unreadable calibration record), the page is RELOADED and the REAL start card judged: every visible text has words (none blank, none its
+   own key), the title reads «hand·song night» on two lines, the language is English or Russian. CONTROL: a blanked Begin label is caught.
+   Then a trusted click on Begin: the first cards must come (the old «seen» flag must not stop them; the calibration offer, if any, is
+   skipped first), every card labelled; the last «Play» hides them (by computed style, not the attribute) and no synthetic hand plays. */
+const NIGHT_STALE=[['handsong.night.lang','xx'], ['handsong.lang','de'], ['handsong.nightSeen','1'], ['handsong.ca'+'lmSeen','1'], ['handsong.nightCards','old'],
+  ['handsong.nightMusic','loud'], ['handsong.nightMusicVol','NaN'], ['handsong.nightForest','abc'], ['handsong.nightJoints','x'], ['handsong.nightLight','maybe'],
+  ['handsong.nightField','2'], ['handsong.nightCalSide','middle'], ['handsong.nightCalOffered','{not json'], ['handsong.handCal.night','{not json'],
+  ['handsong.nightRoom','cave'], ['handsong.sceneLevel','ultra'], ['handsong.nightFxHint','?'], ['handsong.nightBg','dark']];   // Dark: no software WebGL here (the background's fallback is a list check)
+/* in the page: every visible text element under the given roots — blank, or showing its own key */
+function nightLabels(sels){
+  const bad=[], vis=el=>{ const r=el.getBoundingClientRect(), s=getComputedStyle(el); return r.width>0 && r.height>0 && s.visibility!=='hidden' && +s.opacity>0; };
+  let n=0;
+  for(const root of sels.map(s=>document.querySelector(s)).filter(Boolean)) for(const el of root.querySelectorAll('[data-i18n], button, p, li, h1, h2, summary, label, select')){
+    if(!vis(el) || el.matches('#loadmsg, #learnMsg, [role=status], [aria-live]')) continue; n++;   // status lines are empty until there is news
+    const tx=(el.tagName==='SELECT' ? ((el.selectedOptions[0]||{}).textContent||'') : (el.textContent||'')).replace(/\s+/g,' ').trim(), name=el.id||(el.tagName.toLowerCase()+'.'+String(el.className).split(' ')[0]);
+    const icon=!!el.querySelector('svg') && !!(el.title||el.getAttribute('aria-label'));
+    if(!tx && !icon) bad.push(name+' blank'); else if(/^[a-z]+(\.[\w-]+)+$/.test(tx)) bad.push(`${name} shows its key «${tx}»`); }
+  return { n, bad };
+}
+async function uiNightStale(page, label){
+  const lines=[], bad=[];
+  await page.evaluate(L=>{ for(const [k,v] of L) localStorage.setItem(k,v); }, NIGHT_STALE);
+  await page.reload();
+  await within(page.waitForFunction(()=>window.P && document.getElementById('start').classList.contains('on') && getComputedStyle(document.getElementById('nightBegin')).display!=='none', null, { timeout:0 }), 60e3, 'reloading the app');
+  await page.waitForTimeout(300);
+  const st=await page.evaluate(nightLabels, ['#start']);
+  const head=await page.evaluate(()=>{ const h=document.querySelector('.night-start-head'), w=h.querySelector('.night-word'), s=h.querySelector('.night-sub');
+    return { text:h.textContent.replace(/\s+/g,' ').trim(), below:s.getBoundingClientRect().top>=w.getBoundingClientRect().bottom-1, lang:document.documentElement.lang }; });
+  if(st.bad.length || st.n<5) bad.push(`the start card after stale values: ${st.n} texts, ${st.bad.length} not labelled (${st.bad.join(', ')})`);
+  else lines.push(`the start card after ${NIGHT_STALE.length} stale values: ${st.n} texts, all labelled, language «${head.lang}»`);
+  if(!/hand·song night/.test(head.text) || !head.below) bad.push(`the title reads «${head.text}»${head.below?'':', «night» not on its own line'}`);
+  if(!['en','ru'].includes(head.lang)) bad.push(`the language fell to «${head.lang}»`);
+  { await page.evaluate(()=>{ const b=document.getElementById('nightBegin'); window.__nlKeep=b.textContent; b.textContent=''; });
+    const c=await page.evaluate(nightLabels, ['#start']);
+    await page.evaluate(()=>{ document.getElementById('nightBegin').textContent=window.__nlKeep; delete window.__nlKeep; });
+    if(!c.bad.some(x=>/nightBegin/.test(x))) bad.push('CONTROL: a blanked Begin label was not caught'); else lines.push('CONTROL: a blanked Begin label is caught'); }
+  await page.click('#nightBegin');
+  await within(page.waitForFunction(()=>!document.getElementById('start').classList.contains('on'), null, { timeout:0 }), LIMIT_START, 'the start after Begin');
+  const shownNow=()=>page.evaluate(()=>{ const vis=id=>{ const e=document.getElementById(id); return !!e && getComputedStyle(e).display!=='none' && e.getBoundingClientRect().height>0; };
+    return { cal:vis('nightCalCard') && !document.getElementById('nightCal').hidden, cards:vis('nightCards') }; });
+  let s=null; for(let i=0;i<60;i++){ s=await shownNow(); if(s.cal || s.cards) break; await page.waitForTimeout(250); }
+  if(s.cal){ lines.push('the calibration offer came first (skipped)'); const o=await page.evaluate(nightLabels, ['#nightCalCard']); if(o.bad.length) bad.push('the calibration offer not labelled: '+o.bad.join(', '));
+    await page.click('#nightCalNo'); for(let i=0;i<20;i++){ s=await shownNow(); if(s.cards) break; await page.waitForTimeout(250); } }
+  if(!s.cards) bad.push('the first cards did not come after Begin (the stale «seen» flags stopped them, or they are hidden)');
+  else {
+    const titles=[]; let unl=[];
+    for(let k=0;k<4;k++){ const r=await page.evaluate(nightLabels, ['#nightCards']); unl=unl.concat(r.bad.map(x=>`card ${k+1}: ${x}`));
+      titles.push(await page.evaluate(()=>document.getElementById('nightCardTitle').textContent)); await page.click('#nightCardNext'); await page.waitForTimeout(150); }
+    if(unl.length) bad.push('cards not labelled: '+unl.join(', ')); else lines.push(`the first cards came and every one is labelled: ${titles.join(' · ')}`);
+    await page.waitForTimeout(1500);
+    const after=await page.evaluate(async ()=>{ const B=await import('/core/pure/bus.js'), C=await import('/apps/night/cards.js'), e=document.getElementById('nightCards');
+      const hv=B.BUS.get('handsView'); return { open:C.cardsOpen(), display:getComputedStyle(e).display, hands:Array.isArray(hv) ? hv.length : 0 }; });
+    if(after.open || after.display!=='none') bad.push(`the last «Play» left the cards on screen (open ${after.open}, display ${after.display})`);
+    else lines.push('the last «Play» closed them (display none)');
+    if(after.hands) bad.push(`a hand plays after the cards with no hand in front of the camera (${after.hands})`); else lines.push('no hand plays after them (no demo hand)');
+  }
+  return { pass:!bad.length, lines:[...lines.map(l=>`${label}: ${l}`), ...bad.map(b=>`${label}: NOT A PASS — ${b}`)] };
+}
+
 /* AUTOSAVE1 — the real thing at the END of a session: the seed song is autosaved by the app's own timer (the probe's hold released),
    the page is RELOADED, ▶ Play pressed again → the «Continue where you left off?» box must offer it; «Continue» → the same song. */
 async function uiAutosave(page, label){
@@ -533,6 +594,10 @@ async function session(port, plan, label){
       out(`[${label}] network (PRIV1, LAT2): ${N.n} request(s) of the page and its workers (${N.workers} worker(s) started${N.workerUrls.length?': '+[...new Set(N.workerUrls)].join(', '):''}) — ${N.bad.length?N.bad.length+' OUTSIDE the own origin and the MediaPipe paths: '+N.bad.slice(0,5).join(', '):'all to the own origin or the MediaPipe paths'} · control (a worker asking an unlisted host) ${N.ctl?'caught':'NOT CAUGHT'} → ${N.pass?'PASS':'NOT A PASS'}`); }
     { const C=res.csp; C.pass=C.meta && !C.list.length && C.blocked && C.ctl;
       out(`[${label}] CSP (PRIV1): policy ${C.meta?'present':'MISSING'} · ${C.list.length} violation(s) during the run${C.list.length?' — '+C.list.slice(0,5).map(x=>`${x.dir} ${x.uri} (${x.src}:${x.line})`).join('; '):''} · control fetch to https://example.com ${C.blocked&&C.ctl?'refused by connect-src':'NOT REFUSED ('+(C.err||'it went out')+')'} → ${C.pass?'PASS':'NOT A PASS'}`); }
+    if(NIGHT_PAGE && !DUMP){   // NIGHT-7b: stale saved values → the start card still fully labelled (last: it reloads the page)
+      res.stale=await within(uiNightStale(page, `[${label}] NIGHT stale saved values`), LIMIT_START+120e3, 'the stale-values check').catch(e=>({ pass:false, lines:[`[${label}] NIGHT stale saved values: ERROR — ${e&&e.message||e}`] }));
+      for(const l of res.stale.lines) out(l);
+    }
     if(!has('--no-ui') && res.ui){   // AUTOSAVE1: reload → «Continue?» → the same song (last: it reloads the page)
       const ua=await within(uiAutosave(page, `[${label}] UI autosave`), LIMIT_START+120e3, 'the autosave UI check').catch(e=>({ pass:false, lines:[`[${label}] UI autosave: ERROR — ${e&&e.message||e}`] }));
       for(const l of ua.lines) out(l);
@@ -605,6 +670,7 @@ for(const s of sessions){
   }
   if(!s.runs.length && !s.error && !EVAL && !LEAK && !s.dumped) pass=false;
   if(s.ui){ out(`[${s.label}] UI checks (section rename, bend drag, song file, autosave): ${s.ui.pass?'PASS':'NOT A PASS'}`); if(!s.ui.pass) pass=false; }
+  if(s.stale){ out(`[${s.label}] NIGHT stale saved values → start card fully labelled (NIGHT-7b): ${s.stale.pass?'PASS':'NOT A PASS'}`); if(!s.stale.pass) pass=false; }
   if(!s.error){ out(`[${s.label}] CSP (PRIV1): ${s.csp&&s.csp.pass?'PASS — no violation, the control fetch refused':'NOT A PASS'}`); if(!(s.csp&&s.csp.pass)) pass=false;
     out(`[${s.label}] network (PRIV1, LAT2): ${s.net&&s.net.pass?`PASS — ${s.net.n} requests, all to the own origin or the MediaPipe paths`:'NOT A PASS'}`); if(!(s.net&&s.net.pass)) pass=false;
     out(`[${s.label}] storage (CORE-11): ${s.store&&s.store.pass?`PASS — ${s.store.list.length} names, ${NIGHT_PAGE?'all of this app or device facts':'the Full names as before'}, the control seen`:'NOT A PASS'}`); if(!(s.store&&s.store.pass)) pass=false; }

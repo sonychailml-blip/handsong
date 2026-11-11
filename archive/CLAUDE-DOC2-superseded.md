@@ -16,3 +16,7 @@ Guidance for Claude Code in this repository. SHORT by design (DOC1, 2026-10-17):
 rules, a short module map and the verification-step index. Everything else — the full module map, the architecture sections, known
 limits, the full text of every verification step — moved WORD FOR WORD to `archive/CLAUDE-history.md` (index below; grep it by
 section title). The long reasoning behind each section: `archive/CLAUDE-full.md`. State, open decisions, work order: `HANDOFF.md` (the index), then `docs/<track>/HANDOFF.md`.
+
+NIGHT-7b (2026-11-11), `docs/core/MODULE-MAP.md` (the ghost light deleted):
+  `ghost.js` the first-run ghost light; `night.css`; `data/night.json` profile; `fonts/` (OFL, register entries); `vendor/three-r128/` (lazy); `pure/cycle.js` (the 24-min night `nightAt`, sleep `nightDeep`, the moods' easing, rare events, emblem), `rooms/forest/pure/forestlife.js` (stream, mushroom / flower places, rings), `rooms/forest/pure/fireflies.js`;
+  `fxParamsOf`, `looper.js`, `roles.js` stateless helpers, `hands.js` the state machine `HANDS`/`processHands`, `pose.js` the pose generator: HAND1 and the ghost).

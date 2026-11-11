@@ -4,6 +4,17 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`, `archive/NIGHT-RUN-LOG-2026-10.md`. New runs start at `NIGHT-1`.
 
+# NIGHT-7b (2026-11-11): fixes from the user's first look at the test version
+Tree hashes before: core 2b6fc141521883a3 · apps/full d6b90cf2cb4be6da · apps/night 117bb0bc77cf38ef. After: core fcc89441767f3d57 (CORE-14: texts only) · apps/full d6b90cf2cb4be6da (unchanged) · apps/night a37f38449a52a06e.
+- Cause of points 2 and 3 (reproduced first by the new runner check on the unchanged code: «the last Play left the cards on screen (open false, display block)», blank Skip / Next): `night.css` `.night-card.night-cards{display:block}` comes after `.night-card[hidden]` with the same specificity, so `hidden` never hid the cards. A window with the old `handsong.nightSeen` = 1 never had a first run, so the cards stayed on screen unfilled. Not a cache: `sw.js` caches nothing; `i18n.js` already falls back from an unknown stored language to the browser's, then English.
+- Fix: `#nightShell [hidden]{display:none !important}`; `cards.js` fills its labels at load and while closed; `CARDS_KEY` `handsong.nightCards` = `CARDS_V` '1', written by `cardsDone` when the cards close; `cardsDue` reads only it (anything else → due; a blocked store → due).
+- Ghost removed: `apps/night/ghost.js` deleted; `main.js` passes no `frameFilter`; `shell.js startFlow` = calibration offer → cards; `#nightFirstRun` and key `night.firstRun` gone; `calib.js` no longer stops a ghost. Rows: «NIGHT ghost light» removed; «NIGHT calibration screens» part (8) removed.
+- Texts (old → new in the report): `night.card.depth.b` (en, ru), `night.cal.offerB`, `night.cal.doneB`, `night.phones` (moved to `texts.js`), `night.stepPhones` and `night.stepCamera` deleted. The depth card's picture: arcs of space around the sound instead of trees.
+- Start: the two tips always shown (`body.night-seen` gone), a space between «hand·song» and «night» (also in Settings' mark).
+- `apps/night/edition.js` `NIGHT_EDITION` / `devItems()`: the build's edition, or `?release`. `shell.js`, `calib.js` read it.
+- Rows: «NIGHT first cards» 37 cases (computed style + CONTROL, labels while closed, `cardsDue` + CONTROL against NIGHT-7's rule, the start screen's order, no «first steps again»); data «NIGHT texts both languages (app)» 9 cases (+ room words, CONTROL); runner «NIGHT stale saved values» (CONTROL a blanked label); smoke `?release`.
+- Checks: in the report and below once final.
+
 # NIGHT-7 (2026-11-10/11): the test version
 Tree hashes before: core 2b6fc141521883a3 · apps/full d6b90cf2cb4be6da · apps/night 930d69a397b488d9. After: core 2b6fc141521883a3 (unchanged) · apps/full d6b90cf2cb4be6da (unchanged) · apps/night 117bb0bc77cf38ef.
 - The bare floor: `tools/forest-bake.mjs drawGround` (soil, blotches, moss patches, 7200 leaves, 4200 needles, 230 twigs, 3200 moss crumbs, 500 seeds, wrapped at the edges; a height field → `normalOf`); files `tex/ground-{2048,1024,512}.png` + `groundn-*`; `forest.js` uses them at high (2048) and medium (1024), tiled every 6 m (`pure/room.js groundTex`). Files per level: high 9.99 MB, medium 4.23 MB, low 1.56 MB (15.35 MB of 30). The register entry `forest-files` lists them.

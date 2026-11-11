@@ -47,14 +47,12 @@
 <div id="start" class="ov on">
   <div class="startCard">
     <!-- RUN 7 (C7): THE NIGHT START — the same card restyled when the app boots in Night (body.night-boot): the emblem and the wordmark, the
-         first steps (only the first time on this device), «Begin» = the same start handler as Play (rule #1: the sound starts in this
-         click); the privacy notice stays (rule #33). -->
-    <div class="night-only night-start-head"><span data-svg="emblem"></span><span class="night-word">hand<span class="night-word-dot">·</span>song</span><span class="night-sub">night</span></div>
+         two setup tips (NIGHT-7b: always shown; no saved flag hides them), «Begin» = the same start handler as Play (rule #1: the sound
+         starts in this click); the privacy notice stays (rule #33). The space before «night» keeps the words apart without the styles. -->
+    <div class="night-only night-start-head"><span data-svg="emblem"></span><span class="night-word">hand<span class="night-word-dot">·</span>song</span> <span class="night-sub">night</span></div>
     <ol id="nightFirstSteps" class="night-only night-steps">
-      <li><span class="night-vico" data-svg="sound"></span><span data-i18n="night.stepPhones">Use headphones — the forest is quiet.</span></li>
       <li><span class="night-vico" data-svg="lantern"></span><span data-i18n="night.stepLight">Light your hands — a lamp beside you, not behind you.</span></li>
       <li><span class="night-vico" data-svg="hand"></span><span data-i18n="night.stepStand">Stand your phone or laptop so both hands are free.</span></li>
-      <li><span class="night-vico" data-svg="info"></span><span data-i18n="night.stepCamera">Handsong will ask for your camera. Pictures never leave this device.</span></li>
     </ol>
     <button id="nightBegin" class="night-only night-begin" data-i18n="night.begin">Begin</button>
     <!-- NIGHT-7: the privacy line, always on the start screen (rule #33) -->
@@ -643,11 +641,11 @@
       <button id="nightLightTg" class="night-tg"><span class="night-vico" data-svg="forest"></span><span data-i18n="night.light">Lightweight mode — for older computers and phones</span><span class="night-tsw"><span></span></span></button>
     </section>
     <div class="night-about">
-      <span class="night-mark"><span data-svg="emblem"></span><span class="night-word">hand<span class="night-word-dot">·</span>song</span><span class="night-sub">night</span></span>
+      <span class="night-mark"><span data-svg="emblem"></span><span class="night-word">hand<span class="night-word-dot">·</span>song</span> <span class="night-sub">night</span></span>
       <p data-i18n="night.privacy">Pictures and sound never leave this device.</p>
-      <p data-i18n="night.phones">Use headphones — the forest is quiet.</p>
+      <p data-i18n="night.phones">Headphones help: everything here plays quietly.</p>
       <button id="nightHowTo" class="night-lnk" data-i18n="night.howTo">How to play</button>
-      <button id="nightFirstRun" class="night-lnk" data-i18n="night.firstRun" hidden>Show the first steps again</button>
+      <!-- NIGHT-7b: the development items below are hidden in the release edition (apps/night/edition.js; ?release shows it locally) -->
       <button id="nightSceneTg" class="night-lnk night-dev" hidden>Room picture: high (development)</button>
       <button id="nightMeasure" class="night-lnk night-dev" data-i18n="night.measure" hidden>Measure this device (about 2 minutes, development)</button>
       <pre id="nightMeasureOut" class="night-measure" hidden></pre>
@@ -655,7 +653,7 @@
     </div>
   </div>
   <!-- NIGHT-7: THE FIRST CARDS (apps/night/cards.js): four short cards with drawn pictures after the calibration offer on a first start, and from
-       Settings → How to play; the picture, the title and the text are written by the module -->
+       Settings → How to play; the picture, the title and the text are written by the module (NIGHT-7b: filled at load too, so no label is ever blank) -->
   <div id="nightCards" class="night-card night-glass night-cards" role="dialog" aria-modal="true" aria-labelledby="nightCardTitle" hidden>
     <div id="nightCardPic" class="night-card-pic" aria-hidden="true"></div>
     <p id="nightCardTitle" class="night-cal-title"></p><p id="nightCardText" class="night-cal-text"></p>

@@ -4,6 +4,11 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`. Checkpoints A–E of SPLIT-2 are its last sections.
 
+# CORE-14 (2026-11-11): Night texts out of core (for NIGHT-7b)
+Tree hashes before: core 2b6fc141521883a3 · apps/full d6b90cf2cb4be6da · apps/night 117bb0bc77cf38ef. After: core fcc89441767f3d57 · apps/full d6b90cf2cb4be6da (unchanged) · apps/night a37f38449a52a06e.
+- `core/i18n.js`: removed `night.stepPhones`, `night.stepCamera`, `night.firstRun` (no longer used) and `night.phones`, `night.cal.offerB`, `night.cal.doneB` (reworded room-neutral, now in `apps/night/texts.js`), English and Russian. No Full key touched; the debt line «Night's dictionary keys in `i18n.js`» shrinks.
+- Checks: both apps' runs (NIGHT-7b log).
+
 # CORE-13 (2026-11-09): the render rows at 48 kHz whatever the device runs (found at NIGHT-6)
 Tree hashes before: core 14bd513ae15aa87e · apps/full d6b90cf2cb4be6da · apps/night f7f087ef0d9048bb. After: core 2b6fc141521883a3 · apps/full d6b90cf2cb4be6da (unchanged) · apps/night f7f087ef0d9048bb (unchanged).
 - Why: at NIGHT-6 a headset put the laptop's output at 44.1 kHz; «TIM3 timbres = before», «FULL untouched» and «NIGHT lean path» render on the engine copy at the LIVE context's rate and compare with prints made at 48 kHz (lean path: its click CONTROL, tuned at 48 kHz, read 0.229), so they failed with no code changed. GOLD already pins 48 kHz.

@@ -1,13 +1,11 @@
-/* SPLIT-2: the Night app's entry: its shell, its ghost light, its rooms, its profile. */
+/* SPLIT-2: the Night app's entry: its shell, its rooms, its profile (NIGHT-7b: the ghost light is gone — the first cards replace it). */
 import './migrate.js';   // first: the shell reads its settings while it loads
 import './texts.js';   // NIGHT-7: Night's own texts join the dictionaries before anything shows
 import { boot } from '../../core/legacy-ui/boot.js';
 import { shellDoors, setFaceHook } from '../../core/legacy-ui/ui.js';
 import { sceneRoomAdd, setBackground, backgroundOf, sceneInfo, scenePausing, sceneRoom, sceneLevel } from './scene/host.js';
 import { hooks } from '../../core/hooks.js';
-import { handFn } from '../../core/state.js';
 import { nightShellWire, nightShellFace } from './shell.js';
-import { ghostFrame } from './ghost.js';
 import { calTick } from './calib.js';
 import { ROOMS } from './rooms/index.js';
 import { soundModAdd } from '../../core/soundmods.js';
@@ -25,5 +23,5 @@ hooks.scene={ set:setBackground, of:backgroundOf, info:sceneInfo };   // CORE-8:
   if(why) console.warn('[night] the ambience was not registered:', why); }   // eslint-disable-line no-console
 nightShellWire(shellDoors()); setFaceHook(nightShellFace);
 /* afterDraw: the calibration's picture is drawn in the loop, while the camera snapshot is still open (NIGHT-2 stage 3) */
-boot({ profile:'profile.night', frameFilter:(res, t)=>ghostFrame(res, t, handFn.ld.R==='fx' ? 'Left' : 'Right'), afterDraw:()=>calTick(),
+boot({ profile:'profile.night', afterDraw:()=>calTick(),
   detectPause:scenePausing });   // CORE-12: no camera frame is taken while a room builds (NIGHT-3 stage 5 part 2)

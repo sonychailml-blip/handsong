@@ -4,7 +4,7 @@
    runs from a sub-folder (proves «works from any folder»). CONTROL: a run with one worklet missing must fail. Exit 0 / 1, verdict line last.
      node tools/smoke-paths.mjs [--build] [--no-control]
    --build also builds production and preview trees (tools/.build/) and checks them: each from the root and a sub-folder; `?probe` must give window.P on a preview and nothing on production;
-   the root redirect; Night's Measure button (on, and hidden in a release edition). */
+   the root redirect; Night's Measure button (on, and hidden in a release edition — and on the repo's page with ?release, NIGHT-7b). */
 import http from 'node:http';
 import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -44,8 +44,8 @@ async function cdnCache(ctx){   // the runner's cached MediaPipe files: a smoke 
 }
 const ALLOWED_404=/\/_vercel\/insights\/script\.js$/;
 const HOSTS=['https://cdn.jsdelivr.net/npm/@mediapipe/','https://storage.googleapis.com/mediapipe-models/'];
-async function run(app, dir, prefix, breakWorklet=false, measureOn=true){
-  const label=`${app}${dir===ROOT?'':' (built)'} at ${prefix}`, bad=[], miss=s=>bad.push(s), served=[], srv=await serve(dir,prefix,served,breakWorklet?'ks-worklet.js':null), origin=`http://127.0.0.1:${srv.address().port}`;
+async function run(app, dir, prefix, breakWorklet=false, measureOn=true, query=''){   // NIGHT-7b: query '?release' — the players' edition on the repo's own page
+  const label=`${app}${dir===ROOT?'':' (built)'} at ${prefix}${query}`, bad=[], miss=s=>bad.push(s), served=[], srv=await serve(dir,prefix,served,breakWorklet?'ks-worklet.js':null), origin=`http://127.0.0.1:${srv.address().port}`;
   const browser=await chromium.launch({ channel:'chrome', headless:true, args:['--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream','--autoplay-policy=no-user-gesture-required','--disable-background-timer-throttling','--disable-renderer-backgrounding'] });
   const seen=[], talk=[], open=new Set(); let pageRef=null;
   try{
@@ -60,7 +60,7 @@ async function run(app, dir, prefix, breakWorklet=false, measureOn=true){
     page.on('pageerror', e=>miss('page error: '+(e&&e.message||e)));
     page.on('console', m=>{ talk.push(m.type()+': '+m.text().slice(0,160)); if(talk.length>12) talk.shift(); });   // NIGHT-3: told when a page stalls
     page.on('console', m=>{ if(m.type()!=='error') return; const t=m.text(), at=(m.location()||{}).url||''; if(/Failed to load resource/.test(t) && (ALLOWED_404.test(at.split('?')[0])||/\b40\d\b/.test(t))) return; /* a status is judged above */ miss('console error: '+t.slice(0,200)); });
-    await page.goto(origin+prefix+(dir===ROOT ? PAGES[app] : ''));
+    await page.goto(origin+prefix+(dir===ROOT ? PAGES[app] : '')+query);
     await page.waitForSelector(BEGIN[app], { state:'visible', timeout:60e3 });
     await page.waitForTimeout(800);
     await page.click(BEGIN[app]);
@@ -194,6 +194,7 @@ async function redirectCheck(){ const served=[], srv=await serve(ROOT,'/',served
     for(let k=0;k<N;k++) for(const [app,prefix] of list){ const t0=Date.now(), b=await run(app,ROOT,prefix||'/'); out(`[smoke] --only ${app}@${prefix||'/'} ${k+1}/${N}: ${b.length?'stalled or failed':'ok'} in ${((Date.now()-t0)/1000).toFixed(0)} s`); if(b.length) f++; }
     out(`[smoke] --only ${argv[i+1]}: ${f} of ${N*list.length} failed (a diagnosis, not a verdict of the whole test)`); process.exit(f?1:0); } }
 for(const app of ['full','night']) for(const prefix of ['/','/some/sub/']) if((await run(app,ROOT,prefix)).length) fails++;
+if((await run('night',ROOT,'/',false,false,'?release')).length) fails++;   // NIGHT-7b: ?release on Live Server = the players' settings
 if((await statsPage('repo tree',ROOT)).length) fails++;
 if((await roomPage('repo tree',ROOT,'/apps/night/')).length) fails++;
 if((await tailPill('repo tree',ROOT,'/apps/night/')).length) fails++;
