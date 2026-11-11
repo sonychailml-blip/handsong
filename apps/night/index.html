@@ -57,6 +57,8 @@
       <li><span class="night-vico" data-svg="info"></span><span data-i18n="night.stepCamera">Handsong will ask for your camera. Pictures never leave this device.</span></li>
     </ol>
     <button id="nightBegin" class="night-only night-begin" data-i18n="night.begin">Begin</button>
+    <!-- NIGHT-7: the privacy line, always on the start screen (rule #33) -->
+    <p id="nightPrivacyLine" class="night-only night-privacy-line" data-i18n="night.privacyLine">Your camera picture never leaves this device.</p>
     <h1>Hand<span>song</span></h1>
     <p class="startTag" data-i18n="start.tag">Жестовый синтезатор: играйте руками перед камерой.</p>
     <div class="startBtns">
@@ -634,7 +636,9 @@
       <div class="night-sl-lab" data-i18n="night.set.screen">On screen</div>
       <!-- the value «forest» = the current room's picture (the stored choice keeps its old name) -->
       <div id="nightBgSeg" class="night-seg"><button data-bg="forest" data-i18n="night.bgRoom">Room</button><button data-bg="dark" data-i18n="prof.bgDark">Dark</button><button data-bg="camera" data-i18n="prof.bgCamera">Camera</button></div>
-      <!-- later: graphics quality, low · medium · high (docs/night/BACKLOG.md): one more segment here -->
+      <!-- NIGHT-7: the picture's quality for players — standard (medium, the default) or detailed (high, for strong devices) -->
+      <div class="night-sl-lab" data-i18n="night.set.quality">Picture</div>
+      <div id="nightQualSeg" class="night-seg night-seg-2"><button data-q="reduced" data-i18n="night.q.standard">Standard</button><button data-q="full" data-i18n="night.q.detailed">Detailed — for strong devices</button></div>
       <button id="nightFieldTg" class="night-tg"><span class="night-vico" data-svg="note-stay"></span><span data-i18n="night.field">Show the full note field</span><span class="night-tsw"><span></span></span></button>
       <button id="nightLightTg" class="night-tg"><span class="night-vico" data-svg="forest"></span><span data-i18n="night.light">Lightweight mode — for older computers and phones</span><span class="night-tsw"><span></span></span></button>
     </section>
@@ -642,12 +646,21 @@
       <span class="night-mark"><span data-svg="emblem"></span><span class="night-word">hand<span class="night-word-dot">·</span>song</span><span class="night-sub">night</span></span>
       <p data-i18n="night.privacy">Pictures and sound never leave this device.</p>
       <p data-i18n="night.phones">Use headphones — the forest is quiet.</p>
+      <button id="nightHowTo" class="night-lnk" data-i18n="night.howTo">How to play</button>
       <button id="nightFirstRun" class="night-lnk" data-i18n="night.firstRun" hidden>Show the first steps again</button>
       <button id="nightSceneTg" class="night-lnk night-dev" hidden>Room picture: high (development)</button>
       <button id="nightMeasure" class="night-lnk night-dev" data-i18n="night.measure" hidden>Measure this device (about 2 minutes, development)</button>
       <pre id="nightMeasureOut" class="night-measure" hidden></pre>
       <button id="nightToSound" class="night-lnk night-dev" data-i18n="night.toSound" hidden>Sound panel and diagnostics (development)</button>
     </div>
+  </div>
+  <!-- NIGHT-7: THE FIRST CARDS (apps/night/cards.js): four short cards with drawn pictures after the calibration offer on a first start, and from
+       Settings → How to play; the picture, the title and the text are written by the module -->
+  <div id="nightCards" class="night-card night-glass night-cards" role="dialog" aria-modal="true" aria-labelledby="nightCardTitle" hidden>
+    <div id="nightCardPic" class="night-card-pic" aria-hidden="true"></div>
+    <p id="nightCardTitle" class="night-cal-title"></p><p id="nightCardText" class="night-cal-text"></p>
+    <div class="night-cards-foot"><span id="nightCardDots" class="night-cards-dots" aria-hidden="true"></span><span id="nightCardStep" class="night-cards-step"></span></div>
+    <div class="night-btns"><button id="nightCardSkip" class="night-btn"></button><button id="nightCardNext" class="night-btn go"></button></div>
   </div>
   <!-- NIGHT-2: THE HAND'S CALIBRATION (apps/night/calib.js): the camera picture with every point of the hands on its own canvas (the forest stays open
        underneath), a frame, one line with the progress, Cancel; one card for the offer, the result and a failure -->

@@ -8451,3 +8451,12 @@ not a control · run a "random" failure many times and print WHERE and HOW MUCH 
 - The gust (`pure/gust.js`, `forest-gust.js`): the effects hand's light, when it SWEEPS, bends the grass, today's ferns, the floor plants and the ivy along the sweep (the shared sway shader), stirs cat's-paws on the water, shakes leaves loose (12 / 6) and leaves a wake of rings on the stream. A still or slow hand: exactly nothing. Picture only.
 - Laptop medium: detections = Dark (0.0 %); draws 63–64, programs 26, triangles 156 k, textures 14.9 MB. Files unchanged (2.66 MB of 30).
 - Rows: data «FOREST gust (app)» 18; browser «FOREST gust» 11. Waiting for step 139.
+
+# Moved from docs/night/HANDOFF.md at NIGHT-7 (2026-11-11)
+### NIGHT-6 slice 7 (2026-11-10): the canopy and the moon's window. Log: `docs/night/WORK-LOG.md`; as built: `docs/night/design/NIGHT-6-forest/PLAN.md` top
+- Step 139 checked by the user: the gust looks right. High stays as it is (for stronger devices; levels per device later).
+- Crowns on all 95 trees (limbs split twice, leaf sprays of four kinds from a new prepared sheet), young trees and hazel-like shrubs outside the light's reach, saplings at the sides; stars; the moon's face (a prepared file); dappled moonlight drifting on the floor (a prepared pattern), dimmed by clouds.
+- The gap: no leaf on any ray from the eye to the moon's path or down the stream's far reach. The light: the understorey hides 1.4 % of its reach (it hid 18 % before the law kept young trees and shrubs out of it).
+- Darkness, measured (medium, landscape, light at three places): the top third with / without the canopy 7.98 / 8.12, 8.30 / 8.30, 8.45 / 8.57; round the light unchanged (±0.2). The leaves carry a faint moonlit glow (a value; a stronger one made them pale cut-outs).
+- Laptop medium: detections = Dark (0.0 / −0.2 %); draws 66–67, programs 27, triangles 189 k, textures 16.9 MB; first opening 4.1 s (after high in the page). High −54.4 / −52.6 % (left as is). Files: high 2.15, medium 1.00, low 0.50 MB (3.29 of 30).
+- Rows: data «FOREST canopy (app)» 18; browser «FOREST canopy» 14. Waiting for step 140.

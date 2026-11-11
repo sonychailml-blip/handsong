@@ -24,6 +24,7 @@ import { calWire, calOfferIfNew, calActive, calSideApply, calSideSet, calSetting
 import { setSceneLevel, sceneLevel, setBackground, backgroundOf, sceneInfo, sceneRoom, sceneRooms, sceneOptDbg } from './scene/host.js';   // RUN 8 (slice 4): the scene's quality (development switch); C8 the measurement
 import { roomSwitch, roomNext } from './roomswitch.js';   // NIGHT-3 stage 5 part 2: the Room button
 import { latReport } from '../../core/legacy-ui/latmeter.js';   // C8: the device measurement reads the latency meter
+import { cardsWire, cardsShow, cardsOpen } from './cards.js';   // NIGHT-7: the first cards
 
 const $=id=>document.getElementById(id), READ=BUS.reader();
 /* NIGHT-1 stage 2: what this app never plays leaves the graph (the sound stays the same to rounding; row «NIGHT lean path»). Its chain has no drive, brightness or tremolo; its one role is solo */
@@ -89,6 +90,7 @@ function render(){
   for(const b of $('nightHandSeg').children) b.classList.toggle('on', b.dataset.hand===D.hand());   // NIGHT-2 stage 3: «Play with» moved here from the main screen
   calSettingsRender();
   $('nightSceneTg').hidden= EDITION!=='dev'; $('nightSceneTg').textContent=t('night.scene', { lvl:t('night.scene.'+sceneLevel()) });
+  for(const b of $('nightQualSeg').children) b.classList.toggle('on', b.dataset.q===sceneLevel());   // NIGHT-7: the players' picture choice
   $('nightRoomSoundRow').hidden= !amb; $('nightRoomSound').value=String(roomSound());
   $('nightMusicVol').value=String(bedVolumeOf()); $('nightMusicAnswerTg').classList.toggle('on', bedAnswerOf());
   document.body.classList.toggle('night-plain', !!D.plain() || load(KEY.light)==='1');   // C8: the Lighter forest has no glass blur
@@ -118,6 +120,10 @@ function wire(){
   $('nightSceneTg').onclick=()=>{ const L=['full','reduced','minimal'], v=L[(L.indexOf(sceneLevel())+1)%L.length]; setSceneLevel(v).then(()=>render()); };
   $('nightLightTg').onclick=()=>{ const v=load(KEY.light)!=='1'; save(KEY.light, v ? '1' : '0'); lightApply(v, false); render(); };
   $('nightMeasure').onclick=()=>{ measure(); };
+  /* NIGHT-7: the picture's quality (Detailed ends the Lightweight mode, which keeps the picture standard); the first cards again */
+  for(const b of $('nightQualSeg').children) b.onclick=()=>{ const q=b.dataset.q; if(q==='full' && load(KEY.light)==='1'){ save(KEY.light, '0'); lightApply(false, false); } setSceneLevel(q).then(()=>render()); render(); };
+  $('nightHowTo').onclick=()=>{ infoShow(false); cardsShow(); };
+  cardsWire();
   /* NIGHT-2: the background and the hand's points in settings (fingertips only, the default, or all points) */
   for(const b of $('nightBgSeg').children) b.onclick=()=>{ if(!D) return; D.setBg(b.dataset.bg); render(); };
   for(const b of $('nightHandSeg').children) b.onclick=()=>{ if(!D) return; calSideSet(b.dataset.hand); render(); };   // saved: the last choice wins
@@ -130,7 +136,7 @@ function tick(now){
   raf=0; if(!on) return;
   const hv=READ.get('handsView'), n= Array.isArray(hv) ? hv.length : 0;
   st=showStep(st, n, now);
-  $('nightShell').classList.toggle('show', st.shown && !info && !asleep && !calActive());
+  $('nightShell').classList.toggle('show', st.shown && !info && !asleep && !calActive() && !cardsOpen());
   if(startDue){ startDue=false; startFlow(); }
   if(amb){ ambienceRetune(); ambienceTick(); }   // the drone follows the mood; the crickets are scheduled ahead
   bedTick();   // NIGHT-3 stage 4: the music bed's next events, ahead on the audio clock
@@ -153,7 +159,8 @@ document.body.classList.add('night-boot'); if(load(KEY.seen)==='1') document.bod
 $('nightBegin').onclick=()=>{ const go=$('startBtn').onclick; begun=true; if(load(KEY.seen)!=='1'){ save(KEY.seen,'1'); firstRun=true; } if(go) go(); };
 /* NIGHT-2: once the camera runs after a Begin: the calibration offer for a camera not offered yet, then (a first start) the ghost; without an offer the ghost comes at once, as before */
 function startFlow(){ const first=firstRun; firstRun=false;
-  if(!calOfferIfNew(()=>{ if(first) ghostArm({ wait:GHOST_WAIT }); }) && first) ghostArm(); }
+  const then=after=>{ if(first) cardsShow(()=>ghostArm(after ? { wait:GHOST_WAIT } : {})); };   // NIGHT-7: a first start shows the cards, then the ghost
+  if(!calOfferIfNew(()=>then(true))) then(false); }
 /* RUN 8 (slice 3): THE BARS while the hands play — the hand's depth («Глубина»: the room and the light; NIGHT-5 no mark) on the playing hand's side, the
    three effects (Echo · Warmth ↔ Brightness from the middle · Wave) on the effects hand's side; the bar of the finger in use glows; each set
    fades in with its hand and out when it leaves; a set's side follows where its hand is on the screen (40 / 60 % of the width, hysteresis),
@@ -203,7 +210,7 @@ export const nightClockDbg=fn=>{ clockOver=typeof fn==='function' ? fn : null; r
    NIGHT-6 slice 0: the room's frame time, draw calls, triangles, shader programs and texture memory per step, every opening of the session
    (the first is the cold one) and the device. The person's choices come back after it. */
 let measuring=false;
-const BEFORE_N6=Object.freeze({ dew:0, webs:0, sorrel:0, forb:0, bilberry:0, anemone:0, nettle:0, sedge:0, fern2:0, softEdges:false, rocks:0, pebbles:0, floaters:0, mistStrips:0, roots:0, logs:0, stumps:0, snags:0, twigs:0, moss:0, ivy:0, woodShrooms:0, flare:false, barkMoss:false, shade:false, gust:false, gustLeaves:0, crowns:false, crownShare:0, young:0, shrubs:0, saplings:0, stars:0, dapple:false, moonFace:false, paint:false, paintR:0, vignette:false, grain:false, breath:false, foxfire:0, flowers:0 });   // NIGHT-6: the counts its slices added, left out for the baseline step
+const BEFORE_N6=Object.freeze({ dew:0, webs:0, sorrel:0, forb:0, bilberry:0, anemone:0, nettle:0, sedge:0, fern2:0, softEdges:false, rocks:0, pebbles:0, floaters:0, mistStrips:0, roots:0, logs:0, stumps:0, snags:0, twigs:0, moss:0, ivy:0, woodShrooms:0, flare:false, barkMoss:false, shade:false, gust:false, gustLeaves:0, crowns:false, crownShare:0, young:0, shrubs:0, saplings:0, stars:0, dapple:false, moonFace:false, paint:false, paintR:0, vignette:false, grain:false, breath:false, foxfire:0, flowers:0, groundTex:false });   // NIGHT-6: the counts its slices added, left out for the baseline step
 async function measure(){
   if(measuring || !AC) return; measuring=true; const out=$('nightMeasureOut'), wait=ms=>new Promise(r=>setTimeout(r,ms)), SEC=20;
   const keep={ bg:backgroundOf(), level:sceneLevel(), light:load(KEY.light)==='1' }, i=timbreIdx('ld', D.timbre()), rows=[];

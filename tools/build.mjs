@@ -12,7 +12,8 @@ const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), arg
 const die=s=>{ console.error('[build] FAILED — '+s); process.exit(1); };
 const app=process.env.HANDSONG_APP; if(!['full','night'].includes(app)) die('HANDSONG_APP must be full or night (Vercel: Settings → Environment Variables)');
 const other=app==='full' ? 'night' : 'full', i=argv.indexOf('--out'), OUT=path.resolve(ROOT, i>=0 ? argv[i+1] : 'dist');
-const PREVIEW=argv.includes('--probes') || process.env.VERCEL_ENV==='preview', RELEASE=process.env.HANDSONG_EDITION==='release';
+/* NIGHT-7: Night's Vercel PRODUCTION build is the release edition by itself (no development items for players), unless HANDSONG_EDITION=dev */
+const PREVIEW=argv.includes('--probes') || process.env.VERCEL_ENV==='preview', RELEASE=process.env.HANDSONG_EDITION==='release' || (app==='night' && process.env.VERCEL_ENV==='production' && process.env.HANDSONG_EDITION!=='dev');
 const PAGE_LEVEL=['manifest.json','sw.js','icons'], BASE=`apps/${app}`;
 const noDocs=f=>!f.toLowerCase().endsWith('.md');
 const copyTree=(from,to,keep=noDocs)=>cpSync(path.join(ROOT,from),path.join(OUT,to),{ recursive:true, filter:s=>statSync(s).isDirectory() || keep(s) });

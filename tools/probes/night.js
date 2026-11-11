@@ -20,6 +20,7 @@ export { checkNightProfile } from './night/nightprofile.js';
 export { checkNightMigrate } from './night/nightmigrate.js';
 export { checkNightLean, checkQuietFloor } from './night/lean.js';   // NIGHT-1 stages 2, 3
 export { checkNightCalib } from './night/calib.js';   // NIGHT-2 stage 2
+export { checkNightCards } from './night/cards.js';   // NIGHT-7
 export { checkNightBed } from './night/bed.js';   // NIGHT-3 stage 4: the music bed
 export { checkNightRoomSwitch } from './night/roomswitch.js';   // NIGHT-3 stage 5 part 2: the switching machinery
 export { testRoomInstall, testRoomRemove, testRoomMode } from './night/testroom.js';   // its development room

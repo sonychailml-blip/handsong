@@ -6,7 +6,7 @@ Index: `/HANDOFF.md`. Rules: `CLAUDE.md`. Open items: `docs/night/BACKLOG.md`. P
 ⛳ The first public release is **Handsong Night**, right after stage 3 (user, Q1, 2026-10-14); the visual design is the user's chosen C · Hush emblem in Moonglass colours (§7.19). Proposed still: free → "Plus" → packs → "Pro". Vercel Hobby forbids selling (paid plan or other hosting first, §7.12 item 6). After it: the installation (kiosk) mode §7.18 = stage 4b.
 
 ## Deploy (user, 2026-11-02)
-`handsong-night`'s Production branch is `night-release`, a stopper branch that is a copy of the old `main`. Merging `dev` into `main` does not touch Night's production. The new Night does not go public yet, and its public home (Vercel or another host) is not decided. `dev` pushes give previews, which keep `?probe`: use those for phone checks.
+`handsong-night`'s Production branch is `night-release`, a stopper branch that is a copy of the old `main`. Merging `dev` into `main` does not touch Night's production. The new Night does not go public yet, and its public home (Vercel or another host) is not decided. `dev` pushes give previews, which keep `?probe`: use those for phone checks. NIGHT-7 (user, 2026-11-11): the test version for the first testers goes to `night-release` (the user pushes; Full's `main` untouched); a Vercel production build of Night is the release edition by itself.
 
 ## Where it stands
 Stage 4: RUN 6 ✅ C0, VIS1a–c, listening page, design proposals · RUN 7 ✅ sound pass, C11, C6, C4b, C4c, C7, C5 · RUN 8 ✅ the user's fixes, the forest picture, C8 part (Lighter forest) · RUN 9 ✅ the living forest · SPLIT-2 ✅ its own app and name. **Next:** the user's checks below, then C8 rest (phone numbers, auto-proposal), C9 offline, C10 release, C12 release candidate. Plus the new items in the backlog. `NIGHT-1` (sound headroom) stage 1 done, waiting for the user's decision and the Poco numbers.
@@ -24,6 +24,7 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 - **Eye check from the split:** `tools/split-baseline/side-by-side-E/`, the four structure-only screens.
 - **Not done by a machine:** ears, hands, phones. Old setting names do not carry over to the new `handsong-night` address, so first-run steps may appear again there.
 
+- **Step 143, the test version** (five checks, the Poco, an iPhone): `archive/CLAUDE-history.md`, step 143.
 - **Step 127, the quiet floor by ear:** `http://127.0.0.1:5500/apps/night/?probe&tails=off` and `…&tails=on`; `archive/CLAUDE-history.md`.
 - **The Poco headroom page, later:** `<Night preview>/?probe&headroom`, about 25 minutes (user, 2026-11-03).
 
@@ -35,6 +36,16 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 5. The falling star passes in front of the trees. Natural?
 
 ## Records (English, at most about 15 lines each; older ones go to `archive/HANDOFF-history.md`)
+### NIGHT-7 (2026-11-11): the test version. Log: `docs/night/WORK-LOG.md`
+- Steps 141 and 142 checked by the user: the painted middle distance is right, no grain at medium; foxfire and the night flowers look right. The forest's remaining slices (a changing night, sounds and rain, animals) wait in the backlog.
+- The bare floor: soil, fallen leaves, needles, twigs, moss crumbs and seeds, with relief — `tools/forest-bake.mjs drawGround` (a 2048 master, 1024 / 512 copies; colour + normal map, tiled every 6 m). Files: high 9.99 MB, medium 4.23 MB, low 1.56 MB (15.35 MB of 30).
+- The players' build: the development items (Measure this device, Room picture, the sound page) are hidden in the release edition; a Vercel PRODUCTION build of Night is the release edition by itself (`tools/build.mjs`, unless `HANDSONG_EDITION=dev`). The smoke test checks the deploy tree itself.
+- First launch: after the calibration offer, four cards with our own line drawings (Play · Near and far · Your other hand · Music; `apps/night/cards.js`), Skip on each, reopened from Settings → How to play; then the ghost hint.
+- Languages: every Night text in English and Russian (`apps/night/texts.js`; data row «NIGHT texts both languages (app)»); the browser's language by default; the start screen's choice kept.
+- Picture: Standard (medium, the default) / Detailed (high) in Settings → View. The cold first opening at medium stays about 7 s on the laptop (shader compile; the bark's shader trimmed 1.8 → 1.3 s); it now runs in slices, so the start card stays responsive (longest block 2.5 s). Under 4 s was not reached cheaply.
+- Privacy: one line under Begin. Found on the way: a level change during the sliced compile dropped the picture to minimal (row «NIGHT low power» caught it) — fixed in the host.
+- Rows: data «NIGHT texts both languages (app)»; browser «NIGHT first cards» 24. Waiting for step 143 (the user's five checks, the Poco, an iPhone).
+
 ### NIGHT-6 slice 9 (2026-11-10): hidden things the light finds. Log: `docs/night/WORK-LOG.md`; as built: `docs/night/design/NIGHT-6-forest/PLAN.md` top
 - Step 141: the glows stay crisp; the strokes' strength and the grain at medium were left open by the user (asked again in the report); unchanged.
 - Foxfire: thin glowing veins on the dead and fallen wood and on the feet of some old trunks, near the playing light's trail (12 / 8 recent places); each patch holds 8–12 s after the light, then fades in 2.5 s (the wood's and the bark's shaders; no new program).
@@ -50,14 +61,6 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 - Found on the way: the gust could not reverse (its direction blended through zero) — now it turns by angle (data row case added); the glow pass first compiled a second copy of every glowing material (+9 programs) — the lights now see both passes.
 - Laptop medium (a clean second run): detections = Dark (0.0 / 0.0 %), frame 2.1–2.2 ms (1.8 before NIGHT-6), programs 28, textures 16.9 MB; first opening 3.9 s after high. High −48.5 / −45.0 %, cold first opening 8.3 s. Counts of draws and triangles now include every pass.
 - Files unchanged (3.29 MB of 30). Rows: data «FOREST paint (app)» 18; browser «FOREST paint» 15. Waiting for step 141.
-
-### NIGHT-6 slice 7 (2026-11-10): the canopy and the moon's window. Log: `docs/night/WORK-LOG.md`; as built: `docs/night/design/NIGHT-6-forest/PLAN.md` top
-- Step 139 checked by the user: the gust looks right. High stays as it is (for stronger devices; levels per device later).
-- Crowns on all 95 trees (limbs split twice, leaf sprays of four kinds from a new prepared sheet), young trees and hazel-like shrubs outside the light's reach, saplings at the sides; stars; the moon's face (a prepared file); dappled moonlight drifting on the floor (a prepared pattern), dimmed by clouds.
-- The gap: no leaf on any ray from the eye to the moon's path or down the stream's far reach. The light: the understorey hides 1.4 % of its reach (it hid 18 % before the law kept young trees and shrubs out of it).
-- Darkness, measured (medium, landscape, light at three places): the top third with / without the canopy 7.98 / 8.12, 8.30 / 8.30, 8.45 / 8.57; round the light unchanged (±0.2). The leaves carry a faint moonlit glow (a value; a stronger one made them pale cut-outs).
-- Laptop medium: detections = Dark (0.0 / −0.2 %); draws 66–67, programs 27, triangles 189 k, textures 16.9 MB; first opening 4.1 s (after high in the page). High −54.4 / −52.6 % (left as is). Files: high 2.15, medium 1.00, low 0.50 MB (3.29 of 30).
-- Rows: data «FOREST canopy (app)» 18; browser «FOREST canopy» 14. Waiting for step 140.
 
 ### NIGHT-6 stage 1 (2026-11-09): the forest, polished and alive — the comparison and the plan only. `docs/night/design/NIGHT-6-forest/PLAN.md`
 - No app code; tree hashes unchanged (core 14bd513ae15aa87e · apps/full d6b90cf2cb4be6da · apps/night 3279ec88c1f91059).

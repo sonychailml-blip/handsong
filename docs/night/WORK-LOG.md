@@ -4,6 +4,18 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`, `archive/NIGHT-RUN-LOG-2026-10.md`. New runs start at `NIGHT-1`.
 
+# NIGHT-7 (2026-11-10/11): the test version
+Tree hashes before: core 2b6fc141521883a3 · apps/full d6b90cf2cb4be6da · apps/night 930d69a397b488d9. After: core 2b6fc141521883a3 (unchanged) · apps/full d6b90cf2cb4be6da (unchanged) · apps/night 117bb0bc77cf38ef.
+- The bare floor: `tools/forest-bake.mjs drawGround` (soil, blotches, moss patches, 7200 leaves, 4200 needles, 230 twigs, 3200 moss crumbs, 500 seeds, wrapped at the edges; a height field → `normalOf`); files `tex/ground-{2048,1024,512}.png` + `groundn-*`; `forest.js` uses them at high (2048) and medium (1024), tiled every 6 m (`pure/room.js groundTex`). Files per level: high 9.99 MB, medium 4.23 MB, low 1.56 MB (15.35 MB of 30). The register entry `forest-files` lists them.
+- The players' build: `tools/build.mjs` — Night with `VERCEL_ENV=production` is the release edition unless `HANDSONG_EDITION=dev`; `tools/smoke-paths.mjs` builds that deploy tree too and checks every `.night-dev` hidden, no «development» text visible, the picture choice present.
+- First launch: `apps/night/cards.js` (four cards, inline-SVG drawings, Skip / Next, Escape), `shell.js startFlow` (calibration offer → cards → ghost hint, first start only), Settings → How to play; the effects hint hidden while the cards show.
+- Languages: `apps/night/texts.js` (Night's keys, en + ru, merged into `DICTS`); data row «NIGHT texts both languages (app)» (page keys and `t('…')` keys of `apps/night/**`, one-language keys, Night elements with words and no key; CONTROL).
+- Picture: `#nightQualSeg` Standard / Detailed (Detailed turns the Lightweight mode off). The cold opening: `scene/host.js` compiles in slices (`COMPILE_LOG`); the bark's shader leaves out the merged wood's branches (`WOOD7_KINDS`, pixel-identical: the bark's `vW7` is zero); the foxfire noise hoisted out of its loop. Cold medium opening 7.0 s (bark 1.8 → 1.3 s, wood 1.2 s), longest block 2.5 s; not under 4 s.
+- Privacy: `#nightPrivacyLine` under Begin.
+- Fix round (one, the Night suite): a level change during the sliced compile disposed the renderer under it and the host fell back to minimal («NIGHT low power» caught it) — the compile now stops when superseded and the opening returns; «FOREST canopy»'s moon check depended on the room clock (a cloud or the moon's place) — now pinned to a clear moon (60 s); two rows shared `at` 1009.975.
+- Budget (laptop, medium, second run): detections −1.5 % (first run 0.0 %), frame 3.6–3.9 ms (2.5–2.7 at slice 9: the floor's maps), draws 69–70, programs 29, textures 24.9 MB (16.9). High −50.0 / −53.8 %.
+- Checks: static PASS · `[probe-data] PASS — 50 checks, 0 differences` · `P.night: PASS — 49 checks, 0 differences` · `P.quick: PASS — 93 checks, 0 differences` · `[smoke] PASS` with builds (release and deploy trees) · doc-split PASS (both). No print renewed, no tolerance widened.
+
 # NIGHT-6 — slice 9 (2026-11-10): hidden things the light finds
 Tree hashes before: core 2b6fc141521883a3 · apps/full d6b90cf2cb4be6da · apps/night 845492ac100b9e56. After: core 2b6fc141521883a3 (unchanged) · apps/full d6b90cf2cb4be6da (unchanged) · apps/night 930d69a397b488d9.
 - Step 141: the user's note kept both choices open (the strokes: right / stronger / weaker; the grain at medium: yes / no) — left unchanged, asked again.

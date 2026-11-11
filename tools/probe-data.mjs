@@ -1313,6 +1313,34 @@ async function forestHiddenCore(){
     notes.push(`${F.length} flowers (${[...new Set(F.map(f=>f.by))].join(', ')}); a flower found opens in ${(1/FL.open).toFixed(2)} s, stays ${FL.stay} s, closes in ${(1/FL.close).toFixed(1)} s`); }
   return { cases:n, total:d.length, differences:d, notes };
 }
+/* NIGHT-7: every Night text in BOTH languages. The keys the Night page uses (data-i18n, data-i18n-title) and the keys its code writes as t('…')
+   (apps/night/**), with Night's own texts (apps/night/texts.js) joined: each has an English and a Russian text, every «night.*» key is in both
+   dictionaries, the Russian ones are Russian; no element of the Night page's own parts shows words without a key (the brand mark and the
+   development items excepted). CONTROL: a made-up key is reported missing. */
+async function nightTextsCore(){
+  const d=[], notes=[]; let n=0; const miss=s=>d.push(s);
+  const fs=await import('node:fs'), path=await import('node:path'), ROOT=new URL('..', import.meta.url).pathname.replace(/^\/(\w:)/,'$1');
+  const I=await import(new URL('../core/i18n.js', import.meta.url).href); await import(new URL('../apps/night/texts.js', import.meta.url).href);
+  const html=fs.readFileSync(path.join(ROOT, 'apps/night/index.html'), 'utf8'), keys=new Set(), from={};
+  for(const m of html.matchAll(/data-i18n(?:-title)?="([^"]+)"/g)){ keys.add(m[1]); from[m[1]]='index.html'; }
+  const walk=dir=>{ for(const e of fs.readdirSync(dir, { withFileTypes:true })){ const p=path.join(dir, e.name); if(e.isDirectory()){ if(!/vendor|fonts|icons|tex/.test(e.name)) walk(p); } else if(p.endsWith('.js'))
+      for(const m of fs.readFileSync(p, 'utf8').matchAll(/\bt\(\s*'([a-zA-Z0-9_.\-]+)'/g)){ keys.add(m[1]); from[m[1]]=path.relative(ROOT, p).replace(/\\/g,'/'); } } };
+  walk(path.join(ROOT, 'apps/night'));
+  const en=I.DICTS.en, ru=I.DICTS.ru, has=(L,k)=>Object.prototype.hasOwnProperty.call(L,k), CYR=/[а-яё]/i;
+  const pre=[...keys].filter(k=>k.endsWith('.')); for(const k of pre) keys.delete(k);   // t('night.music.'+mode): a prefix — some key under it in both languages
+  { n++; const bad=pre.filter(p=>!Object.keys(en).some(k=>k.startsWith(p)) || !Object.keys(ru).some(k=>k.startsWith(p))); if(bad.length) miss('prefixes with no key under them: '+bad.join(', ')); }
+  const noEn=[...keys].filter(k=>!has(en,k)), noRu=[...keys].filter(k=>!has(ru,k)); n+=2;
+  if(noEn.length) miss(noEn.length+' keys with no English: '+noEn.slice(0,8).map(k=>k+' ('+from[k]+')').join(', '));
+  if(noRu.length) miss(noRu.length+' keys with no Russian: '+noRu.slice(0,8).map(k=>k+' ('+from[k]+')').join(', '));
+  const night=[...new Set([...Object.keys(en), ...Object.keys(ru)])].filter(k=>k.startsWith('night.')), half=night.filter(k=>!has(en,k) || !has(ru,k)), latin=night.filter(k=>has(ru,k) && !CYR.test(ru[k]) && /[a-z]{4}/i.test(ru[k]) && !/^(Handsong|Night)/.test(ru[k])); n+=2;
+  if(half.length) miss('night keys in one language only: '+half.join(', ')); if(latin.length) miss('Russian texts that are not Russian: '+latin.slice(0,8).join(', '));
+  { const own=[...html.matchAll(/<(button|p|span|h2|label|div|summary|li)\b([^>]*)>([^<]+)</g)].filter(([, , a, txt])=>/class="[^"]*\bnight-/.test(a) && !/data-i18n=/.test(a) && /[A-Za-zА-Яа-я]{3}/.test(txt)
+      && !/night-word|night-sub|night-dev|night-measure/.test(a)); n++;
+    if(own.length) miss(own.length+' Night elements with words but no key: '+own.slice(0,6).map(m=>m[3].trim().slice(0,30)).join(' | ')); }
+  { n++; if(has(en,'night.__control')) miss('CONTROL: a made-up key exists'); const k2=new Set(keys); k2.add('night.__control'); if(![...k2].some(k=>!has(en,k))) miss('CONTROL: a made-up key is not reported missing'); }
+  notes.push(`${keys.size} keys used by the Night page and its code, ${night.length} «night.*» keys: all in English and Russian`);
+  return { cases:n, total:d.length, differences:d, notes };
+}
 /* NIGHT-6: THE FOREST'S FILES (tools/forest-bake.mjs). Every prepared file matches what the tool draws now, pixel for pixel (CONTROL a changed
    pixel is caught); the PNG writer and reader round-trip; the forest's files stay inside the user's budget (CONTROL 16 MB is over it). The
    sizes are printed every run (the user's rule: report the size in every slice). */
@@ -1477,6 +1505,7 @@ const ROWS=[
   ['FOREST canopy (app)',       ()=>forestCanopyCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 7
   ['FOREST paint (app)',        ()=>forestPaintCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 8
   ['FOREST hidden (app)',       ()=>forestHiddenCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 9
+  ['NIGHT texts both languages (app)', ()=>nightTextsCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-7
   ['NIGHT forest files (app)',  ()=>nightForestFiles(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 (the files rule, the size budget)
   ['OLD NAME gone',             ()=>oldNameGone(),  r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // SPLIT-2
   ['NIGHT rare events (core)',  ()=>rareCore(),     r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // RUN 9 (slice 4)

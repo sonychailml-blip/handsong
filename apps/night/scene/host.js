@@ -94,6 +94,17 @@ function openFail(op, e){ errors.push('opening '+op.id+': '+String(e&&e.message|
 export const scenePausing=()=> !!opening && !opening.late && !pauseOff;
 /* a promise that settles when the opening of `id` (if any) has ended */
 const openedP=id=> opening && opening.id===id ? new Promise(r=>opening.waits.push(r)) : Promise.resolve();
+/* NIGHT-7: compile the room's shaders a few objects at a time, the page free between them (a first opening compiles for seconds: Begin and the
+   start card stay responsive). The lights stay in the scene throughout (programs are keyed by them); no frame is drawn meanwhile.
+   alive(): false once this opening is superseded (a level change or a switch meanwhile) — it stops at once, the renderer may be gone */
+let compiling=0;
+export const COMPILE_LOG=[];   // probes: each slice's time (ms) and what it held, the last opening's
+async function compileSliced(r, scene, camera, alive, step=1){ const kids=scene.children.slice(), lights=kids.filter(o=>o.isLight), rest=kids.filter(o=>!o.isLight); compiling++; COMPILE_LOG.length=0;
+  try{ for(let k=0;k<rest.length && alive();k+=step){ scene.children=lights.concat(rest.slice(k, k+step)); const a=performance.now(); r.compile(scene, camera);
+      COMPILE_LOG.push([Math.round(performance.now()-a), rest.slice(k, k+step).map(o=>o.type+(o.material ? ':'+(o.material.customProgramCacheKey ? String(o.material.customProgramCacheKey()).slice(0,40) : o.material.type) : '')).join('+')]); await new Promise(res=>setTimeout(res, 0)); } }
+  finally { scene.children=kids; compiling--; }
+  if(!alive()) return false;
+  const a=performance.now(); r.compile(scene, camera); COMPILE_LOG.push([Math.round(performance.now()-a), 'all']); return true; }
 /* open a room (its id, default the current room); opt.level 'full' | 'reduced' | 'minimal' → sceneInfo() */
 export async function sceneOpen(id=roomId, opt={}){
   want=id; if(opt.level && LV[opt.level]) level=opt.level;
@@ -112,7 +123,10 @@ export async function sceneOpen(id=roomId, opt={}){
     catch(e){ openFail(op, e); return sceneInfo(); }   // a failed build: the renderer goes, the room's 2D stand-in shows (never black)
     last=0; info.t0=0; info.frames=0;
     /* RUN 9 (slice 5): compile every shader NOW (inside the opening, not inside a frame later: a 1–4-s frame) */
-    try{ renderer.compile(room.scene, room.camera); }catch(e){ errors.push('compile: '+(e&&e.message||e)); } info.openMs=Math.round(performance.now()-tb);
+    const rm=room, rr=renderer;
+    try{ await compileSliced(rr, rm.scene, rm.camera, ()=>room===rm && renderer===rr && opening===op); }catch(e){ errors.push('compile: '+(e&&e.message||e)); }
+    if(room!==rm || renderer!==rr || opening!==op) return sceneInfo();   // superseded meanwhile: the newer opening is in charge
+    info.openMs=Math.round(performance.now()-tb);
     OPEN_LOG.push({ id, level, ms:info.openMs, programs:(renderer.info.programs||[]).length }); if(OPEN_LOG.length>24) OPEN_LOG.splice(1, 1);   // NIGHT-6 slice 0: the first stays
     bedSeq=READ.seq('bed'); }   // NIGHT-6: a new room starts with the bed's next events (older ones were heard before it)
   stackSet('scene', !!renderer);
@@ -137,7 +151,7 @@ export async function sceneSwitch(id, o={}){
 export function sceneClose(){ want=null; if(opening) openEnd(opening); stackSet('scene', false); if(room){ room.dispose(); room=null; } dropRenderer(true); info.fps=0; }
 /* the scene module (layer «scene»): the room at its own rate; a new solo note-on makes the playing light glint */
 function sceneFrame(t, bus){
-  if(!renderer || !room) return;
+  if(!renderer || !room || compiling>0) return;
   const L=LV[level]; if(last && t-last < 1000/L.fps-2) return;
   const dt=last ? Math.min(0.05, (t-last)/1000) : 1/60; last=t;
   const N=bus.since('notes', notesSeq); notesSeq=N.seq; for(const it of N.items) if(it.kind==='on' && it.role==='ld') room.glint(0, it.vel);

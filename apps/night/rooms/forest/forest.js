@@ -46,9 +46,12 @@ const TEX=Object.freeze({ 'web-1024':new URL('./tex/web-1024.png', import.meta.u
   'shade-2048':new URL('./tex/shade-2048.png', import.meta.url), 'shade-1024':new URL('./tex/shade-1024.png', import.meta.url),
   'crown-1024':new URL('./tex/crown-1024.png', import.meta.url), 'crown-512':new URL('./tex/crown-512.png', import.meta.url),
   'dapple-1024':new URL('./tex/dapple-1024.png', import.meta.url), 'dapple-512':new URL('./tex/dapple-512.png', import.meta.url),
-  'moon-512':new URL('./tex/moon-512.png', import.meta.url), 'moon-256':new URL('./tex/moon-256.png', import.meta.url) });
-export const FOREST_TEX=Object.freeze({ full:Object.freeze({ web:'web-1024', floor:'floor-2048', shade:'shade-2048', crown:'crown-1024', dapple:'dapple-1024', moon:'moon-512' }),
-  reduced:Object.freeze({ web:'web-512', floor:'floor-1024', shade:'shade-1024', crown:'crown-512', dapple:'dapple-512', moon:'moon-256' }) });
+  'moon-512':new URL('./tex/moon-512.png', import.meta.url), 'moon-256':new URL('./tex/moon-256.png', import.meta.url),
+  'ground-2048':new URL('./tex/ground-2048.png', import.meta.url), 'ground-1024':new URL('./tex/ground-1024.png', import.meta.url),
+  'groundn-2048':new URL('./tex/groundn-2048.png', import.meta.url), 'groundn-1024':new URL('./tex/groundn-1024.png', import.meta.url) });
+const GROUND_TILE=6;   // NIGHT-7: metres of floor one copy of the ground's files covers (tools/forest-bake.mjs GROUND.tile)
+export const FOREST_TEX=Object.freeze({ full:Object.freeze({ web:'web-1024', floor:'floor-2048', shade:'shade-2048', crown:'crown-1024', dapple:'dapple-1024', moon:'moon-512', ground:'ground-2048', groundN:'groundn-2048' }),
+  reduced:Object.freeze({ web:'web-512', floor:'floor-1024', shade:'shade-1024', crown:'crown-512', dapple:'dapple-512', moon:'moon-256', ground:'ground-1024', groundN:'groundn-1024' }) });
 const WOOD_MEMO=new Map();   // NIGHT-6 slice 5: the wood's places per counts (pure, seeded): worked out once per session
 const IMG={}, LOADING={}, assetErr=[];
 async function fileImage(url){ const r=await fetch(url); if(!r.ok) throw new Error(r.status+' '+url.pathname);
@@ -81,7 +84,7 @@ export function buildForest(T, opt){
     reduce=!!opt.reduce, R=seeded(FOREST_SEED), V=(x,y,z)=>new T.Vector3(x,y,z);
   const col=n=>new T.Color(C('forest-'+n));
   const own=[];   // everything to dispose
-  const pick=FOREST_TEX[opt.level]||FOREST_TEX.full, files=opt.files||{ web:IMG[pick.web], floor:IMG[pick.floor], shade:IMG[pick.shade], crown:IMG[pick.crown], dapple:IMG[pick.dapple], moon:IMG[pick.moon] };   // NIGHT-6: this level's prepared files (opt.files: a probe's own)
+  const pick=FOREST_TEX[opt.level]||FOREST_TEX.full, files=opt.files||{ web:IMG[pick.web], floor:IMG[pick.floor], shade:IMG[pick.shade], crown:IMG[pick.crown], dapple:IMG[pick.dapple], moon:IMG[pick.moon], ground:IMG[pick.ground], groundN:IMG[pick.groundN] };   // NIGHT-6: this level's prepared files (opt.files: a probe's own)
   const tex=(c,srgb,rx=1,ry=1)=>{ const t=new T.CanvasTexture(c); t.wrapS=t.wrapT=T.RepeatWrapping; t.repeat.set(rx,ry); t.anisotropy=8; if(srgb) t.encoding=T.sRGBEncoding; own.push(t); return t; };
   /* RUN 9: the PALETTE is the mood's look (the record's looks → tokens), eased towards a new mood's look (τ MOOD_TC s) */
   const looks=new Map(), lookCols=L=>{ let c=looks.get(L.pre); if(!c){ c={}; for(const [k,n] of Object.entries(L.tokens)) c[k]=new T.Color(C(n)); looks.set(L.pre,c); } return c; };
@@ -108,7 +111,10 @@ export function buildForest(T, opt){
     for(let i=0;i<pa.count;i++){ const x=pa.getX(i), z=pa.getZ(i); if(x<bx[0] || x>bx[1] || z<bz[0] || z>bz[1]){ pa.setY(i, gy(x,z)); continue; }
       const dd=streamNear(x,z).d; pa.setY(i, bankGround(x, z, dd)); const u=Math.max(0, Math.min(1, (dd-STREAM.half)/0.7)); wet[i]=1-u*u*(3-2*u); }
     gg.setAttribute('aWet', new T.BufferAttribute(wet, 1)); gg.computeVertexNormals(); }
-  const groundM=new T.MeshStandardMaterial({ map:tex(gc,true,24,24), bumpMap:tex(gb,false,24,24), bumpScale:0.05, roughness:0.95 });
+  /* NIGHT-7: the bare forest floor from its prepared files (colour + normal map, one copy every GROUND_TILE m); without them today's painted one */
+  const fileTex=(img, srgb)=>{ const t=new T.Texture(img); t.wrapS=t.wrapT=T.RepeatWrapping; t.repeat.set(90/GROUND_TILE, 90/GROUND_TILE); t.anisotropy=8; if(srgb) t.encoding=T.sRGBEncoding; t.needsUpdate=true; own.push(t); return t; };
+  const groundM= Lv.groundTex && files.ground && files.groundN ? new T.MeshStandardMaterial({ map:fileTex(files.ground, true), normalMap:fileTex(files.groundN, false), normalScale:new T.Vector2(1, 1), roughness:0.93 })
+    : new T.MeshStandardMaterial({ map:tex(gc,true,24,24), bumpMap:tex(gb,false,24,24), bumpScale:0.05, roughness:0.95 });
   const ground=new T.Mesh(gg, groundM); ground.receiveShadow=true; s.add(ground); own.push(gg, groundM);
   /* bark */
   const [kc,k]=canvas2(256,512), [kb,kk]=canvas2(256,512); k.fillStyle=C('forest-bark'); k.fillRect(0,0,256,512); kk.fillStyle=grey(128); kk.fillRect(0,0,256,512);

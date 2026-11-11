@@ -24,16 +24,21 @@ uniform vec3 uMossW, uLichen, uGrain, uGrainDark, uFungus, uFungusRim, uDead;`;
 const LOOK=`{ vec3 wp=vWP7, wn=normalize(vWN7); float dead=vW7.x, kind=vW7.y, topM=vW7.z;
   float above=wp.y-gnd7(wp.xz), ang=atan(wn.z, wn.x); vec3 c=diffuseColor.rgb;
   c=mix(c, uDead*clamp(dot(c, vec3(0.3333))/0.16, 0.35, 2.0), dead*0.7);   // dead wood: greyer, paler
+#ifdef WOOD7_KINDS
   if(kind>0.5 && kind<1.5){ float rho=length(vCap7), rg=fract(rho*9.0+0.6*vn7(vCap7*3.0)), crack=smoothstep(0.9, 0.97, vn7(vec2(atan(vCap7.y, vCap7.x)*3.0, rho*2.0)))*smoothstep(0.15, 0.5, rho);
     vec3 g=mix(uGrain, uGrainDark, smoothstep(0.72, 0.95, rg)+0.35*(1.0-smoothstep(0.0, 0.25, rho)));
     g=mix(g, uGrainDark*0.45, crack); g=mix(g, uDead*0.9, dead*0.45); c=mix(g, c, smoothstep(0.88, 0.97, rho)); }   // rings and cracks, the bark at the rim
   else if(kind>1.5){ float rho=vCap7.y, b=0.5+0.5*sin(rho*30.0+vn7(vec2(vCap7.x*8.0, rho*3.0))*3.0);
     c=mix(uFungus*0.55, uFungus, b*0.5+rho*0.5); c=mix(c, uFungusRim, smoothstep(0.86, 0.97, rho)); if(wn.y<-0.2) c=uFungusRim*0.8; }   // growth zones, a pale rim, pale pores below
+#endif
   if(kind<1.5){
     float mh=1.0-smoothstep(0.12, 1.3+1.2*vn7(wp.xz*2.0), above), side=0.4+0.6*smoothstep(-0.3, 0.6, dot(wn, vec3(0.37, 0.0, -0.93)));
-    float mm=clamp(mh*side*(0.45+0.9*vn7(vec2(ang*2.0, wp.y*3.0))), 0.0, 1.0), top=smoothstep(0.15, 0.7, wn.y)*topM*(0.65+0.5*vn7(wp.xz*3.0+wp.y));
+    float mm=clamp(mh*side*(0.45+0.9*vn7(vec2(ang*2.0, wp.y*3.0))), 0.0, 1.0);
+#ifdef WOOD7_KINDS
+    float top=smoothstep(0.15, 0.7, wn.y)*topM*(0.65+0.5*vn7(wp.xz*3.0+wp.y));
     if(kind>0.5) top*=smoothstep(0.82, 0.98, length(vCap7));   // a cut top: moss only at its rim
     mm=max(mm, top)*(1.0-0.5*dead);
+#endif
     float lic=smoothstep(0.64, 0.76, vn7(vec2(ang*4.0+wp.x*0.5, wp.y*3.2+wp.z*0.5)))*smoothstep(0.8, 2.0, above)*(1.0-smoothstep(3.5, 5.5, above))*(0.5+0.8*dead);   // small spots, 0.8–5 m up
     c=mix(c, uLichen*(0.8+0.4*vn7(wp.xy*40.0)), clamp(lic, 0.0, 1.0)*0.6);
     c=mix(c, uMossW*(0.6+0.6*vn7(wp.xy*30.0+wp.z*7.0)), smoothstep(0.25, 0.6, mm)); }
@@ -47,11 +52,11 @@ export function woodUniforms(T, C){ const k=n=>({ value:new T.Color(C('forest-'+
    8–12 s, then fading. With no trail point it adds exactly nothing */
 const FOX=(n, L)=>`{ vec3 wp=vWP7; float above=wp.y-gnd7(wp.xz);
   float where= vW7.x>0.25 ? 1.0 : (vW7.z<0.01 && vW7.y<0.5 ? smoothstep(0.55, 0.75, vn7(wp.xz*0.45+3.1))*(1.0-smoothstep(1.2, 3.0, above)) : 0.0);
-  if(where>0.0 && uFoxK>0.0){ float act=0.0;
-    for(int i=0;i<${n};i++){ vec4 p=uFox[i]; if(p.w<0.0) continue; float age=uFoxT-p.w, hold=${L.hold[0].toFixed(3)}+${(L.hold[1]-L.hold[0]).toFixed(3)}*vn7(wp.xz*1.7+float(i)), f= age<hold ? 1.0 : max(0.0, 1.0-(age-hold)/${L.fade.toFixed(3)}); vec3 dd=wp-p.xyz; act=max(act, f*exp(-dot(dd,dd)/${(L.r*L.r).toFixed(4)})); }
+  if(where>0.0 && uFoxK>0.0){ float act=0.0, hold=${L.hold[0].toFixed(3)}+${(L.hold[1]-L.hold[0]).toFixed(3)}*vn7(wp.xz*1.7);   // the patch's own hold, once (a noise inside the loop made the shader slow to compile)
+    for(int i=0;i<${n};i++){ vec4 p=uFox[i]; float age=uFoxT-p.w, f= p.w<0.0 ? 0.0 : (age<hold ? 1.0 : max(0.0, 1.0-(age-hold)/${L.fade.toFixed(3)})); vec3 dd=wp-p.xyz; act=max(act, f*exp(-dot(dd,dd)/${(L.r*L.r).toFixed(4)})); }
     if(act>0.0){ vec2 q=vec2(wp.x*7.0+wp.z*4.3, wp.y*8.0-wp.z*3.1); float vein=(1.0-smoothstep(0.015, 0.05, abs(vn7(q)-0.5)))*smoothstep(0.3, 0.6, vn7(q*0.37+3.0));   // connected thin lines, some stretches faded
       totalEmissiveRadiance+=uFoxCol*(uFoxK*where*act*(vein*0.6+0.02)*(0.75+0.25*sin(uFoxT*1.3+wp.x*3.0+wp.z*2.0))); } } }`;   // the veins and a faint glow round them
-/* mat → the wood's look. attrs: true = per-vertex (aW7, aCap7: the merged wood), false = today's bark (instanced, no moss on top). WU.uFox
+/* mat → the wood's look (NIGHT-7: the bark's shader leaves out what only the merged wood uses — end grain, fungi, moss on top — so it compiles faster). attrs: true = per-vertex (aW7, aCap7: the merged wood), false = today's bark (instanced, no moss on top). WU.uFox
    present: + foxfire (WU.foxLaw: { hold, fade, r }) */
 function patchLook(mat, WU, attrs, key){ const fox=WU.uFox ? WU.uFox.value.length : 0, law=WU.foxLaw, U={ ...WU }; delete U.foxLaw;
   mat.onBeforeCompile=sh=>{ Object.assign(sh.uniforms, U);
@@ -61,7 +66,7 @@ function patchLook(mat, WU, attrs, key){ const fox=WU.uFox ? WU.uFox.value.lengt
     w7=instanceMatrix*w7; n7=mat3(instanceMatrix)*n7;
   #endif
     vWP7=(modelMatrix*w7).xyz; vWN7=normalize(mat3(modelMatrix)*n7); ${attrs ? 'vW7=aW7; vCap7=aCap7;' : 'vW7=vec3(0.0); vCap7=vec2(0.0);'} }`);
-    sh.fragmentShader='varying vec3 vWP7;\nvarying vec3 vWN7;\nvarying vec3 vW7;\nvarying vec2 vCap7;\n'+GLSL+'\n'+sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n'+LOOK)
+    sh.fragmentShader=(attrs ? '#define WOOD7_KINDS\n' : '')+'varying vec3 vWP7;\nvarying vec3 vWN7;\nvarying vec3 vW7;\nvarying vec2 vCap7;\n'+GLSL+'\n'+sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n'+LOOK)
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  if(vW7.y>1.5) roughnessFactor=0.7;');
     if(fox) sh.fragmentShader=`uniform vec4 uFox[${fox}];\nuniform vec3 uFoxCol;\nuniform float uFoxK, uFoxT;\n`+sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n'+FOX(fox, law)); };
   mat.customProgramCacheKey=()=>key+(fox ? '.fox'+fox : ''); return mat; }

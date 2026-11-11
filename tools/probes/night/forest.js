@@ -13,7 +13,7 @@
    the second time exactly as the first (closing the room is not a lost context). */
 import { row } from '../core/rows.js';
 import { cv } from '../../../core/palette.js';
-import { loadThree, setBackground, sceneInfo, setSceneLevel, sceneLevel, sceneRoomDbg, sceneSnapDbg, sceneProgramsDbg, sceneHeldDbg, sceneBedDbg } from '../../../apps/night/scene/host.js';   // RUN 8: + the quality levels and the room (NIGHT forest picture)
+import { loadThree, setBackground, sceneInfo, setSceneLevel, sceneLevel, sceneRoomDbg, sceneSnapDbg, sceneProgramsDbg, sceneHeldDbg, sceneBedDbg, sceneClockDbg } from '../../../apps/night/scene/host.js';   // RUN 8: + the quality levels and the room (NIGHT forest picture)
 import { buildForest, forestAssets } from '../../../apps/night/rooms/forest/forest.js';
 import { fliesInit, fliesStep, FOREST_FLIES, depthDistance } from '../../../apps/night/rooms/forest/pure/fireflies.js';
 import { ANSWERS, noteRingAmp } from '../../../apps/night/rooms/forest/pure/answers.js';   // NIGHT-6 slice 1
@@ -646,7 +646,7 @@ export async function checkForestCanopy(){
       { const S=mk('reduced', { lv:{ crowns:false, crownShare:0, young:0, shrubs:0, saplings:0, stars:0, dapple:false, moonFace:false } }).state().canopy; n++; if(S.sprays || S.stars || S.dapple || S.moonFace) miss('the baseline still builds '+JSON.stringify(S)); }
     } finally { for(const r of rooms) r.dispose(); }
     const why=profileApply('profile.night'); n++; if(why){ miss('Night refused: '+why); return { cases:n, total:d.length, differences:d, notes }; }
-    await setSceneLevel('reduced'); await setBackground('forest'); await frames(6);
+    await setSceneLevel('reduced'); await setBackground('forest'); sceneClockDbg(60); await frames(6);   // NIGHT-7: a clear moon in view (the clock pinned; the moon's place and the clouds follow it)
     const room=sceneRoomDbg(); if(!room || !sceneInfo().webgl){ notes.push('no WebGL room — the drawn checks do not apply'); return { cases:n, total:d.length, differences:d, notes }; }
     const P=room.canopyDbg.parts, D=room.dappleDbg, dk=()=>D.uDapK.value, moon=room.scene.children.find(o=>o.isSprite && o.material.map && o.material.map.image && o.material.map.image.width===256);
     const black=new (await loadThree()).DataTexture(new Uint8Array([0,0,0,255]), 1, 1); black.needsUpdate=true; let keepK=0, keepMap=null;
@@ -658,7 +658,7 @@ export async function checkForestCanopy(){
       if(!(Math.abs(ab[0]-ab[1])>0)) miss(name+' do not show in the picture'); if(cc[0]!==cc[1]) miss('CONTROL: one frame rendered twice differs by '+(cc[0]-cc[1])); }
     black.dispose(); n++; if(!moon) miss('no moon disc with the prepared face');
   } catch(e){ miss('error: '+(e&&e.stack||e)); }
-  finally{ try{ await setSceneLevel(keepLevel); }catch(e){} if(profileCurrent()!==was) profileApply(was); await setBackground('camera'); await sleep(30); }
+  finally{ sceneClockDbg(null); try{ await setSceneLevel(keepLevel); }catch(e){} if(profileCurrent()!==was) profileApply(was); await setBackground('camera'); await sleep(30); }
   return { cases:n, total:d.length, differences:d, notes };
 }
 row({ night:true, at:1008.6398, name:'FOREST canopy', drawn:true, run:()=>checkForestCanopy(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });

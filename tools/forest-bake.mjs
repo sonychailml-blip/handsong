@@ -15,6 +15,9 @@
    - crown-1024 → 512, 256 (slice 7): four LEAF SPRAYS for the crowns and the understorey (layout: pure/canopy.js CROWN_ATLAS);
    - dapple-1024 → 512, 256 (slice 7): a tileable pattern of the moonlight's spots through the leaves (the ground moves two copies of it);
    - moon-512 → 256, 128 (slice 7): the moon's face — darker seas, soft craters, a slightly darker limb — inside today's soft glow edge;
+   - ground-2048 → 1024, 512 and groundn-2048 → 1024, 512 (NIGHT-7): the BARE FOREST FLOOR, tileable — dark soil with its blotches, a few
+     soft moss patches, fallen leaves (each with its stalk, veins and a darker rim; brown, ochre, rust), needles, twigs, moss crumbs and seeds —
+     its colour, and a normal map from the same shapes' heights (the later on top; smaller copies get their normals from the boxed-down heights);
    - shade-2048 → 1024, 512 (slice 5): the CONTACT SHADOWS, the darkness on the ground under the trunks, roots, rocks, logs, stumps and dead
      trees, painted from the same laws the room places them by (apps/night/rooms/forest/pure/wood.js shadeBlobs; the area WOOD.shade). */
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, statSync, existsSync, rmSync } from 'node:fs';
@@ -34,8 +37,9 @@ export const FOREST_DIR='apps/night/rooms/forest', TEX_DIR=FOREST_DIR+'/tex';
 /* the user's size budget for the forest's files, every level together (2026-11-09: warn before 30 MB) */
 export const FOREST_BUDGET=30*1048576;
 /* which file each level loads (high = the masters); the room's own table is forest.js FILES */
-export const LEVEL_FILES=Object.freeze({ high:['web-1024.png','floor-2048.png','shade-2048.png','crown-1024.png','dapple-1024.png','moon-512.png'], medium:['web-512.png','floor-1024.png','shade-1024.png','crown-512.png','dapple-512.png','moon-256.png'],
-  low:['web-256.png','floor-512.png','shade-512.png','crown-256.png','dapple-256.png','moon-128.png'] });
+export const LEVEL_FILES=Object.freeze({ high:['web-1024.png','floor-2048.png','shade-2048.png','crown-1024.png','dapple-1024.png','moon-512.png','ground-2048.png','groundn-2048.png'],
+  medium:['web-512.png','floor-1024.png','shade-1024.png','crown-512.png','dapple-512.png','moon-256.png','ground-1024.png','groundn-1024.png'],
+  low:['web-256.png','floor-512.png','shade-512.png','crown-256.png','dapple-256.png','moon-128.png','ground-512.png','groundn-512.png'] });
 
 /* ---------------- grey drawing (the web): coverage 0…1, lines blend by max ---------------- */
 function line(img, S, x0, y0, x1, y1, w, v){
@@ -204,6 +208,36 @@ function drawMoon(S=512){ const R=seeded(0x4D4F4F4E), v=new Float32Array(S*S), c
     else if(r<0.8) b=0.86*(1-(r-0.62)/0.18*0.9); else b=r<1 ? 0.086*(1-(r-0.8)/0.2) : 0;   // the glow goes on from the limb's own brightness (no bright ring)
     v[y*S+x]=b; }
   return v; }
+/* NIGHT-7: THE BARE FOREST FLOOR (S², tileable: every shape near an edge is drawn again across it) → { col, hgt } premultiplied floats.
+   Drawn on two canvases at once: colour, and height (soil low, each later layer higher, twigs and seeds on top) */
+export const GROUND=Object.freeze({ size:2048, derived:Object.freeze([1024, 512]), tile:6, normal:5 });   // tile: metres one copy covers in the room; normal: the relief's strength
+function drawGround(S=GROUND.size){ const SS=2, R=seeded(0x47524E44), C=new Ras(S, S, SS), H=new Ras(S, S, SS), all=[[0,0],[S,0],[S,S],[0,S]], g=v=>[v, v, v, 1];
+  const wrap=(cx, cy, rad, fn)=>{ for(const dx of [-S,0,S]) for(const dy of [-S,0,S]){ if(cx+dx+rad<0 || cx+dx-rad>S || cy+dy+rad<0 || cy+dy-rad>S) continue; fn(dx, dy); } };
+  C.fill(all, hsl(27, 0.3, 0.095)); H.fill(all, g(0.2));
+  for(let i=0;i<520;i++){ const x=R()*S, y=R()*S, r=S*(0.008+Math.pow(R(),2)*0.05), dark=R()<0.55, col= dark ? hsl(24, 0.28, 0.05, 0.09) : hsl(31, 0.34, 0.17, 0.07), hh=dark ? 0.12 : 0.3;
+    wrap(x, y, r, (dx,dy)=>{ for(let k=0;k<5;k++){ const rk=r*(1-k*0.18); C.ellipse(x+dx, y+dy, rk, rk*(0.7+0.3*((i*7)%5)/5), i, col, 28); H.ellipse(x+dx, y+dy, rk, rk*0.85, i, [hh, hh, hh, 0.08], 20); } }); }
+  for(let i=0;i<70;i++){ const x=R()*S, y=R()*S, r=S*(0.012+R()*0.03);   // a few soft moss patches (most of the floor is litter)
+    wrap(x, y, r, (dx,dy)=>{ for(let k=0;k<6;k++){ const rk=r*(1-k*0.15); C.ellipse(x+dx, y+dy, rk, rk*0.8, i*0.7, hsl(92+R()*16, 0.4, 0.07+k*0.012, 0.12), 24); } }); }
+  const NL=7200;
+  for(let i=0;i<NL;i++){ const x=R()*S, y=R()*S, len=S*(0.006+Math.pow(R(),1.6)*0.016), wid=len*(0.3+R()*0.22), a=R()*6.283, lay=i/NL, hu=12+R()*34, sa=0.24+R()*0.32, li=0.085+R()*0.2*(0.55+0.45*lay), rot=R()<0.25;
+    const col=hsl(hu, sa*(rot ? 0.6 : 1), li*(rot ? 0.6 : 1)), rib=hsl(hu, sa, li*0.55, 0.8), x0=x-Math.cos(a)*len/2, y0=y-Math.sin(a)*len/2, hv=0.3+0.55*lay;
+    wrap(x, y, len, (dx,dy)=>{ leaf(C, x0+dx, y0+dy, len*1.03, wid*1.06, a, shade(col, 0.55), null, rot ? 0 : 0.4); leaf(C, x0+dx, y0+dy, len, wid, a, col, rib, rot ? 0 : 0.4); leaf(H, x0+dx, y0+dy, len, wid, a, g(hv), null, 0); }); }
+  for(let i=0;i<4200;i++){ const x=R()*S, y=R()*S, l=S*(0.003+R()*0.006), a=R()*6.283, li=0.08+R()*0.14, p=[[x, y], [x+Math.cos(a)*l, y+Math.sin(a)*l]];   // needles
+    wrap(x, y, l, (dx,dy)=>{ const q=p.map(([u,v])=>[u+dx, v+dy]); C.stroke(q, S*0.0007, hsl(30+R()*12, 0.42, li), S*0.0005); H.stroke(q, S*0.0007, g(0.88), S*0.0005); }); }
+  for(let i=0;i<230;i++){ const x=R()*S, y=R()*S, l=S*(0.015+R()*0.04), a=R()*6.283, wd=S*(0.0012+R()*0.0024), bend=(R()-0.5)*0.6, pts=quad(x, y, x+Math.cos(a+bend)*l*0.5, y+Math.sin(a+bend)*l*0.5, x+Math.cos(a)*l, y+Math.sin(a)*l, 8);   // twigs
+    wrap(x, y, l, (dx,dy)=>{ const q=pts.map(([u,v])=>[u+dx, v+dy]); C.stroke(q, wd*1.25, hsl(24, 0.3, 0.035), wd); C.stroke(q, wd, hsl(26, 0.32, 0.09+R()*0.05), wd*0.8); H.stroke(q, wd, g(0.97), wd*0.8); }); }
+  for(let i=0;i<3200;i++){ const x=R()*S, y=R()*S, r=S*(0.0006+R()*0.0016), c=hsl(82+R()*28, 0.25+R()*0.2, 0.07+R()*0.08);   // moss crumbs
+    wrap(x, y, r, (dx,dy)=>{ C.ellipse(x+dx, y+dy, r, r*(0.7+R()*0.3), R()*3, c, 10); H.ellipse(x+dx, y+dy, r, r, 0, g(0.75), 8); }); }
+  for(let i=0;i<500;i++){ const x=R()*S, y=R()*S, r=S*(0.0008+R()*0.0016), c=hsl(30+R()*20, 0.12+R()*0.15, 0.12+R()*0.12);   // seeds and grit
+    wrap(x, y, r, (dx,dy)=>{ C.ellipse(x+dx, y+dy, r, r*0.75, R()*3, c, 10); H.ellipse(x+dx, y+dy, r, r*0.75, 0, g(0.92), 8); }); }
+  return { col:C.down(), hgt:H.down() }; }
+/* heights (premultiplied floats, opaque) of S² → an RGBA8 normal map (tangent space, +y up the picture), tileable; k: the relief's strength */
+function normalOf(hgt, S, k){ const h=new Float32Array(S*S), o=new Uint8Array(S*S*4);
+  for(let i=0;i<S*S;i++) h[i]=hgt[i*4];
+  const at=(x,y)=>h[((y+S)%S)*S+((x+S)%S)];
+  for(let y=0;y<S;y++) for(let x=0;x<S;x++){ const nx=-(at(x+1,y)-at(x-1,y))*0.5*k, ny=(at(x,y+1)-at(x,y-1))*0.5*k, l=Math.hypot(nx, ny, 1), i=(y*S+x)*4;
+    o[i]=Math.round(255*(nx/l*0.5+0.5)); o[i+1]=Math.round(255*(ny/l*0.5+0.5)); o[i+2]=Math.round(255*(1/l*0.5+0.5)); o[i+3]=255; }
+  return o; }
 function drawFern2(w, h, seed=9){
   const maps=[[0,0,0,0.25,0,-0.4,0.02],[0.95,0.005,-0.005,0.93,-0.002,0.5,0.84],[0.035,-0.2,0.16,0.04,-0.09,0.02,0.07],[-0.04,0.2,0.16,0.04,0.083,0.12,0.07]];
   const R=seeded(seed), cum=[]; let acc=0; for(const m of maps){ acc+=m[6]; cum.push(acc); }
@@ -250,6 +284,9 @@ export function bakeAll(){
     for(const d of C.derived) out.push({ name:`crown-${d}.png`, w:d, h:d, ch:4, px:toRGBA(boxDown(m, C.size, C.size/d), d, 3) }); }
   { const dg=toGrey(drawDapple(1024)); out.push({ name:'dapple-1024.png', w:1024, h:1024, ch:1, px:dg }, { name:'dapple-512.png', w:512, h:512, ch:1, px:greyDown(dg,1024,2) }, { name:'dapple-256.png', w:256, h:256, ch:1, px:greyDown(dg,1024,4) }); }
   { const mg=toGrey(drawMoon(512)); out.push({ name:'moon-512.png', w:512, h:512, ch:1, px:mg }, { name:'moon-256.png', w:256, h:256, ch:1, px:greyDown(mg,512,2) }, { name:'moon-128.png', w:128, h:128, ch:1, px:greyDown(mg,512,4) }); }
+  { const G=GROUND, S=G.size, gr=drawGround(S), k=G.normal*S/1024;   // NIGHT-7: the bare floor (k: the relief per pixel of this size)
+    out.push({ name:`ground-${S}.png`, w:S, h:S, ch:4, px:toRGBA(gr.col.p, S, 0) }, { name:`groundn-${S}.png`, w:S, h:S, ch:4, px:normalOf(gr.hgt.p, S, k) });
+    for(const d of G.derived){ out.push({ name:`ground-${d}.png`, w:d, h:d, ch:4, px:toRGBA(boxDown(gr.col.p, S, S/d), d, 0) }, { name:`groundn-${d}.png`, w:d, h:d, ch:4, px:normalOf(boxDown(gr.hgt.p, S, S/d), d, k*d/S) }); } }
   const sg=toGrey(drawShade(2048)); out.push({ name:'shade-2048.png', w:2048, h:2048, ch:1, px:sg }, { name:'shade-1024.png', w:1024, h:1024, ch:1, px:greyDown(sg,2048,2) }, { name:'shade-512.png', w:512, h:512, ch:1, px:greyDown(sg,2048,4) });   // NIGHT-6 slice 5
   return out;
 }

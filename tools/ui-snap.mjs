@@ -141,6 +141,15 @@ const SCREENS_FOREST=[
                        await p.evaluate(async ()=>{ const Q=await import('/core/frzqueue.js'); Q.afPause('runner', true); const G=await import('/apps/night/ghost.js'); if(G.ghostOn && G.ghostOn() && G.ghostStop) G.ghostStop(); document.querySelector('#nightBgSeg [data-bg="forest"]').click(); });
                        await forestAt(p, 60); await p.waitForTimeout(3000); await playHands(p, false); await p.waitForTimeout(1500); }],
   ['f-moon',         async p=>{ await forestAt(p, 60); await playHands(p); await p.waitForTimeout(900); }],
+  /* NIGHT-7: the first cards (each one, portrait) and the settings card's View section (the picture choice) */
+  ['f-card1',        async p=>{ await p.evaluate(async ()=>{ const C=await import('/apps/night/cards.js'); C.cardsShow(); }); await p.waitForTimeout(400); }],
+  ['f-card2',        async p=>{ await p.evaluate(()=>document.getElementById('nightCardNext').click()); await p.waitForTimeout(300); }],
+  ['f-card3',        async p=>{ await p.evaluate(()=>document.getElementById('nightCardNext').click()); await p.waitForTimeout(300); }],
+  ['f-card4',        async p=>{ await p.evaluate(()=>document.getElementById('nightCardNext').click()); await p.waitForTimeout(300); }],
+  ['f-settings',     async p=>{ await p.evaluate(()=>{ document.getElementById('nightCardSkip').click(); document.getElementById('nightInfoBtn').click(); const c=document.getElementById('nightInfo'); c.scrollTop=c.scrollHeight; }); await p.waitForTimeout(400); }],
+  ['f-settings-ru',  async p=>{ await p.evaluate(async ()=>{ const I=await import('/core/i18n.js'); I.setLang('ru'); }); await p.waitForTimeout(300); }],
+  ['f-card1-ru',     async p=>{ await p.evaluate(async ()=>{ document.getElementById('nightInfoClose').click(); const C=await import('/apps/night/cards.js'); C.cardsShow(); }); await p.waitForTimeout(400); }],
+  ['f-card-after',   async p=>{ await p.evaluate(async ()=>{ document.getElementById('nightCardSkip').click(); const I=await import('/core/i18n.js'); I.setLang('en'); }); await p.waitForTimeout(300); }],
   ['f-cloud',        async p=>{ await forestAt(p, 630); await p.waitForTimeout(600); await playHands(p); await p.waitForTimeout(900); }],
   ['f-dusk',         async p=>{ await forestAt(p, 60); await moodTo(p, 'Dusk|Сумер'); await p.waitForTimeout(9000); await playHands(p); await p.waitForTimeout(900); }],
   ['f-mist',         async p=>{ await moodTo(p, 'Mist|Туман'); await p.waitForTimeout(9000); await playHands(p); await p.waitForTimeout(900); }],

@@ -1,5 +1,6 @@
 /* SPLIT-2: the Night app's entry: its shell, its ghost light, its rooms, its profile. */
 import './migrate.js';   // first: the shell reads its settings while it loads
+import './texts.js';   // NIGHT-7: Night's own texts join the dictionaries before anything shows
 import { boot } from '../../core/legacy-ui/boot.js';
 import { shellDoors, setFaceHook } from '../../core/legacy-ui/ui.js';
 import { sceneRoomAdd, setBackground, backgroundOf, sceneInfo, scenePausing, sceneRoom, sceneLevel } from './scene/host.js';

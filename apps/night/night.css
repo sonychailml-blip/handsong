@@ -245,3 +245,28 @@ body.night-boot #start .startFoot{ border-top-color:var(--night-hair); color:var
 body.night-boot #privacyNote summary{ color:var(--night-dim); }
 body.night-boot #start .startLang [data-icon]{ display:none; }
 body.night-boot #langSel{ background:var(--night-fill); color:var(--night-ink); border:1px solid var(--night-hair); }
+
+/* NIGHT-7: the start screen's privacy line; the first cards (their pictures: our own line drawings, apps/night/cards.js) */
+.night-privacy-line{ margin:var(--night-gap) 0 0; color:var(--night-dim); font-size:var(--night-fs-small); text-align:center; }
+.night-card.night-cards{ display:block; width:min(460px, calc(100vw - 28px)); }
+body.night-cards-open #nightFxHint{ display:none !important; }   /* the effects hand's hint waits while the cards show */
+.night-card-pic{ display:flex; justify-content:center; margin:0 0 var(--night-gap); color:var(--night-ink); }
+.night-pic{ width:100%; max-width:340px; height:auto; overflow:visible; }
+.night-cards-foot{ display:flex; align-items:center; justify-content:space-between; gap:var(--night-gap); margin-top:var(--night-gap); }
+.night-cards-dots{ display:flex; gap:var(--night-gap-sm); }
+.night-cards-dot{ width:var(--night-gap-sm); height:var(--night-gap-sm); border-radius:var(--night-r-pill); background:var(--night-hair); }
+.night-cards-dot.on{ background:var(--night-accent); }
+.night-cards-step{ color:var(--night-dim); font-size:var(--night-fs-small); }
+.np-palm{ fill:currentColor; opacity:.88; }
+.np-limb{ fill:none; stroke:currentColor; stroke-linecap:round; opacity:.88; }
+.np-glow{ fill:var(--night-accent); filter:var(--night-glow-f); }
+.np-dot{ fill:var(--night-dim); }
+.np-line{ fill:none; stroke:var(--night-dim); stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+.np-dash{ fill:none; stroke:var(--night-dim); stroke-width:2; stroke-dasharray:4 4; }
+.np-hold{ fill:none; stroke:var(--night-accent); stroke-width:5; stroke-linecap:round; opacity:.7; }
+.np-tree{ fill:var(--night-dim); opacity:.45; }
+.np-bar{ fill:var(--night-fill); stroke:var(--night-hair); }
+.np-t1{ fill:var(--night-accent); } .np-t2{ fill:var(--night-warm); } .np-t3{ fill:var(--night-cold); }
+.np-btn{ fill:var(--night-fill); stroke:var(--night-hair); stroke-width:1.5; }
+.np-ico{ color:var(--night-ink); }
+.np-wave{ fill:none; stroke:var(--night-accent); stroke-width:2; stroke-linecap:round; opacity:.7; } .np-faint{ opacity:.35; }

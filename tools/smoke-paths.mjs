@@ -18,8 +18,9 @@ const argv=process.argv.slice(2), out=s=>console.log(s), NO_CONTROL=argv.include
 const PAGES={ full:'apps/full/', night:'apps/night/' };
 const BEGIN={ full:'#startBtn', night:'#nightBegin' };
 const BUILD=argv.includes('--build'), BUILD_DIR=path.join(ROOT,'tools','.build');
+/* NIGHT-7: kind 'deploy' = built exactly as Vercel's production build (VERCEL_ENV=production) */
 function build(app, kind){ const dir=path.join(BUILD_DIR,`${app}-${kind}`), a=['tools/build.mjs','--out',dir]; if(kind==='preview') a.push('--probes');
-  const r=spawnSync(process.execPath,a,{ cwd:ROOT, encoding:'utf8', env:{ ...process.env, HANDSONG_APP:app, HANDSONG_EDITION:kind==='release'?'release':'', VERCEL_ENV:'' } }); out((r.stdout||'').trim()||(r.stderr||'').trim()); if(r.status!==0) throw new Error('build failed: '+app+' '+kind); return dir; }
+  const r=spawnSync(process.execPath,a,{ cwd:ROOT, encoding:'utf8', env:{ ...process.env, HANDSONG_APP:app, HANDSONG_EDITION:kind==='release'?'release':'', VERCEL_ENV: kind==='deploy' ? 'production' : '' } }); out((r.stdout||'').trim()||(r.stderr||'').trim()); if(r.status!==0) throw new Error('build failed: '+app+' '+kind); return dir; }
 const MIME={ '.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.mjs':'text/javascript; charset=utf-8', '.json':'application/json; charset=utf-8', '.css':'text/css; charset=utf-8',
   '.png':'image/png', '.woff2':'font/woff2' };
 /* the server logs every request: a worklet's fetch is invisible to Playwright's own events. breakName = a file it refuses (the CONTROL) */
@@ -86,7 +87,12 @@ async function run(app, dir, prefix, breakWorklet=false, measureOn=true){
       const f=await page.evaluate(async ()=>{ await document.fonts.ready; return [...document.fonts].filter(x=>x.status==='loaded').map(x=>x.family.replace(/"/g,'')); });
       if(!f.includes('Andika')) miss('the Andika font did not load: '+f.join(','));
       if(!seen.some(([u,st])=>/three\.min\.js/.test(u)&&st===200)) miss('the forest library did not load');
-      const hid=await page.evaluate(()=>document.getElementById('nightMeasure').hidden); if(hid===measureOn) miss(`«Measure this device» is ${hid?'hidden':'shown'}, expected ${measureOn?'shown':'hidden'}`); }
+      const hid=await page.evaluate(()=>document.getElementById('nightMeasure').hidden); if(hid===measureOn) miss(`«Measure this device» is ${hid?'hidden':'shown'}, expected ${measureOn?'shown':'hidden'}`);
+      /* NIGHT-7: a players' build shows no development item anywhere in settings (each .night-dev hidden; no visible text that says so) and keeps the picture choice */
+      if(!measureOn){ const r=await page.evaluate(()=>{ const card=document.getElementById('nightInfo'), shown=el=>{ for(let e=el;e && e!==card.parentElement;e=e.parentElement){ if(e.hidden && e!==card) return false; } return true; };
+          const dev=[...card.querySelectorAll('.night-dev')].filter(shown).map(e=>e.id), words=[...card.querySelectorAll('*')].filter(e=>!e.children.length && /development|разработк/i.test(e.textContent) && shown(e)).map(e=>e.id||e.textContent.slice(0,40));
+          return { dev, words, qual:!!document.getElementById('nightQualSeg') && shown(document.getElementById('nightQualSeg')) }; });
+        if(r.dev.length) miss('development items shown to players: '+r.dev.join(', ')); if(r.words.length) miss('development words shown to players: '+r.words.join(' | ')); if(!r.qual) miss('the picture choice is missing'); } }
   }catch(e){ miss('error: '+(e&&e.message||e)); const card=pageRef ? await pageRef.evaluate(()=>{ const s=document.getElementById('start'); return s ? (s.className+' · '+(s.innerText||'').replace(/\s+/g,' ').slice(0,160)) : 'no #start'; }).catch(x=>'unreadable: '+x.message) : '';
     out(`    [stalled] last served: ${served.slice(-6).map(([u,st])=>u+' '+st).join(' · ')}
     [stalled] pending: ${[...open].map(q=>q.url().replace(origin,'').slice(0,120)).join(' · ')||'none'}
@@ -205,7 +211,10 @@ if(BUILD){ fails+=await redirectCheck();
     if((await statsPage(`${app} preview`,prev)).length) fails++; fails+=await statsAbsent(prod);
     if(app==='night'){ if((await roomPage('night preview',prev,'/')).length) fails++; if((await tailPill('night preview',prev,'/')).length) fails++; if((await bedPill('night preview',prev,'/')).length) fails++; fails+=await roomAbsent(prod); }
     if((await panelGate(`${app} preview`,prev,'/',true)).length) fails++; if((await panelGate(`${app} production`,prod,'/',false)).length) fails++; }
-  if((await run('night',build('night','release'),'/',false,false)).length) fails++; }
+  if((await run('night',build('night','release'),'/',false,false)).length) fails++;
+  { const dep=build('night','deploy'), ed=await readFile(path.join(dep,'core/edition.js'),'utf8');   // NIGHT-7: the tree Vercel's production makes for Night: the release edition, no probes
+    if(!/EDITION='release'/.test(ed)){ out('[smoke] night deploy: NOT A PASS — not the release edition'); fails++; }
+    if((await run('night',dep,'/',false,false)).length) fails++; fails+=await probeGate('night',dep,false); } }
 if(!NO_CONTROL){ const c=await run('full',prodFull||ROOT,'/',true); const caught=c.some(x=>/ks-worklet/.test(x));
   out(`[smoke] CONTROL (a missing worklet must fail): ${caught?'caught':'NOT CAUGHT — the test cannot fail'}`); if(!caught) fails++; }
 out(`[smoke] ${fails?'NOT A PASS — '+fails+' target(s) failed':'PASS — every target loaded, control caught'}`);

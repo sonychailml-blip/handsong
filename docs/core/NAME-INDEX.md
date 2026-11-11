@@ -37,6 +37,11 @@ NIGHT-2 stage 2: the hand's calibration screens over CORE-1's engine (core/handc
 - const (8): `CAL_KEY`, `CAL_OPEN`, `travelS`, `travelPos`, `fxV`, `fxPos`, `calActive`, `calDbg`
 - fn (9): `calWire`, `calOfferIfNew`, `calStep`, `calSideApply`, `calSideSet`, `calResetAll`, `calAbort`, `calSettingsRender`, `calTick`
 
+## apps/night/cards.js
+NIGHT-7 — THE FIRST CARDS: after the calibration offer on a first start (and from Settings → «How to play»), four short cards with simple drawn pictures, written from the real gestures (core/gestur…
+- const (2): `cardsOpen`, `cardsDbg`
+- fn (2): `cardsShow`, `cardsWire`
+
 ## apps/night/ghost.js
 RUN 7 (C7, Night plan §6; docs/night/QUALITY.md points 4, 5, 6) — THE GHOST LIGHT: on the first run (and from ⓘ «Show the first steps again»), while no real hand has appeared, a ghost hand drifts s…
 - const (4): `GHOST`, `ghostArm`, `ghostStop`, `ghostOn`
@@ -207,7 +212,7 @@ NIGHT-3 stage 5 part 2: THE ROOM SWITCH — one door for everything a room chang
 
 ## apps/night/scene/host.js
 THE SCENE HOST and Night's BACKGROUNDS (VIS1b, RUN 6; Night's own since CORE-8 — the shared UI reaches it through hooks.scene).
-- const (21): `BACKGROUNDS`, `sceneRoomAdd`, `sceneRoomRemove`, `sceneRooms`, `sceneRoom`, `sceneRoomSet`, `SCENE_LEVEL_DEFAULT`, `SCENE_FADE`, `scenePausing`, `backgroundOf`, `sceneLevel`, `sceneShadowDbg`, `sceneOptDbg`, `sceneInfo`, `sceneRoomDbg`, `sceneLevelDbg`, `sceneHeldDbg`, `sceneProgramsDbg`, `sceneClockDbg`, `sceneBedDbg`, `sceneOpenDbg`
+- const (22): `BACKGROUNDS`, `sceneRoomAdd`, `sceneRoomRemove`, `sceneRooms`, `sceneRoom`, `sceneRoomSet`, `SCENE_LEVEL_DEFAULT`, `SCENE_FADE`, `scenePausing`, `COMPILE_LOG`, `backgroundOf`, `sceneLevel`, `sceneShadowDbg`, `sceneOptDbg`, `sceneInfo`, `sceneRoomDbg`, `sceneLevelDbg`, `sceneHeldDbg`, `sceneProgramsDbg`, `sceneClockDbg`, `sceneBedDbg`, `sceneOpenDbg`
 - fn (8): `loadThree`, `sceneOpen`, `sceneSwitch`, `sceneClose`, `setBackground`, `setSceneLevel`, `sceneSnapDbg`, `sceneShotDbg`
 
 ## apps/night/shell.js
@@ -229,6 +234,10 @@ NIGHT-3 stage 4: THE MUSIC BED's SOUND — built once on the first On into the m
 NIGHT-4: THE MUSIC BED v2's NODE — one AudioWorkletNode («night-bed», apps/night/worklets/bed-worklet.js) into the master's input (the sleep fade and the limiter cover it; live sound, never a track…
 - const (3): `BED2_WORKLET`, `BED2_POOLS`, `BED2_DIV`
 - fn (4): `buildBed2`, `bed2Post`, `bed2Park`, `bed2Stats`
+
+## apps/night/texts.js
+NIGHT-7 — NIGHT'S OWN TEXTS, both languages.
+- const (1): `NIGHT_TEXTS`
 
 ## apps/night/worklets/bed-worklet.js
 NIGHT-4: THE MUSIC BED v2 — one AudioWorklet processor «night-bed» holding every voice of the bed and its own reverb (design: docs/night/design/NIGHT-3-rooms/PLAN.md §4b; the law apps/night/pure/be…
@@ -1044,6 +1053,7 @@ SPLIT-2: the probe entry of the Night page: its own rows and the core rows flagg
 - → ./core/vis.js (1): `checkVisStack`
 - → ./night/bed.js (1): `checkNightBed`
 - → ./night/calib.js (1): `checkNightCalib`
+- → ./night/cards.js (1): `checkNightCards`
 - → ./night/forest.js (2): `checkForestRoom`, `checkBackgrounds`
 - → ./night/lean.js (2): `checkNightLean`, `checkQuietFloor`
 - → ./night/night.js (1): `checkSoloFirefly`
@@ -1064,6 +1074,10 @@ NIGHT-4: the music bed's A/B switch, dev only.
 ## tools/probes/night/calib.js
 NIGHT-2 stage 2: row «NIGHT calibration screens» (quick; the probe clock through the REAL processHands, an injected store and camera: no real key is touched).
 - fn (1): `checkNightCalib`
+
+## tools/probes/night/cards.js
+NIGHT-7: row «NIGHT first cards» — the four first cards: they open, each has its title, text and drawn picture in both languages (no left-over {name}); Next walks them and the last closes them, cal…
+- fn (1): `checkNightCards`
 
 ## tools/probes/night/forest.js
 VIS1c (RUN 6, Night plan §10, review 2026-10-17): two rows (quick and all).
@@ -1117,7 +1131,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 - const (5): `TEST_ROOM_ID`, `TEST_ROOM`, `testRoomMode`, `testRoomInfo`, `testRoomFreeLeaks`
 - fn (2): `testRoomInstall`, `testRoomRemove`
 
-_218 modules, 2509 exported names._
+_221 modules, 2517 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 
