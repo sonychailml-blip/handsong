@@ -9,7 +9,7 @@ Index: `/HANDOFF.md`. Rules: `CLAUDE.md`. Open items: `docs/night/BACKLOG.md`. P
 `handsong-night`'s Production branch is `night-release`, a stopper branch that is a copy of the old `main`. Merging `dev` into `main` does not touch Night's production. The new Night does not go public yet, and its public home (Vercel or another host) is not decided. `dev` pushes give previews, which keep `?probe`: use those for phone checks. NIGHT-7 (user, 2026-11-11): the test version for the first testers goes to `night-release` (the user pushes; Full's `main` untouched); a Vercel production build of Night is the release edition by itself.
 
 ## Where it stands
-Stage 4: RUN 6 ✅ C0, VIS1a–c, listening page, design proposals · RUN 7 ✅ sound pass, C11, C6, C4b, C4c, C7, C5 · RUN 8 ✅ the user's fixes, the forest picture, C8 part (Lighter forest) · RUN 9 ✅ the living forest · SPLIT-2 ✅ its own app and name. **Next:** the user's checks below, then C8 rest (phone numbers, auto-proposal), C9 offline, C10 release, C12 release candidate. Plus the new items in the backlog. `NIGHT-8` (the forest closer to real) built, waiting for step 146; `NIGHT-8b` (the user's phone-test fixes) for step 147; `NIGHT-9` (real ground and water) for step 148; `NIGHT-10` (camera choice) for step 149. `NIGHT-1` (sound headroom) stage 1 done, waiting for the user's decision and the Poco numbers.
+Stage 4: RUN 6 ✅ C0, VIS1a–c, listening page, design proposals · RUN 7 ✅ sound pass, C11, C6, C4b, C4c, C7, C5 · RUN 8 ✅ the user's fixes, the forest picture, C8 part (Lighter forest) · RUN 9 ✅ the living forest · SPLIT-2 ✅ its own app and name. **Next:** the user's checks below, then C8 rest (phone numbers, auto-proposal), C9 offline, C10 release, C12 release candidate. Plus the new items in the backlog. `NIGHT-8` (the forest closer to real) built, waiting for step 146; `NIGHT-8b` (the user's phone-test fixes) for step 147; `NIGHT-9` (real ground and water) for step 148; `NIGHT-10` (camera choice) for step 149; `NIGHT-8c` (every trunk its own bark, moss and lichen) for step 150. `NIGHT-1` (sound headroom) stage 1 done, waiting for the user's decision and the Poco numbers.
 
 ## The user's open checks, with today's addresses
 Old step texts use the old address and `src/…`; these are the current forms. Live Server, headphones, a lamp beside you.
@@ -26,6 +26,7 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 
 - **Step 145, music and full screen** (five checks; covers step 144's and 143's phone parts): `archive/CLAUDE-history.md`, step 145. Steps 143 (1), (3) and 144 (1)–(4) still stand on the laptop.
 - **Step 146, the forest closer to real** (five checks: the two stream samples by ear, the stream in the app, the water, the ground and rocks, the Poco): `archive/CLAUDE-history.md`, step 146.
+- **Step 150, every trunk its own bark, moss and lichen** (five checks: the two trunks of your screenshot at Standard, Detailed close up, the moss, the lichen, the Poco): `archive/CLAUDE-history.md`, step 150. Before / after crops: `tools/.ui-snap/n8c-compare/`.
 - **Step 149, choosing the camera** (five checks: the Poco's Front / Back, the back camera towards you, a USB webcam, an iPhone, the release edition): `archive/CLAUDE-history.md`, step 149.
 - **Step 148, real ground and real water** (five checks: pick the floor — scanned or baked —, the ground, the water, the look as a whole, the Poco): `archive/CLAUDE-history.md`, step 148.
 - **Step 147, fixes after the first phone test** (five checks: full screen after the camera prompt on the Poco, the corner icon, no flash of Full, moss and fireflies, the shipped stream by ear): `archive/CLAUDE-history.md`, step 147. Step 146 (1) is answered (the recording ships).
@@ -40,6 +41,12 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 5. The falling star passes in front of the trees. Natural?
 
 ## Records (English, at most about 15 lines each; older ones go to `archive/HANDOFF-history.md`)
+### NIGHT-8c (2026-11-12): every trunk its own bark, moss and lichen. Log: `docs/night/WORK-LOG.md`
+- The blotches were the bark's LICHEN: one formula for all trunks (world angle × height, one hard-thresholded noise → tall ovals 0.8–5.5 m up); 8b's moss only reached the feet. Also the bark texture's height layout was the same on every trunk (a seam every 3.2 m), and the merged wood's moss the same on every piece.
+- Each trunk (and branch, and merged-wood piece) has its own bark mapping (`pure/wood.js barkUv`: turn, lift, scale, spiral); the bark tile joins itself.
+- One moss and lichen law everywhere (`forest-wood.js` LOOK): each piece's own numbers and noise region; moss in irregular patches along the grain, in the furrows, denser low and on the damp side, softer and duller; lichen as faint soft-edged crust islands, each trunk its own amount.
+- Standard as cheap as before (detections −2.6 / +2.5 % vs Dark, draws, programs, triangles, textures unchanged).
+- Rows: data «FOREST bark layouts (app)» (five CONTROLS); runner «FOREST wood» extended. Crops: `tools/.ui-snap/n8c-compare.html`. Waiting for step 150.
 ### NIGHT-10 (2026-11-11): choosing the camera (+ CORE-16). Log: `docs/night/WORK-LOG.md`
 - Settings → Camera: «Front» / «Back» on a phone, device names on a computer (no hardware numbers), «Camera N» before the permission; shown with two or more cameras.
 - A tap switches live (music and hand model go on); kept on this device; a kept camera that is gone opens the default quietly.

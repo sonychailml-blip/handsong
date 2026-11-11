@@ -176,7 +176,7 @@ NIGHT-6 slice 4 — THE STREAM'S SURROUNDINGS (parts of the night forest room; f
 
 ## apps/night/rooms/forest/forest-wood.js
 NIGHT-6 slice 5 — MOSS, ROOTS AND FALLEN WOOD (parts of the night forest room; forest.js builds them; the places are ./pure/wood.js): - THE WOOD: roots of the near trees, a log on the bank, a log a…
-- const (2): `gnd7Src`, `patchBark`
+- const (3): `gnd7Src`, `lookSrc`, `patchBark`
 - fn (6): `woodUniforms`, `barkAttrs`, `trunkGeo`, `limbGeo`, `buildWood`, `patchShade`
 
 ## apps/night/rooms/forest/forest.js
@@ -256,8 +256,8 @@ NIGHT-9 — THE STREAM'S FLOW, as numbers (pure, rule #36; data row «FOREST wat
 
 ## apps/night/rooms/forest/pure/wood.js
 NIGHT-6 slice 5 — MOSS, ROOTS AND FALLEN WOOD, as numbers.
-- const (5): `WOOD`, `trunkRadius`, `trunkOuter`, `barkMossUnit`, `blobDark`
-- fn (6): `flareAt`, `barkMoss`, `nearTrees`, `twigShape`, `woodPlaces`, `shadeBlobs`
+- const (6): `WOOD`, `trunkRadius`, `trunkOuter`, `barkUvGap`, `barkMossUnit`, `blobDark`
+- fn (8): `flareAt`, `barkMoss`, `barkUv`, `woodPieces`, `nearTrees`, `twigShape`, `woodPlaces`, `shadeBlobs`
 
 ## apps/night/rooms/forest/standin.js
 NIGHT-3: the forest's 2D STAND-IN — the «low» level and the fallback without WebGL (or after a lost context): the night's two colours and a soft glow at each hand (the playing hand lime, the effect…
@@ -1202,7 +1202,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 - const (5): `TEST_ROOM_ID`, `TEST_ROOM`, `testRoomMode`, `testRoomInfo`, `testRoomFreeLeaks`
 - fn (2): `testRoomInstall`, `testRoomRemove`
 
-_236 modules, 2606 exported names._
+_236 modules, 2610 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

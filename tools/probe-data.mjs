@@ -1669,6 +1669,67 @@ async function forestBarkMoss(){
   notes.push(`${T.length} trunks, the smallest gap ${g.toFixed(3)} (trunks ${at}; ${W.WOOD.bark.minGap} wanted); CONTROL one moss for all: gap 0`);
   return { cases:n, total:d.length, differences:d, notes };
 }
+/* NIGHT-8c: EVERY TRUNK ITS OWN BARK LAYOUT, MOSS AND LICHEN (apps/night/rooms/forest/pure/wood.js barkUv, woodPieces; forest-wood.js lookSrc) —
+   the user: two big trunks in the light showed the same pale oval blotches in the same layout, and 8b's moss did not change them. They were the
+   LICHEN: one formula for every trunk (the world normal's angle and the height through one thresholded noise: tall ovals 0.8–5.5 m up, the same
+   size, band, cover and colour on all) — and the bark texture's height layout was the same on every trunk. Checks: (1) today's 95 trunks' bark
+   mappings differ pairwise by ≥ WOOD.bark.uvGap (turn and lift circular, scale, spiral), the two trunks in the light (0, 1) and the big pair on the
+   right (1, 7) in turn or lift by ≥ 0.15, each number spans ≥ 0.85 of its range, repeatable; CONTROL one mapping for all → gap 0. (2) Exact: every
+   two trunks' noise regions at least one cell apart and the look's hash without a near-repeat at any shift between them (< 0.5 over 24 × 24 cells);
+   CONTROL a weak hash's near-repeat is caught, CONTROL the same numbers share a region. (3) The merged wood's pieces (woodPlaces at Detailed) each have their own moss and
+   mapping rows (none shared with a trunk, the lists long enough); CONTROL the limbs' list is not the wood's. (4) The look's source: moss and
+   lichen read the piece's own numbers on both paths (no bark-only branch), no world-angle coordinate, the lichen from vp8; CONTROL the old
+   lichen line fails that judgement. */
+async function forestBarkLayouts(){
+  const d=[], notes=[]; let n=0; const miss=s=>d.push(s), W=await import(new URL('../apps/night/rooms/forest/pure/wood.js', import.meta.url).href), Lo=await import(new URL('../apps/night/rooms/forest/pure/layout.js', import.meta.url).href);
+  const FW=await import(new URL('../apps/night/rooms/forest/forest-wood.js', import.meta.url).href), FR=(await import(new URL('../apps/night/rooms/forest/pure/room.js', import.meta.url).href)).FOREST_ROOM;
+  const T=Lo.forestTrunks(), B=W.WOOD.bark, U=W.barkUv(T.length), M=W.barkMoss(T.length);
+  const gapOf=L=>{ let g=Infinity, at=null; for(let i=0;i<L.length;i++) for(let j=i+1;j<L.length;j++){ const x=W.barkUvGap(L[i], L[j]); if(x<g){ g=x; at=[i,j]; } } return [g, at]; };
+  /* (1) the mapping law */
+  { const [g, at]=gapOf(U); n+=4; if(!(g>=B.uvGap)) miss(`trunks ${at} have nearly the same bark layout (gap ${g.toFixed(3)}, ${B.uvGap} wanted)`);
+    const circ=x=>{ const v=Math.abs(x)%1; return Math.min(v, 1-v); }, apart=(i,j)=>Math.max(circ(U[i][0]-U[j][0]), circ(U[i][1]-U[j][1]));
+    for(const [i,j] of [[0,1],[1,7]]) if(apart(i,j)<0.15) miss(`trunks ${i} and ${j} turn and lift within ${apart(i,j).toFixed(2)}`);
+    const span=k=>{ const v=U.map(u=>u[k]); return (Math.max(...v)-Math.min(...v))/([1, 1, B.scale[1]-B.scale[0], 2*B.spiral][k]); };
+    for(let k=0;k<4;k++) if(span(k)<0.85){ miss(`bark mapping number ${k} spans only ${span(k).toFixed(2)} of its range`); break; }
+    if(JSON.stringify(W.barkUv(T.length))!==JSON.stringify(U)) miss('two draws differ');
+    n++; if(gapOf(U.map(()=>U[0]))[0]>=B.uvGap) miss('CONTROL: one mapping for every trunk passes the gap judgement');
+    notes.push(`bark mappings: ${T.length} trunks, the smallest gap ${g.toFixed(3)} (trunks ${at}; ${B.uvGap} wanted); trunks 0 / 1 (the two in the light) turn ${U[0][0].toFixed(2)} / ${U[1][0].toFixed(2)}, lift ${U[0][1].toFixed(2)} / ${U[1][1].toFixed(2)}, scale ${U[0][2].toFixed(2)} / ${U[1][2].toFixed(2)}, spiral ${U[0][3].toFixed(2)} / ${U[1][3].toFixed(2)}; CONTROL one for all: gap 0`); }
+  /* (2) no two trunks share a moss or lichen layout — exact: each piece's field is the noise at its own region (q.y + of, of = i × offStep cells);
+     two regions at least one cell apart share no lattice cell, and the look's hash (forest-wood.js h28) has no near-repeat at any shift between two
+     trunks (each octave's multiple of it): over a 24 × 24 window of cells the shifted hash correlates < 0.5 with the unshifted one (576 cells:
+     chance stays near ±0.15). CONTROL a weak hash (one linear term per axis: 0.07217 × 97 ≈ 7.0005) at a shift of 97 cells correlates > 0.5; CONTROL two
+     trunks given the same numbers share a region. */
+  { const fr=x=>x-Math.floor(x), h28=(x,y)=>{ const a=25*fr(x*0.3183099+0.71), b=25*fr(y*0.3183099+0.113); return fr(a*b*(a+b)); };
+    const hWeak=(x,y)=>fr(x*0.1031+y*0.07217);
+    const cor=(a,b)=>{ const k=a.length, ma=a.reduce((s,v)=>s+v,0)/k, mb=b.reduce((s,v)=>s+v,0)/k; let sab=0, saa=0, sbb=0; for(let i=0;i<k;i++){ const x=a[i]-ma, y=b[i]-mb; sab+=x*y; saa+=x*x; sbb+=y*y; } return sab/Math.sqrt(saa*sbb||1); };
+    const win=(h, dy)=>{ const v=[]; for(let x=0;x<24;x++) for(let y=0;y<24;y++) v.push(h(x, y+dy)); return v; }, base=win(h28, 0);
+    const of=M.map(m=>m[5]); let gap=Infinity, gat=null, worst=-1, wat=null; n+=2;
+    for(let i=0;i<of.length;i++) for(let j=i+1;j<of.length;j++){ const dlt=Math.abs(of[i]-of[j]); if(dlt<gap){ gap=dlt; gat=[i,j]; }
+      for(const k of [1, 2, 3, 4, 6]){ const s=Math.round(dlt*k), c=cor(base, win(h28, s)); if(c>worst){ worst=c; wat=[i, j, k, s]; } } }
+    if(!(gap>=1)) miss(`trunks ${gat}: their moss regions are ${gap.toFixed(2)} cells apart (≥ 1 wanted)`);
+    if(!(worst<0.5)) miss(`the hash nearly repeats between trunks ${wat.slice(0,2)} (octave ×${wat[2]}, ${wat[3]} cells): correlation ${worst.toFixed(2)}`);
+    const minGap=L=>{ let g=Infinity; for(let i=0;i<L.length;i++) for(let j=i+1;j<L.length;j++) g=Math.min(g, Math.abs(L[i]-L[j])); return g; }, two=of.slice(); two[1]=two[0];
+    const weak97=cor(win(hWeak, 0), win(hWeak, 97)), same=minGap(two); n+=2;
+    if(!(weak97>0.5)) miss(`CONTROL: a weak hash at 97 cells correlates only ${weak97.toFixed(2)} — the judgement cannot fail`);
+    if(same>=1) miss('CONTROL: two trunks given the same numbers pass the region judgement');
+    notes.push(`moss and lichen layouts: the trunks' regions at least ${gap.toFixed(2)} cells apart (trunks ${gat}), the two in the light ${Math.abs(of[0]-of[1]).toFixed(2)}; the hash at every shift between two trunks and its octaves (${(of.length*(of.length-1)/2)*5} shifts) correlates at most ${worst.toFixed(2)}; CONTROL a weak hash at 97 cells ${weak97.toFixed(2)}, the same numbers 0 cells apart`); }
+  /* (3) the merged wood's pieces */
+  { const P=W.woodPlaces(FR.levels.full, T), k=P.roots.length+P.logs.length+P.stumps.length+P.snags.length+P.twigs.length+1, WP=W.woodPieces('wood'), LP=W.woodPieces('limbs'); n+=3;
+    if(k>B.pieces.n) miss(`the merged wood has ${k} pieces, the list ${B.pieces.n}`);
+    const key=r=>r.map(v=>v.toFixed(6)).join(), tk=new Set(M.map(key).concat(U.map(key))), shared=[...WP.moss.slice(0,k), ...WP.uv.slice(0,k)].filter(r=>tk.has(key(r))).length;
+    if(shared) miss(shared+' merged-wood rows equal a trunk\'s');
+    const [g]=gapOf(WP.uv.slice(0,k)); if(!(g>0.02)) miss(`two merged-wood pieces share a bark layout (gap ${g.toFixed(3)})`);
+    n++; if(key(LP.moss[0])===key(WP.moss[0]) || key(LP.uv[0])===key(WP.uv[0])) miss('CONTROL: the limbs\' list is the wood\'s');
+    notes.push(`the merged wood at Detailed: ${k} pieces (roots ${P.roots.length}, logs ${P.logs.length}, stumps ${P.stumps.length}, dead trees ${P.snags.length}, branches ${P.twigs.length}, fungi 1), each its own moss and bark mapping (smallest mapping gap ${g.toFixed(3)}), none a trunk's; the limbs their own list`); }
+  /* (4) what the look is made of */
+  { const judge=src=>{ const why=[]; if(/#else/.test(src)) why.push('a bark-only branch'); if(/atan\(wn\.z, *wn\.x\)/.test(src)) why.push('a world-angle coordinate');
+      if(!/vBk7\.x/.test(src) || !/vBk7b\.x/.test(src) || !/vMU7/.test(src)) why.push('not the piece\'s own numbers'); if(!/float lf=[^;]*vp8/.test(src) || /float lic=[^;]*vn7/.test(src)) why.push('the lichen not from vp8'); return why; };
+    const w=judge(FW.lookSrc()); n++; if(w.length) miss('the look: '+w.join(', '));
+    const OLD=`float lic=smoothstep(0.64, 0.76, vn7(vec2(ang*4.0+wp.x*0.5, wp.y*3.2+wp.z*0.5)))*smoothstep(0.8, 2.0, above); ang=atan(wn.z, wn.x);`;
+    n++; if(!judge(OLD).length) miss('CONTROL: the old lichen line passes the look judgement');
+    notes.push(`the look: moss and lichen from each piece's own numbers on the bark and the merged wood alike, no world-angle coordinate, the lichen from vp8; CONTROL the old lichen line is caught (${judge(OLD).join(', ')})`); }
+  return { cases:n, total:d.length, differences:d, notes };
+}
 /* NIGHT-8b: THE GREEN FIREFLIES COME TO THE PLAYING LIGHT (apps/night/rooms/forest/pure/fireflies.js) — the user: they used to circle it now and
    then; only the moths did. The cause: in the nearest depth band the light stands at z ≈ 3.3, inside the flies' wrap box's near end (3.5), so
    every orbit wrapped away. The law's 35 flies (the medium level), a light at depth 0, 0.15 and 0.5 on the aisle, a note every 1.5 s (held
@@ -1808,6 +1869,7 @@ const ROWS=[
   ['NIGHT stream sound (app)',  ()=>nightStreamSound(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-8
   ['FOREST wood (app)',         ()=>forestWoodCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 5
   ['FOREST bark moss (app)',    ()=>forestBarkMoss(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-8b
+  ['FOREST bark layouts (app)', ()=>forestBarkLayouts(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-8c
   ['FOREST fireflies visit the light (app)', ()=>forestFliesVisit(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-8b
   ['NIGHT stream recording (app)', ()=>nightStreamRec(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-8b
   ['NIGHT full-screen icons (app)', ()=>nightFsIcons(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-8b

@@ -24,7 +24,7 @@ const MOOD_LOOKS=FOREST_ROOM.looks;
 import { FOREST_LEVELS } from '../../../apps/night/rooms/forest/forest.js';
 import { streamNear } from '../../../apps/night/rooms/forest/pure/forestlife.js';   // RUN 9 (slice 2)
 import { lifePlaces } from '../../../apps/night/rooms/forest/pure/forestlife.js';   // NIGHT-6 slice 5
-import { woodPlaces, barkMoss } from '../../../apps/night/rooms/forest/pure/wood.js';   // NIGHT-8b: barkMoss
+import { woodPlaces, barkMoss, barkUv, woodPieces } from '../../../apps/night/rooms/forest/pure/wood.js';   // NIGHT-8b: barkMoss; NIGHT-8c: barkUv, woodPieces
 import { forestTrunks, FOREST_SEED, PAINT_DRAWS } from '../../../apps/night/rooms/forest/pure/layout.js';
 import { seeded } from '../../../core/pure/dsp.js';
 import { canopyPlaces } from '../../../apps/night/rooms/forest/pure/canopy.js';   // NIGHT-6 slice 7
@@ -574,13 +574,23 @@ export async function checkForestWood(){
           if(!tm) miss(lv+': the trunks carry no moss of their own (aBark7)');
           else { const A=tm.geometry.attributes.aBark7.array, B=tm.geometry.attributes.aBark7b.array;
             if(M.some((m,i)=>[0,1,2,3].some(k=>A[i*4+k]!==f(m[k])) || B[i*2]!==f(m[5]) || B[i*2+1]!==f(m[4]))) miss(lv+': the moss of the trunks is not barkMoss() trunk for trunk');
-            if(!/vBk7/.test(stub(tm.material))) miss(lv+': the bark shader does not read the moss of each trunk'); } }
+            if(!/vBk7/.test(stub(tm.material))) miss(lv+': the bark shader does not read the moss of each trunk');
+            /* NIGHT-8c: every trunk its own bark mapping (barkUv, trunk for trunk) read by the bark shader; the merged wood's pieces their own moss rows */
+            const C=tm.geometry.attributes.aBark7c, UV=barkUv(pureT.length); n+=3;
+            if(!C || UV.some((u,i)=>u.some((v,k)=>C.array[i*4+k]!==f(v)))) miss(lv+': the trunks\' bark mapping is not barkUv() trunk for trunk');
+            if(!/aBark7c/.test(stub(tm.material)) || !/vMU7/.test(stub(tm.material))) miss(lv+': the bark shader does not read each trunk\'s mapping');
+            const wg=r.woodDbg.parts.wood && r.woodDbg.parts.wood.geometry, WA=wg && wg.attributes.aBark7, pcs=wg ? wg.userData.pieces : 0, WM=woodPieces('wood').moss;
+            if(!WA) miss(lv+': the merged wood carries no moss of its own (aBark7)');
+            else { const rows=new Set(); for(let i=0;i<WA.count;i++) rows.add([0,1,2,3].map(k=>WA.array[i*4+k]).join());
+              const want=new Set(WM.slice(0, pcs).map(m=>[0,1,2,3].map(k=>f(m[k])).join()));
+              if(rows.size!==pcs || [...rows].some(x=>!want.has(x))) miss(`${lv}: the merged wood carries ${rows.size} moss rows for ${pcs} pieces (woodPieces('wood') piece by piece wanted)`);
+              else notes.push(`${lv}: the trunks carry barkUv() trunk for trunk; the merged wood's ${pcs} pieces each their own moss row and bark mapping`); } } }
         notes.push(`${lv}: ${Wd.roots} roots, ${Wd.logs} logs, ${Wd.stumps} stumps, ${Wd.snags} dead trees, ${Wd.twigs} branches, ${Wd.brackets} fungi, ${Wd.moss} moss, ${Wd.ivy} ivy cards, ${sh-L.shrooms} mushrooms on wood; ${Wd.verts} wood vertices`); }
       { n+=2; const R=seeded(FOREST_SEED); for(let i=0;i<=PAINT_DRAWS;i++) R(); const x=(R()*2-1)*22; if(x===pureT[8][0]) miss('CONTROL: the replay one draw late gives the same trunk');
         if(/uSway/.test(stub(new T.MeshStandardMaterial()))) miss('CONTROL: a plain material has the sway'); }
       { const S=mk('reduced', { lv:{ roots:0, logs:0, stumps:0, snags:0, twigs:0, moss:0, ivy:0, woodShrooms:0, flare:false, barkMoss:false, shade:false } }).state(); n++;
         if(S.wood.verts || S.wood.moss || S.wood.ivy || S.wood.shade || S.wood.flare || S.wood.bark) miss('the baseline still builds '+JSON.stringify(S.wood));
-        n++; if(rooms[rooms.length-1].scene.children.some(o=>o.isInstancedMesh && o.geometry.attributes.aBark7)) miss('the baseline (no bark moss) still gives the trunks moss attributes'); }
+        n++; if(rooms[rooms.length-1].scene.children.some(o=>o.isInstancedMesh && (o.geometry.attributes.aBark7 || o.geometry.attributes.aBark7c))) miss('the baseline (no bark moss) still gives the trunks moss or mapping attributes'); }
     } finally { for(const r of rooms) r.dispose(); }
     const why=profileApply('profile.night'); n++; if(why){ miss('Night refused: '+why); return { cases:n, total:d.length, differences:d, notes }; }
     await setSceneLevel('reduced'); await setBackground('forest'); await frames(6);

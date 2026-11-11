@@ -29,7 +29,11 @@ export const WOOD=F({ seed:0x574F4F44, eye:F([0, 5.5]),
   ivy:F({ H:F([1.6, 4.8]), step:0.3 }),
   max:F({ stumps:5, snags:3, twigs:56, moss:400, ivy:12, woodShrooms:30 }),
   /* NIGHT-8b: the bark's moss per trunk (barkMoss): reach up the trunk (m), the side it faces (rad round `north`, ± side), cover, patchiness, tint */
-  bark:F({ seed:0x4D4F5353, h:F([0.45, 2.8]), north:-1.19, side:1.5, cover:F([0.12, 1]), minGap:0.2 }),
+  bark:F({ seed:0x4D4F5353, h:F([0.45, 2.8]), north:-1.19, side:1.5, cover:F([0.12, 1]), minGap:0.2,
+    /* NIGHT-8c: the bark texture's mapping per trunk (barkUv): its own turn round the trunk, height offset, vertical scale and a slight spiral */
+    uvSeed:0x42555631, scale:F([0.8, 1.25]), spiral:0.5, uvGap:0.07,
+    /* NIGHT-8c: the merged wood's pieces and the canopy's limbs: their own lists (seed offsets from seed / uvSeed), n long, taken in turn */
+    pieces:F({ wood:0x100, limbs:0x200, n:1024 }), offStep:7.31 }),
   shade:F({ x0:-17, z0:-28, w:34, d:34 }) });
 
 /* the trunk's radius factor at hb metres above its foot (a: the angle round it, local; null = the mean, no buttress lobes) */
@@ -43,7 +47,8 @@ const eyeD=(x, z)=>Math.hypot(x-WOOD.eye[0], z-WOOD.eye[1]);
 function segDist(px, pz, ax, az, bx, bz){ const vx=bx-ax, vz=bz-az, t=clamp(((px-ax)*vx+(pz-az)*vz)/(vx*vx+vz*vz||1), 0, 1); return Math.hypot(px-ax-vx*t, pz-az-vz*t); }
 /* NIGHT-8b: THE BARK'S MOSS, PER TRUNK (the user: two neighbouring trunks had the same moss) — n trunks → per trunk [h, side, cover, patch, tint,
    off]: h how far up the trunk it reaches (m), side the angle (rad, world x→z) of the face it favours, cover 0…1 how much of that face, patch 0…1
-   smooth → patchy, tint −1…1 cool → warm, off its own noise offset. Five parameters from a low-discrepancy sequence (Halton, bases 2 3 5 7 11,
+   smooth → patchy, tint −1…1 cool → warm, off its own noise offset (NIGHT-8c: i × WOOD.bark.offStep cells — every piece of a list its own
+   region of the noise, never near another's; the old random offsets, 0…99.6, could coincide). Five parameters from a low-discrepancy sequence (Halton, bases 2 3 5 7 11,
    each shifted by a seeded offset — every parameter alone spread evenly too) so every two trunks differ — the data row checks the smallest gap
    (WOOD.bark.minGap, in the unit cube);
    index i keeps its moss at every level (the room passes forestTrunks() order). The room's bark shader reads them per instance (forest-wood.js) */
@@ -51,9 +56,24 @@ export function barkMoss(n, seed=WOOD.bark.seed){
   const B=WOOD.bark, R=seeded(seed), base=[2, 3, 5, 7, 11], s0=base.map(()=>R()), out=[];
   const vdc=(i, b)=>{ let f=1, r=0; while(i>0){ f/=b; r+=f*(i%b); i=Math.floor(i/b); } return r; };   // the radical inverse of i in base b
   for(let i=0;i<n;i++){ const u=base.map((b,k)=>(s0[k]+vdc(i+1, b))%1);
-    out.push([lerp(B.h[0], B.h[1], u[0]), B.north+(u[1]*2-1)*B.side, lerp(B.cover[0], B.cover[1], u[2]), u[3], u[4]*2-1, Math.floor(R()*997)/10]); }
+    out.push([lerp(B.h[0], B.h[1], u[0]), B.north+(u[1]*2-1)*B.side, lerp(B.cover[0], B.cover[1], u[2]), u[3], u[4]*2-1, Math.round(i*B.offStep*100)/100]); }
   return out;
 }
+/* NIGHT-8c: THE BARK TEXTURE'S MAPPING, PER TRUNK (the user: two big trunks showed one layout) — n trunks → per trunk [turn, lift, scale, spiral]:
+   turn 0…1 of a full turn round the trunk, lift 0…1 of a texture tile up (a tile is 0.2 of the trunk's v: 3.2 m), scale (WOOD.bark.scale) of the tile's height,
+   spiral (± WOOD.bark.spiral turns round over 16 m of trunk: the grain's slight twist). Halton, bases 2 3 5 7, each shifted by its own seeded offset (another seed than the moss, so the two never line up);
+   turn and lift are circular. The room applies them in the bark shader (instanced trunks and branches) and in the merged wood's uv (forest-wood.js) */
+export function barkUv(n, seed=WOOD.bark.uvSeed){
+  const B=WOOD.bark, R=seeded(seed), base=[2, 3, 5, 7], s0=base.map(()=>R()), out=[];
+  const vdc=(i, b)=>{ let f=1, r=0; while(i>0){ f/=b; r+=f*(i%b); i=Math.floor(i/b); } return r; };
+  for(let i=0;i<n;i++){ const u=base.map((b,k)=>(s0[k]+vdc(i+1, b))%1); out.push([u[0], u[1], lerp(B.scale[0], B.scale[1], u[2]), (u[3]*2-1)*B.spiral]); }
+  return out;
+}
+/* NIGHT-8c: the merged wood's ('wood') or the limbs' ('limbs') per-piece lists → { moss: barkMoss rows, uv: barkUv rows } (forest-wood.js builder) */
+export function woodPieces(kind){ const B=WOOD.bark, k=B.pieces[kind]; return { moss:barkMoss(B.pieces.n, B.seed+k), uv:barkUv(B.pieces.n, B.uvSeed+k) }; }
+/* barkUv's numbers → the unit cube, turn and lift circular (the data row's distance between two trunks' layouts) */
+export const barkUvGap=(a, b)=>{ const B=WOOD.bark, c=x=>{ const d=Math.abs(x)%1; return Math.min(d, 1-d); };
+  return Math.hypot(c(a[0]-b[0]), c(a[1]-b[1]), (a[2]-b[2])/(B.scale[1]-B.scale[0]), (a[3]-b[3])/(2*B.spiral)); };
 /* the moss parameters of barkMoss → the unit cube (the data row's distance) */
 export const barkMossUnit=m=>{ const B=WOOD.bark; return [(m[0]-B.h[0])/(B.h[1]-B.h[0]), ((m[1]-B.north)/B.side+1)/2, (m[2]-B.cover[0])/(B.cover[1]-B.cover[0]), m[3], (m[4]+1)/2]; };
 /* the near trees' indices, nearest the eye first */

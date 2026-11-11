@@ -1936,6 +1936,13 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
     4. iPhone Safari, if at hand: «Front» / «Back» in the list after the camera permission; switching works.
     5. The players' edition (`?release`): the Camera section shows only the cameras' names, nothing technical.
 
+150. Every trunk its own bark, moss and lichen (NIGHT-8c), at most five checks by hand; the rest is in the rows «FOREST bark layouts (app)» (each trunk's own bark mapping — CONTROL one for all; every two trunks' noise regions apart and the hash without a near-repeat — CONTROLS a weak hash, the same numbers; the merged wood's pieces their own rows — CONTROL the limbs' list; the look made of each piece's own numbers — CONTROL the old lichen line) and «FOREST wood» (the trunks carry barkUv() trunk for trunk, the merged wood its pieces' own moss rows; a shader that fails to compile fails «NIGHT forest picture»). Before / after crops: `tools/.ui-snap/n8c-compare/`.
+    1. The laptop, Standard, the start view with a note held (the light near the two trunks of your screenshot): no pale oval blotches; the two trunks' bark, moss and lichen differ.
+    2. Detailed, the same view, then walk the light close to a trunk: the bark's furrows run unbroken up the trunk (no ring every 3 m); patches follow the grain.
+    3. The moss low on the trunks, roots, logs and stumps: soft and dull green, denser at the foot and on one side, irregular islands thinning upwards — not paint.
+    4. The lichen: faint pale crust patches between knee and head height, more on some trunks than others. Too much, too little or right?
+    5. The Poco (a `dev` preview): Standard as smooth as before.
+
 ## Superseded at DOC1 (old lines verbatim, replaced in place above by a later slice)
 - NIGHT-2 stage 3 (2026-11-03, the rule of at most five manual checks) updated this line of CLAUDE.md's report format:
   probe verdict lines and fix rounds; what was left undone; docs found stale; the user's remaining steps (ear, camera, phone).

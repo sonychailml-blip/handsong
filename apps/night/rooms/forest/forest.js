@@ -26,7 +26,7 @@ import { ANSWERS, swellAt } from './pure/answers.js';
 import { FOREST_SEED, ROCKS_TODAY, forestTrunks } from './pure/layout.js';   // NIGHT-6 slice 5: the seed and today's rocks, shared with the bake tool
 import { woodPlaces } from './pure/wood.js';
 import { buildWood, patchBark, patchShade, trunkGeo, woodUniforms, barkAttrs } from './forest-wood.js';
-import { barkMoss } from './pure/wood.js';   // NIGHT-8b: every trunk its own moss
+import { barkMoss, barkUv } from './pure/wood.js';   // NIGHT-8b: every trunk its own moss; NIGHT-8c: its own bark mapping
 import { groundRoots, groundOcclusion } from './pure/relief.js';   // NIGHT-9: the ground's root bulges and occlusion
 import { buildGust } from './forest-gust.js';   // NIGHT-6 slice 6: the effects hand moves the forest
 import { buildCanopy, patchDapple } from './forest-canopy.js';   // NIGHT-6 slice 7: the canopy, the stars, the dappled moonlight
@@ -145,7 +145,7 @@ export function buildForest(T, opt){
   const [kc,k]=canvas2(256,512), [kb,kk]=canvas2(256,512); k.fillStyle=C('forest-bark'); k.fillRect(0,0,256,512); kk.fillStyle=grey(128); kk.fillRect(0,0,256,512);
   for(let i=0;i<260;i++){ const x=R()*256, wd=1+R()*4, dark=R()<0.65, ph=R()*6;
     for(const dx of [-256,0,256]){ k.strokeStyle=C(dark?'forest-bark-dark':'forest-bark-light'); kk.strokeStyle=dark?rgba([0,0,0],0.7):rgba([255,255,255],0.35); k.lineWidth=kk.lineWidth=wd;
-      for(const c of [k,kk]){ c.beginPath(); for(let y=0;y<=512;y+=16){ const xx=x+dx+Math.sin(y*0.03+ph)*4; if(y) c.lineTo(xx,y); else c.moveTo(xx,y); } c.stroke(); } } }
+      for(const c of [k,kk]){ c.beginPath(); for(let y=0;y<=512;y+=16){ const xx=x+dx+Math.sin(y*Math.PI/128+ph)*4; if(y) c.lineTo(xx,y); else c.moveTo(xx,y); } c.stroke(); } } }   // NIGHT-8c: two whole waves per tile — the tile joins itself (no ring every 3.2 m)
   const barkM=new T.MeshStandardMaterial({ map:tex(kc,true,2,5), bumpMap:tex(kb,false,2,5), bumpScale:0.035, roughness:0.95 }); own.push(barkM);
   const FU=foxUniforms(T, C, Lv.foxfire|0);   // NIGHT-6 slice 9: the foxfire's trail, shared by the bark and the wood
   if(Lv.barkMoss) patchBark(barkM, { ...woodUniforms(T, C), ...FU });   // NIGHT-6 slice 5: moss low on the trunk (NIGHT-8b: each its own), lichen higher, darker at the foot
@@ -160,7 +160,7 @@ export function buildForest(T, opt){
      the ground's law (./pure/ground.js, its own seeded draws) */
   const lkey=[Lv.litterLeaves||0, Lv.litterPebbles||0, Lv.litterTwigs||0].join(); if(!LITTER_MEMO.has(lkey)) LITTER_MEMO.set(lkey, litterPlaces({ leaves:Lv.litterLeaves||0, pebbles:Lv.litterPebbles||0, twigs:Lv.litterTwigs||0 }, spots)); const litter=LITTER_MEMO.get(lkey);
   const brG=new T.CylinderGeometry(0.6,1,1,6), branches=new T.InstancedMesh(brG, barkM, brs.length+litter.twigs.length); own.push(brG);
-  if(Lv.barkMoss){ const BM=barkMoss(spots.length+brs.length+litter.twigs.length); barkAttrs(T, trunkG, BM.slice(0, spots.length)); barkAttrs(T, brG, BM.slice(spots.length)); }   // NIGHT-8b: the moss per trunk (forestTrunks order), the branches' own after them
+  if(Lv.barkMoss){ const nb=spots.length+brs.length+litter.twigs.length, BM=barkMoss(nb), BU=barkUv(nb); barkAttrs(T, trunkG, BM.slice(0, spots.length), BU.slice(0, spots.length)); barkAttrs(T, brG, BM.slice(spots.length), BU.slice(spots.length)); }   // NIGHT-8b: the moss per trunk (forestTrunks order), the branches' own after them; NIGHT-8c: + each one's bark mapping
   brs.forEach(([x,z,r,h,a,l],i)=>{ d.rotation.set(0,a,1.05+R()*0.35,'YXZ'); d.scale.set(0.035+r*0.06,l,0.035+r*0.06);
     const dirv=V(0,1,0).applyEuler(d.rotation); d.position.set(x,gy(x,z)+h,z).addScaledVector(dirv,l*0.5); d.updateMatrix(); branches.setMatrixAt(i,d.matrix); });
   litter.twigs.forEach((tw,i)=>{ d.rotation.set(0, tw.rot, Math.PI/2, 'YXZ'); d.scale.set(tw.r, tw.len, tw.r); d.position.set(tw.x, tw.y+tw.r*0.6, tw.z); d.updateMatrix(); branches.setMatrixAt(brs.length+i, d.matrix); });   // NIGHT-8: lying twigs
