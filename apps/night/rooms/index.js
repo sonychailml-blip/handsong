@@ -6,7 +6,8 @@ import { standInForest } from './forest/standin.js';
 import { ROOM_IDS } from '../pure/room.js';
 
 export const ROOMS=Object.freeze([
-  Object.freeze({ record:FOREST_ROOM, standIn:standInForest, load:(o={})=>import('./forest/forest.js').then(m=>m.forestAssets(o.level).then(()=>m.buildForest)),   // NIGHT-6: the level's prepared files first
+  Object.freeze({ record:FOREST_ROOM, standIn:standInForest, base:new URL('./forest/', import.meta.url).href,   // NIGHT-8b: base — the room's folder (its sound files)
+    load:(o={})=>import('./forest/forest.js').then(m=>m.forestAssets(o.level).then(()=>m.buildForest)),   // NIGHT-6: the level's prepared files first
     prefetch:(o={})=>import('./forest/forest.js').then(m=>m.forestAssets(o.level)) }),   // NIGHT-6: its code and files fetched ahead (main.js, while the start card shows)
 ]);
 const LIST=[...ROOMS];

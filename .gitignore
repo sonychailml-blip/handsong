@@ -8,3 +8,5 @@ tools/split-baseline/
 dist/
 tools/.build/
 tools/.ktx-lab/
+tools/design/reference/
+commitmsg-*.txt

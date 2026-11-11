@@ -1,4 +1,4 @@
-import { camFacing } from './state.js';
+import { camFacing, setCamFacing } from './state.js';   // CORE-16: a picked camera tells its own facing (the one mirroring source stays camFacing)
 import { t } from './i18n.js';
 import { schedNew, schedPlan, schedAfter, HAND_POLICIES } from './pure/handsched.js';
 import { MP_LINE, rateOf } from './pure/latency.js';
@@ -63,14 +63,21 @@ function openCamera(facing){
 async function openOnce(facing){
   if(stream){ if(opts.low!=='off' || low.touched.size){ low.gen++; await bounded(devRestore(vtrack(), 'restore')); } stopStream(stream); stream=null; video.srcObject=null; }
   if(CS.pending){ await bounded(CS.pending, PEND_WAIT_MS); if(CS.pending) throw camErr('AbortError', 'an earlier camera request still has not answered'); }
-  const want={ ...camWant(), facingMode:facing };
-  const s=await gumOnce({ video:want, audio:false });
+  /* CORE-16 (opt-in): a picked camera opens by its device; when it is gone the default (by facing) opens quietly. No pick: exactly as before */
+  const p=pick, want= p ? { ...camBase(), deviceId:{ exact:p.deviceId } } : { ...camWant(), facingMode:facing };
+  let s;
+  if(p){ try{ s=await gumOnce({ video:want, audio:false }); PK.missed=false; }
+    catch(e){ if(!(e && /Overconstrained|NotFound|NotReadable/.test(e.name||''))) throw e; PK.missed=true; PK.misses++;
+      if(camOpenDbgO.noFallback) throw e;   // probe CONTROL: a vanished camera without the fallback must fail the start
+      s=await gumOnce({ video:{ ...camWant(), facingMode:facing }, audio:false }); } }
+  else s=await gumOnce({ video:want, audio:false });
   try{
     video.srcObject=s;
     if(camOpenDbgO.playFail) throw camErr(camOpenDbgO.playFail, 'simulated by the probe');
     await withTimeout(video.play(), PLAY_MS, 'TimeoutError', `the camera gave no picture within ${PLAY_MS/1000} s`);
   }catch(e){ stopStream(s); if(video.srcObject===s) video.srcObject=null; throw e; }
   stream=s;
+  if(p){ const st=settingsOf(s.getVideoTracks()[0]); setCamFacing(st.facingMode==='environment' ? 'environment' : 'user'); }   // CORE-16: the opened camera's own facing (a webcam without one faces the person)
   camStartT=performance.now();
   if(opts.low!=='off'){ opts.low='off'; low.note='reopened'; low.asked=null; }   // LAT3: a reopened camera gets today's request
   low.orig=null; low.touched.clear();
@@ -289,6 +296,20 @@ async function initVision(msg){ await initDetector(msg); msg(t('load.camera')); 
    поэтому кнопки на странице при загрузке нет — правило AudioContext/камера соблюдено). Детектор не пересоздаём:
    новый поток идёт в тот же <video>, кадры приходят тем же насосом. Бросает при отказе — откат в ui.js. */
 async function switchCamera(facing){ await openCamera(facing); }
+/* CORE-16 — CHOOSING A CAMERA (opt-in; nothing calls these in Full). pick: { deviceId } or null (the default: by facing, as before). Every later
+   open (the start, a reopen after back/forward, a low-light set) takes it; when the device is gone the default opens quietly (cameraPickInfo
+   says so). A picked camera sets camFacing from its own settings ('environment' = not mirrored). */
+let pick=null; const PK={ missed:false, misses:0 };
+const setCameraPick=p=>{ pick= p && typeof p.deviceId==='string' && p.deviceId ? { deviceId:p.deviceId } : null; return pick; };
+/* live: the picked camera now (→ the open's promise; throws as switchCamera) */
+async function cameraSwitch(p){ setCameraPick(p); if(!p) setCamFacing('user'); await openCamera(camFacing); }
+/* the cameras the browser lists → [{ deviceId, label, groupId, facing: 'user' | 'environment' | null (from the label's words; null unknown) }]; labels
+   (and ids) may be empty before the camera permission is granted */
+const FACING_WORDS={ environment:/\b(back|rear|environment|world)\b|задн|тылов/i, user:/\b(front|user|selfie|face ?time|integrated)\b|фронт|передн/i };
+async function cameraList(){ try{ const L=await navigator.mediaDevices.enumerateDevices(); return L.filter(d=>d.kind==='videoinput').map(d=>({ deviceId:d.deviceId||'', label:d.label||'', groupId:d.groupId||'',
+  facing: FACING_WORDS.environment.test(d.label||'') ? 'environment' : FACING_WORDS.user.test(d.label||'') ? 'user' : null })); }catch(e){ return []; } }
+/* the open camera: its device, label and facing; whether the last picked open fell back to the default */
+function cameraPickInfo(){ const tr=stream&&stream.getVideoTracks()[0], st=tr ? settingsOf(tr) : {}; return { pick:pick ? { ...pick } : null, deviceId:st.deviceId||'', label:tr&&tr.label||'', facing:camFacing, missed:PK.missed, misses:PK.misses }; }
 
 /* Test switches. Hands: the schedule's policy (instant — both models are always built). Processor: setOptions on both models (graph
    rebuild ≈ 1 s each, in the worker when it runs). Frame rate: reopens the camera. Path: builds the other path, then swaps. Low light:
@@ -463,4 +484,4 @@ function pumpDbg(o={}){
 /* Экспорт: детектор живёт здесь; кадры и результаты отдаются стоку (main.js). */
 export { video, canvas, ctx, initVision, initDetector, startCamera, switchCamera, setHandsSink, pollFrame,
   camInfo, camLabel, modelInfo, visionOpts, VISION_DEF, setHandsTracked, setModelDelegate, setCamFps, setDetectPath, setLowLight, lowInfo,
-  pathInfo, pumpStats, pumpDbg, pumpStepDbg, detRunDbg, lowDbg, camSimDbg, camOpenDbg, camStats, camStatsDbg };
+  pathInfo, pumpStats, pumpDbg, pumpStepDbg, detRunDbg, lowDbg, camSimDbg, camOpenDbg, camStats, camStatsDbg, setCameraPick, cameraSwitch, cameraList, cameraPickInfo };

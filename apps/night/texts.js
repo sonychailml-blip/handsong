@@ -10,6 +10,7 @@ export const NIGHT_TEXTS=Object.freeze({
     'night.set.quality':'Picture',
     'night.q.standard':'Standard',
     'night.q.detailed':'Detailed — for strong devices',
+    'night.set.camera':'Camera', 'night.cam.front':'Front', 'night.cam.back':'Back', 'night.cam.n':'Camera {n}',   // NIGHT-10
     'night.howTo':'How to play',
     'night.card.skip':'Skip',
     'night.card.next':'Next',
@@ -36,6 +37,7 @@ export const NIGHT_TEXTS=Object.freeze({
     'night.set.quality':'Картинка',
     'night.q.standard':'Обычная',
     'night.q.detailed':'Подробная — для мощных устройств',
+    'night.set.camera':'Камера', 'night.cam.front':'Передняя', 'night.cam.back':'Задняя', 'night.cam.n':'Камера {n}',   // NIGHT-10
     'night.howTo':'Как играть',
     'night.card.skip':'Пропустить',
     'night.card.next':'Дальше',

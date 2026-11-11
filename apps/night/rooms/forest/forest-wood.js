@@ -12,13 +12,18 @@ import { WOOD, flareAt, twigShape, trunkRadius } from './pure/wood.js';
 import { bankGround } from './pure/forestlife.js';
 import { cellUv, FLOOR_ATLAS } from './pure/floor.js';
 import { seeded } from '../../../../core/pure/dsp.js';
+import { RELIEF } from './pure/fireflies.js';   // NIGHT-9: the ground's relief (gnd7 copies forestGround)
+const f=v=>Number(v).toFixed(4);
 
 const TAU=2*Math.PI, lerp=(a,b,t)=>a+(b-a)*t;
 /* the shader's own small noise and the floor's height (pure/fireflies.js forestGround, the same numbers) */
 const GLSL=`float h27(vec2 p){ p=fract(p*vec2(123.34,456.21)); p+=dot(p,p+45.32); return fract(p.x*p.y); }
 float vn7(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(h27(i),h27(i+vec2(1.0,0.0)),f.x), mix(h27(i+vec2(0.0,1.0)),h27(i+vec2(1.0,1.0)),f.x), f.y); }
-float gnd7(vec2 p){ float y=0.28*sin(p.x*0.3)*cos(p.y*0.27)+0.14*sin(p.x*0.9+p.y*0.6); if(abs(p.x)<6.0 && p.y>-14.0 && p.y<5.0) y*=0.35; return y; }
+float gnd7(vec2 p){ float b=0.28*sin(p.x*0.3)*cos(p.y*0.27)+0.14*sin(p.x*0.9+p.y*0.6), r=${f(RELIEF.a)}*sin(0.83*p.x+0.41*p.y+1.3)*sin(0.57*p.y-0.29*p.x+0.4)+${f(RELIEF.b)}*sin(1.9*p.x-1.3*p.y+2.1)*cos(1.6*p.y+0.7*p.x);
+  float m=smoothstep(${f(-RELIEF.edge)}, ${f(RELIEF.edge)}, 6.0-abs(p.x))*smoothstep(${f(-RELIEF.edge)}, ${f(RELIEF.edge)}, p.y+14.0)*smoothstep(${f(-RELIEF.edge)}, ${f(RELIEF.edge)}, 5.0-p.y); return b*(1.0-0.65*m)+r*(1.0-${f(1-RELIEF.aisle)}*m); }   // NIGHT-9: pure/fireflies.js forestGround, the same law
 uniform vec3 uMossW, uLichen, uGrain, uGrainDark, uFungus, uFungusRim, uDead;`;
+/* NIGHT-9 probes: the shader's copy of the ground law (data row «FOREST relief (app)» reads its constants) */
+export const gnd7Src=()=>{ const L=GLSL.split('\n'), i=L.findIndex(l=>l.startsWith('float gnd7')); return i<0 ? '' : L[i]+L[i+1]; };
 /* the wood's look (fragment, after the map): w = (dead 0…1, kind 0 bark | 1 end grain | 2 fungus, moss on top 0…1), cap = the disc's or
    shelf's own coordinates */
 const LOOK=`{ vec3 wp=vWP7, wn=normalize(vWN7); float dead=vW7.x, kind=vW7.y, topM=vW7.z;
@@ -32,8 +37,17 @@ const LOOK=`{ vec3 wp=vWP7, wn=normalize(vWN7); float dead=vW7.x, kind=vW7.y, to
     c=mix(uFungus*0.55, uFungus, b*0.5+rho*0.5); c=mix(c, uFungusRim, smoothstep(0.86, 0.97, rho)); if(wn.y<-0.2) c=uFungusRim*0.8; }   // growth zones, a pale rim, pale pores below
 #endif
   if(kind<1.5){
+#ifdef WOOD7_KINDS
     float mh=1.0-smoothstep(0.12, 1.3+1.2*vn7(wp.xz*2.0), above), side=0.4+0.6*smoothstep(-0.3, 0.6, dot(wn, vec3(0.37, 0.0, -0.93)));
-    float mm=clamp(mh*side*(0.45+0.9*vn7(vec2(ang*2.0, wp.y*3.0))), 0.0, 1.0);
+    float mm=clamp(mh*side*(0.45+0.9*vn7(vec2(ang*2.0, wp.y*3.0))), 0.0, 1.0); vec3 mt7=vec3(1.0);
+#else
+    /* NIGHT-8b: each trunk its own moss (pure/wood.js barkMoss, per instance): reach, the face it favours, cover, patchiness, tint; the noise
+       runs on the normal's x and z (no seam round the trunk) from the trunk's own offset */
+    float pf=1.5+4.0*vBk7.w, of=vBk7b.x;
+    float mh=1.0-smoothstep(0.12, max(0.2, vBk7.x*(0.8+0.4*vn7(wp.xz*2.0+of))), above), side=0.25+0.75*smoothstep(-0.4, 0.6, dot(wn, vec3(cos(vBk7.y), 0.0, sin(vBk7.y))));
+    float nz=0.5*(vn7(vec2(wn.x*pf+of, wp.y*pf*1.6))+vn7(vec2(wn.z*pf-of, wp.y*pf*1.6+7.0)));
+    float mm=clamp(mh*side*(0.2+1.1*vBk7.z)*mix(1.0, 0.1+1.8*nz, 0.4+0.6*vBk7.w), 0.0, 1.0); vec3 mt7=vec3(1.0+0.16*vBk7b.y, 1.0+0.03*vBk7b.y, 1.0-0.28*vBk7b.y);
+#endif
 #ifdef WOOD7_KINDS
     float top=smoothstep(0.15, 0.7, wn.y)*topM*(0.65+0.5*vn7(wp.xz*3.0+wp.y));
     if(kind>0.5) top*=smoothstep(0.82, 0.98, length(vCap7));   // a cut top: moss only at its rim
@@ -41,7 +55,7 @@ const LOOK=`{ vec3 wp=vWP7, wn=normalize(vWN7); float dead=vW7.x, kind=vW7.y, to
 #endif
     float lic=smoothstep(0.64, 0.76, vn7(vec2(ang*4.0+wp.x*0.5, wp.y*3.2+wp.z*0.5)))*smoothstep(0.8, 2.0, above)*(1.0-smoothstep(3.5, 5.5, above))*(0.5+0.8*dead);   // small spots, 0.8–5 m up
     c=mix(c, uLichen*(0.8+0.4*vn7(wp.xy*40.0)), clamp(lic, 0.0, 1.0)*0.6);
-    c=mix(c, uMossW*(0.6+0.6*vn7(wp.xy*30.0+wp.z*7.0)), smoothstep(0.25, 0.6, mm)); }
+    c=mix(c, uMossW*mt7*(0.6+0.6*vn7(wp.xy*30.0+wp.z*7.0)), smoothstep(0.25, 0.6, mm)); }
   c*=mix(0.35, 1.0, smoothstep(-0.15, 0.9, above));   // darker where it meets the ground
   diffuseColor.rgb=c; }`;
 /* the colour uniforms (tokens) */
@@ -60,18 +74,22 @@ const FOX=(n, L)=>`{ vec3 wp=vWP7; float above=wp.y-gnd7(wp.xz);
    present: + foxfire (WU.foxLaw: { hold, fade, r }) */
 function patchLook(mat, WU, attrs, key){ const fox=WU.uFox ? WU.uFox.value.length : 0, law=WU.foxLaw, U={ ...WU }; delete U.foxLaw;
   mat.onBeforeCompile=sh=>{ Object.assign(sh.uniforms, U);
-    sh.vertexShader=(attrs ? 'attribute vec3 aW7;\nattribute vec2 aCap7;\n' : '')+'varying vec3 vWP7;\nvarying vec3 vWN7;\nvarying vec3 vW7;\nvarying vec2 vCap7;\n'+sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+    sh.vertexShader=(attrs ? 'attribute vec3 aW7;\nattribute vec2 aCap7;\n' : 'attribute vec4 aBark7;\nattribute vec2 aBark7b;\nvarying vec4 vBk7;\nvarying vec2 vBk7b;\n')+'varying vec3 vWP7;\nvarying vec3 vWN7;\nvarying vec3 vW7;\nvarying vec2 vCap7;\n'+sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
   { vec4 w7=vec4(transformed,1.0); vec3 n7=objectNormal;
   #ifdef USE_INSTANCING
     w7=instanceMatrix*w7; n7=mat3(instanceMatrix)*n7;
   #endif
-    vWP7=(modelMatrix*w7).xyz; vWN7=normalize(mat3(modelMatrix)*n7); ${attrs ? 'vW7=aW7; vCap7=aCap7;' : 'vW7=vec3(0.0); vCap7=vec2(0.0);'} }`);
-    sh.fragmentShader=(attrs ? '#define WOOD7_KINDS\n' : '')+'varying vec3 vWP7;\nvarying vec3 vWN7;\nvarying vec3 vW7;\nvarying vec2 vCap7;\n'+GLSL+'\n'+sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n'+LOOK)
+    vWP7=(modelMatrix*w7).xyz; vWN7=normalize(mat3(modelMatrix)*n7); ${attrs ? 'vW7=aW7; vCap7=aCap7;' : 'vW7=vec3(0.0); vCap7=vec2(0.0); vBk7=aBark7; vBk7b=aBark7b;'} }`);
+    sh.fragmentShader=(attrs ? '#define WOOD7_KINDS\n' : 'varying vec4 vBk7;\nvarying vec2 vBk7b;\n')+'varying vec3 vWP7;\nvarying vec3 vWN7;\nvarying vec3 vW7;\nvarying vec2 vCap7;\n'+GLSL+'\n'+sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n'+LOOK)
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  if(vW7.y>1.5) roughnessFactor=0.7;');
     if(fox) sh.fragmentShader=`uniform vec4 uFox[${fox}];\nuniform vec3 uFoxCol;\nuniform float uFoxK, uFoxT;\n`+sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n'+FOX(fox, law)); };
   mat.customProgramCacheKey=()=>key+(fox ? '.fox'+fox : ''); return mat; }
-/* today's bark (trunks, branches): moss low on the north side, lichen, darker at the foot */
-export const patchBark=(mat, WU)=>patchLook(mat, WU, false, 'handsong.bark7');
+/* today's bark (trunks, branches): moss low on the trunk, lichen, darker at the foot. NIGHT-8b: each instance's moss from its attributes
+   aBark7 (h, side, cover, patch) and aBark7b (off, tint) — barkAttrs puts barkMoss's numbers on an instanced geometry */
+export const patchBark=(mat, WU)=>patchLook(mat, WU, false, 'handsong.bark8');
+export function barkAttrs(T, geo, moss){ const n=Math.max(1, moss.length), a=new Float32Array(n*4), b=new Float32Array(n*2);
+  moss.forEach((m,i)=>{ a.set([m[0], m[1], m[2], m[3]], i*4); b.set([m[5], m[4]], i*2); });
+  geo.setAttribute('aBark7', new T.InstancedBufferAttribute(a, 4)); geo.setAttribute('aBark7b', new T.InstancedBufferAttribute(b, 2)); return geo; }
 
 /* the trunk with its foot flared (pure/wood.js flareAt): today's 16-m cylinder, rows packed towards the foot, the bark's v kept by height */
 export function trunkGeo(T){ const L=WOOD.trunk.len, g=new T.CylinderGeometry(WOOD.trunk.top, 1, L, 20, 9), p=g.attributes.position, uv=g.attributes.uv;

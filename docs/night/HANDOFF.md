@@ -9,7 +9,7 @@ Index: `/HANDOFF.md`. Rules: `CLAUDE.md`. Open items: `docs/night/BACKLOG.md`. P
 `handsong-night`'s Production branch is `night-release`, a stopper branch that is a copy of the old `main`. Merging `dev` into `main` does not touch Night's production. The new Night does not go public yet, and its public home (Vercel or another host) is not decided. `dev` pushes give previews, which keep `?probe`: use those for phone checks. NIGHT-7 (user, 2026-11-11): the test version for the first testers goes to `night-release` (the user pushes; Full's `main` untouched); a Vercel production build of Night is the release edition by itself.
 
 ## Where it stands
-Stage 4: RUN 6 ✅ C0, VIS1a–c, listening page, design proposals · RUN 7 ✅ sound pass, C11, C6, C4b, C4c, C7, C5 · RUN 8 ✅ the user's fixes, the forest picture, C8 part (Lighter forest) · RUN 9 ✅ the living forest · SPLIT-2 ✅ its own app and name. **Next:** the user's checks below, then C8 rest (phone numbers, auto-proposal), C9 offline, C10 release, C12 release candidate. Plus the new items in the backlog. `NIGHT-8` (the forest closer to real) built, waiting for step 146. `NIGHT-1` (sound headroom) stage 1 done, waiting for the user's decision and the Poco numbers.
+Stage 4: RUN 6 ✅ C0, VIS1a–c, listening page, design proposals · RUN 7 ✅ sound pass, C11, C6, C4b, C4c, C7, C5 · RUN 8 ✅ the user's fixes, the forest picture, C8 part (Lighter forest) · RUN 9 ✅ the living forest · SPLIT-2 ✅ its own app and name. **Next:** the user's checks below, then C8 rest (phone numbers, auto-proposal), C9 offline, C10 release, C12 release candidate. Plus the new items in the backlog. `NIGHT-8` (the forest closer to real) built, waiting for step 146; `NIGHT-8b` (the user's phone-test fixes) for step 147; `NIGHT-9` (real ground and water) for step 148; `NIGHT-10` (camera choice) for step 149. `NIGHT-1` (sound headroom) stage 1 done, waiting for the user's decision and the Poco numbers.
 
 ## The user's open checks, with today's addresses
 Old step texts use the old address and `src/…`; these are the current forms. Live Server, headphones, a lamp beside you.
@@ -26,6 +26,9 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 
 - **Step 145, music and full screen** (five checks; covers step 144's and 143's phone parts): `archive/CLAUDE-history.md`, step 145. Steps 143 (1), (3) and 144 (1)–(4) still stand on the laptop.
 - **Step 146, the forest closer to real** (five checks: the two stream samples by ear, the stream in the app, the water, the ground and rocks, the Poco): `archive/CLAUDE-history.md`, step 146.
+- **Step 149, choosing the camera** (five checks: the Poco's Front / Back, the back camera towards you, a USB webcam, an iPhone, the release edition): `archive/CLAUDE-history.md`, step 149.
+- **Step 148, real ground and real water** (five checks: pick the floor — scanned or baked —, the ground, the water, the look as a whole, the Poco): `archive/CLAUDE-history.md`, step 148.
+- **Step 147, fixes after the first phone test** (five checks: full screen after the camera prompt on the Poco, the corner icon, no flash of Full, moss and fireflies, the shipped stream by ear): `archive/CLAUDE-history.md`, step 147. Step 146 (1) is answered (the recording ships).
 - **Step 127, the quiet floor by ear:** `http://127.0.0.1:5500/apps/night/?probe&tails=off` and `…&tails=on`; `archive/CLAUDE-history.md`.
 - **The Poco headroom page, later:** `<Night preview>/?probe&headroom`, about 25 minutes (user, 2026-11-03).
 
@@ -37,6 +40,28 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 5. The falling star passes in front of the trees. Natural?
 
 ## Records (English, at most about 15 lines each; older ones go to `archive/HANDOFF-history.md`)
+### NIGHT-10 (2026-11-11): choosing the camera (+ CORE-16). Log: `docs/night/WORK-LOG.md`
+- Settings → Camera: «Front» / «Back» on a phone, device names on a computer (no hardware numbers), «Camera N» before the permission; shown with two or more cameras.
+- A tap switches live (music and hand model go on); kept on this device; a kept camera that is gone opens the default quietly.
+- The back camera is not mirrored (picture and hands together, one source `camFacing`); the right hand still plays (MediaPipe's own labels, never flipped).
+- The calibration stays per camera (a lens changes the hand's size in the picture); a camera not offered yet gets the offer after a switch.
+- Core: CORE-16 `core/vision.js` opt-in camera pick (Full calls none of it; FULL untouched holds).
+- Rows: data «NIGHT camera names (app)»; runner «NIGHT camera choice» (made-up front and back cameras, two CONTROLS). Waiting for step 149.
+### NIGHT-9 (2026-11-11): real ground and real water. Log: `docs/night/WORK-LOG.md`
+- Relief in the ground law itself (mounds and hollows, the aisle's old step softened, deeper banks, the water 5 cm lower), root bulges at trunk feet and a finer mesh at Detailed; occlusion per vertex.
+- The green was blue night light on brown soil (measured on the screenshots): a night grade in the ground's own shading makes it dark brown-grey; the palette elsewhere unchanged.
+- The floor: the CC0 photo-scanned «Leaves Forest Ground» (Poly Haven) is the default; our baked floor stays switchable for the user's choice (`n9-compare.html`). Files 22.54 MB of 30.
+- Water: stronger Fresnel, clear and wobbling near the viewer, a mirror of the trunks, crowns and moon against a brighter sky (Detailed every frame, Standard every 1.5 s), a flow map (narrows faster, pools slower, eddies behind rocks), a dark wet edge.
+- Standard costs as before (detections −0.3 / −1.2 % vs Dark); Detailed about 2–3 points dearer (−57.5 %).
+- Rows: data «FOREST relief», «FOREST water flow» (app); browser «FOREST ground and water». Waiting for step 148 (the user picks the floor).
+### NIGHT-8b (2026-11-11): fixes after the user's first phone test. Log: `docs/night/WORK-LOG.md`
+- Full screen is never asked while the camera permission is undecided: Begin asks only for the camera then; the next tap after the camera runs (calibration, card, any tap) gives full screen; with the camera already granted Begin gives it at once (`fullscreen.js`, Permissions API; no dependence on `fullscreenchange`).
+- The corner icon: four filled corner brackets, mirror-symmetric, out / in (`pure/fsicons.js`); preview `tools/.ui-snap/fs-icons.svg`.
+- No flash of Full: the page's `<body class="night-boot">` from the first paint (runner «NIGHT first frames»: 152 frames before the scripts, all Night's).
+- Moss per trunk (`pure/wood.js barkMoss`, per-instance attributes on the bark): reach, side, cover, patchiness, tint.
+- Green fireflies at a near light: a light in the nearest depth band sat inside the flies' wrap box's near end, so every orbit wrapped away (0 seen round it); the orbit's centre now keeps clear of it (≈ 7 seen while playing).
+- The stream plays the CC0 recording (`rooms/forest/sound/stream.mp3`, 664 KB MP3): grains of 4.5–8 s from random places, never across the file's ends, 1.6-s equal-power joins, two streams per voice along the water; the synthesis is the fallback; asleep at Room sounds 0; same place under the wind and crickets (the row: within ±0.75 dB of the synthesis's); cheaper than the synthesis. Sample: `tools/.listen/brook-c-shipped.wav`.
+- Rows: data «NIGHT full-screen icons», «FOREST bark moss», «FOREST fireflies visit the light», «NIGHT stream recording» (all app); browser «FOREST fireflies visit the light»; runner «NIGHT full screen, camera undecided», «NIGHT first frames». Waiting for step 147.
 ### NIGHT-8 (2026-11-11): the forest, closer to real. Log: `docs/night/WORK-LOG.md`
 - The stream's murmur: synthesized, endless (`pure/brook.js`: bubble resonances in clusters over a soft rush, each voice's flow drifting; no loop), run by the nature worklet (`worklets/nature-worklet.js`) in the nature sound under the Room-sounds slider; six voices along the water from its path (near: wide, bright, close; far: narrow, dark). Measured 5.3 dB under the wind and crickets (K-like), the nature sound +0.9 dB; asleep when the room's sound is off; the Lighter mode thins it. Cost ≈ 1 % of a core (node, half rate).
 - Listening samples: `tools/.listen/brook-a-synth.wav` (shipped) and `brook-b-recording.wav` (CC0, «stream-river-water-up-close» by jackthemurray, Freesound #433589 via Wikimedia Commons, looped with a 3-s equal-power join; not shipped). (a) ships until the user chooses by ear.
@@ -60,16 +85,6 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 - Start screen: the title with a real space («hand·song night»), two tips (always shown), Begin, the privacy line.
 - `?release` shows the players' edition on Live Server (`apps/night/edition.js`); it hides Measure this device, Room picture, the Sound panel and diagnostics, the calibration's side-vote line. Smoke test checks it.
 - New runner check «NIGHT stale saved values» (18 stale values, reload, the real start card and first launch). Waiting for step 144.
-### NIGHT-7 (2026-11-11): the test version. Log: `docs/night/WORK-LOG.md`
-- Steps 141 and 142 checked by the user: the painted middle distance is right, no grain at medium; foxfire and the night flowers look right. The forest's remaining slices (a changing night, sounds and rain, animals) wait in the backlog.
-- The bare floor: soil, fallen leaves, needles, twigs, moss crumbs and seeds, with relief — `tools/forest-bake.mjs drawGround` (a 2048 master, 1024 / 512 copies; colour + normal map, tiled every 6 m). Files: high 9.99 MB, medium 4.23 MB, low 1.56 MB (15.35 MB of 30).
-- The players' build: the development items (Measure this device, Room picture, the sound page) are hidden in the release edition; a Vercel PRODUCTION build of Night is the release edition by itself (`tools/build.mjs`, unless `HANDSONG_EDITION=dev`). The smoke test checks the deploy tree itself.
-- First launch: after the calibration offer, four cards with our own line drawings (Play · Near and far · Your other hand · Music; `apps/night/cards.js`), Skip on each, reopened from Settings → How to play; then the ghost hint.
-- Languages: every Night text in English and Russian (`apps/night/texts.js`; data row «NIGHT texts both languages (app)»); the browser's language by default; the start screen's choice kept.
-- Picture: Standard (medium, the default) / Detailed (high) in Settings → View. The cold first opening at medium stays about 7 s on the laptop (shader compile; the bark's shader trimmed 1.8 → 1.3 s); it now runs in slices, so the start card stays responsive (longest block 2.5 s). Under 4 s was not reached cheaply.
-- Privacy: one line under Begin. Found on the way: a level change during the sliced compile dropped the picture to minimal (row «NIGHT low power» caught it) — fixed in the host.
-- Rows: data «NIGHT texts both languages (app)»; browser «NIGHT first cards» 24. Waiting for step 143 (the user's five checks, the Poco, an iPhone).
-
 ### NIGHT-6 slice 9 (2026-11-10): hidden things the light finds. Log: `docs/night/WORK-LOG.md`; as built: `docs/night/design/NIGHT-6-forest/PLAN.md` top
 - Step 141: the glows stay crisp; the strokes' strength and the grain at medium were left open by the user (asked again in the report); unchanged.
 - Foxfire: thin glowing veins on the dead and fallen wood and on the feet of some old trunks, near the playing light's trail (12 / 8 recent places); each patch holds 8–12 s after the light, then fades in 2.5 s (the wood's and the bark's shaders; no new program).
@@ -77,19 +92,3 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 - Found on the way: the probe snapshot's second drawing kept the frame's geometry uploads (three uploads attributes once per frame; since slice 8 the host counts frames itself) — the snapshot now starts a new frame.
 - Laptop medium: detections = Dark (0.0 / 0.0 %), frame 2.5–2.7 ms, draws 69–70, programs 29, textures 16.9 MB; first opening 5.1 s after high. High −52.4 / −45.7 %. Files unchanged (3.29 MB of 30).
 - Rows: data «FOREST hidden (app)» 16; browser «FOREST hidden» 13. Waiting for step 142 (and the two open answers of step 141).
-
-### NIGHT-6 slice 8 (2026-11-10): the painted distance and the film. Log: `docs/night/WORK-LOG.md`; as built: `docs/night/design/NIGHT-6-forest/PLAN.md` top
-- Step 140 checked by the user: the canopy, the moon's window, the stars and the dapple look right; the light stays clearly visible.
-- Departure from the plan (reason measured): no far forest baked beyond 28 m — today's fog leaves ≥ 94 % fog there, so it would not show; the sketch's painted look is its per-frame stroke pass on the middle distance, so that is what was built (the plan had left it out for cost): strokes from 7 m growing to the level's radius at 26 m (high 3 px, medium 2.5), written out tap by tap (29 / 21 taps, 92 / 68 sector feeds against the sketch's 81 × 8).
-- The glowing things (light, fireflies, dew, mushrooms' glow, moths, leaves, moon, clouds, stars) draw after the strokes with their own depth test, so they stay crisp. Film: vignette at both levels, a fine grain at high, a slight cool grade; the camera breathes sideways (≤ 5 cm).
-- Found on the way: the gust could not reverse (its direction blended through zero) — now it turns by angle (data row case added); the glow pass first compiled a second copy of every glowing material (+9 programs) — the lights now see both passes.
-- Laptop medium (a clean second run): detections = Dark (0.0 / 0.0 %), frame 2.1–2.2 ms (1.8 before NIGHT-6), programs 28, textures 16.9 MB; first opening 3.9 s after high. High −48.5 / −45.0 %, cold first opening 8.3 s. Counts of draws and triangles now include every pass.
-- Files unchanged (3.29 MB of 30). Rows: data «FOREST paint (app)» 18; browser «FOREST paint» 15. Waiting for step 141.
-
-### NIGHT-6 stage 1 (2026-11-09): the forest, polished and alive — the comparison and the plan only. `docs/night/design/NIGHT-6-forest/PLAN.md`
-- No app code; tree hashes unchanged (core 14bd513ae15aa87e · apps/full d6b90cf2cb4be6da · apps/night 3279ec88c1f91059).
-- Compared item by item with the sketch «Живой лес»: the forest lacks most of the sketch's plant life (no leaves anywhere, no herb layer, one fern), the fallen wood, moss, the stream's banks and life, webs, dew, the moon's gap and stars, the painted distance, film. Today is ahead on the night cycle, moods, response, rare events.
-- Kept exactly: everything floating and how it moves, the mushrooms' glow per Mood (their rows stay unchanged; new inputs default to today's step). Rule: add, don't move.
-- Costs by RUN 9's method (hand detections vs Dark) and NIGHT-1's (µs per quantum): medium has 3.8 points left (−6.2 → −10 %), split into allowances; the opening (textures, programs) is the main Poco risk. No Poco number exists yet: slice 0 measures it.
-- New sound kinds (rain, the stream, owl, splash) need no core change: Night's nature module gains parts (native nodes for hiss, one nature worklet for events), one seeded schedule shared with the picture.
-- 14 slices proposed (0 the yardstick; 1 answers to notes and the bed; 2 fireflies follow the melody; … 11 sound and rain; 12 animals) and 8 decisions. Waiting for the user's approval.

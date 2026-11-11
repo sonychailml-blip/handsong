@@ -10,6 +10,7 @@ import { seeded } from '../../../../../core/pure/dsp.js';
 
 export const FOREST_FLIES={ seed:0x464C5931, n:70, reach:5.5, pull:2.2, swirl:2.6, drift:0.9, damp:1.1, floor:0.25, ceil:5.5,
   callReach:9, callPull:0.12, scatter:1.0, release:1.6,   // RUN 9: a playing light CALLS from further (a gentle drift beyond the old reach); a stopping one lets them SCATTER
+  edge:1.6,   // NIGHT-8b: the centre a fly circles stays ring + edge inside the box's near end (a near light kept no orbit: every one wrapped away)
   box:{ x:11, zNear:3.5, zFar:-24, zSpan:27 },
   /* NIGHT-6 slice 2: hold — rings × (1 − ring·hold), pull × (1 + pull·hold), swirl × (1 − swirl·hold), the near flies' glow drawn (sync·hold) to a
      shared breath of `breath` s; held seconds from…full → 0…1. rate — rings × (1 + ring·rate), swirl × (1 + swirl·rate); notes per second over
@@ -21,8 +22,16 @@ const sm01=u=>{ u=Math.max(0, Math.min(1, u)); return u*u*(3-2*u); };
 /* NIGHT-6 slice 2: a note held `sec` seconds → hold 0…1; note-on times (s) and the time t → rate 0…1 (notes per second over the window) */
 export const holdK=sec=>{ const H=FOREST_FLIES.melody.hold; return sm01(((+sec||0)-H.from)/(H.full-H.from)); };
 export function rateK(times, t){ const R=FOREST_FLIES.melody.rate; let n=0; for(const x of times) if(x>t-R.window && x<=t) n++; return sm01((n/R.window-R.from)/(R.full-R.from)); }
-/* the forest floor's height at (x, z): gentle waves, flatter along the playing aisle (the prototype's terrain) */
-export function forestGround(x, z){ let y=0.28*Math.sin(x*0.3)*Math.cos(z*0.27)+0.14*Math.sin(x*0.9+z*0.6); if(Math.abs(x)<6 && z>-14 && z<5) y*=0.35; return y; }
+/* the forest floor's height at (x, z): gentle waves, flatter along the playing aisle (the prototype's terrain). NIGHT-9: + RELIEF — mounds and
+   hollows of a few metres (two crossed sine products, every 3–8 m; half as high in the aisle), and the aisle's edge softened over `edge` m (it
+   was a step at |x| = 6). Everything standing on the ground reads this law; forest-wood.js gnd7 is its one shader copy (the data row compares) */
+export const RELIEF=Object.freeze({ a:0.11, b:0.05, aisle:0.45, edge:0.9 });
+const sstep=(a, b, v)=>{ const t=Math.max(0, Math.min(1, (v-a)/(b-a))); return t*t*(3-2*t); };
+export function forestGround(x, z){ const R=RELIEF, E=R.edge;
+  const base=0.28*Math.sin(x*0.3)*Math.cos(z*0.27)+0.14*Math.sin(x*0.9+z*0.6);
+  const rel=R.a*Math.sin(0.83*x+0.41*z+1.3)*Math.sin(0.57*z-0.29*x+0.4)+R.b*Math.sin(1.9*x-1.3*z+2.1)*Math.cos(1.6*z+0.7*x);
+  const m=sstep(-E, E, 6-Math.abs(x))*sstep(-E, E, z+14)*sstep(-E, E, 5-z);   // 1 inside the aisle, 0 outside, smooth across its edge
+  return base*(1-0.65*m)+rel*(1-(1-R.aisle)*m); }
 
 /* n flies from a seed: { p:[x,y,z], v:[x,y,z], ph, sp, ring, ax:[x,y,z] (unit), glow } */
 export function fliesInit(n=FOREST_FLIES.n, seed=FOREST_FLIES.seed){
@@ -50,9 +59,11 @@ export function fliesStep(F, lights, dt, t, k=1, form=null){
     const call=best ? +best.call||0 : 0, sc=best ? +best.scatter||0 : 0, hold=best ? +best.hold||0 : 0, rate=best ? +best.rate||0 : 0, M=C.melody;
     let hb=0;   // NIGHT-6 slice 2: how far this fly's glow joins the shared breath
     if(best && bd<C.reach+C.callReach*call && C.release*sc<1){
-      const tx=best.x-p[0], ty=best.y-p[1], tz=best.z-p[2], dd=Math.max(bd,0.05);
-      let cx=ty*f.ax[2]-tz*f.ax[1], cy=tz*f.ax[0]-tx*f.ax[2], cz=tx*f.ax[1]-ty*f.ax[0]; const cl=Math.hypot(cx,cy,cz)||1; cx/=cl; cy/=cl; cz/=cl;
       const ring= hold||rate ? f.ring*(1-M.hold.ring*hold)*(1+M.rate.ring*rate) : f.ring;   // no melody input: the old ring exactly
+      /* NIGHT-8b: the orbit's centre — the light, moved back from the box's near end by ring + edge when it stands nearer (seen from the eye the
+         flies still circle round it); elsewhere exactly the old arithmetic */
+      const oz=Math.min(best.z, B.zNear-ring-C.edge), tx=best.x-p[0], ty=best.y-p[1], tz=oz-p[2], dd=Math.max(oz===best.z ? bd : Math.hypot(tx,ty,tz), 0.05);
+      let cx=ty*f.ax[2]-tz*f.ax[1], cy=tz*f.ax[0]-tx*f.ax[2], cz=tx*f.ax[1]-ty*f.ax[0]; const cl=Math.hypot(cx,cy,cz)||1; cx/=cl; cy/=cl; cz/=cl;
       let a=(dd-ring)/dd*C.pull*dt*k*(bd<C.reach ? 1 : C.callPull)*(1-Math.min(1, C.release*sc)), b=C.swirl*f.sp*dt*k*(1-0.5*sc);
       if(hold){ a*=1+M.hold.pull*hold; hb=M.hold.sync*hold; } if(hold||rate) b*=(1-M.hold.swirl*hold)*(1+M.rate.swirl*rate);
       v[0]+=tx*a+cx*b; v[1]+=ty*a+cy*b; v[2]+=tz*a+cz*b;

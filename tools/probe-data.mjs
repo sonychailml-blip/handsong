@@ -1585,6 +1585,193 @@ try{
 const loadMs=Math.round(performance.now()-T00);
 
 // PROBE1: the browser's data rows come from the registry (same names, runs and reads as P.all, in its order); then the node-only rows
+/* NIGHT-8b: THE FULL-SCREEN ICONS (apps/night/pure/fsicons.js FS_ENTER, FS_EXIT) — the user saw a pinwheel. Each is four separate filled L brackets
+   (closed axis-aligned outlines of six corners, one per quarter, at least 4 units apart), the whole drawing mirror-symmetric left ↔ right and
+   top ↔ bottom (a pinwheel is turned, never mirrored); «in»: each bracket's corner at the outer corner, «out»: towards the middle. CONTROL a
+   pinwheel (one uneven L turned four times round the middle) fails the mirror test. */
+async function nightFsIcons(){
+  const d=[], notes=[]; let n=0; const miss=s=>d.push(s), I=await import(new URL('../apps/night/pure/fsicons.js', import.meta.url).href).catch(e=>({ err:e }));
+  if(I.err){ return { cases:1, total:1, differences:['apps/night/pure/fsicons.js does not load in node: '+I.err.message], notes }; }
+  const pieces=p=>p.split('Z').map(x=>x.trim()).filter(Boolean).map(sp=>{ const pts=[]; let x=0, y=0; for(const m of sp.matchAll(/([MHV])\s*([\d.]+)(?:\s+([\d.]+))?/g)){ if(m[1]==='M'){ x=+m[2]; y=+m[3]; } else if(m[1]==='H') x=+m[2]; else y=+m[2]; pts.push([x,y]); } return pts; });
+  const key=a=>a.map(([x,y])=>x.toFixed(3)+','+y.toFixed(3)).sort().join(' ');
+  const mirror=(P, f)=>key(P.flat())===key(P.flat().map(f));
+  const judge=(path, out)=>{ const P=pieces(path); n+=5; const bad=[];
+    if(P.length!==4) bad.push(P.length+' pieces');
+    if(P.some(q=>q.length!==6 || q.some((p,i)=>{ const r=q[(i+1)%q.length]; return p[0]!==r[0] && p[1]!==r[1]; }))) bad.push('a piece is not a six-corner axis-aligned outline');
+    if(!mirror(P, ([x,y])=>[24-x,y])) bad.push('not mirrored left ↔ right'); if(!mirror(P, ([x,y])=>[x,24-y])) bad.push('not mirrored top ↔ bottom');
+    const box=q=>[Math.min(...q.map(p=>p[0])), Math.min(...q.map(p=>p[1])), Math.max(...q.map(p=>p[0])), Math.max(...q.map(p=>p[1]))], B=P.map(box);
+    const quads=new Set(B.map(b=>((b[0]+b[2])/2<12 ? 'l' : 'r')+((b[1]+b[3])/2<12 ? 't' : 'b'))); if(quads.size!==4) bad.push('not one piece per quarter');
+    let gap=Infinity; for(let i=0;i<B.length;i++) for(let j=i+1;j<B.length;j++){ const a=B[i], b=B[j]; gap=Math.min(gap, Math.max(b[0]-a[2], a[0]-b[2], b[1]-a[3], a[1]-b[3])); }
+    if(!(gap>=4)) bad.push('pieces only '+gap+' apart');
+    /* the bracket's corner: (in) its bounding box's outer corner is a vertex and the inner one is not; (out) the other way round */
+    for(let i=0;i<P.length;i++){ const b=B[i], cx=(b[0]+b[2])/2<12 ? b[0] : b[2], cy=(b[1]+b[3])/2<12 ? b[1] : b[3], ix=cx===b[0] ? b[2] : b[0], iy=cy===b[1] ? b[3] : b[1];
+      const has=(x,y)=>P[i].some(p=>p[0]===x && p[1]===y), outer=has(cx,cy), inner=has(ix,iy);
+      if(out ? !(outer && !inner) : !(inner && !outer)){ bad.push(`piece ${i+1}: its corner is not ${out ? 'at the outer corner' : 'towards the middle'}`); break; } }
+    return bad; };
+  for(const [name, path, out] of [['in (corners out)', I.FS_ENTER, true], ['out (corners in)', I.FS_EXIT, false]]){ const b=judge(path, out); if(b.length) miss(name+': '+b.join('; ')); }
+  { const rot=(pts,k)=>pts.map(([x,y])=>{ let X=x-12, Y=y-12; for(let i=0;i<k;i++) [X,Y]=[-Y,X]; return [X+12,Y+12]; }), base=pieces('M3.5 3.5H10V5.5H5.5V7H3.5Z')[0], wheel=[0,1,2,3].map(k=>rot(base,k)); n++;   // the uneven L: arms 6.5 and 3.5
+    if(mirror(wheel, ([x,y])=>[24-x,y])) miss('CONTROL: a pinwheel passes the mirror test'); else notes.push('CONTROL: a pinwheel (one uneven L turned four times) fails the mirror test'); }
+  notes.push('in: four corner brackets pointing out; out: four pointing in; both mirror-symmetric on both axes, filled, pieces ≥ 4 units apart');
+  return { cases:n, total:d.length, differences:d, notes };
+}
+/* NIGHT-8b: THE STREAM FROM A RECORDING (apps/night/pure/brookrec.js) on a made-up recording (seeded noise, 30 s at 48 kHz; node cannot decode
+   the shipped MP3 — the browser row decodes it): (1) repeatable — CONTROL another seed differs; (2) never across the file's ends — the first and
+   last `edge` seconds hold NaN, the output stays finite — CONTROL a NaN inside the body is caught; (3) EQUAL-POWER joins — on a constant
+   recording the output rises to exactly √2 of its plain level in the middle of a join (cos + sin) — CONTROL a hard cut (the phasor frozen)
+   does not; (4) grains of 4.5–8 s: about one join per stream every 3–6.4 s; (5) asleep: zeros, nothing computed; (6) the Lighter mode plays
+   the three loudest (nearest) voices; (7) a recording shorter than one grain and its edges is refused; (8) the room's recipe names a file that
+   exists in its folder, under 1.5 MB. */
+async function nightStreamRec(){
+  const d=[], notes=[]; let n=0; const miss=s=>d.push(s), RC=await import(new URL('../apps/night/pure/brookrec.js', import.meta.url).href);
+  const FR=(await import(new URL('../apps/night/rooms/forest/pure/room.js', import.meta.url).href)).FOREST_ROOM, V=FR.nature.stream.voices, FS=48000, B=RC.BROOK_REC;
+  const noise=(sec, seed)=>{ let s=seed>>>0||1; const x=new Float32Array(FS*sec); for(let i=0;i<x.length;i++){ s^=s<<13; s>>>=0; s^=s>>>17; s^=s<<5; s>>>=0; x[i]=s/4294967296*2-1; } return x; };
+  const run=(st, pcm, sec)=>{ const N=FS*sec, L=new Float32Array(N), R=new Float32Array(N); for(let o=0;o<N;o+=128) RC.recOut(st, pcm, L, R, o, Math.min(128, N-o)); return [L, R]; };
+  const pcm=noise(30, 7);
+  { const a=run(RC.recNew(FS, V, pcm.length, 1), pcm, 6), b=run(RC.recNew(FS, V, pcm.length, 1), pcm, 6), c=run(RC.recNew(FS, V, pcm.length, 1, B.seed+1), pcm, 6); n+=2;
+    if(a[0].some((v,i)=>v!==b[0][i]) || a[1].some((v,i)=>v!==b[1][i])) miss('two renders with the same seed differ'); if(a[0].every((v,i)=>v===c[0][i])) miss('CONTROL: another seed gives the same sound'); }
+  { const e=Math.round(B.edge*FS), p=pcm.slice(); for(let i=0;i<e;i++){ p[i]=NaN; p[p.length-1-i]=NaN; } const [L, R]=run(RC.recNew(FS, V, p.length, 1), p, 60); n+=2;
+    if(L.some(v=>!Number.isFinite(v)) || R.some(v=>!Number.isFinite(v))) miss('a grain read the file\'s edges (across its ends)');
+    const q=pcm.slice(); for(let i=e;i<q.length-e;i+=FS) q[i]=NaN; const [L2]=run(RC.recNew(FS, V, q.length, 1), q, 60); if(L2.every(v=>Number.isFinite(v))) miss('CONTROL: NaN inside the body was not caught'); }
+  { const one=new Float32Array(FS*30).fill(0.5), V1=[{ pan:0, w:0, gain:1, lp:20000, rate:1, f:[400,2000], rush:0 }], rest=2*0.5*Math.SQRT1_2*Math.SQRT1_2;   // one voice = two streams at the middle, each 0.5 · ½√2 (its gain) · ½√2 (the pan)
+    const peakOf=st=>{ const [L]=run(st, one, 20); let mx=0; for(let i=FS;i<L.length;i++) mx=Math.max(mx, L[i]); return mx; };
+    const solo=o=>{ o.vs=o.vs.slice(0, 1); return o; }, rest1=rest/2;   // one stream alone: its joins never overlap another's
+    const ratio=peakOf(solo(RC.recNew(FS, V1, one.length, 1)))/rest1; n+=2;
+    if(Math.abs(ratio-Math.SQRT2)>0.003) miss(`a join peaks at ${ratio.toFixed(4)} × the plain level (√2 = 1.4142 for equal power)`);
+    const hc=solo(RC.recNew(FS, V1, one.length, 1)); hc.cd=1; hc.sd=0; const r2=peakOf(hc)/rest1; if(Math.abs(r2-Math.SQRT2)<=0.003) miss('CONTROL: a hard cut passed the equal-power judgement');
+    notes.push(`joins: peak ${ratio.toFixed(4)} × the plain level on a constant recording (√2 wanted); CONTROL hard cut ${r2.toFixed(4)}`); }
+  { const st=RC.recNew(FS, V, pcm.length, 1), g0=st.grains; run(st, pcm, 60); const per=(st.grains-g0)/st.vs.length; n++;
+    if(!(per>=60/6.4-1.5 && per<=60/2.9+1.5)) miss(`${per.toFixed(1)} joins per stream in 60 s (grains ${B.grain.join('–')} s with ${B.fade}-s joins)`); notes.push(`${per.toFixed(1)} joins per stream a minute, ${st.vs.length} streams (${V.length} voices × 2)`); }
+  { const st=RC.recNew(FS, V, pcm.length, 1); st.sleep=true; const [L]=run(st, pcm, 1); n++; if(L.some(v=>v!==0) || st.frames!==0) miss('asleep, the stream still sounds or computes'); }
+  { const st=RC.recNew(FS, V, pcm.length, 1), want=V.map((v,i)=>[v.gain,i]).sort((a,b)=>b[0]-a[0]).slice(0, B.light).map(x=>x[1]).sort((a,b)=>a-b); n+=2;
+    if(JSON.stringify(st.near)!==JSON.stringify(want)) miss(`the Lighter mode keeps voices ${st.near} (the loudest ${want} wanted)`);
+    if(JSON.stringify(want)===JSON.stringify([0,1,2])) miss('CONTROL: the loudest voices are the first three — the check cannot tell'); }
+  { n++; if(RC.recNew(FS, V, RC.recMinLen(FS)-1, 1)!==null || RC.recNew(FS, V, RC.recMinLen(FS), 1)===null) miss('a recording too short is not refused (or one just long enough is)'); }
+  { const fs=await import('node:fs'), f=new URL('../apps/night/rooms/forest/'+FR.nature.stream.rec.file, import.meta.url); n+=2;
+    if(!fs.existsSync(f)) miss('the recipe names a file that is not there: '+FR.nature.stream.rec.file);
+    else { const sz=fs.statSync(f).size; if(sz>1.5*1048576) miss(`the recording is ${(sz/1048576).toFixed(2)} MB (1.5 at most)`); notes.push(`the shipped file: ${FR.nature.stream.rec.file}, ${(sz/1024).toFixed(0)} KB, level ×${FR.nature.stream.rec.norm}`); } }
+  return { cases:n, total:d.length, differences:d, notes };
+}
+/* NIGHT-8b: THE BARK'S MOSS PER TRUNK (apps/night/rooms/forest/pure/wood.js barkMoss) — the user saw the same moss on two big trunks. For today's
+   95 trunks: every two differ by at least WOOD.bark.minGap in the five parameters (unit cube); the two big trunks on the right (forestTrunks 1
+   and 7) differ in at least three of them by 0.15; each parameter spans most of its range; repeatable — CONTROL another seed differs; CONTROL
+   one moss for every trunk (the old law) fails the gap judgement. */
+async function forestBarkMoss(){
+  const d=[], notes=[]; let n=0; const miss=s=>d.push(s), W=await import(new URL('../apps/night/rooms/forest/pure/wood.js', import.meta.url).href), Lo=await import(new URL('../apps/night/rooms/forest/pure/layout.js', import.meta.url).href);
+  const T=Lo.forestTrunks(), M=W.barkMoss(T.length), U=M.map(W.barkMossUnit), gapOf=U2=>{ let g=Infinity, at=null; for(let i=0;i<U2.length;i++) for(let j=i+1;j<U2.length;j++){ const x=Math.hypot(...U2[i].map((v,k)=>v-U2[j][k])); if(x<g){ g=x; at=[i,j]; } } return [g, at]; };
+  const [g, at]=gapOf(U); n+=4;
+  if(!(g>=W.WOOD.bark.minGap)) miss(`trunks ${at} have nearly the same moss (gap ${g.toFixed(3)}, ${W.WOOD.bark.minGap} wanted)`);
+  { const a=U[1], b=U[7], far=a.filter((v,k)=>Math.abs(v-b[k])>=0.15).length; if(far<3) miss(`the two big trunks on the right differ in ${far} of 5 moss parameters`);
+    notes.push(`the two big trunks on the right (${T[1].slice(0,2)}, ${T[7].slice(0,2)}): reach ${M[1][0].toFixed(2)} / ${M[7][0].toFixed(2)} m, side ${M[1][1].toFixed(2)} / ${M[7][1].toFixed(2)} rad, cover ${M[1][2].toFixed(2)} / ${M[7][2].toFixed(2)}, patchiness ${M[1][3].toFixed(2)} / ${M[7][3].toFixed(2)}, tint ${M[1][4].toFixed(2)} / ${M[7][4].toFixed(2)} (${far} of 5 apart)`); }
+  for(let k=0;k<5;k++){ const v=U.map(u=>u[k]), sp=Math.max(...v)-Math.min(...v); if(sp<0.85){ miss(`moss parameter ${k} spans only ${sp.toFixed(2)} of its range`); break; } }
+  if(JSON.stringify(W.barkMoss(T.length))!==JSON.stringify(M)) miss('two draws differ');
+  { n+=2; if(JSON.stringify(W.barkMoss(T.length, W.WOOD.bark.seed+1))===JSON.stringify(M)) miss('CONTROL: another seed gives the same moss');
+    if(gapOf(U.map(()=>U[0]))[0]>=W.WOOD.bark.minGap) miss('CONTROL: one moss for every trunk passes the gap judgement'); }
+  notes.push(`${T.length} trunks, the smallest gap ${g.toFixed(3)} (trunks ${at}; ${W.WOOD.bark.minGap} wanted); CONTROL one moss for all: gap 0`);
+  return { cases:n, total:d.length, differences:d, notes };
+}
+/* NIGHT-8b: THE GREEN FIREFLIES COME TO THE PLAYING LIGHT (apps/night/rooms/forest/pure/fireflies.js) — the user: they used to circle it now and
+   then; only the moths did. The cause: in the nearest depth band the light stands at z ≈ 3.3, inside the flies' wrap box's near end (3.5), so
+   every orbit wrapped away. The law's 35 flies (the medium level), a light at depth 0, 0.15 and 0.5 on the aisle, a note every 1.5 s (held
+   0.8 s) or no notes, 100 s with forest.js's own easing: the mean number of flies seen round the light from the eye (within 25° of it, at most
+   3.5 m behind it) — playing ≥ 3 at every depth, idle ≥ 1; CONTROL the old law (FOREST_FLIES.edge off) brings fewer than 3 at depth 0. */
+async function forestFliesVisit(){
+  const d=[], notes=[]; let n=0; const miss=s=>d.push(s), F=await import(new URL('../apps/night/rooms/forest/pure/fireflies.js', import.meta.url).href);
+  const eye=[0,1.55,5.5], C=F.FOREST_FLIES;
+  const visit=(d01, notesOn)=>{ const fl=F.fliesInit(35), dt=1/30, Lz=eye[2]-F.depthDistance(d01), MM=C.melody, ME=MM.ease; let music=0, gather=0, rel=0, holdE=0, rateE=0, last=-9, seen=0, frames=0; const noteT=[];
+    for(let t=0;t<100;t+=dt){ let held=0; if(notesOn){ if(t-last>=1.5){ last=t; music=Math.min(1.5, music+0.21); noteT.push(t); } if(t-last<0.8) held=t-last; }
+      while(noteT.length && noteT[0]<=t-MM.rate.window) noteT.shift(); const hT=F.holdK(held), rT=F.rateK(noteT, t);
+      holdE+=(hT-holdE)*(1-Math.exp(-dt/(hT>holdE ? ME.holdIn : ME.holdOut))); rateE+=(rT-rateE)*(1-Math.exp(-dt/(rT>rateE ? ME.rateIn : ME.rateOut)));
+      const playing=music>0.15 || holdE>0.25; gather+=((playing?1:0)-gather)*(1-Math.exp(-dt/(playing?2.5:7))); rel= playing ? gather : rel*Math.exp(-dt/10);
+      const L={ x:0, y:1.5, z:Lz, on:1, call:playing ? gather : 0, scatter:playing ? 0 : rel, hold:holdE, rate:rateE }; F.fliesStep(fl, [L], dt, t, 1, null); music*=Math.exp(-dt/1.8);
+      if(t>20){ const lv=[L.x-eye[0], L.y-eye[1], L.z-eye[2]], ll=Math.hypot(...lv); let k=0;
+        for(const q of fl){ const v=[q.p[0]-eye[0], q.p[1]-eye[1], q.p[2]-eye[2]], vl=Math.hypot(...v); if((v[0]*lv[0]+v[1]*lv[1]+v[2]*lv[2])/(vl*ll)>Math.cos(25*Math.PI/180) && vl<ll+3.5) k++; }
+        seen+=k; frames++; } }
+    return seen/frames; };
+  const res=[];
+  for(const d01 of [0, 0.15, 0.5]){ const p=visit(d01, true), i=visit(d01, false); n+=2; res.push(`depth ${d01}: ${p.toFixed(1)} playing, ${i.toFixed(1)} idle`);
+    if(!(p>=3)) miss(`depth ${d01}: only ${p.toFixed(2)} flies come round the playing light (3 wanted)`); if(!(i>=1)) miss(`depth ${d01}: only ${i.toFixed(2)} round the idle light (1 wanted)`); }
+  { const keep=C.edge; let old; try{ C.edge=-1e9; old=visit(0, true); } finally{ C.edge=keep; } n++;
+    if(old>=3) miss(`CONTROL: the old law brings ${old.toFixed(2)} flies to a near light — the judgement cannot fail`); else res.push(`CONTROL the old law at depth 0: ${old.toFixed(2)}`); }
+  notes.push('flies seen round the light: '+res.join('; '));
+  return { cases:n, total:d.length, differences:d, notes };
+}
+
+/* NIGHT-9: THE GROUND'S RELIEF (pure/fireflies.js forestGround + RELIEF, pure/relief.js) — (1) mounds and hollows: over 40 × 40 m outside
+   the aisle the relief term alone spans ≥ 0.2 m with ≥ 6 local tops and ≥ 6 hollows on a 1-m grid; inside the aisle it is half as high;
+   (2) the aisle's edge is smooth: walking across it in 1-cm steps no step exceeds 1 cm — CONTROL the old law (×0.35 inside a box) steps ≥ 5 cm;
+   (3) forest-wood.js gnd7 carries the same constants (its text built from RELIEF); (4) root bulges: on a made-up grid round a trunk of r 0.4 the
+   ground rises r·k at the foot, nothing 3 reaches away, and not at all where the stream is near; (5) occlusion: a bowl's bottom is darker than
+   its rim, a flat open grid is 1 everywhere — CONTROL — a trunk darkens its foot, and nothing falls under AO.min. */
+async function forestRelief(){
+  const d=[], notes=[]; let n=0; const miss=s=>d.push(s), F=await import(new URL('../apps/night/rooms/forest/pure/fireflies.js', import.meta.url).href), RL=await import(new URL('../apps/night/rooms/forest/pure/relief.js', import.meta.url).href);
+  const R=F.RELIEF, rel=(x,z)=>R.a*Math.sin(0.83*x+0.41*z+1.3)*Math.sin(0.57*z-0.29*x+0.4)+R.b*Math.sin(1.9*x-1.3*z+2.1)*Math.cos(1.6*z+0.7*x);
+  { let lo=Infinity, hi=-Infinity, tops=0, pits=0; const g=(x,z)=>rel(x,z);
+    for(let x=-30;x<=-10;x+=1) for(let z=-30;z<=10;z+=1){ const v=g(x,z); lo=Math.min(lo,v); hi=Math.max(hi,v); const nb=[g(x+1,z),g(x-1,z),g(x,z+1),g(x,z-1)]; if(nb.every(w=>w<v)) tops++; if(nb.every(w=>w>v)) pits++; }
+    n+=2; if(!(hi-lo>=0.2)) miss(`the relief spans only ${(hi-lo).toFixed(3)} m`); if(tops<6 || pits<6) miss(`${tops} tops and ${pits} hollows (6 of each wanted)`);
+    const inA=F.forestGround(0,-5)-(0.28*Math.sin(0)*Math.cos(-5*0.27)+0.14*Math.sin(-3))*0.35; n++; if(Math.abs(inA-rel(0,-5)*R.aisle)>1e-9) miss('the aisle does not take half the relief');
+    notes.push(`relief: ${(hi-lo).toFixed(2)} m span, ${tops} tops, ${pits} hollows over 20 × 40 m (1-m grid); half as high in the aisle`); }
+  { const old=(x,z)=>{ let y=0.28*Math.sin(x*0.3)*Math.cos(z*0.27)+0.14*Math.sin(x*0.9+z*0.6); if(Math.abs(x)<6 && z>-14 && z<5) y*=0.35; return y; };
+    const worst=f=>{ let m=0; for(const z of [-10,-5,0,3]) for(let x=4;x<8;x+=0.01) m=Math.max(m, Math.abs(f(x+0.01,z)-f(x,z))); return m; };
+    const a=worst(F.forestGround), b=worst(old); n+=2; if(!(a<=0.01)) miss(`the aisle's edge steps ${a.toFixed(3)} m in 1 cm`); if(!(b>=0.05)) miss(`CONTROL: the old law's step is only ${b.toFixed(3)} m`);
+    notes.push(`the aisle's edge: the largest 1-cm step ${(a*1000).toFixed(1)} mm (CONTROL the old law ${(b*100).toFixed(1)} cm)`); }
+  { const W=await import(new URL('../apps/night/rooms/forest/forest-wood.js', import.meta.url).href).catch(()=>null); n++;
+    const src=W && W.gnd7Src ? W.gnd7Src() : null, f=v=>Number(v).toFixed(4);
+    if(!src || ![f(R.a), f(R.b), f(-R.edge), f(1-R.aisle)].every(c=>src.includes(c)) || !/0\.65\*m/.test(src)) miss('forest-wood.js gnd7 does not carry the relief law (constants missing)'); }
+  { const grid=(N, step, h)=>{ const X=[], Z=[], Y=[]; for(let r=0;r<=N;r++) for(let c=0;c<=N;c++){ X.push((c-N/2)*step); Z.push((r-N/2)*step); Y.push(h((c-N/2)*step, (r-N/2)*step)); }
+      return { count:X.length, getX:i=>X[i], getZ:i=>Z[i], getY:i=>Y[i], setY:(i,v)=>{ Y[i]=v; }, Y }; };
+    const g=grid(60, 0.1, ()=>0), add=RL.groundRoots(g, [[0,0,0.4]]), at=(x,z)=>{ const c=Math.round(x/0.1)+30, r=Math.round(z/0.1)+30; return g.Y[r*61+c]; }; n+=3;
+    if(Math.abs(at(0,0)-0.4*RL.ROOTS.k)>1e-6) miss(`the bulge at the foot is ${at(0,0).toFixed(4)} (${(0.4*RL.ROOTS.k).toFixed(4)} wanted)`);
+    if(Math.abs(at(2.9,0))>1e-3) miss('the bulge reaches 3 m out');
+    const g2=grid(60, 0.1, ()=>0); RL.groundRoots(g2, [[0,0,0.4]], ()=>0.1); if(g2.Y.some(v=>v!==0)) miss('a bulge rises in the stream');
+    void add; }
+  { const bowl=(x,z)=>0.3*(x*x+z*z)/9, gB={ count:61*61 }; const X=[], Z=[], Y=[]; for(let r=0;r<=60;r++) for(let c=0;c<=60;c++){ X.push((c-30)*0.1); Z.push((r-30)*0.1); Y.push(-0.3*Math.exp(-(((c-30)*0.1)**2)-(((r-30)*0.1)**2))); }
+    const P={ count:X.length, getX:i=>X[i], getZ:i=>Z[i], getY:i=>Y[i] }, ao=RL.groundOcclusion(P, 60, []), mid=ao[30*61+30], rim=ao[5*61+5];
+    const flat={ count:X.length, getX:i=>X[i], getZ:i=>Z[i], getY:()=>0 }, af=RL.groundOcclusion(flat, 60, []), at=RL.groundOcclusion(flat, 60, [[0,0,0.4]]); n+=4;
+    if(!(mid<rim-0.05)) miss(`a hollow's bottom ${mid.toFixed(3)} is not darker than its rim ${rim.toFixed(3)}`);
+    if(af.some(v=>v!==1)) miss('CONTROL: a flat open ground is not 1 everywhere');
+    if(!(at[30*61+35]<0.8)) miss(`a trunk's foot is not darker (${at[30*61+35].toFixed(3)})`);
+    if([...ao, ...at].some(v=>v<RL.AO.min-1e-9)) miss('an occlusion under the minimum');
+    notes.push(`occlusion: a hollow's bottom ${mid.toFixed(2)} against its rim ${rim.toFixed(2)}; a trunk's foot ${at[30*61+35].toFixed(2)}; flat open ground 1`); void bowl; void gB; }
+  return { cases:n, total:d.length, differences:d, notes };
+}
+/* NIGHT-9: THE STREAM'S FLOW (pure/water.js) — the width along the stream stays in its range and is smooth (no jump over 0.01 between
+   1/2000 steps), varying by ≥ 0.25; on level ground speed × width = 1 (the same water through every section) wherever the speed is within its
+   bounds, so the narrows are the fast places — CONTROL a constant width would give one speed (its speed range 0); a falling bed is faster;
+   repeatable. */
+async function forestWaterFlow(){
+  const d=[], notes=[]; let n=0; const miss=s=>d.push(s), W=await import(new URL('../apps/night/rooms/forest/pure/water.js', import.meta.url).href), WF=W.WATER_FLOW;
+  let lo=Infinity, hi=-Infinity, jump=0, bad=0, prev=W.waterWidth(0), sLo=Infinity, sHi=-Infinity;
+  for(let k=0;k<=2000;k++){ const u=k/2000, w=W.waterWidth(u), s=W.waterSpeed(u, 0); lo=Math.min(lo,w); hi=Math.max(hi,w); jump=Math.max(jump, Math.abs(w-prev)); prev=w; sLo=Math.min(sLo,s); sHi=Math.max(sHi,s);
+    if(s>WF.speed[0] && s<WF.speed[1] && Math.abs(s*w-1)>1e-9) bad++; }
+  n+=5; if(lo<WF.width[0]-1e-9 || hi>WF.width[1]+1e-9) miss(`the width leaves its range: ${lo.toFixed(3)}…${hi.toFixed(3)}`);
+  if(!(hi-lo>=0.25)) miss(`the width varies only ${(hi-lo).toFixed(3)}`); if(jump>0.01) miss(`the width jumps ${jump.toFixed(4)} between neighbouring steps`);
+  if(bad) miss(`${bad} places where speed × width ≠ 1 on level ground`); if(!(W.waterSpeed(0.5, 0.1)>W.waterSpeed(0.5, 0))) miss('a falling bed is not faster');
+  { n++; const ctlW=1, ctl=[0,0.25,0.5,0.75,1].map(()=>1/ctlW); if(Math.max(...ctl)-Math.min(...ctl)!==0) miss('CONTROL: a constant width gave more than one speed'); if(!(sHi-sLo>0.3)) miss(`the speed varies only ${(sHi-sLo).toFixed(3)} (a constant width would give 0)`); }
+  notes.push(`width ${lo.toFixed(2)}…${hi.toFixed(2)} × the half-width, speed ${sLo.toFixed(2)}…${sHi.toFixed(2)} on level ground (narrows fast, pools slow); the largest step ${jump.toFixed(4)}`);
+  return { cases:n, total:d.length, differences:d, notes };
+}
+
+/* NIGHT-10: THE CAMERAS' NAMES (apps/night/pure/camera.js) — a phone: front and back cameras read «Front» / «Back» (a second back camera
+   «Back 2»), one of unknown facing by its name; a computer: device names without hardware numbers («HD Webcam (046d:0825)» → «HD Webcam»);
+   labels empty before the permission → «Camera 1», «Camera 2»; never an id in a name; the phone hint from the browser (Android, iPhone, an iPad
+   that says MacIntel with touch). CONTROL the same list on a computer is not called Front / Back. */
+async function nightCameraNames(){
+  const d=[], notes=[]; let n=0; const miss=s=>d.push(s), C=await import(new URL('../apps/night/pure/camera.js', import.meta.url).href);
+  const L=[{ deviceId:'a1', label:'camera2 1, facing front', facing:'user' }, { deviceId:'b2', label:'camera2 0, facing back', facing:'environment' }, { deviceId:'b3', label:'Back Ultra Wide Camera', facing:'environment' }, { deviceId:'c4', label:'USB2.0 HD UVC WebCam', facing:null }];
+  const P=C.cameraNames(L, true), K=P.map(e=>e.kind+(e.n>1 ? e.n : '')).join(','); n++;
+  if(K!=='front,back,back2,name') miss('a phone\'s cameras read '+K);
+  { const Q=C.cameraNames(L, false); n++; if(Q.some(e=>e.kind==='front' || e.kind==='back')) miss('CONTROL: a computer\'s list was called Front / Back'); }
+  { const Q=C.cameraNames([{ deviceId:'x', label:'HD Webcam (046d:0825)' }, { deviceId:'y', label:'Integrated Camera (USB VID_04F2 PID_B6DD)' }], false); n+=2;
+    if(Q[0].name!=='HD Webcam') miss(`«HD Webcam (046d:0825)» reads «${Q[0].name}»`); if(/VID|PID|\(/.test(Q[1].name)) miss(`a name keeps its hardware numbers: «${Q[1].name}»`); }
+  { const Q=C.cameraNames([{ deviceId:'', label:'' }, { deviceId:'', label:'' }], true); n++; if(Q.map(e=>e.kind+e.n).join()!=='number1,number2') miss('labels before the permission: '+JSON.stringify(Q)); }
+  { n+=4; if(!C.camMobile({ ua:'Mozilla/5.0 (Linux; Android 13; 22041219PG) Chrome/120 Mobile Safari/537.36' })) miss('an Android phone is not a phone');
+    if(!C.camMobile({ ua:'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Safari/605.1.15', platform:'MacIntel', touch:5 })) miss('an iPad is not a phone or tablet');
+    if(C.camMobile({ ua:'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120', platform:'Win32', touch:0 })) miss('a Windows computer counted as a phone');
+    if(P.some(e=>e.name && /a1|b2|b3|c4/.test(e.name))) miss('an id shows in a name'); }
+  notes.push('phone: Front, Back, Back 2, «USB2.0 HD UVC WebCam»; computer names cleaned of hardware numbers; «Camera 1/2» before the permission; CONTROL a computer list is not Front / Back');
+  return { cases:n, total:d.length, differences:d, notes };
+}
+
 const ROWS=[
   ...REG.rows({ node:true }).map(r=>[r.name, r.run, r.read]),
   ['LIC1 licence register',     ()=>LIC.run(),          r=>({ cases:r.cases, diff:r.total, list:r.differences })],
@@ -1620,6 +1807,13 @@ const ROWS=[
   ['FOREST ground (app)',       ()=>forestGroundCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-8
   ['NIGHT stream sound (app)',  ()=>nightStreamSound(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-8
   ['FOREST wood (app)',         ()=>forestWoodCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 5
+  ['FOREST bark moss (app)',    ()=>forestBarkMoss(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-8b
+  ['FOREST fireflies visit the light (app)', ()=>forestFliesVisit(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-8b
+  ['NIGHT stream recording (app)', ()=>nightStreamRec(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-8b
+  ['NIGHT full-screen icons (app)', ()=>nightFsIcons(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-8b
+  ['FOREST relief (app)',       ()=>forestRelief(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-9
+  ['FOREST water flow (app)',   ()=>forestWaterFlow(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-9
+  ['NIGHT camera names (app)',  ()=>nightCameraNames(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-10
   ['FOREST gust (app)',         ()=>forestGustCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 6
   ['FOREST canopy (app)',       ()=>forestCanopyCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 7
   ['FOREST paint (app)',        ()=>forestPaintCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 8

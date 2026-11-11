@@ -8510,3 +8510,32 @@ not a control · run a "random" failure many times and print WHERE and HOW MUCH 
 - Level near the nature sound (K-like −1.0 / +1.1 / +1.9 dB).
 - v1 is unchanged behind the dev A/B pills `?probe&bed=v1|v2&voices=a|b`, and plays by itself if AudioWorklet is missing.
 - Accepted by ear (user, 2026-11-09): v2 with the «voices» palette stays the default; v1 stays as the fallback (NIGHT-5 gave it v2's gap rule).
+
+## Moved from docs/night/HANDOFF.md at NIGHT-8b (2026-11-11)
+### NIGHT-6 stage 1 (2026-11-09): the forest, polished and alive — the comparison and the plan only. `docs/night/design/NIGHT-6-forest/PLAN.md`
+- No app code; tree hashes unchanged (core 14bd513ae15aa87e · apps/full d6b90cf2cb4be6da · apps/night 3279ec88c1f91059).
+- Compared item by item with the sketch «Живой лес»: the forest lacks most of the sketch's plant life (no leaves anywhere, no herb layer, one fern), the fallen wood, moss, the stream's banks and life, webs, dew, the moon's gap and stars, the painted distance, film. Today is ahead on the night cycle, moods, response, rare events.
+- Kept exactly: everything floating and how it moves, the mushrooms' glow per Mood (their rows stay unchanged; new inputs default to today's step). Rule: add, don't move.
+- Costs by RUN 9's method (hand detections vs Dark) and NIGHT-1's (µs per quantum): medium has 3.8 points left (−6.2 → −10 %), split into allowances; the opening (textures, programs) is the main Poco risk. No Poco number exists yet: slice 0 measures it.
+- New sound kinds (rain, the stream, owl, splash) need no core change: Night's nature module gains parts (native nodes for hiss, one nature worklet for events), one seeded schedule shared with the picture.
+- 14 slices proposed (0 the yardstick; 1 answers to notes and the bed; 2 fireflies follow the melody; … 11 sound and rain; 12 animals) and 8 decisions. Waiting for the user's approval.
+
+## Moved from docs/night/HANDOFF.md at NIGHT-9 (2026-11-11)
+### NIGHT-6 slice 8 (2026-11-10): the painted distance and the film. Log: `docs/night/WORK-LOG.md`; as built: `docs/night/design/NIGHT-6-forest/PLAN.md` top
+- Step 140 checked by the user: the canopy, the moon's window, the stars and the dapple look right; the light stays clearly visible.
+- Departure from the plan (reason measured): no far forest baked beyond 28 m — today's fog leaves ≥ 94 % fog there, so it would not show; the sketch's painted look is its per-frame stroke pass on the middle distance, so that is what was built (the plan had left it out for cost): strokes from 7 m growing to the level's radius at 26 m (high 3 px, medium 2.5), written out tap by tap (29 / 21 taps, 92 / 68 sector feeds against the sketch's 81 × 8).
+- The glowing things (light, fireflies, dew, mushrooms' glow, moths, leaves, moon, clouds, stars) draw after the strokes with their own depth test, so they stay crisp. Film: vignette at both levels, a fine grain at high, a slight cool grade; the camera breathes sideways (≤ 5 cm).
+- Found on the way: the gust could not reverse (its direction blended through zero) — now it turns by angle (data row case added); the glow pass first compiled a second copy of every glowing material (+9 programs) — the lights now see both passes.
+- Laptop medium (a clean second run): detections = Dark (0.0 / 0.0 %), frame 2.1–2.2 ms (1.8 before NIGHT-6), programs 28, textures 16.9 MB; first opening 3.9 s after high. High −48.5 / −45.0 %, cold first opening 8.3 s. Counts of draws and triangles now include every pass.
+- Files unchanged (3.29 MB of 30). Rows: data «FOREST paint (app)» 18; browser «FOREST paint» 15. Waiting for step 141.
+
+## Moved from docs/night/HANDOFF.md at NIGHT-10 (2026-11-11)
+### NIGHT-7 (2026-11-11): the test version. Log: `docs/night/WORK-LOG.md`
+- Steps 141 and 142 checked by the user: the painted middle distance is right, no grain at medium; foxfire and the night flowers look right. The forest's remaining slices (a changing night, sounds and rain, animals) wait in the backlog.
+- The bare floor: soil, fallen leaves, needles, twigs, moss crumbs and seeds, with relief — `tools/forest-bake.mjs drawGround` (a 2048 master, 1024 / 512 copies; colour + normal map, tiled every 6 m). Files: high 9.99 MB, medium 4.23 MB, low 1.56 MB (15.35 MB of 30).
+- The players' build: the development items (Measure this device, Room picture, the sound page) are hidden in the release edition; a Vercel PRODUCTION build of Night is the release edition by itself (`tools/build.mjs`, unless `HANDSONG_EDITION=dev`). The smoke test checks the deploy tree itself.
+- First launch: after the calibration offer, four cards with our own line drawings (Play · Near and far · Your other hand · Music; `apps/night/cards.js`), Skip on each, reopened from Settings → How to play; then the ghost hint.
+- Languages: every Night text in English and Russian (`apps/night/texts.js`; data row «NIGHT texts both languages (app)»); the browser's language by default; the start screen's choice kept.
+- Picture: Standard (medium, the default) / Detailed (high) in Settings → View. The cold first opening at medium stays about 7 s on the laptop (shader compile; the bark's shader trimmed 1.8 → 1.3 s); it now runs in slices, so the start card stays responsive (longest block 2.5 s). Under 4 s was not reached cheaply.
+- Privacy: one line under Begin. Found on the way: a level change during the sliced compile dropped the picture to minimal (row «NIGHT low power» caught it) — fixed in the host.
+- Rows: data «NIGHT texts both languages (app)»; browser «NIGHT first cards» 24. Waiting for step 143 (the user's five checks, the Poco, an iPhone).

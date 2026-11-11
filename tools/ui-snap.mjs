@@ -24,9 +24,10 @@ const ONLY=val('--only');   // comma list of screens
 const FOREST=argv.includes('--forest');   // RUN 9: the forest's own screens (GPU capture, the Night face)
 const NIGHT=argv.includes('--night') || FOREST;   // RUN 7 (C6/C11): the Night face's screens instead (a phone viewport, the page apps/night/)
 const LEVEL=val('--level');   // NIGHT-8: the forest's picture level for the capture (full = Detailed, reduced = Standard; stored before the page loads)
+const GROUND=val('--ground');   // NIGHT-9: 'baked' | 'scan' — which bare floor the forest draws (the user's comparison; forest.js forestGroundDbg, set before the room opens)
 const out=s=>console.log(s);
 const MIME={ '.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.json':'application/json; charset=utf-8', '.css':'text/css; charset=utf-8',
-  '.png':'image/png', '.svg':'image/svg+xml', '.webmanifest':'application/manifest+json' };
+  '.png':'image/png', '.svg':'image/svg+xml', '.webmanifest':'application/manifest+json', '.mp3':'audio/mpeg' };
 function serve(){
   const srv=http.createServer(async (q,r)=>{ try{ const u=new URL(q.url,'http://x'); let p=decodeURIComponent(u.pathname); if(p.endsWith('/')) p+='index.html';
     const f=path.join(ROOT,p); if(!f.startsWith(ROOT)){ r.writeHead(403); r.end(); return; }
@@ -177,6 +178,9 @@ const SCREENS_FOREST=[
   ['f-close-ground', async p=>{ await closeView(p, [2.4,1.25,3.9], [1.9,0,0.4]); }],
   ['f-close-ground-off', async p=>{ await closeView(p, [2.4,1.25,3.9], [1.9,0,0.4], { groundMacro:false, litterLeaves:0, litterPebbles:0, litterTwigs:0 }); }],   // NIGHT-8 iteration: the same view without the ground's large scale and litter
   ['f-close-far',    async p=>{ await closeView(p, [0.2,1.3,-1.0], [1.5,0,-7.0]); }],
+  /* NIGHT-9: where the water meets the bank, looking down; a trunk's foot with the ground round it */
+  ['f-close-bank',   async p=>{ await closeView(p, [0.2,0.9,2.2], [-0.9,0.0,0.8]); }],
+  ['f-close-foot',   async p=>{ await closeView(p, [-0.3,1.1,0.2], [-2.1,0.2,-2.2]); }],
   ['f-close-end',    async p=>{ await p.evaluate(async ()=>{ const H=await import('/apps/night/scene/host.js'); H.sceneRoomDbg().viewDbg(null); H.sceneOptDbg(null); }); }],
   ['f-land-back',    async p=>{ await p.setViewportSize({ width:844, height:390 }); await p.waitForTimeout(1500); }],
   ['f-land-cloud',   async p=>{ await forestAt(p, 640); await p.waitForTimeout(600); await playHands(p); await p.waitForTimeout(900); }],
@@ -214,12 +218,13 @@ async function capture(tag){
     await ctx.grantPermissions(['camera','microphone'],{ origin:`http://127.0.0.1:${port}` }); await cdnCache(ctx);
     await ctx.addInitScript(()=>{ try{ localStorage.setItem('handsong.lang','en'); }catch(e){} });
     if(LEVEL) await ctx.addInitScript(lv=>{ try{ localStorage.setItem('handsong.sceneLevel', lv); }catch(e){} }, LEVEL);
+    if(GROUND) await ctx.addInitScript(g=>{ window.__groundSet=g; }, GROUND);
     /* SPLIT-2: the effects hint's own 7-s timer races the capture (it hid between the style walk and the shot): it stays up through night-play; night-forest takes it down, as the timer would have */
     if(NIGHT) await ctx.addInitScript(()=>{ const st=window.setTimeout; window.setTimeout=(f,ms,...a)=>st(f, ms===7000 ? 3600e3 : ms, ...a); });
     const page=await ctx.newPage(); const errs=[]; page.on('pageerror',e=>errs.push(String(e&&e.message||e)));
     await page.goto(`http://127.0.0.1:${port}/apps/${NIGHT?'night':'full'}/index.html?probe`);
     await page.waitForFunction(()=>window.P && window.R, null, { timeout:60e3 }); await page.waitForTimeout(800);
-    const FAST=argv.includes('--fast') ? new Set(['f-start','f-wide-still','f-wide-notes','f-close-water','f-close-rocks','f-close-ground','f-close-ground-off','f-close-far','f-close-end']) : null;   // NIGHT-8: look iterations — the start and the laptop-sized views only
+    const FAST=argv.includes('--fast') ? new Set(['f-start','f-wide-still','f-wide-notes','f-close-water','f-close-rocks','f-close-ground','f-close-ground-off','f-close-far','f-close-bank','f-close-foot','f-close-end']) : null;   // NIGHT-8: look iterations — the start and the laptop-sized views only
     for(const [name,act] of (FOREST ? SCREENS_FOREST.filter(([n])=>!FAST || FAST.has(n)) : NIGHT ? SCREENS_NIGHT : SCREENS)){
       await act(page);
       if(ONLY && !ONLY.split(',').includes(name)) continue;

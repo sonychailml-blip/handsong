@@ -50,6 +50,9 @@ THERE in full and here as one index entry):
   144 The test version's fixes: room-neutral shared texts, the cards close and replace the ghost, stale saved values, `?release`, the start screen (NIGHT-7b)
   145 Music from the first moment and full screen: music on Begin, full screen and its toggle, the home screen (iOS, Android), room-neutral icons (NIGHT-7c)
   146 The forest closer to real: the stream's murmur by ear (two samples), the water, the ground, the rounded rocks, the room's own slider icon (NIGHT-8)
+  147 Fixes after the first phone test: full screen after the camera prompt, the corner icon, no flash of Full, moss per trunk, fireflies at a near light, the shipped stream recording (NIGHT-8b)
+  148 Real ground and real water: relief, soil colour, the scanned floor against the baked one, occlusion; the water's reflection, clarity, flow and edge (NIGHT-9)
+  149 Choosing the camera: Front / Back on a phone, a USB webcam on a computer, live switch, not mirrored at the back, kept per device (NIGHT-10, CORE-16)
 
 ## Moved to `archive/CLAUDE-history.md` at DOC1 (grep by title; read only what the slice needs)
 - «Module map (full, moved at DOC1)» — every module's detailed paragraph (AUD1a … IDS1, SONG1, AUTOSAVE1, PACK1 …).

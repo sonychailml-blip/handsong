@@ -27,3 +27,26 @@ export function patchGroundMacro(T, mat, tex, C){
   mat.customProgramCacheKey=()=>k+'.macro';
   return U;
 }
+/* NIGHT-9 — THE GROUND AT NIGHT (applied after every other patch of the ground's material):
+   - OCCLUSION per vertex (aAO7, pure/relief.js groundOcclusion): hollows and trunk feet see less sky — it scales the indirect light fully and
+     the direct light a little, so things sit in the ground;
+   - the NIGHT GRADE: the night's light is blue (sky, moon, fog), and blue light on brown soil read as green-teal; the soil's lit colour is drawn
+     towards its own brightness in the soil token's hue (GROUND_GRADE.k; moss keeps half its green), a little brighter (gain); the glows'
+     emission (the ground waves) is added after, ungraded;
+   - the WET LINE: a dark, glossy band of mud where the water meets the bank (vWet from the wet-bank patch, near 1). */
+export const GROUND_GRADE=Object.freeze({ k:0.6, gain:1.15, moss:0.5, wet:0.5 });
+const OUT_LINE='vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + reflectedLight.directSpecular + reflectedLight.indirectSpecular + totalEmissiveRadiance;';
+export function patchGroundNight(T, mat, C, o={}){
+  const prev=mat.onBeforeCompile, k=mat.customProgramCacheKey.call(mat), G=GROUND_GRADE, tint=new T.Color(C('forest-soil-night'));
+  tint.multiplyScalar(1/Math.max(1e-4, 0.2126*tint.r+0.7152*tint.g+0.0722*tint.b));   // the hue at brightness 1
+  const U={ uSoilTint:{ value:tint }, uSoilK:{ value:G.k }, uSoilGain:{ value:G.gain } };
+  mat.onBeforeCompile=(sh, r)=>{ if(prev) prev.call(mat, sh, r); Object.assign(sh.uniforms, U);
+    if(o.ao){ sh.vertexShader='attribute float aAO7;\nvarying float vAO7;\n'+sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vAO7=aAO7;');
+      sh.fragmentShader='varying float vAO7;\n'+sh.fragmentShader.replace('#include <aomap_fragment>', '#include <aomap_fragment>\n  reflectedLight.indirectDiffuse*=vAO7; reflectedLight.indirectSpecular*=vAO7; reflectedLight.directDiffuse*=mix(1.0, vAO7, 0.55);'); }
+    if(o.wet) sh.fragmentShader=sh.fragmentShader.replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
+  { float wl9=smoothstep(0.84, 0.93, vWet)*(1.0-smoothstep(0.975, 1.0, vWet)); diffuseColor.rgb*=1.0-${G.wet.toFixed(3)}*wl9; roughnessFactor=mix(roughnessFactor, 0.2, wl9); }`);
+    sh.fragmentShader='uniform vec3 uSoilTint;\nuniform float uSoilK, uSoilGain;\n'+sh.fragmentShader.replace(OUT_LINE, `vec3 lit9=reflectedLight.directDiffuse+reflectedLight.indirectDiffuse+reflectedLight.directSpecular+reflectedLight.indirectSpecular;
+  float L9=dot(lit9, vec3(0.2126, 0.7152, 0.0722)), m9=clamp((diffuseColor.g-diffuseColor.r)/(diffuseColor.g+1e-4)*3.0, 0.0, 1.0);
+  lit9=mix(lit9, L9*uSoilTint, uSoilK*(1.0-${G.moss.toFixed(3)}*m9))*uSoilGain;
+  vec3 outgoingLight=lit9+totalEmissiveRadiance;`); };
+  mat.customProgramCacheKey=()=>k+'.night9'+(o.ao ? 'a' : '')+(o.wet ? 'w' : ''); mat.userData.night9=U; return mat; }

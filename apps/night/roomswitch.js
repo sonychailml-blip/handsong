@@ -9,7 +9,7 @@ import { sceneSwitch, sceneRoom, sceneRoomSet, sceneRooms, backgroundOf } from '
 import { ROOMS, roomById } from './rooms/index.js';
 import { ROOM_IDS } from './pure/room.js';
 import { bedHold, bedResume, bedTakesDrone } from './bed.js';
-import { buildAmbience, ambienceSchedule, ambienceTune, ambienceSet, ambienceRoom, ambienceBrook, ambienceBrookLight, NATURE_WORKLET } from './sound/ambience.js';
+import { buildAmbience, ambienceSchedule, ambienceTune, ambienceSet, ambienceRoom, ambienceBrook, ambienceBrookLight, ambienceBrookRec, NATURE_WORKLET } from './sound/ambience.js';
 
 export const ROOM_KEY='handsong.nightRoom';
 export const ROOM_NAME_MS=1500, ROOM_QUIET_MS=2500;   // the name's time on screen; without the room's picture, the bed waits out the nature crossfade
@@ -37,7 +37,20 @@ export function natureLoad(ac){
 }
 const brookVoices=()=>{ const R=[roomCurrent(), ...ROOMS.map(r=>r.record)].find(r=>r.nature.stream); return R ? R.nature.stream.voices : null; };
 function natureBrook(E, a, seed){ const v=brookVoices(); if(!v) return;
-  natureLoad(E.ac).then(ok=>{ if(ok && ambienceBrook(E, a, v, seed)) ambienceBrookLight(E, a, brookLight); }); }
+  natureLoad(E.ac).then(ok=>{ if(ok && ambienceBrook(E, a, v, seed)){ ambienceBrookLight(E, a, brookLight); natureRec(E, a); } }); }
+/* NIGHT-8b: THE STREAM'S RECORDING — the room's file (its recipe's stream.rec, in its folder) fetched once a session from our own origin, decoded
+   into each context that plays it (the browser resamples to the context's rate), its channels averaged to one, handed to the stream's node with
+   the recipe's level. Any failure leaves the synthesis playing (amb.brook.rec 'failed'). */
+const recBytes=new Map();   // url → a promise of the file's bytes
+export function natureRecOf(){ const R=[roomById(sceneRoom()), ...ROOMS].find(r=>r && r.base && r.record.nature.stream && r.record.nature.stream.rec);
+  return R ? { url:new URL(R.record.nature.stream.rec.file, R.base).href, norm:R.record.nature.stream.rec.norm } : null; }
+export function natureRecPcm(ac, url){
+  let p=recBytes.get(url);
+  if(!p){ p=fetch(url).then(r=>{ if(!r.ok) throw new Error(r.status+' '+url); return r.arrayBuffer(); }); recBytes.set(url, p); p.catch(()=>{ if(recBytes.get(url)===p) recBytes.delete(url); }); }
+  return p.then(b=>ac.decodeAudioData(b.slice(0))).then(buf=>{ const n=buf.length, C=buf.numberOfChannels, m=new Float32Array(n);
+    for(let c=0;c<C;c++){ const d=buf.getChannelData(c); for(let i=0;i<n;i++) m[i]+=d[i]/C; } return m; }); }
+function natureRec(E, a){ const R=natureRecOf(); if(!R || !a.brook) return; a.brook.rec='loading';
+  natureRecPcm(E.ac, R.url).then(pcm=>ambienceBrookRec(E, a, pcm, R.norm), e=>{ a.brook.rec='failed'; console.warn('[night] the stream recording did not load — the synthesis plays:', e); }); }   // eslint-disable-line no-console
 /* the Lighter mode (the shell): fewer bubbles, the nearest voices only */
 export function natureLight(v){ brookLight=!!v; if(liveAmb && liveAmb.brook) ambienceBrookLight(null, liveAmb, brookLight); }
 /* at the start, before the first picture: the remembered room, if it is a real one this app has */
@@ -67,5 +80,5 @@ export const roomSwitchDbg=()=>({ room:sceneRoom(), rooms:sceneRooms(), stored:l
   nature:liveAmb ? { id:liveAmb.A.id, cur:liveAmb.cur, parked:liveAmb.slots.map(x=>x.parked),
     /* each slot as the live graph has it now: its recipe, its fade, the gains it plays (the probes read that the old room really went) */
     slots:liveAmb.slots.map(x=>({ id:x.A.id, parked:x.parked, mix:x.mix.gain.value, wind:x.wg.gain.value, crickets:x.cg.gain.value, stream:x.sg.gain.value, drone:[x.dRootA.gain.value, x.dFifthA.gain.value] })),
-    brook:liveAmb.brook ? { sleep:liveAmb.brook.sleep, light:liveAmb.brook.light } : null } : null });   // NIGHT-8: the stream
+    brook:liveAmb.brook ? { sleep:liveAmb.brook.sleep, light:liveAmb.brook.light, rec:liveAmb.brook.rec } : null } : null });   // NIGHT-8: the stream (NIGHT-8b: its recording)
 export const natureAmbDbg=()=>liveAmb;   // probe only (the stream's node, its stats)

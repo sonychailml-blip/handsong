@@ -15,7 +15,7 @@ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 /* NIGHT-6 slice 4 (the user: today the stream is hard to see — it may flow towards the viewer): the stream now comes from the far forest
    and runs through the near foreground, past the spot where the moon's reflection falls (about 4.5 m ahead, a little left), and leaves
    under the eye. The water lies a little below the ground (lift −0.04) in a gently carved bed (CARVE, bankGround). */
-export const STREAM=Object.freeze({ pts:Object.freeze([[4.5,-24],[2.2,-17],[3.0,-11.5],[0.6,-7.5],[1.2,-4],[-0.6,-1.2],[-1.2,1.4],[-0.4,3.6],[1.0,6.5]]), half:0.42, lift:-0.04, seg:160 });
+export const STREAM=Object.freeze({ pts:Object.freeze([[4.5,-24],[2.2,-17],[3.0,-11.5],[0.6,-7.5],[1.2,-4],[-0.6,-1.2],[-1.2,1.4],[-0.4,3.6],[1.0,6.5]]), half:0.42, lift:-0.09, seg:160 });   // NIGHT-9: lift −0.09 (was −0.04): the water lower, its banks seen
 function cr(p0,p1,p2,p3,t){ const t2=t*t, t3=t2*t; return 0.5*((2*p1)+(-p0+p2)*t+(2*p0-5*p1+4*p2-p3)*t2+(-p0+3*p1-3*p2+p3)*t3); }
 /* the point at u (0…1) → { x, z, tx, tz (unit tangent), y (the ground there + the water's lift) } */
 export function streamAt(u){
@@ -35,7 +35,7 @@ export function streamNear(x, z){
 }
 /* NIGHT-6 slice 4: the bed — depth at the centre, falling to 0 between from × half and half + to (smooth); bankGround = the floor with the
    bed carved (the fireflies keep forestGround); d (the distance to the centre line) may be passed when known */
-export const CARVE=Object.freeze({ depth:0.16, from:0.6, to:0.55 });
+export const CARVE=Object.freeze({ depth:0.26, from:0.6, to:0.75 });   // NIGHT-9: deeper and wider (the banks slope down into the water; were 0.16, 0.55)
 export function bankGround(x, z, d=streamNear(x, z).d){ const C=CARVE, a=STREAM.half*C.from, b=STREAM.half+C.to, t=clamp((d-a)/(b-a),0,1); return forestGround(x,z)-C.depth*(1-t*t*(3-2*t)); }
 /* MUSHROOMS and FLOWERS: n of each kind, seeded, in the aisle (|x| ≤ 6, z 0.5 … −12.5 — not under the camera), kept off the water */
 export const LIFE=Object.freeze({ seed:0x4D555348, shrooms:28, blooms:10, reach:2.6, tau:0.7, base:0.22, breathe:0.12 });

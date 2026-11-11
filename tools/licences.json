@@ -168,6 +168,36 @@
    "replace": "kept — our own generated material (NIGHT-6: the user's rule that what never changes is prepared ahead as files)"
   },
   {
+   "id": "stream-recording",
+   "name": "The night forest's stream: a field recording of soft flowing water («stream-river-water-up-close»), played in grains by the nature sound (NIGHT-8b)",
+   "class": "sound",
+   "use": "shipped",
+   "version": "Freesound #433589 (Wikimedia Commons file SHA-1 27245d1abe3a5303e862bb9a489e2ba17dd452bf)",
+   "licence": "CC0-1.0",
+   "source": "jackthemurray, «stream-river-water-up-close», Freesound https://freesound.org/people/jackthemurray/sounds/433589/ — mirrored on Wikimedia Commons as «433589 jackthemurray stream-river-water-up-close.wav» (https://commons.wikimedia.org/wiki/File:433589_jackthemurray_stream-river-water-up-close.wav), Creative Commons Zero 1.0 Public Domain Dedication (http://creativecommons.org/publicdomain/zero/1.0/). Our edit (2026-11-11, ffmpeg with LAME, dev tools outside the repo): 0.5–68.4 s, the two channels averaged to one, rumble below 55 Hz removed, +24 dB, low-passed at 11 kHz, MP3 80 kbit/s mono 48 kHz.",
+   "files": [
+    "apps/night/rooms/forest/sound/stream.mp3"
+   ]
+  },
+  {
+   "id": "forest-floor-scan",
+   "name": "The night forest's bare floor, photo-scanned: «Leaves Forest Ground» — colour, normal (OpenGL) and AO/roughness/metal maps, smaller copies per picture level (NIGHT-9)",
+   "class": "image",
+   "use": "shipped",
+   "version": "Poly Haven, 2k JPG (published 2022-06-19); our copies re-encoded at 2048 / 1024 / 512 px",
+   "licence": "CC0-1.0",
+   "source": "Poly Haven, https://polyhaven.com/a/leaves_forest_ground — photography Dimitrios Savva, processing Dario Barresi; every Poly Haven asset is CC0 1.0 (https://polyhaven.com/license). Downloaded 2026-11-11 (SHA-1 of the 2k originals: diff fac51b5c30e6623f0b95dcd85cf0239c440eb30d, nor_gl 16902982b2c82ecc4a4dbae73107fc0446631341, arm 26203870a0db64bc897fc05502a8bad99e9b4685), resized with ffmpeg (a dev tool outside the repo).",
+   "files": [
+    "apps/night/rooms/forest/scan/litter-arm-1024.jpg",
+    "apps/night/rooms/forest/scan/litter-arm-512.jpg",
+    "apps/night/rooms/forest/scan/litter-col-1024.jpg",
+    "apps/night/rooms/forest/scan/litter-col-2048.jpg",
+    "apps/night/rooms/forest/scan/litter-nor-1024.jpg",
+    "apps/night/rooms/forest/scan/litter-nor-2048.jpg"
+   ],
+   "replace": "kept while the user compares it with our baked floor (NIGHT-9); CC0 photo material"
+  },
+  {
    "id": "system-fonts",
    "name": "Interface and canvas text — the device's system fonts (CSS --font stack, canvas system-ui)",
    "class": "font",

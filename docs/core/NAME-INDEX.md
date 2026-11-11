@@ -37,6 +37,11 @@ NIGHT-2 stage 2: the hand's calibration screens over CORE-1's engine (core/handc
 - const (8): `CAL_KEY`, `CAL_OPEN`, `travelS`, `travelPos`, `fxV`, `fxPos`, `calActive`, `calDbg`
 - fn (9): `calWire`, `calOfferIfNew`, `calStep`, `calSideApply`, `calSideSet`, `calResetAll`, `calAbort`, `calSettingsRender`, `calTick`
 
+## apps/night/camera.js
+NIGHT-10 — CHOOSING THE CAMERA (Settings → Camera).
+- const (3): `CAM_KEY`, `camEnvDbg`, `camDbg`
+- fn (3): `camRestore`, `camWire`, `camRender`
+
 ## apps/night/cards.js
 NIGHT-7 — THE FIRST CARDS: after the calibration offer on a first start (and from Settings → «How to play»), four short cards with simple drawn pictures, written from the real gestures (core/gestur…
 - const (6): `CARDS_KEY`, `cardsDue`, `cardsDone`, `cardsOpen`, `cardsDbg`, `cardsEnvDbg`
@@ -48,8 +53,8 @@ NIGHT-7b — NIGHT'S EDITION: the build's (core/edition.js: 'release' in a playe
 
 ## apps/night/fullscreen.js
 NIGHT-7c — FULL SCREEN on computers and Android (Chrome, Edge, Firefox; iPadOS Safari through its prefixed door).
-- const (8): `fsApi`, `fsOn`, `fsStandalone`, `fsStarted`, `fsFlowEnd`, `fsOnChange`, `fsCanToggle`, `fsDbg`
-- fn (3): `fsBegin`, `fsFlowTap`, `fsToggle`
+- const (9): `fsApi`, `fsOn`, `fsStandalone`, `FS_RETRIES`, `fsStarted`, `fsOnChange`, `fsCanToggle`, `fsDbg`, `fsAskAlwaysDbg`
+- fn (2): `fsBegin`, `fsToggle`
 
 ## apps/night/icons.js
 NIGHT-7c — NIGHT'S OWN DRAWN ICONS (our own work, rule #32), added to the shared table through core's door (CORE-15) before the page's markup is filled (main.js imports this right after the texts).
@@ -84,10 +89,24 @@ NIGHT-8: THE STREAM'S MURMUR — the law and the synthesis, pure (rule #36; data
 - const (2): `BROOK`, `brookStats`
 - fn (4): `checkBrookVoices`, `brookNew`, `brookRender`, `brookOut`
 
+## apps/night/pure/brookrec.js
+NIGHT-8b: THE STREAM FROM A RECORDING — the law, pure (rule #36; data row «NIGHT stream recording (app)»), run unchanged by the nature worklet (apps/night/worklets/nature-worklet.js) and by the lis…
+- const (3): `BROOK_REC`, `recMinLen`, `recStats`
+- fn (2): `recNew`, `recOut`
+
+## apps/night/pure/camera.js
+NIGHT-10 — THE CAMERAS AS THE PERSON READS THEM (pure, rule #36; data row «NIGHT camera names (app)»).
+- const (2): `cleanCamName`, `camMobile`
+- fn (1): `cameraNames`
+
 ## apps/night/pure/cycle.js
 RUN 9 — THE NIGHT over the forest, as numbers.
 - const (7): `NIGHT`, `CLOUD_PASSES`, `sleepProgress`, `MOOD_TC`, `RARE`, `EMBLEM_AT`, `emblemPoints`
 - fn (4): `nightAt`, `nightDeep`, `rareInit`, `rareStep`
+
+## apps/night/pure/fsicons.js
+NIGHT-8b — THE FULL-SCREEN SIGN, pure data (apps/night/icons.js draws it filled): the plain standard sign, four separate corner brackets with square corners (thin round-joined strokes read as a pin…
+- const (2): `FS_ENTER`, `FS_EXIT`
 
 ## apps/night/pure/heard.js
 NIGHT-6 slice 1 — WHEN A SOUND IS HEARD, on the page's clock.
@@ -121,7 +140,8 @@ NIGHT-6 slice 3 — THE FOREST FLOOR (parts of the night forest room; forest.js 
 
 ## apps/night/rooms/forest/forest-ground.js
 NIGHT-8 — THE BARE GROUND'S LARGE SCALE (a part of the night forest room; forest.js applies it to the ground's material, after the ground waves and the wet banks).
-- fn (1): `patchGroundMacro`
+- const (1): `GROUND_GRADE`
+- fn (2): `patchGroundMacro`, `patchGroundNight`
 
 ## apps/night/rooms/forest/forest-gust.js
 NIGHT-6 slice 6 — THE EFFECTS HAND MOVES THE FOREST (a part of the night forest room; forest.js builds it; the numbers are ./pure/gust.js).
@@ -135,6 +155,11 @@ NIGHT-6 slice 9 — HIDDEN THINGS THE LIGHT FINDS (a part of the night forest ro
 RUN 9 (slice 2) — THE FOREST ANSWERS THE PLAYING, softly (never busy).
 - const (1): `WATER_GL`
 - fn (5): `patchGroundWaves`, `patchSway`, `patchWetGround`, `patchSoftEdges`, `buildLife`
+
+## apps/night/rooms/forest/forest-mirror.js
+NIGHT-9 — THE WATER'S MIRROR (a part of the night forest room; forest.js builds it after the paint pass).
+- const (2): `MIRROR_LAYER`, `MIRROR_LOOK`
+- fn (1): `buildMirror`
 
 ## apps/night/rooms/forest/forest-paint.js
 NIGHT-6 slice 8 — THE PAINTED DISTANCE AND THE FILM (the night forest room's picture pass; forest.js builds it; the numbers are ./pure/paint.js).
@@ -151,12 +176,12 @@ NIGHT-6 slice 4 — THE STREAM'S SURROUNDINGS (parts of the night forest room; f
 
 ## apps/night/rooms/forest/forest-wood.js
 NIGHT-6 slice 5 — MOSS, ROOTS AND FALLEN WOOD (parts of the night forest room; forest.js builds them; the places are ./pure/wood.js): - THE WOOD: roots of the near trees, a log on the bank, a log a…
-- const (1): `patchBark`
-- fn (5): `woodUniforms`, `trunkGeo`, `limbGeo`, `buildWood`, `patchShade`
+- const (2): `gnd7Src`, `patchBark`
+- fn (6): `woodUniforms`, `barkAttrs`, `trunkGeo`, `limbGeo`, `buildWood`, `patchShade`
 
 ## apps/night/rooms/forest/forest.js
 VIS1c (RUN 6, Night plan §3) — THE NIGHT FOREST ROOM's picture: a scene module built with three.js r128 (vendored, loaded by the scene host apps/night/scene/host.js).
-- const (4): `FOREST_LEVELS`, `FOREST_BOUNDS`, `FOREST_TEX`, `forestAssetsDbg`
+- const (6): `FOREST_LEVELS`, `FOREST_BOUNDS`, `GROUND_ALBEDO`, `FOREST_TEX`, `forestGroundDbg`, `forestAssetsDbg`
 - fn (2): `forestAssets`, `buildForest`
 - → ./pure/layout.js (1): `FOREST_SEED`
 
@@ -172,7 +197,7 @@ NIGHT-6 slice 7 — THE CANOPY AND THE MOON'S WINDOW, as numbers.
 
 ## apps/night/rooms/forest/pure/fireflies.js
 VIS1c (RUN 6, Night plan §3.1) — the night forest's WILD FIREFLIES and its ground, as numbers.
-- const (3): `FOREST_FLIES`, `holdK`, `FOREST_DEPTH`
+- const (4): `FOREST_FLIES`, `holdK`, `RELIEF`, `FOREST_DEPTH`
 - fn (6): `rateK`, `forestGround`, `fliesInit`, `fliesStep`, `fliesDart`, `depthDistance`
 
 ## apps/night/rooms/forest/pure/floor.js
@@ -210,6 +235,11 @@ NIGHT-6 slice 8 — THE PAINTED DISTANCE AND THE FILM, as numbers.
 - const (3): `PAINT`, `strokeR`, `breathAt`
 - fn (2): `strokeTaps`, `vignetteAt`
 
+## apps/night/rooms/forest/pure/relief.js
+NIGHT-9 — THE GROUND'S ROOT BULGES AND OCCLUSION, as numbers (pure, rule #36; data row «FOREST relief (app)»).
+- const (2): `ROOTS`, `AO`
+- fn (2): `groundRoots`, `groundOcclusion`
+
 ## apps/night/rooms/forest/pure/room.js
 NIGHT-3: THE FOREST ROOM'S RECORD — what the room is, as data (pure, rule #36; checked by apps/night/pure/room.js, data row «NIGHT room records»).
 - const (1): `FOREST_ROOM`
@@ -219,10 +249,15 @@ NIGHT-6 slice 4 — THE STREAM'S LIFE, as numbers.
 - const (3): `STREAM_LIFE`, `streamLength`, `STREAM_SOUND`
 - fn (7): `outOfWater`, `streamRocks`, `streamPebbles`, `floatersInit`, `floatAt`, `mistStrips`, `streamVoices`
 
+## apps/night/rooms/forest/pure/water.js
+NIGHT-9 — THE STREAM'S FLOW, as numbers (pure, rule #36; data row «FOREST water flow (app)»).
+- const (1): `WATER_FLOW`
+- fn (2): `waterWidth`, `waterSpeed`
+
 ## apps/night/rooms/forest/pure/wood.js
 NIGHT-6 slice 5 — MOSS, ROOTS AND FALLEN WOOD, as numbers.
-- const (4): `WOOD`, `trunkRadius`, `trunkOuter`, `blobDark`
-- fn (5): `flareAt`, `nearTrees`, `twigShape`, `woodPlaces`, `shadeBlobs`
+- const (5): `WOOD`, `trunkRadius`, `trunkOuter`, `barkMossUnit`, `blobDark`
+- fn (6): `flareAt`, `barkMoss`, `nearTrees`, `twigShape`, `woodPlaces`, `shadeBlobs`
 
 ## apps/night/rooms/forest/standin.js
 NIGHT-3: the forest's 2D STAND-IN — the «low» level and the fallback without WebGL (or after a lost context): the night's two colours and a soft glow at each hand (the playing hand lime, the effect…
@@ -235,7 +270,7 @@ NIGHT-3: THE ROOMS — the order a player meets them (ids, rule #37) and each ro
 ## apps/night/roomswitch.js
 NIGHT-3 stage 5 part 2: THE ROOM SWITCH — one door for everything a room change touches, in this order: the music bed fades out and holds (it takes the new room's recipes while silent); the picture…
 - const (8): `ROOM_KEY`, `ROOM_NAME_MS`, `roomCurrent`, `roomNature`, `natureModule`, `roomNext`, `roomSwitchDbg`, `natureAmbDbg`
-- fn (4): `natureLoad`, `natureLight`, `roomRestore`, `roomSwitch`
+- fn (6): `natureLoad`, `natureRecOf`, `natureRecPcm`, `natureLight`, `roomRestore`, `roomSwitch`
 
 ## apps/night/scene/host.js
 THE SCENE HOST and Night's BACKGROUNDS (VIS1b, RUN 6; Night's own since CORE-8 — the shared UI reaches it through hooks.scene).
@@ -250,7 +285,7 @@ RUN 7 (C6 + C11, Night plan §5; docs/night/QUALITY.md points 4, 5, 6, 9, 10) �
 ## apps/night/sound/ambience.js
 THE ROOMS' AMBIENCE (RUN 7, C4c; Night's own since CORE-7): drone + wind + distant crickets + one soft echo (NIGHT-8: + the stream), built from a room's NATURE recipe (the forest's: apps/night/room…
 - const (3): `NATURE_WORKLET`, `BROOK_SLEEP_S`, `AMB_SWAP`
-- fn (8): `buildAmbience`, `ambienceSchedule`, `ambienceTune`, `ambienceSet`, `ambienceRoom`, `ambienceBrook`, `ambienceBrookLight`, `ambienceBrookStats`
+- fn (9): `buildAmbience`, `ambienceSchedule`, `ambienceTune`, `ambienceSet`, `ambienceRoom`, `ambienceBrook`, `ambienceBrookLight`, `ambienceBrookStats`, `ambienceBrookRec`
 
 ## apps/night/sound/bed.js
 NIGHT-3 stage 4: THE MUSIC BED's SOUND — built once on the first On into the master's input (the sleep fade and the limiter cover it; live sound, never a track — rule #31), from a room's bed recipe B.
@@ -856,8 +891,8 @@ Vercel Web Analytics queue stub — a classic script, not a module: calls made b
 
 ## core/vision.js
 (no head comment)
-- const (11): `video`, `canvas`, `ctx`, `camLabel`, `modelInfo`, `visionOpts`, `VISION_DEF`, `lowInfo`, `pathInfo`, `pumpStats`, `camStats`
-- fn (19): `initVision`, `initDetector`, `startCamera`, `switchCamera`, `setHandsSink`, `pollFrame`, `camInfo`, `setHandsTracked`, `setModelDelegate`, `setCamFps`, `setDetectPath`, `setLowLight`, `pumpDbg`, `pumpStepDbg`, `detRunDbg`, `lowDbg`, `camSimDbg`, `camOpenDbg`, `camStatsDbg`
+- const (12): `video`, `canvas`, `ctx`, `camLabel`, `modelInfo`, `visionOpts`, `VISION_DEF`, `lowInfo`, `pathInfo`, `pumpStats`, `camStats`, `setCameraPick`
+- fn (22): `initVision`, `initDetector`, `startCamera`, `switchCamera`, `setHandsSink`, `pollFrame`, `camInfo`, `setHandsTracked`, `setModelDelegate`, `setCamFps`, `setDetectPath`, `setLowLight`, `pumpDbg`, `pumpStepDbg`, `detRunDbg`, `lowDbg`, `camSimDbg`, `camOpenDbg`, `camStatsDbg`, `cameraSwitch`, `cameraList`, `cameraPickInfo`
 
 ## tools/probes/core/calpanel.js
 CORE-1 CP4: a development panel for the calibration, no app UI and no console needed: run it, set the sliders, measure the wrist.
@@ -1113,7 +1148,7 @@ NIGHT-7: row «NIGHT first cards» — the four first cards: they open, each has
 
 ## tools/probes/night/forest.js
 VIS1c (RUN 6, Night plan §10, review 2026-10-17): two rows (quick and all).
-- fn (17): `checkForestRoom`, `checkBackgrounds`, `checkForestPicture`, `checkNightCycle`, `checkForestResponse`, `checkForestDetail`, `checkForestRare`, `checkForestLevels`, `checkForestAnswers`, `checkForestMelody`, `checkForestFloor`, `checkForestStream`, `checkForestWood`, `checkForestGust`, `checkForestCanopy`, `checkForestPaint`, `checkForestHidden`
+- fn (19): `checkForestRoom`, `checkBackgrounds`, `checkForestPicture`, `checkNightCycle`, `checkForestResponse`, `checkForestDetail`, `checkForestRare`, `checkForestLevels`, `checkForestAnswers`, `checkForestMelody`, `checkForestFloor`, `checkForestStream`, `checkForestWood`, `checkForestFlies`, `checkForestGust`, `checkForestCanopy`, `checkForestPaint`, `checkForestHidden`, `checkForestGroundWater`
 
 ## tools/probes/night/headroom-calc.js
 NIGHT-1: the headroom page's sums, pure (runs in node: tools/probe-data.mjs, row «NIGHT-1 headroom sums»).
@@ -1167,7 +1202,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 - const (5): `TEST_ROOM_ID`, `TEST_ROOM`, `testRoomMode`, `testRoomInfo`, `testRoomFreeLeaks`
 - fn (2): `testRoomInstall`, `testRoomRemove`
 
-_229 modules, 2562 exported names._
+_236 modules, 2606 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 
@@ -1191,3 +1226,5 @@ NIGHT-3 stage 3 (2026-11-03): `apps/night/pure/cycle.js` `MOOD_LOOKS`, `MOOD_OF`
 NIGHT-7b (2026-11-11): `apps/night/ghost.js` deleted (`GHOST`, `ghostArm`, `ghostStop`, `ghostOn`, `ghostAt`, `ghostFrame`; Night's `frameFilter`); row «NIGHT ghost light» removed; `#nightFirstRun`, key `night.firstRun`; keys `night.stepPhones`, `night.stepCamera`; storage `handsong.nightSeen` (no longer read; the cards' own key is `handsong.nightCards`); body class `night-seen`; ui-snap screen `night-ghost` → `night-cards`. Moved from `core/i18n.js` to `apps/night/texts.js` (reworded): `night.phones`, `night.cal.offerB`, `night.cal.doneB`.
 
 NIGHT-7c (2026-11-11): storage `handsong.nightMusic` and `handsong.nightMusicVol` no longer read (now `handsong.nightMusicMode`, `handsong.nightMusicLevel`); the cards' version `1` → `2`; the forest icon on the Depth bar and the Lightweight switch → `depth`, `lightweight`.
+
+NIGHT-8b (2026-11-11): `apps/night/fullscreen.js` `fsFlowTap` and `fsFlowEnd` deleted (the page's own tap listener asks for full screen once the camera runs; the flow needs no end); the full-screen icon paths moved to `apps/night/pure/fsicons.js` (`FS_ENTER`, `FS_EXIT`); the bark's program key `handsong.bark7` → `handsong.bark8`.

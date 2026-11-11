@@ -11,9 +11,11 @@ import { calTick } from './calib.js';
 import { ROOMS } from './rooms/index.js';
 import { soundModAdd } from '../../core/soundmods.js';
 import { natureModule, roomRestore } from './roomswitch.js';
+import { camRestore } from './camera.js';   // NIGHT-10: the camera kept on this device
 
 for(const R of ROOMS) sceneRoomAdd(R.record.id, { load:R.load, standIn:R.standIn, three:()=>import('./vendor/three-r128/three.min.js') });   // NIGHT-3: the rooms, by id
 roomRestore();   // NIGHT-3 stage 5 part 2: the room remembered on this device, before the first picture
+camRestore();   // NIGHT-10: before the start — the start opens the kept camera (the default when it is gone)
 /* NIGHT-6 (the user): the current room's code and the files of its level are fetched while the start card shows, so the first opening finds them ready */
 setTimeout(()=>{ const R=ROOMS.find(r=>r.record.id===sceneRoom()); if(R && R.prefetch && sceneLevel()!=='minimal') R.prefetch({ level:sceneLevel() }).catch(()=>{}); }, 0);
 hooks.scene={ set:setBackground, of:backgroundOf, info:sceneInfo };   // CORE-8: the shared UI (backgrounds, the latency meter's scene line) reaches the host through this door

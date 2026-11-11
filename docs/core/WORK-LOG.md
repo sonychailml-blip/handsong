@@ -4,6 +4,12 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`. Checkpoints A–E of SPLIT-2 are its last sections.
 
+# CORE-16 (2026-11-11): choosing a camera (for NIGHT-10)
+Tree hashes before: core b48faaf6170ac8e3 · apps/full d6b90cf2cb4be6da · apps/night de5cfad6c4d82c51. After: core 9311771e25bd2c02 · apps/full d6b90cf2cb4be6da (unchanged) · apps/night 9cc7fe68a2e4e4d5.
+- `core/vision.js`, opt-in (core rule 4; Full calls none of it): `setCameraPick({ deviceId } | null)` — every later open takes the device (`deviceId: { exact }`); a device that is gone (OverconstrainedError / NotFound / NotReadable) opens the default by facing quietly (`cameraPickInfo().missed`); a picked camera sets `camFacing` from its own settings ('environment' → not mirrored; a webcam without a facing faces the person), so `mirrored()` stays the one source (hard rule #13). `cameraSwitch(pick)` live (the same detector and pump); `cameraList()` (videoinput: id, label, facing guessed from the label's words; labels may be empty before the permission); `cameraPickInfo()`. Probe door: `camOpenDbg({ noFallback })` (CONTROL). With no pick every open is byte for byte as before.
+- The hand keys stay MediaPipe's labels (never flipped): the raw frame of a camera turned to the person has the same geometry front or back, so the playing hand keeps its key.
+- Checks: both apps' runs (NIGHT-10 log): Full P.quick PASS (FULL untouched 0), Night PASS with the runner's «NIGHT camera choice».
+
 # CORE-15 (2026-11-11): an app's own drawn icons (for NIGHT-7c)
 Tree hashes before: core fcc89441767f3d57 · apps/full d6b90cf2cb4be6da · apps/night a37f38449a52a06e. After: core b48faaf6170ac8e3 · apps/full d6b90cf2cb4be6da (unchanged) · apps/night 7c0f340534617f72.
 - `core/icons.js` `svgIconAdd(name, shapes)`: adds to `SVG_ICONS` (a bad name, a taken name or no shapes refused in words). Opt-in: Full calls nothing; the table it reads is unchanged. Night's icons stay in the app (`apps/night/icons.js`).

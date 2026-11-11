@@ -13,6 +13,7 @@
 import { STREAM, STREAM_LINE, streamNear, LIFE, lifePlaces, pulseOf, RINGS, ringsNew, ringAdd, ringsAge } from './pure/forestlife.js';
 import { ANSWERS, noteRingAmp, swellAt, bedClusters } from './pure/answers.js';   // NIGHT-6 slice 1: a note rings the stream; the music bed's swells
 import { GUST } from './pure/gust.js';   // NIGHT-6 slice 6: the gust's numbers (the sway's shader)
+import { WATER_FLOW, waterWidth, waterSpeed } from './pure/water.js';   // NIGHT-9: the flow's width and speed along the stream
 
 const f=v=>Number(v).toFixed(4);
 /* the ground's material gains the ground waves: U = { uNow, uGW (6 × vec4: x, z, t0 (−1 free), amp), uGWCol, uGWK (gain: 1; a probe's control sets 0) } */
@@ -79,22 +80,28 @@ export function patchSoftEdges(mat){
    bright GLINTS that ride the flow downstream; the SHALLOWS see-through towards the banks (stones on the bed, refracted by the ripples, fading
    with depth); WHITE WATER and ripples round the rocks that stand in it (uRk: a collar on the upstream side, a wake of streaks downstream); the
    playing light's sparkle and glow as before. Quiet: everything slow and small. */
-const WATER_V=`attribute vec2 aTan; varying vec3 vW; varying vec2 vUv; varying vec2 vTan;
-void main(){ vUv=uv; vTan=aTan; vec4 w=modelMatrix*vec4(position,1.0); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }`;
+const WATER_V=`attribute vec2 aTan; attribute vec2 aFlow; varying vec3 vW; varying vec2 vUv; varying vec2 vTan; varying vec2 vFlow;
+void main(){ vUv=uv; vTan=aTan; vFlow=aFlow; vec4 w=modelMatrix*vec4(position,1.0); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }`;
 export const WATER_GL=8, WATER_RK=12;   // NIGHT-8: glowing things reflected, rocks in the water
 const WATER_F=W=>`uniform vec4 uGust; uniform vec2 uGustDir;
 uniform float uNow, uMoonK, uLightK, uFogD, uAlpha, uLen, uHalf, uWide; uniform vec3 uDeep, uSky, uMoonCol, uMoonPos, uLightPos, uLightCol, uRingCol, uFogCol, uBed; uniform vec4 uWR[${W.n}];
 uniform vec4 uGl[${WATER_GL}]; uniform vec3 uGlC[${WATER_GL}]; uniform vec4 uRk[${WATER_RK}];
-varying vec3 vW; varying vec2 vUv; varying vec2 vTan;
+uniform sampler2D tMir; uniform mat4 uMirM; uniform float uMirK, uMirGain;   // NIGHT-9: the mirror (forest-mirror.js; uMirK 0: none — the sky colour as before)
+varying vec3 vW; varying vec2 vUv; varying vec2 vTan; varying vec2 vFlow;
 float h21(vec2 p){ p=fract(p*vec2(123.34,456.21)); p+=dot(p,p+45.32); return fract(p.x*p.y); }
 float vn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(h21(i),h21(i+vec2(1.0,0.0)),f.x), mix(h21(i+vec2(0.0,1.0)),h21(i+vec2(1.0,1.0)),f.x), f.y); }
-float hgt(vec2 q, float t){ return vn(q*vec2(0.9,2.4)-vec2(t*0.55,0.0))*0.65+vn(q*vec2(2.3,4.8)-vec2(t*1.1,t*0.05))*0.35; }
+float hgt0(vec2 q){ return vn(q*vec2(0.9,2.4))*0.65+vn(q*vec2(2.3,4.8))*0.35; }
+/* NIGHT-9: THE FLOW MAP — the pattern carried downstream at this place's own speed (vFlow.x: narrows faster, pools slower) in two phases half a
+   cycle apart, crossfaded, so a speed that changes along the stream never tears the pattern (a scroll by t·speed would shear without end) */
+float hgt(vec2 q, float t){ float c=t*0.4, f1=fract(c), f2=fract(c+0.5), w=abs(2.0*f1-1.0), d=vFlow.x*1.5;   // ≈ 0.6 units a second at speed 1 (as before)
+ 
+  return mix(hgt0(q-vec2(f1*d, 0.0)), hgt0(q-vec2(f2*d, 0.0)+vec2(0.37, 0.61)), w); }
 /* the bed's stones: the nearest cell centre's distance (a rounded stone in each cell, darker gaps) */
 float stones(vec2 p){ vec2 i=floor(p), f=fract(p); float d=1.0, id=0.0;
   for(int y=-1;y<=1;y++) for(int x=-1;x<=1;x++){ vec2 g=vec2(float(x),float(y)), o=vec2(h21(i+g), h21(i+g+17.3))*0.8+0.1; float e=length(g+o-f); if(e<d){ d=e; id=h21(i+g+3.1); } }
   return (1.0-smoothstep(0.25,0.48,d))*(0.55+0.45*id); }
 void main(){
-  float t=uNow, acr=(vUv.y-0.5)*2.0*uWide, eD=abs(acr)/uHalf; vec2 q=vec2(vUv.x*uLen, acr), p=vW.xz;
+  float t=uNow, acr=(vUv.y-0.5)*2.0*uWide, eD=abs(acr)/(uHalf*vFlow.y); vec2 q=vec2(vUv.x*uLen, acr), p=vW.xz;   // NIGHT-9: the width along the stream (pure/water.js)
   vec3 V=normalize(vW-cameraPosition); float dist=length(vW-cameraPosition);
   vec2 Tn=normalize(vTan), Bn=vec2(-Tn.y, Tn.x);
   float e=0.05, h0=hgt(q,t), hx=hgt(q+vec2(e,0.0),t), hy=hgt(q+vec2(0.0,e),t), str=(0.45+0.6*smoothstep(0.5,1.0,eD))/(1.0+dist*0.1);
@@ -109,18 +116,22 @@ void main(){
     float al=dot(dv,Tn), ac=dot(dv,Bn), up=smoothstep(0.2,-0.6,al/(d+1e-4));
     float col=exp(-sd*sd/(0.0012+0.012*k.z))*(0.15+0.85*up)*smoothstep(0.35,0.75,vn(vec2(atan(dv.y,dv.x)*4.0+t*0.7, sd*30.0-t*3.0)));
     float wl=max(al, 0.0), wake=exp(-ac*ac/((k.z*0.6+wl*0.25)*(k.z*0.6+wl*0.25)))*exp(-wl/(0.35+k.z*2.0))*step(0.0, al)*smoothstep(0.62,0.85,vn(vec2(wl*7.0-t*2.4, ac*16.0)));
-    foam+=col*0.8+wake*0.6; gw+=dv/(d+1e-4)*sin(sd*38.0-t*5.0)*exp(-sd*4.0)*0.05; }
+    foam+=col*0.8+wake*0.6; gw+=dv/(d+1e-4)*sin(sd*38.0-t*5.0)*exp(-sd*4.0)*0.05;
+    gw+=vec2(-dv.y, dv.x)/(d+1e-4)*exp(-sd*2.6)*step(0.0, al)*0.07*sin(t*1.6*vFlow.x+sd*8.0-ac*5.0); }   // NIGHT-9: a small eddy turning behind it
   foam=min(foam, 1.0);
   vec3 N=normalize(vec3(-gw.x,1.0,-gw.y)), R=reflect(V,N);
-  float fres=0.03+0.97*pow(1.0-max(dot(-V,N),0.0),5.0);
+  float ndv=max(dot(-V,N),0.0), fres=0.02+0.98*pow(1.0-ndv,5.0);
+  float see=smoothstep(0.45,0.85,ndv)*(1.0-smoothstep(2.2,6.5,dist));   // NIGHT-9: looking down near the viewer the water is clear
   /* the body: near black; towards the banks the shallow bed shows through (stones, refracted, fading with depth) */
   float shallow=smoothstep(0.35,0.95,eD);
-  vec2 bp=p*4.1+gw*1.8+vec2(0.37*sin(p.y*1.7), 0.37*sin(p.x*1.3));   // the cells bent a little (no grid)
+  vec2 bp=p*4.1+gw*(1.8+2.6*see)+vec2(0.37*sin(p.y*1.7), 0.37*sin(p.x*1.3))+vec2(sin(t*1.3+p.x*3.1), cos(t*1.1+p.y*2.7))*0.07*see;   // the cells bent a little (no grid); NIGHT-9: the bed wobbling under the moving surface
   float stn=stones(bp)*(0.7+0.3*vn(bp*0.37));
   vec3 bed=uBed*(0.5+0.5*stn)*(0.04+0.11*uMoonK+0.5*uLightK/(1.0+dot(uLightPos-vW,uLightPos-vW)*0.5));   // dim: the tokens are drawn as linear (sRGB out)
-  vec3 body=mix(uDeep*0.45, bed, shallow*0.5);
+  vec3 body=mix(uDeep*0.45, bed*(1.0+0.8*see), max(shallow*0.5, see*0.75));
   vec3 sky=mix(uFogCol, uSky, clamp(R.y*2.0,0.0,1.0))*0.11;
-  vec3 col=mix(body, sky, fres*(1.0-0.5*shallow));
+  /* NIGHT-9: the reflection — the mirror's picture of the trunks and the crowns against the sky and the moon (bent by the ripples), else the sky */
+  if(uMirK>0.0){ vec4 mp=uMirM*vec4(vW,1.0); vec2 mu=mp.xy/mp.w+gw*0.9; vec3 mr=sRGBToLinear(texture2D(tMir, clamp(mu, 0.002, 0.998))).rgb*uMirGain; sky=mix(sky, mr, uMirK); }
+  vec3 col=mix(body, sky, min(1.0, fres*1.35)*(1.0-0.5*shallow)*(1.0-0.7*see));
   /* the moon: its image broken by the ripples into sparkles along its path; and small bright glints that ride the flow */
   vec3 M=normalize(uMoonPos-vW); float mk=max(dot(R,M),0.0);
   float sp=smoothstep(0.7,0.97,vn(q*vec2(5.0,12.0)-vec2(t*1.6,0.0)));
@@ -135,7 +146,8 @@ void main(){
   float fe=smoothstep(0.75,1.0,eD)*(1.0-smoothstep(1.0,1.3,eD)), fn=smoothstep(0.7,0.92,vn(q*vec2(1.6,6.0)-vec2(t*0.9,0.0)));
   vec3 lit=uMoonCol*(0.04+0.16*uMoonK)+uLightCol*uLightK*0.12/(1.0+ld*ld*0.3);
   col=mix(col, lit*(0.9+0.4*vn(q*vec2(14.0,30.0)-vec2(t*3.0,0.0))), foam*0.8)+lit*fe*fn*0.35;
-  float a=(1.0-smoothstep(1.05,1.45,eD))*smoothstep(0.0,0.03,vUv.x)*mix(1.0, 0.7, shallow*(1.0-foam));
+  col*=1.0-0.4*smoothstep(0.82,1.02,eD)*(1.0-foam);   // NIGHT-9: the dark wet line along the water's edge
+  float a=(1.0-smoothstep(1.05,1.45,eD))*smoothstep(0.0,0.03,vUv.x)*mix(1.0, 0.7, shallow*(1.0-foam))*mix(1.0, 0.6, see*(1.0-foam));
   col=mix(col,uFogCol,1.0-exp(-uFogD*uFogD*dist*dist));
   gl_FragColor=vec4(col, a*uAlpha);
   #include <tonemapping_fragment>
@@ -185,17 +197,19 @@ export function buildLife(ctx){
   /* the stream: a ribbon over the ground along the core's line */
   /* NIGHT-6 slice 4: the ribbon a little wider than the water (it fades out over the carved bank), u along by length, a tangent per vertex,
      three strips across (the middle line carries the flow's detail); tapered only at its far end */
-  const L=STREAM_LINE, WIDE=STREAM.half+0.2, AC=[0, 0.5, 1], pos=new Float32Array(L.length*3*3), uv=new Float32Array(L.length*3*2), tan=new Float32Array(L.length*3*2), idx=[]; let len=0;
+  const L=STREAM_LINE, WIDE=STREAM.half*WATER_FLOW.width[1]+0.2, AC=[0, 0.5, 1], pos=new Float32Array(L.length*3*3), uv=new Float32Array(L.length*3*2), tan=new Float32Array(L.length*3*2), flow=new Float32Array(L.length*3*2), idx=[]; let len=0;   // NIGHT-9: wide enough for the widest pool
   L.forEach((p,i)=>{ if(i) len+=Math.hypot(p.x-L[i-1].x, p.z-L[i-1].z); }); let acc=0;
   L.forEach((p,i)=>{ if(i) acc+=Math.hypot(p.x-L[i-1].x, p.z-L[i-1].z); const u=acc/len, w=WIDE*Math.min(1, u*14+0.1), nx=-p.tz, nz=p.tx;
-    AC.forEach((a,k)=>{ const o=(a-0.5)*2*w, j=i*3+k; pos.set([p.x+nx*o, p.y, p.z+nz*o], j*3); uv.set([u, 0.5+(a-0.5)*w/WIDE], j*2); tan.set([p.tx, p.tz], j*2); });
+    const q0=L[Math.max(0, i-1)], fall=i ? (q0.y-p.y)/Math.max(1e-3, Math.hypot(p.x-q0.x, p.z-q0.z)) : 0, fs=waterSpeed(u, fall), fw=waterWidth(u);   // NIGHT-9: speed and width here
+    AC.forEach((a,k)=>{ const o=(a-0.5)*2*w, j=i*3+k; pos.set([p.x+nx*o, p.y, p.z+nz*o], j*3); uv.set([u, 0.5+(a-0.5)*w/WIDE], j*2); tan.set([p.tx, p.tz], j*2); flow.set([fs, fw], j*2); });
     if(i) for(let k=0;k<2;k++){ const a=(i-1)*3+k, b=i*3+k; idx.push(a, a+1, b, a+1, b+1, b); } });
-  const wg=new T.BufferGeometry(); wg.setAttribute('position', new T.BufferAttribute(pos,3)); wg.setAttribute('uv', new T.BufferAttribute(uv,2)); wg.setAttribute('aTan', new T.BufferAttribute(tan,2)); wg.setIndex(idx);
+  const wg=new T.BufferGeometry(); wg.setAttribute('position', new T.BufferAttribute(pos,3)); wg.setAttribute('uv', new T.BufferAttribute(uv,2)); wg.setAttribute('aTan', new T.BufferAttribute(tan,2)); wg.setAttribute('aFlow', new T.BufferAttribute(flow,2)); wg.setIndex(idx);
   const WU={ uGust:U.uGust, uGustDir:U.uGustDir, uNow:U.uNow, uMoonK:{ value:1 }, uLightK:{ value:0 }, uFogD:{ value:0.06 }, uAlpha:{ value:0.95 }, uLen:{ value:len }, uHalf:{ value:STREAM.half }, uWide:{ value:WIDE }, uDeep:{ value:new T.Color(C('forest-water')) }, uSky:{ value:pal.sky }, uMoonCol:{ value:pal.moonhalo },
     uMoonPos:{ value:V(-14,23,-55) }, uLightPos:{ value:V(0,1,0) }, uLightCol:{ value:new T.Color(C('forest-light')) }, uRingCol:{ value:new T.Color(C('forest-light')) }, uFogCol:{ value:pal.fog },
     uWR:{ value:Array.from({ length:RINGS.water.n }, ()=>new T.Vector4(0,0,-1,0)) },
     uGl:{ value:Array.from({ length:WATER_GL }, ()=>new T.Vector4(0,0,0,0)) }, uGlC:{ value:Array.from({ length:WATER_GL }, ()=>new T.Color()) }, uRk:{ value:Array.from({ length:WATER_RK }, ()=>new T.Vector4(0,0,0,0)) },
-    uBed:{ value:new T.Color(C('forest-streambed')) } };   // NIGHT-8
+    uBed:{ value:new T.Color(C('forest-streambed')) },   // NIGHT-8
+    tMir:{ value:null }, uMirM:{ value:new T.Matrix4() }, uMirK:{ value:0 }, uMirGain:{ value:1.0 } };   // NIGHT-9: the mirror (forest-mirror.js sets them)
   const wm=new T.ShaderMaterial({ uniforms:WU, vertexShader:WATER_V, fragmentShader:WATER_F(RINGS.water), transparent:true, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2 });
   const stream=new T.Mesh(wg, wm); stream.renderOrder=-1; s.add(stream); own.push(wg, wm);
   const SH=new T.Color(), BL=new T.Color();

@@ -75,5 +75,7 @@ export function buildPaint(ctx){
   /* probes: the pass's switches (uR, uSoft, uVig, uGrain, uGrade; direct: draw in one pass as without painting) → the previous values */
   function set(o){ if(!comp) return null; const U=comp.uniforms, was={}; for(const [k,v] of Object.entries(o||{})){ if(k==='direct'){ was.direct=direct; direct=!!v; } else if(U[k]){ was[k]=U[k].value; U[k].value=v; } } return was; }
   const state=()=>({ on, R, glow, taps: on ? strokeTaps(R).length : 0, frames, rebuilt, vignette:!!(comp && comp.uniforms.uVig.value), grain:!!(comp && comp.uniforms.uGrain.value), size:rt ? [rt.width, rt.height] : null });
-  return { render, state, set };
+  /* NIGHT-9: the glowing things' own depth test off (another pass draws — the water's mirror — whose depth is not the picture's) */
+  const glowDepthOff=()=>{ PU.uUseDepth7.value=0; };
+  return { render, state, set, glowDepthOff };
 }

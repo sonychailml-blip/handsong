@@ -24,7 +24,7 @@
      colours (textures add small numeric jitter around them). The firefly greens are the hand's light; the halo / mask entries are alpha
      ramps of white used as light masks (sprites, mist), not visible colours on their own. */
   --cv-forest-fog:#060e18; --cv-forest-sky:#1b2a46; --cv-forest-under:#040604; --cv-forest-moon:#6b84bd; --cv-forest-moonhalo:#9fb4dd;
-  --cv-forest-ground:#17160f; --cv-forest-moss:#30481c; --cv-forest-soil:#46321e; --cv-forest-leaf:#2b2213; --cv-forest-bark:#2e251e;
+  --cv-forest-ground:#17160f; --cv-forest-soil-night:#8c7862; --cv-forest-moss:#30481c; --cv-forest-soil:#46321e; --cv-forest-leaf:#2b2213; --cv-forest-bark:#2e251e;
   --cv-forest-bark-dark:rgba(8,6,5,.55); --cv-forest-bark-light:rgba(110,95,75,.28); --cv-forest-fern:#2c4a1e; --cv-forest-frond:#233a1a;
   --cv-forest-rock:#272b22; --cv-forest-rock-grey:#33363a; --cv-forest-rock-warm:#3a3027; --cv-forest-rock-lichen:#6a7264; --cv-forest-mist:#8aa2c8; --cv-forest-fly:#d6ff7a; --cv-forest-wild:#c8ff78; --cv-forest-light:#c6ff7a;
   /* RUN 9: the moods' looks (the room record's looks) — Glow = the base set above + haze / cloud; Dusk and Mist their own sets */
@@ -237,6 +237,7 @@ body.night-boot #start .startCard > h1, body.night-boot #start .startTag, body.n
 body.night-boot #installHint, body.night-boot #learnMsg, body.night-boot #start .startFoot > p:not(.startLang){ display:none !important; }
 body.night-boot .night-start-head{ display:flex !important; flex-direction:column; align-items:center; gap:var(--night-gap-sm); margin:0 0 var(--night-gap); }
 .night-start-head .emblem{ width:150px; height:30px; }
+.night-start-head > [data-svg="emblem"]{ display:block; width:150px; height:30px; }   /* NIGHT-8b: its place kept before the drawing comes (no jump on the first paint) */
 .night-steps{ list-style:none; margin:var(--night-gap) 0; padding:0; text-align:left; }
 body.night-boot .night-steps{ display:flex !important; flex-direction:column; gap:var(--night-gap); }
 .night-steps li{ display:grid; grid-template-columns:var(--night-icon) 1fr; gap:var(--night-gap); align-items:start; color:var(--night-dim); font-size:var(--night-fs-value); line-height:var(--night-lh); }

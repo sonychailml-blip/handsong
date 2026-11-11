@@ -28,6 +28,8 @@ export const WOOD=F({ seed:0x574F4F44, eye:F([0, 5.5]),
   twigs:F({ x:10, z:F([-16, 3]), s:F([0.6, 1.3]), variants:4 }),
   ivy:F({ H:F([1.6, 4.8]), step:0.3 }),
   max:F({ stumps:5, snags:3, twigs:56, moss:400, ivy:12, woodShrooms:30 }),
+  /* NIGHT-8b: the bark's moss per trunk (barkMoss): reach up the trunk (m), the side it faces (rad round `north`, ± side), cover, patchiness, tint */
+  bark:F({ seed:0x4D4F5353, h:F([0.45, 2.8]), north:-1.19, side:1.5, cover:F([0.12, 1]), minGap:0.2 }),
   shade:F({ x0:-17, z0:-28, w:34, d:34 }) });
 
 /* the trunk's radius factor at hb metres above its foot (a: the angle round it, local; null = the mean, no buttress lobes) */
@@ -39,6 +41,21 @@ export const trunkOuter=(r, hb)=>trunkRadius(r, hb)+r*(WOOD.flare.lob[0]+WOOD.fl
 
 const eyeD=(x, z)=>Math.hypot(x-WOOD.eye[0], z-WOOD.eye[1]);
 function segDist(px, pz, ax, az, bx, bz){ const vx=bx-ax, vz=bz-az, t=clamp(((px-ax)*vx+(pz-az)*vz)/(vx*vx+vz*vz||1), 0, 1); return Math.hypot(px-ax-vx*t, pz-az-vz*t); }
+/* NIGHT-8b: THE BARK'S MOSS, PER TRUNK (the user: two neighbouring trunks had the same moss) — n trunks → per trunk [h, side, cover, patch, tint,
+   off]: h how far up the trunk it reaches (m), side the angle (rad, world x→z) of the face it favours, cover 0…1 how much of that face, patch 0…1
+   smooth → patchy, tint −1…1 cool → warm, off its own noise offset. Five parameters from a low-discrepancy sequence (Halton, bases 2 3 5 7 11,
+   each shifted by a seeded offset — every parameter alone spread evenly too) so every two trunks differ — the data row checks the smallest gap
+   (WOOD.bark.minGap, in the unit cube);
+   index i keeps its moss at every level (the room passes forestTrunks() order). The room's bark shader reads them per instance (forest-wood.js) */
+export function barkMoss(n, seed=WOOD.bark.seed){
+  const B=WOOD.bark, R=seeded(seed), base=[2, 3, 5, 7, 11], s0=base.map(()=>R()), out=[];
+  const vdc=(i, b)=>{ let f=1, r=0; while(i>0){ f/=b; r+=f*(i%b); i=Math.floor(i/b); } return r; };   // the radical inverse of i in base b
+  for(let i=0;i<n;i++){ const u=base.map((b,k)=>(s0[k]+vdc(i+1, b))%1);
+    out.push([lerp(B.h[0], B.h[1], u[0]), B.north+(u[1]*2-1)*B.side, lerp(B.cover[0], B.cover[1], u[2]), u[3], u[4]*2-1, Math.floor(R()*997)/10]); }
+  return out;
+}
+/* the moss parameters of barkMoss → the unit cube (the data row's distance) */
+export const barkMossUnit=m=>{ const B=WOOD.bark; return [(m[0]-B.h[0])/(B.h[1]-B.h[0]), ((m[1]-B.north)/B.side+1)/2, (m[2]-B.cover[0])/(B.cover[1]-B.cover[0]), m[3], (m[4]+1)/2]; };
 /* the near trees' indices, nearest the eye first */
 export function nearTrees(trunks){ const N=WOOD.near;
   return trunks.map((t,i)=>i).filter(i=>{ const [x,z,r]=trunks[i], e=eyeD(x,z); return e>N.eyeMin+r && e<N.eyeMax && z>N.zMin; }).sort((a,b)=>eyeD(trunks[a][0],trunks[a][1])-eyeD(trunks[b][0],trunks[b][1])); }

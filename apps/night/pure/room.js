@@ -40,7 +40,9 @@ export function checkRoom(r, known={}){
   for(const k of ['drone','wind','crickets','echo']) if(!plain(N[k])) return `nature.${k}: its numbers`;
   if(!Number.isInteger(N.crickets.n) || N.crickets.n<1 || N.crickets.n>NATURE_CRICKETS) return `nature.crickets.n: 1…${NATURE_CRICKETS} (the voices a nature slot holds)`;
   if(N.stream!=null){ const S=N.stream; if(!plain(S) || !num(S.gain) || S.gain<0 || S.gain>1 || !num(S.send) || S.send<0 || S.send>1) return 'nature.stream: { voices, gain 0…1, send 0…1 }';
-    const why=checkBrookVoices(S.voices); if(why) return 'nature.stream.'+why; }
+    const why=checkBrookVoices(S.voices); if(why) return 'nature.stream.'+why;
+    if(S.rec!=null && (!plain(S.rec) || typeof S.rec.file!=='string' || !/^[a-z0-9_-]+(\/[a-z0-9_-]+)*\.mp3$/.test(S.rec.file) || !num(S.rec.norm) || S.rec.norm<=0 || S.rec.norm>64))
+      return 'nature.stream.rec: { file «….mp3» in the room folder, norm above 0, at most 64 }'; }   // NIGHT-8b: the stream's recording
   if(!num(N.level) || N.level<0 || N.level>1) return 'nature.level: 0…1';
   if(!num(N.master) || N.master<=0 || N.master>1) return 'nature.master: above 0, at most 1';
   if(!num(N.ahead) || N.ahead<=0 || N.ahead>2) return 'nature.ahead: above 0, at most 2 s';
@@ -124,6 +126,7 @@ export const ROOM_DAMAGES=Object.freeze([
   ['icon', r=>{ r.icon='Leaf Icon'; }],   // NIGHT-8
   ['nature.stream', r=>{ r.nature.stream.gain=3; }],
   ['nature.stream.voices[0].lp', r=>{ r.nature.stream.voices[0].lp=50; }],
+  ['nature.stream.rec', r=>{ r.nature.stream.rec={ file:'../x.wav', norm:1 }; }],   // NIGHT-8b
   ['unknown field', r=>{ r.theme='dark'; }],
   ['bed.presets', r=>{ delete r.bed.presets.glimmer; }],   // stage 4
   ['bed.glim', r=>{ r.bed.glim.swell=0; }],

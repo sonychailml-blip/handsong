@@ -15,7 +15,7 @@ import { row } from '../core/rows.js';
 import { cv } from '../../../core/palette.js';
 import { loadThree, setBackground, sceneInfo, setSceneLevel, sceneLevel, sceneRoomDbg, sceneSnapDbg, sceneProgramsDbg, sceneHeldDbg, sceneBedDbg, sceneClockDbg } from '../../../apps/night/scene/host.js';   // RUN 8: + the quality levels and the room (NIGHT forest picture)
 import { buildForest, forestAssets } from '../../../apps/night/rooms/forest/forest.js';
-import { fliesInit, fliesStep, FOREST_FLIES, depthDistance } from '../../../apps/night/rooms/forest/pure/fireflies.js';
+import { fliesInit, fliesStep, FOREST_FLIES, depthDistance, forestGround } from '../../../apps/night/rooms/forest/pure/fireflies.js';   // NIGHT-9: + forestGround
 import { ANSWERS, noteRingAmp } from '../../../apps/night/rooms/forest/pure/answers.js';   // NIGHT-6 slice 1
 import { nightClockDbg } from '../../../apps/night/shell.js';
 import { NIGHT, nightAt, CLOUD_PASSES } from '../../../apps/night/pure/cycle.js';   // RUN 9
@@ -24,7 +24,7 @@ const MOOD_LOOKS=FOREST_ROOM.looks;
 import { FOREST_LEVELS } from '../../../apps/night/rooms/forest/forest.js';
 import { streamNear } from '../../../apps/night/rooms/forest/pure/forestlife.js';   // RUN 9 (slice 2)
 import { lifePlaces } from '../../../apps/night/rooms/forest/pure/forestlife.js';   // NIGHT-6 slice 5
-import { woodPlaces } from '../../../apps/night/rooms/forest/pure/wood.js';
+import { woodPlaces, barkMoss } from '../../../apps/night/rooms/forest/pure/wood.js';   // NIGHT-8b: barkMoss
 import { forestTrunks, FOREST_SEED, PAINT_DRAWS } from '../../../apps/night/rooms/forest/pure/layout.js';
 import { seeded } from '../../../core/pure/dsp.js';
 import { canopyPlaces } from '../../../apps/night/rooms/forest/pure/canopy.js';   // NIGHT-6 slice 7
@@ -38,6 +38,9 @@ import { canvas } from '../../../core/vision.js';
 import { handsProbe, processHandsProbe } from '../../../core/gestures.js';   // RUN 9: a hand in view for the drawn wave check
 import { pose } from '../../../core/gestures/pose.js';
 import { meas, frame } from '../core/kit.js';
+import { AO as RELIEF_AO } from '../../../apps/night/rooms/forest/pure/relief.js';   // NIGHT-9
+import { waterSpeed, waterWidth } from '../../../apps/night/rooms/forest/pure/water.js';   // NIGHT-9
+import { forestGroundDbg, GROUND_ALBEDO } from '../../../apps/night/rooms/forest/forest.js';   // NIGHT-9
 
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const frames=async n=>{ for(let i=0;i<n;i++) await frame(); };   // rAF, or 1 s in a hidden tab (kit.frame)
@@ -567,11 +570,17 @@ export async function checkForestWood(){
         if(pl.slice(0, today.length).some((p,i)=>p.kind!==today[i].kind || p.x!==today[i].x || p.z!==today[i].z)) miss(lv+': today\'s mushrooms moved');
         if(sh!==L.shrooms+L.woodShrooms) miss(`${lv}: ${sh} mushrooms (${L.shrooms} + ${L.woodShrooms} expected)`);
         if(!/uSway/.test(stub(r.fernsDbg.frondM)) || !/uSway/.test(stub(r.fernsDbg.frondD))) miss(lv+': today\'s ferns do not sway');
+        { const tm=r.scene.children.find(o=>o.isInstancedMesh && o.count===pureT.length && o.geometry.attributes.aBark7), M=barkMoss(pureT.length), f=Math.fround; n+=2;   // NIGHT-8b: every trunk its own moss
+          if(!tm) miss(lv+': the trunks carry no moss of their own (aBark7)');
+          else { const A=tm.geometry.attributes.aBark7.array, B=tm.geometry.attributes.aBark7b.array;
+            if(M.some((m,i)=>[0,1,2,3].some(k=>A[i*4+k]!==f(m[k])) || B[i*2]!==f(m[5]) || B[i*2+1]!==f(m[4]))) miss(lv+': the moss of the trunks is not barkMoss() trunk for trunk');
+            if(!/vBk7/.test(stub(tm.material))) miss(lv+': the bark shader does not read the moss of each trunk'); } }
         notes.push(`${lv}: ${Wd.roots} roots, ${Wd.logs} logs, ${Wd.stumps} stumps, ${Wd.snags} dead trees, ${Wd.twigs} branches, ${Wd.brackets} fungi, ${Wd.moss} moss, ${Wd.ivy} ivy cards, ${sh-L.shrooms} mushrooms on wood; ${Wd.verts} wood vertices`); }
       { n+=2; const R=seeded(FOREST_SEED); for(let i=0;i<=PAINT_DRAWS;i++) R(); const x=(R()*2-1)*22; if(x===pureT[8][0]) miss('CONTROL: the replay one draw late gives the same trunk');
         if(/uSway/.test(stub(new T.MeshStandardMaterial()))) miss('CONTROL: a plain material has the sway'); }
       { const S=mk('reduced', { lv:{ roots:0, logs:0, stumps:0, snags:0, twigs:0, moss:0, ivy:0, woodShrooms:0, flare:false, barkMoss:false, shade:false } }).state(); n++;
-        if(S.wood.verts || S.wood.moss || S.wood.ivy || S.wood.shade || S.wood.flare || S.wood.bark) miss('the baseline still builds '+JSON.stringify(S.wood)); }
+        if(S.wood.verts || S.wood.moss || S.wood.ivy || S.wood.shade || S.wood.flare || S.wood.bark) miss('the baseline still builds '+JSON.stringify(S.wood));
+        n++; if(rooms[rooms.length-1].scene.children.some(o=>o.isInstancedMesh && o.geometry.attributes.aBark7)) miss('the baseline (no bark moss) still gives the trunks moss attributes'); }
     } finally { for(const r of rooms) r.dispose(); }
     const why=profileApply('profile.night'); n++; if(why){ miss('Night refused: '+why); return { cases:n, total:d.length, differences:d, notes }; }
     await setSceneLevel('reduced'); await setBackground('forest'); await frames(6);
@@ -589,6 +598,29 @@ export async function checkForestWood(){
   return { cases:n, total:d.length, differences:d, notes };
 }
 row({ night:true, at:1008.6395, name:'FOREST wood', drawn:true, run:()=>checkForestWood(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });
+/* NIGHT-8b: row «FOREST fireflies visit the light» — the room built without a renderer (medium, a laptop's landscape view), its own update fed a
+   playing hand in the NEAREST depth band (d 0: the band where the green fireflies had stopped coming — every orbit wrapped away at the flies'
+   box) and a note every 1.5 s held 0.8 s (the room's glint and held doors), 80 s of room time at 30 frames a second: from 20 s on, the mean
+   number of wild fireflies seen round the playing light from the room's own camera (within 25° of it, at most 3.5 m behind it) must be ≥ 2.
+   CONTROL the old law (FOREST_FLIES.edge off) brings fewer than 1. This holds the room's wiring (the lights it gives the law) to the data row. */
+export async function checkForestFlies(){
+  const d=[], notes=[]; let n=0; const miss=s=>d.push(s);
+  try{
+    const T=await loadThree(); await forestAssets('reduced');
+    const seen=()=>{ const room=buildForest(T, { C:cv, level:'reduced', w:844, h:390 }); try{ const hand={ x:0.5*844, y:0.55*390, d:0, play:true }; let sum=0, fr=0, last=-9;
+      for(let i=0;i<2400;i++){ const t=i/30; if(t-last>=1.5){ last=t; room.glint(0, 0.6); } room.held(t-last<0.8 ? t-last : 0); room.update(1/30, t, [hand]);
+        if(t>20){ const st=room.state(), c=st.cam, L=st.rigs[0], lv=[L.x-c[0], L.y-c[1], L.z-c[2]], ll=Math.hypot(...lv); let k=0;
+          for(const q of st.fliesAt){ const v=[q[0]-c[0], q[1]-c[1], q[2]-c[2]], vl=Math.hypot(...v); if((v[0]*lv[0]+v[1]*lv[1]+v[2]*lv[2])/(vl*ll)>Math.cos(25*Math.PI/180) && vl<ll+3.5) k++; }
+          sum+=k; fr++; } }
+      return { mean:sum/fr, z:room.state().rigs[0].z }; } finally { room.dispose(); } };
+    const ok=seen(); n++; if(!(ok.mean>=2)) miss(`only ${ok.mean.toFixed(2)} fireflies come round the playing light in the near band (2 wanted; the light at z ${ok.z.toFixed(2)})`);
+    const keep=FOREST_FLIES.edge; let old; try{ FOREST_FLIES.edge=-1e9; old=seen(); } finally { FOREST_FLIES.edge=keep; } n++;
+    if(!(old.mean<1)) miss(`CONTROL: the old law brings ${old.mean.toFixed(2)} fireflies to the near light — the judgement cannot fail`);
+    notes.push(`the near band (light at z ${ok.z.toFixed(2)}): ${ok.mean.toFixed(2)} fireflies round the playing light on average; CONTROL the old law ${old.mean.toFixed(2)}`);
+  } catch(e){ miss('error: '+(e&&e.stack||e)); }
+  return { cases:n, total:d.length, differences:d, notes };
+}
+row({ night:true, at:1008.63951, name:'FOREST fireflies visit the light', run:()=>checkForestFlies(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });
 /* NIGHT-6 slice 6: row «FOREST gust» — the room built without a renderer, the effects hand driven through its update: no hand and a still
    hand leave the gust's strength (state and shader uniform) exactly 0 and shake no leaf; a sweep makes a gust along it, near the effects light,
    shakes leaves loose; a sweep across the stream makes a wake — CONTROL the still hand none; the baseline (gust off) keeps the uniform at 0
@@ -676,7 +708,7 @@ export async function checkForestPaint(){
     try{
       for(const lv of ['full','reduced']){ const r=mk(lv), st=r.state().paint, L=FOREST_LEVELS[lv]; let bad=0, glow=0, plain=0; n+=3;
         if(!st.on || st.R!==L.paintR || !(st.taps>10)) miss(`${lv}: ${JSON.stringify(st)}`);
-        r.scene.traverse(o=>{ const g=o.isSprite || o.isPoints, m=o.material; if(!m || Array.isArray(m)) return; if(g){ glow++; if(o.layers.mask!==2 || (m.depthTest!==false && !m.userData.depthAware)) bad++; } else if(o.isMesh){ plain++; if(m.userData.depthAware || o.layers.mask!==1) bad++; } });
+        r.scene.traverse(o=>{ const g=o.isSprite || o.isPoints, m=o.material; if(!m || Array.isArray(m)) return; if(g){ glow++; if((o.layers.mask&3)!==2 || (m.depthTest!==false && !m.userData.depthAware)) bad++; } else if(o.isMesh){ plain++; if(m.userData.depthAware || (o.layers.mask&3)!==1) bad++; } })   // NIGHT-9: the paint's two layers only (the water's mirror adds its own layer to the silhouettes);
         if(bad) miss(`${lv}: ${bad} objects in the wrong pass`);
         const x=t=>{ r.update(1/60, t, [], null, NIN); return r.camera.position.x; }, a=x(10), b=x(12);
         if(!(Math.abs(a-b)>0.001)) miss(lv+': the camera does not breathe ('+(a-b).toFixed(5)+')');
@@ -744,3 +776,48 @@ export async function checkForestHidden(){
   return { cases:n, total:d.length, differences:d, notes };
 }
 row({ night:true, at:1008.63995, name:'FOREST hidden', drawn:true, run:()=>checkForestHidden(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });
+/* NIGHT-9: row «FOREST ground and water» — (1) BUILT without a renderer at each level: the ground mesh has the level's segments, the occlusion
+   per vertex (all within [AO.min, 1], darker on average than open ground) and a root bulge at a trunk's foot (above forestGround there); the
+   floor is the photo-scanned set when the level asks for it (its map is the scan's picture, its colour scale GROUND_ALBEDO.scan), the baked one
+   through forestGroundDbg('baked') — CONTROL the switch really changes the map; the ground's shader takes the night patch (occlusion, grade, wet
+   line); the water's ribbon carries pure/water.js's speed and width per vertex; the mirror's timing per level (Detailed every frame, Standard
+   every mirrorMs). (2) DRAWN (medium): over 12 frames the mirror redraws at most twice (once on opening, once when due) and the water's
+   reflection changes the picture (uMirK 0 against 1) — CONTROL one frame drawn twice is the same. */
+export async function checkForestGroundWater(){
+  const d=[], notes=[]; let n=0; const miss=s=>d.push(s);
+  const keepLevel=sceneLevel(), was=profileCurrent();
+  try{
+    const T=await loadThree(); const stub=m=>{ const sh={ uniforms:{}, vertexShader:'#include <begin_vertex>\n#include <project_vertex>', fragmentShader:'#include <map_fragment>\n#include <normal_fragment_maps>\n#include <roughnessmap_fragment>\n#include <emissivemap_fragment>\n#include <aomap_fragment>\nvec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + reflectedLight.directSpecular + reflectedLight.indirectSpecular + totalEmissiveRadiance;' }; if(m.onBeforeCompile) m.onBeforeCompile(sh, null); return sh; };
+    for(const lv of ['full','reduced']){ await forestAssets(lv); const L=FOREST_LEVELS[lv], r=buildForest(T, { C:cv, level:lv, w:844, h:390 });
+      try{ const st=r.state(), g=r.scene.children.find(o=>o.isMesh && o.geometry && o.geometry.attributes.aAO7), W=r.lifeDbg.stream; n+=7;
+        if(!g){ miss(lv+': the ground has no occlusion'); continue; }
+        const P=g.geometry.parameters||{}; if(P.widthSegments!==L.groundSeg) miss(`${lv}: the ground has ${P.widthSegments} segments (${L.groundSeg} wanted)`);
+        const ao=g.geometry.attributes.aAO7.array; let mn=1, sum=0; for(const v of ao){ mn=Math.min(mn,v); sum+=v; } const mean=sum/ao.length;
+        if(mn<RELIEF_AO.min-1e-6 || ao.some(v=>v>1+1e-6) || !(mean<0.995)) miss(`${lv}: occlusion ${mn.toFixed(3)}…, mean ${mean.toFixed(3)}`);
+        { const pa=g.geometry.attributes.position, tr=st.trunks[1]; let best=-1, bd=1e9; for(let i=0;i<pa.count;i++){ const dd=Math.hypot(pa.getX(i)-tr[0], pa.getZ(i)-tr[1]); if(dd<bd){ bd=dd; best=i; } }
+          const lift=pa.getY(best)-forestGround(pa.getX(best), pa.getZ(best)); if(!(lift>0.03)) miss(`${lv}: no root bulge at a trunk's foot (${lift.toFixed(3)} m)`); }
+        if(!st.ground.scan || !g.material.map || !g.material.aoMap) miss(`${lv}: the floor is not the scanned set`);
+        if(Math.abs(g.material.color.r-GROUND_ALBEDO.scan)>1e-6) miss(`${lv}: the scanned floor's colour scale ${g.material.color.r}`);
+        { const sh=stub(g.material); if(!/vAO7/.test(sh.fragmentShader) || !/uSoilTint/.test(sh.fragmentShader) || !/wl9/.test(sh.fragmentShader)) miss(lv+': the ground lacks the night patch'); }
+        { const fa=W.geometry.attributes.aFlow, ua=W.geometry.attributes.uv; if(!fa) miss(lv+': the water has no flow'); else { let bad=0; for(let i=0;i<fa.count;i+=3){ const u=ua.getX(i); if(Math.abs(fa.getY(i)-waterWidth(u))>1e-5 || !(fa.getX(i)>=waterSpeed(u,-1)-1e-5)) bad++; } if(bad) miss(`${lv}: ${bad} water vertices off pure/water.js`); } }
+        { const M=st.mirror; if(!M.on || M.every!==(L.mirrorMs||0) || M.px[0]!==L.mirrorPx || (lv==='reduced' && !(M.every>=500))) miss(`${lv}: the mirror ${JSON.stringify(M)} (Standard redraws it at most every 0.5 s or slower)`); }
+        notes.push(`${lv}: ground ${P.widthSegments}² segments, occlusion ${mn.toFixed(2)}…1 (mean ${mean.toFixed(3)}), the scanned floor; mirror ${st.mirror.px.join('×')} every ${st.mirror.every ? st.mirror.every+' ms' : 'frame'}`);
+      } finally { r.dispose(); } }
+    { forestGroundDbg('baked'); try{ await forestAssets('reduced'); const r=buildForest(T, { C:cv, level:'reduced', w:844, h:390 }); try{ n++; const st=r.state(); if(st.ground.scan) miss('CONTROL: forestGroundDbg(baked) still built the scanned floor'); else notes.push('CONTROL: the baked floor builds through the switch'); } finally { r.dispose(); } } finally { forestGroundDbg(null); } }
+    const why=profileApply('profile.night'); if(why){ miss('Night refused: '+why); return { cases:n, total:d.length, differences:d, notes }; }
+    await setSceneLevel('reduced'); await setBackground('forest'); await frames(4);
+    const room=sceneRoomDbg(); if(!room || !sceneInfo().webgl){ notes.push('no WebGL room — the drawn checks do not apply'); return { cases:n, total:d.length, differences:d, notes }; }
+    const d0=room.state().mirror.draws, t0=performance.now(); await frames(12); const d1=room.state().mirror.draws, el=performance.now()-t0, cap=Math.ceil(el/FOREST_LEVELS.reduced.mirrorMs)+1; n++;
+    if(!(d1>=1 && d1-d0<=cap)) miss(`Standard's mirror drew ${d1-d0} times in ${(el/1000).toFixed(1)} s (at most ${cap}: one every ${FOREST_LEVELS.reduced.mirrorMs} ms; ${d1} in all)`);
+    { const on=[], lights=[]; room.scene.traverse(o=>{ if(o.layers.mask & 16) (o.isLight ? lights : on).push(o); }); n++;   // the mirror's layer: the silhouettes and the lights only
+      if(on.some(o=>o.isMesh && o.geometry && (o.geometry.attributes.aAO7 || o.geometry.attributes.aFlow))) miss('the ground or the water is on the mirror layer');
+      notes.push(`the mirror's layer: ${on.length} objects (the silhouettes), ${lights.length} lights`); }
+    const WU=room.lifeDbg.WU, keep=WU.uMirGain.value, ab=await sceneSnapDbg(on=>{ WU.uMirGain.value= on ? 0 : keep; }, true), cc=await sceneSnapDbg(()=>{}, true); WU.uMirGain.value=keep; n+=2;
+    if(!ab || !cc) notes.push('the mirror: no frame rendered');
+    else { if(!(Math.abs(ab[0]-ab[1])>0)) miss('the water\'s reflection does not show in the picture'); if(cc[0]!==cc[1]) miss('CONTROL: one frame rendered twice differs');
+      notes.push(`the reflection changes the mean RGB sum of one frame by ${(ab[0]-ab[1]).toFixed(4)} (CONTROL ${(cc[0]-cc[1]).toFixed(4)}); the mirror drew ${d1-d0} time(s) in ${(el/1000).toFixed(1)} s at Standard`); }
+  } catch(e){ miss('error: '+(e&&e.stack||e)); }
+  finally{ try{ await setSceneLevel(keepLevel); }catch(e){} if(profileCurrent()!==was) profileApply(was); await setBackground('camera'); await sleep(30); }
+  return { cases:n, total:d.length, differences:d, notes };
+}
+row({ night:true, at:1008.63952, name:'FOREST ground and water', drawn:true, run:()=>checkForestGroundWater(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });

@@ -19,13 +19,14 @@ import { svgIcon } from '../../core/icons.js';
 import { nightView, setNightView, chainKeyOf, setVolFloor } from '../../core/state.js';
 import { scaleById, scaleView } from '../../core/scales.js';   // NIGHT-7c: the profile's own view for the music before the profile applies
 import { profileOf } from '../../core/profile.js';
-import { fsBegin, fsStarted, fsFlowTap, fsFlowEnd, fsToggle, fsOn, fsOnChange, fsCanToggle } from './fullscreen.js';   // NIGHT-7c: full screen
+import { fsBegin, fsStarted, fsToggle, fsOn, fsOnChange, fsCanToggle } from './fullscreen.js';   // NIGHT-7c: full screen (NIGHT-8b: never while the camera is undecided)
 import { devItems } from './edition.js';   // NIGHT-7b: the release edition (a players' build, or ?release) hides the development items
 import { calWire, calOfferIfNew, calActive, calSideApply, calSideSet, calSettingsRender, calAbort } from './calib.js';   // NIGHT-2: the hand's calibration (its picture is drawn by the loop: main.js afterDraw)
 import { setSceneLevel, sceneLevel, setBackground, backgroundOf, sceneInfo, sceneRoom, sceneRooms, sceneOptDbg } from './scene/host.js';   // RUN 8 (slice 4): the scene's quality (development switch); C8 the measurement
 import { roomSwitch, roomNext, natureLight } from './roomswitch.js';   // NIGHT-3 stage 5 part 2: the Room button
 import { latReport } from '../../core/legacy-ui/latmeter.js';   // C8: the device measurement reads the latency meter
 import { cardsWire, cardsShow, cardsOpen, cardsDue, cardsDone } from './cards.js';   // NIGHT-7: the first cards
+import { camWire, camRender } from './camera.js';   // NIGHT-10: Settings → Camera
 
 const $=id=>document.getElementById(id), READ=BUS.reader();
 /* NIGHT-1 stage 2: what this app never plays leaves the graph (the sound stays the same to rounding; row «NIGHT lean path»). Its chain has no drive, brightness or tremolo; its one role is solo */
@@ -54,7 +55,8 @@ export const REACH=1;   // the hand's reach in the room (Forest depth's `reach`)
    setHand(v); noteMode() 'note'|'hold' / setNoteMode(v); backgrounds() / bg() / setBg(m); plain() (no glass blur);
    firstRun() (C7; absent → the line stays hidden). The ambience (C4c) is driven here: on in a face that has one (profile.ambience), off
    otherwise; its Forest volume is the slider. */
-export function nightShellWire(doors){ D=doors; wire(); calWire(D, { leave:()=>infoShow(false), defHand:()=>defHand, changed:()=>render() }); }
+export function nightShellWire(doors){ D=doors; wire(); calWire(D, { leave:()=>infoShow(false), defHand:()=>defHand, changed:()=>render() });
+  camWire({ after:()=>{ if(calOfferIfNew(()=>{})) infoShow(false); } }); }   // NIGHT-10: a camera not offered yet gets the calibration offer after a switch
 export function nightShellFace(p){
   on=p && p.shell==='night'; $('nightShell').hidden=!on;
   setNightView(on ? { glow:p.noteField==='glow', plain:p.labels==='plain', fieldAll:load(KEY.field)==='1', tips:load(KEY.joints)!=='all' } : null);   // RUN 8: tips — fingertips only (dev switch)
@@ -113,7 +115,7 @@ function sleepSet(mins){
   sleep={ mins, t0:performance.now() };
   if(!mins){ asleep=false; $('nightShell').classList.remove('asleep'); $('nightVeilMsg').hidden=true; $('nightVeil').style.opacity='0'; if(lastFade!==1){ lastFade=1; outputFade(1, 0.6); } }
 }
-function infoShow(v){ info=v; $('nightInfo').hidden=!v; if(v) render(); }
+function infoShow(v){ info=v; $('nightInfo').hidden=!v; if(v){ render(); camRender(); } }   // NIGHT-10: the cameras listed when the card opens
 function wire(){
   const tap=(id,f)=>{ $(id).onclick=()=>{ if(!D) return; f(); glint($(id)); render(); }; };
   tap('nightRoom', ()=>{ const id=roomNext(); if(id){ roomSwitch(id).then(()=>render()); render(); } });   // NIGHT-8: the slider's icon follows at once   // NIGHT-3 stage 5 part 2: the next room
@@ -125,7 +127,7 @@ function wire(){
   $('nightInfoBtn').onclick=()=>infoShow(true); $('nightInfoClose').onclick=()=>infoShow(false);
   $('nightFsBtn').onclick=()=>{ fsToggle().then(()=>render()); };   // NIGHT-7c: the corner toggle
   fsOnChange(()=>render());
-  for(const id of ['nightCal', 'nightCards']) $(id).addEventListener('click', ()=>{ fsFlowTap(); }, true);   // a tap in the first-launch flow asks again if it is due
+  /* NIGHT-8b: the next tap after the camera runs asks for full screen while it is still wished — fullscreen.js listens to the whole page itself */
   $('nightFieldTg').onclick=()=>{ const all=!(nightView && nightView.fieldAll); save(KEY.field, all ? '1' : '0'); if(nightView) setNightView({ ...nightView, fieldAll:all }); render(); };
   $('nightToSound').onclick=()=>{ infoShow(false); if(D.sound) D.sound(); };   // dev: the Sound panel (Diagnostics → Latency meter — step 105)
   $('nightMusicVol').oninput=e=>{ const v=+e.target.value; save(MUSIC_KEYS.vol, String(v)); bedSetVolume(v); };
@@ -169,12 +171,12 @@ function tick(now){
 /* RUN 7 (C7): THE NIGHT START — the start card is Night's (body.night-boot): the title, two setup tips (NIGHT-7b: always; no saved flag hides
    them), Begin, the privacy line. «Begin» runs the very same start handler as Play, inside this click (rule #1). Only a person's own tap leads
    to the first cards (never a profile switch — the probes switch). */
-document.body.classList.add('night-boot');
-$('nightBegin').onclick=()=>{ const go=$('startBtn').onclick; begun=true; firstRun=cardsDue(STORE); audioSessionPlayback(); if(go) go(); fsBegin(); musicEarly(); };   // NIGHT-7c: the audio context first (rule #1), then full screen (it spends the tap's activation), then the music
+document.body.classList.add('night-boot');   // NIGHT-8b: the page's markup carries it already (the first paint is Night's); kept for a page without it
+$('nightBegin').onclick=()=>{ const go=$('startBtn').onclick; begun=true; firstRun=cardsDue(STORE); audioSessionPlayback(); if(go) go(); fsBegin(); musicEarly(); };   // NIGHT-7c: the audio context first (rule #1), then full screen (only with the camera already granted — NIGHT-8b), then the music
 /* NIGHT-2: once the camera runs after a Begin: the calibration offer for a camera not offered yet, then the first cards when due. NIGHT-7b: the
    cards alone — the old ghost hand is gone; they count as seen only once they close (finished or skipped) */
 function startFlow(){ const first=firstRun; firstRun=false;
-  const then=()=>{ if(first) cardsShow(()=>{ cardsDone(STORE); fsFlowEnd(); }); else fsFlowEnd(); };   // NIGHT-7c: the flow's end: no more asking for full screen
+  const then=()=>{ if(first) cardsShow(()=>{ cardsDone(STORE); }); };   // NIGHT-8b: full screen needs no end of the flow (the next tap after the camera asks while it is wished)
   if(!calOfferIfNew(then)) then(); }
 /* NIGHT-7c: THE MUSIC FROM THE TAP ON BEGIN — once the engine's master exists and the context runs (the camera, its prompt and the hand model
    still on their way), the bed starts in the Night profile's own view with its own fade-in (the level rises over about 3 s, the ground over 2.5 s);

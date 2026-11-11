@@ -39,7 +39,8 @@
 <script src="../../core/va-stub.js"></script>
 <script defer src="/_vercel/insights/script.js"></script>
 </head>
-<body>
+<!-- NIGHT-8b: Night's start look from the very first paint (it used to wait for shell.js, so Full's start card showed for about a second) -->
+<body class="night-boot">
  
 <!-- ================= СТАРТОВЫЙ СЛОЙ ================= -->
 <!-- Не отдельная страница, а СВЕТЛАЯ приветственная карточка на светлом фоне (после «▶ Играть» экран —
@@ -627,6 +628,11 @@
         <div class="night-btns"><button id="nightCalResetNo" class="night-btn" data-i18n="night.cal.cancel">Cancel</button><button id="nightCalResetYes" class="night-btn go" data-i18n="night.cal.resetDo">Reset</button></div></div>
       <div class="night-sl-lab" data-i18n="night.set.dots">Hands on screen</div>
       <div id="nightDotsSeg" class="night-seg night-seg-2"><button data-dots="tips" data-i18n="night.set.tips">Fingertips</button><button data-dots="all" data-i18n="night.set.all">All points</button></div>
+    </section>
+    <!-- NIGHT-10: the camera — the cameras this device has (Front / Back on a phone, their names on a computer); shown only with two or more; the choice is kept on this device -->
+    <section id="nightCamSec" class="night-sec" hidden>
+      <h2 class="night-sec-h" data-i18n="night.set.camera">Camera</h2>
+      <div id="nightCamSeg" class="night-seg"></div>
     </section>
     <!-- NIGHT-3 stage 4: the music bed — its volume and the response switch (its preset is the Music button) -->
     <section class="night-sec">

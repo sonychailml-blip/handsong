@@ -61,8 +61,14 @@ function ambienceBrook(E, amb, voices, seed=0){
   if(amb.brook || !voices || !voices.length) return null;
   const node=new AudioWorkletNode(E.ac, 'night-nature', { numberOfInputs:0, numberOfOutputs:1, outputChannelCount:[2], processorOptions:{ voices, seed:(0x42524F4B+seed)>>>0, sleep:!amb.on } });
   for(const sl of amb.slots) node.connect(sl.sg);
-  amb.brook={ node, sleep:!amb.on, light:false }; return amb.brook;
+  amb.brook={ node, sleep:!amb.on, light:false, rec:null }; return amb.brook;
 }
+/* NIGHT-8b: the stream's RECORDING into its node — the mono samples (at this context's rate; moved, not copied) and the level `norm`; the node
+   hands over from the synthesis and answers → a promise of true (playing the recording) / false (refused: too short, not samples). amb.brook.rec:
+   'on' | 'refused' (the caller sets 'loading' / 'failed') */
+function ambienceBrookRec(E, amb, pcm, norm){ const b=amb.brook; if(!b) return Promise.resolve(false);
+  return new Promise(res=>{ const p=b.node.port, f=e=>{ if(e.data && e.data.rec){ p.removeEventListener('message', f); b.rec= e.data.rec.ok ? 'on' : 'refused'; res(!!e.data.rec.ok); } };
+    p.addEventListener('message', f); p.start(); p.postMessage([{ k:'rec', pcm, norm }], pcm && pcm.buffer ? [pcm.buffer] : []); }); }
 /* the stream's sleep (from AC time t) and the Lighter mode */
 function brookSleep(amb, v, t){ const b=amb.brook; if(!b || b.sleep===v) return; b.sleep=v; b.node.port.postMessage([{ k:'sleep', v, t }]); }
 function ambienceBrookLight(E, amb, v){ const b=amb.brook; if(!b || b.light===!!v) return; b.light=!!v; b.node.port.postMessage([{ k:'light', v:!!v }]); }
@@ -132,4 +138,4 @@ function ambienceSet(E, amb, on, level, when, drone=true){
   amb.dGate.gain.setTargetAtTime(on && drone ? 1 : 0, t, on && drone ? amb.A.drone.tc : 0.8);
   if(on && v>0 && amb.A.stream) brookSleep(amb, false, null); else brookSleep(amb, true, t+BROOK_SLEEP_S);   // NIGHT-8: the stream sleeps once faded out (or in a room without one)
 }
-export { buildAmbience, ambienceSchedule, ambienceTune, ambienceSet, ambienceRoom, ambienceBrook, ambienceBrookLight, ambienceBrookStats };
+export { buildAmbience, ambienceSchedule, ambienceTune, ambienceSet, ambienceRoom, ambienceBrook, ambienceBrookLight, ambienceBrookStats, ambienceBrookRec };

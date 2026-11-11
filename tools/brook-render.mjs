@@ -53,3 +53,24 @@ if(rec){ const w=wavRead(readFileSync(rec)), xl=resample(w.L, w.fs), xr=resample
   const g=ra/rms(BL, BR); for(let i=0;i<N;i++){ BL[i]*=g; BR[i]*=g; } for(let i=0;i<fade;i++){ const q=i/fade; BL[i]*=q; BR[i]*=q; BL[N-1-i]*=q; BR[N-1-i]*=q; }
   writeFileSync(path.join(OUT, 'brook-b-recording.wav'), wavOf(BL, BR, FS)); const sb=selfSim(BL, BR);
   console.log(`[brook] (b) recording: tools/.listen/brook-b-recording.wav — source ${w.fs} Hz, ${w.bits}-bit, ${w.ch} ch, ${(w.L.length/w.fs).toFixed(1)} s; loop body ${(BODY/FS).toFixed(1)} s with a ${XF/FS}-s equal-power join (seams at ${[1,2].map(j=>(j*BODY/FS).toFixed(1)+' s').filter((x,j)=>(j+1)*BODY<N).join(', ')}); RMS ${db(rms(BL, BR))}, peak ${db(peak(BL, BR))}; self-similarity ${sb.best.toFixed(3)} at ${sb.at.toFixed(2)} s`); }
+/* NIGHT-8b: (c) THE SHIPPED STREAM — the recording the app plays (apps/night/rooms/forest/sound/stream.mp3, decoded here by ffmpeg, a dev tool
+   outside the repo; the browser decodes it itself) through the app's own grain law (apps/night/pure/brookrec.js), 40 s, at the room's level
+   factor `norm`. Prints the factor that brings the grains to (a)'s K-like loudness (the listening page's measure, as the probes' kLoud) —
+   the room's recipe stores it — the joins per voice and the longest self-similarity (a loop would show a peak near 1). */
+{ const { spawnSync }=await import('node:child_process'), RC=await import('../apps/night/pure/brookrec.js'), S=FOREST_ROOM.nature.stream;
+  const file=path.join(ROOT, 'apps/night/rooms/forest', S.rec.file), dec=spawnSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-i', file, '-f', 'f32le', '-ac', '1', '-ar', String(FS), '-'], { maxBuffer:1<<28 });
+  if(dec.status!==0 || !dec.stdout.length) console.log('[brook] (c) not rendered: ffmpeg could not decode '+file+' — '+String(dec.stderr||dec.error||'').trim());
+  else { const pcm=new Float32Array(dec.stdout.buffer.slice(dec.stdout.byteOffset, dec.stdout.byteOffset+dec.stdout.length));
+    const kLoud=(x, rate)=>{ const a1=Math.exp(-2*Math.PI*100/rate), a2=Math.exp(-2*Math.PI*2000/rate), sh=Math.pow(10,4/20)-1, n=x.length, w=new Float32Array(n); let x1=0,y1=0,x2=0,y2=0,lp=0;   // tools/probes/night/night.js kLoud, the same numbers
+      for(let i=0;i<n;i++){ const v=x[i]; y1=a1*(y1+v-x1); x1=v; y2=a1*(y2+y1-x2); x2=y1; lp=lp*a2+(1-a2)*y2; w[i]=y2+sh*(y2-lp); }
+      const win=Math.round(0.4*rate), hop=Math.round(0.1*rate), ms=[]; for(let a=0;a+win<=n;a+=hop){ let e=0; for(let i=a;i<a+win;i++) e+=w[i]*w[i]; ms.push(e/win); }
+      ms.sort((p,q)=>q-p); const top=ms.slice(0, Math.max(1, Math.ceil(ms.length/4))); return 10*Math.log10(top.reduce((s,v)=>s+v,0)/top.length+1e-12); };
+    const mid=(A, B)=>{ const m=new Float32Array(A.length); for(let i=0;i<A.length;i++) m[i]=(A[i]+B[i])/2; return m; };
+    const one=RC.recNew(FS, V, pcm.length, 1), CL=new Float32Array(N), CR=new Float32Array(N); for(let o=0;o<N;o+=128) RC.recOut(one, pcm, CL, CR, o, Math.min(128, N-o));
+    const ka=kLoud(mid(L, R).subarray(FS*2), FS), k1=kLoud(mid(CL, CR).subarray(FS*2), FS), want=Math.pow(10, (ka-k1)/20);
+    const st2=RC.recNew(FS, V, pcm.length, S.rec.norm), XL=new Float32Array(N), XR=new Float32Array(N), t0=Date.now(); for(let o=0;o<N;o+=128) RC.recOut(st2, pcm, XL, XR, o, Math.min(128, N-o)); const ms=Date.now()-t0;
+    for(let i=0;i<fade;i++){ const q=i/fade; XL[i]*=q; XR[i]*=q; XL[N-1-i]*=q; XR[N-1-i]*=q; }
+    writeFileSync(path.join(OUT, 'brook-c-shipped.wav'), wavOf(XL, XR, FS)); const sc=selfSim(XL, XR), kc=kLoud(mid(XL, XR).subarray(FS*2), FS);
+    let xy=0, xx=0, yy=0; for(let i=0;i<N;i++){ xy+=XL[i]*XR[i]; xx+=XL[i]*XL[i]; yy+=XR[i]*XR[i]; }
+    console.log(`[brook] (c) shipped: tools/.listen/brook-c-shipped.wav — ${S.rec.file} decoded: ${(pcm.length/FS).toFixed(1)} s mono; ${st2.grains} grains (${(st2.grains/(V.length*2)).toFixed(1)} per stream in 40 s), ${RC.BROOK_REC.fade}-s equal-power joins, never across the file's ends; RMS ${db(rms(XL, XR))}, peak ${db(peak(XL, XR))}; K-like ${kc.toFixed(2)} dB against (a) ${ka.toFixed(2)} dB (${(kc-ka>=0?'+':'')+(kc-ka).toFixed(2)} dB); L/R correlation ${(xy/Math.sqrt(xx*yy||1)).toFixed(3)}; self-similarity ${sc.best.toFixed(3)} at ${sc.at.toFixed(2)} s; rendered in ${ms} ms`);
+    console.log(`[brook] (c) the level factor that matches (a)'s K-like loudness: norm ${want.toFixed(4)} (the room's recipe has ${S.rec.norm})`); } }

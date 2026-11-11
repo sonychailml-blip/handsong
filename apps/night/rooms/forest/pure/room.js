@@ -17,14 +17,14 @@ export const FOREST_ROOM=F({
       roots:5, logs:2, stumps:5, snags:3, twigs:56, moss:400, ivy:12, woodShrooms:30, flare:true, barkMoss:true, shade:true, gust:true, gustLeaves:12,
       crowns:true, crownShare:1, young:10, shrubs:16, saplings:10, stars:500, dapple:true, moonFace:true,
       paint:true, paintR:3, vignette:true, grain:true, breath:true, foxfire:12, flowers:14, groundTex:true,
-      groundMacro:true, litterLeaves:900, litterPebbles:220, litterTwigs:160 }),   // NIGHT-8: the ground's large scale and its litter   // NIGHT-7: the bare floor's prepared files   // NIGHT-6 slice 9: the light's trail points, the night flowers   // NIGHT-6 slice 8: the painted distance and the film   // NIGHT-6 slice 7: the canopy   // NIGHT-6 slice 5: moss, roots, fallen wood (ivy: trees)   // NIGHT-6 slice 4: the stream's surroundings   // NIGHT-6 slice 3: the floor (fern2: rosettes)
+      groundMacro:true, litterLeaves:900, litterPebbles:220, litterTwigs:160, groundSeg:224, groundScan:true, groundAO:true, waterMirror:true, mirrorMs:0, mirrorPx:512 }),   // NIGHT-9: the ground mesh finer, the photo-scanned floor, occlusion; the water's mirror every frame (512 px)   // NIGHT-8: the ground's large scale and its litter   // NIGHT-7: the bare floor's prepared files   // NIGHT-6 slice 9: the light's trail points, the night flowers   // NIGHT-6 slice 8: the painted distance and the film   // NIGHT-6 slice 7: the canopy   // NIGHT-6 slice 5: moss, roots, fallen wood (ivy: trees)   // NIGHT-6 slice 4: the stream's surroundings   // NIGHT-6 slice 3: the floor (fern2: rosettes)
     reduced:F({ flies:35, trail:8, shadow:0, shadowSmall:0, mist:false, shrooms:14, blooms:5, grass:1400, leaves:24, moths:3, beams:2, dew:500, webs:5,
       sorrel:600, forb:240, bilberry:100, anemone:200, nettle:50, sedge:230, fern2:45, softEdges:true,
       rocks:18, pebbles:120, floaters:14, mistStrips:3,
       roots:5, logs:2, stumps:5, snags:3, twigs:0, moss:200, ivy:6, woodShrooms:16, flare:true, barkMoss:true, shade:true, gust:true, gustLeaves:6,
       crowns:true, crownShare:0.35, young:6, shrubs:10, saplings:6, stars:250, dapple:true, moonFace:true,
       paint:true, paintR:2.5, vignette:true, grain:false, breath:true, foxfire:8, flowers:8, groundTex:true,
-      groundMacro:true, litterLeaves:380, litterPebbles:90, litterTwigs:60 }) }),   // NIGHT-8   // NIGHT-6 slice 8: smaller strokes, no grain at medium   // NIGHT-6 slice 7: a third of each crown's sprays beyond the first   // NIGHT-6 slice 5: no fallen branches at medium   // NIGHT-6: soft cut-out edges at medium (no antialiasing there)   // NIGHT-6 slice 1: dew, webs
+      groundMacro:true, litterLeaves:380, litterPebbles:90, litterTwigs:60, groundSeg:160, groundScan:true, groundAO:true, waterMirror:true, mirrorMs:1500, mirrorPx:256 }) }),   // NIGHT-9: the mirror every 1.5 s, 256 px   // NIGHT-8   // NIGHT-6 slice 8: smaller strokes, no grain at medium   // NIGHT-6 slice 7: a third of each crown's sprays beyond the first   // NIGHT-6 slice 5: no fallen branches at medium   // NIGHT-6: soft cut-out edges at medium (no antialiasing there)   // NIGHT-6 slice 1: dew, webs
   looks:F({
     glow:LOOK('forest-', 0.06, 1, 1),            // Glow: the base tokens
     dusk:LOOK('forest-dusk-', 0.052, 0.8, 0.9),  // Dusk: violet sky, a warm low moon, less mist
@@ -39,7 +39,10 @@ export const FOREST_ROOM=F({
     echo:F({ time:0.13, fb:0.38, lp:2800 }),
     /* NIGHT-8: the stream's murmur (apps/night/pure/brook.js, the nature worklet): its voices along the water, its gain in the nature mix (under
        the wind's own level, so it sits under the music), a little of it into the echo */
-    stream:F({ voices:F(streamVoices()), gain:0.25, send:0.06 }),   // gain: measured ≈ 5 dB under the wind and crickets (K-like; row «NIGHT stream, water and ground»)
+    stream:F({ voices:F(streamVoices()), gain:0.25, send:0.06,   // gain: measured ≈ 5 dB under the wind and crickets (K-like; row «NIGHT stream, water and ground»)
+      /* NIGHT-8b: the recording the stream plays (the room's folder; apps/night/pure/brookrec.js), the synthesis its fallback; norm brings its grains
+         to the synthesis's place under the wind and crickets (K-like, in the mix with its echo send: row «NIGHT stream, water and ground», shipped file) */
+      rec:F({ file:'sound/stream.mp3', norm:1.244 }) }),
     level:0.6,     // the default room volume (0…1, the shell's slider)
     master:0.42,   // the ambience bus at level 1: at the default level ≈ 12 dB under the Night sounds (measured, RUN 7)
     ahead:0.35,    // seconds of chirps scheduled ahead

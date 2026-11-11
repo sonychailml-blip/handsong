@@ -169,7 +169,7 @@ process.on('unhandledRejection', e=>bail(1,'unhandled rejection: '+(e&&e.stack||
 
 /* ---------- статический сервер ---------- */
 const MIME={ '.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.mjs':'text/javascript; charset=utf-8', '.json':'application/json; charset=utf-8',
-  '.css':'text/css; charset=utf-8', '.png':'image/png', '.svg':'image/svg+xml', '.ico':'image/x-icon', '.webmanifest':'application/manifest+json', '.md':'text/plain; charset=utf-8' };
+  '.css':'text/css; charset=utf-8', '.png':'image/png', '.svg':'image/svg+xml', '.ico':'image/x-icon', '.webmanifest':'application/manifest+json', '.md':'text/plain; charset=utf-8', '.mp3':'audio/mpeg' };
 function serve(){
   const srv=http.createServer(async (q,r)=>{
     try{
@@ -363,13 +363,13 @@ async function nightBeginHear(page, stub=false){
   await page.evaluate(st=>{ window.__t0=performance.now(); if(st){ const el=document.documentElement, real=el.requestFullscreen; el.requestFullscreen=function(){ el.requestFullscreen=real; return Promise.reject(new Error('refused (control)')); }; } }, stub);
   await page.click('#nightBegin');
   await page.evaluate(()=>{ window.__hearP=(async ()=>{ const B2=await import('/apps/night/bed2.js'), A=await import('/core/audio.js'), F=await import('/apps/night/fullscreen.js');
-    let an=null, first=null, last=-200, at4=null, fsTap=null; const buf=new Float32Array(2048);
+    let an=null, first=null, last=-200, at4=null, fsTap=null, faceAt=null; const buf=new Float32Array(2048);
     for(let k=0;k<100;k++){ const n=B2.bed2NodeDbg(); if(n && !an && A.AC){ an=A.AC.createAnalyser(); an.fftSize=2048; n.connect(an); }
       if(an){ an.getFloatTimeDomainData(buf); let s=0; for(const x of buf) s+=x*x; last=10*Math.log10(s/buf.length+1e-20); if(first==null && last>-60) first=Math.round(performance.now()-window.__t0); }
-      if(k===40) at4=last; if(k===5) fsTap=F.fsDbg();   // full screen 0.5 s after the tap: before any later tap of the flow could ask again
+      if(k===40) at4=last; if(k===5) fsTap=F.fsDbg(); if(faceAt==null && !B2.bed2ViewDbg().over && B2.bed2ViewDbg().ticked) faceAt=Math.round(performance.now()-window.__t0);   // NIGHT-8b: when the profile took over (the camera ran)   // full screen 0.5 s after the tap: before any later tap of the flow could ask again
       await new Promise(r=>setTimeout(r, 100)); }
     if(an) try{ B2.bed2NodeDbg().disconnect(an); }catch(e){}
-    return { first, last:+last.toFixed(1), at4:at4==null ? null : +at4.toFixed(1), ac:A.AC && A.AC.state, view:B2.bed2ViewDbg(), fs:fsTap||F.fsDbg() }; })(); });
+    return { first, last:+last.toFixed(1), at4:at4==null ? null : +at4.toFixed(1), ac:A.AC && A.AC.state, view:B2.bed2ViewDbg(), fs:fsTap||F.fsDbg(), faceAt }; })(); });
 }
 const nightHeard=page=>within(page.evaluate(()=>window.__hearP), 30e3, 'the music measure');
 async function uiNightStale(page, label){
@@ -411,14 +411,14 @@ async function uiNightStale(page, label){
   }
   /* NIGHT-7c: the music under all this, and full screen on the Begin tap */
   { const h=await nightHeard(page); musicJudge(h, true, 'with stale values', lines, bad);
-    if(h.fs.asked>=1 && h.fs.granted>=1) lines.push(`full screen asked on the Begin tap and granted (asked ${h.fs.asked}, granted ${h.fs.granted}, now ${h.fs.on ? 'on' : 'off'})`);
-    else bad.push(`full screen on the Begin tap: asked ${h.fs.asked}, granted ${h.fs.granted}, refused ${h.fs.refused} (api ${h.fs.api})`); }
+    if(h.fs.asked>=1 && h.fs.granted>=1 && !h.fs.deferred && !h.fs.undecided) lines.push(`camera already granted («${h.fs.cam}»): full screen asked on the Begin tap and granted (asked ${h.fs.asked}, granted ${h.fs.granted}, now ${h.fs.on ? 'on' : 'off'})`);
+    else bad.push(`full screen on the Begin tap with the camera granted: asked ${h.fs.asked}, granted ${h.fs.granted}, refused ${h.fs.refused}, deferred ${h.fs.deferred}, camera «${h.fs.cam}» (api ${h.fs.api})`); }
   return { pass:!bad.length, lines:[...lines.map(l=>`${label}: ${l}`), ...bad.map(b=>`${label}: NOT A PASS — ${b}`)] };
 }
 /* the music measure judged: on = audible within 6 s of the tap, playing in the live view, started once (no restart when the face came) */
 function musicJudge(h, on, what, lines, bad){
   if(on){ if(h.first!=null && h.first<=6000 && h.view.same && h.view.starts===1) lines.push(`music ${what}: audible ${h.first} ms after Begin, ${h.at4} dBFS at 4 s, ${h.last} at 10 s; in the live view, started once`);
-    else bad.push(`music ${what}: first audible ${h.first==null ? 'never' : h.first+' ms'} (6000 at most), live view ${h.view.same} ${JSON.stringify(h.view)}, started ${h.view.starts} times (once wanted), audio ${h.ac}`); }
+    else bad.push(`music ${what}: first audible ${h.first==null ? 'never' : h.first+' ms'} (6000 at most), live view ${h.view.same} ${JSON.stringify(h.view)}, started ${h.view.starts} times (once wanted), audio ${h.ac}, the profile (the camera) took over ${h.faceAt==null ? 'not within 10 s' : 'at '+h.faceAt+' ms'}`); }
   else { if(h.first==null && h.ac==='running') lines.push(`music ${what}: silent for 10 s with the audio running`); else bad.push(`music ${what}: audible ${h.first} ms after Begin (audio ${h.ac})`); }
 }
 /* NIGHT-7c — the music on a FRESH profile (everything cleared), and the CONTROLS: a stored «off» (the person's own choice) must fail the
@@ -445,6 +445,160 @@ async function uiNightMusic(page, label){
   else { await page.click('#nightCardNext'); await page.waitForTimeout(400); const f=await page.evaluate(async ()=>(await import('/apps/night/fullscreen.js')).fsDbg());
     if(f.retried===1 && f.granted===1) lines.push(`after the refusal the next tap in the flow asked again and got it (asked ${f.asked}, retried ${f.retried})`); else bad.push(`the next tap did not ask again: ${JSON.stringify(f)}`);
     await page.click('#nightCardSkip'); }
+  return { pass:!bad.length, lines:[...lines.map(l=>`${label}: ${l}`), ...bad.map(b=>`${label}: NOT A PASS — ${b}`)] };
+}
+
+/* NIGHT-8b — THE FIRST FRAMES OF THE NIGHT PAGE (the user saw Full's start card for about a second). A new page of this session loads the app
+   with a recorder run before any of the page's own code: at every animation frame (each one is about to be painted) it notes which of Full's
+   start items and which of Night's are visible, for 4 s. The app's main.js is held back 1.2 s, so many frames come before any of the page's
+   scripts run (as on a slow phone). PASS: from the very first frame Night's title and Begin show and nothing of Full's start card; CONTROL the
+   same page with Night's body class taken out of its markup (the NIGHT-8 page) must show Full's items in its early frames. */
+const FP_REC=()=>{ const fr=[]; window.__fp=fr; const t0=performance.now();
+  const vis=sel=>{ const e=document.querySelector(sel); if(!e) return false; const s=getComputedStyle(e), r=e.getBoundingClientRect(); return s.display!=='none' && s.visibility!=='hidden' && +s.opacity>0 && r.width>0 && r.height>0; };
+  const FULL=['#start .startCard > h1', '#start .startTag', '#startBtn', '#learnBtn', '#fsBtnStart', '#startSupport'], NIGHT=['.night-start-head', '#nightBegin'];
+  const tick=()=>{ if(document.body && document.getElementById('start')) fr.push({ t:Math.round(performance.now()-t0), full:FULL.filter(vis), night:NIGHT.filter(vis), js:!!document.querySelector('.night-start-head svg') });
+    if(performance.now()-t0<4000) requestAnimationFrame(tick); else fr.done=true; };
+  requestAnimationFrame(tick); };
+async function nightFirstFrames(page, control){
+  const ctx=page.context(), p=await ctx.newPage(), url=page.url();
+  try{
+    await p.addInitScript(FP_REC);
+    await p.route(u=>/\/apps\/night\/main\.js$/.test(u.pathname), async r=>{ await new Promise(z=>setTimeout(z, 1200)); await r.continue(); });
+    if(control) await p.route(u=>/\/apps\/night\/(index\.html)?$/.test(u.pathname), async r=>{ const resp=await r.fetch(); const body=(await resp.text()).replace('<body class="night-boot">', '<body>'); await r.fulfill({ response:resp, body }); });
+    await p.goto(url, { waitUntil:'commit' });
+    await within(p.waitForFunction(()=>window.__fp && window.__fp.done, null, { timeout:0, polling:200 }), 30e3, 'the first frames');
+    return await p.evaluate(()=>window.__fp.slice());
+  } finally { await p.close().catch(()=>{}); }
+}
+async function uiNightFirstFrames(page, label){
+  const lines=[], bad=[], judge=F=>{ const early=F.filter(f=>!f.js), wrong=F.filter(f=>f.full.length || f.night.length<2);
+    return { n:F.length, early:early.length, wrong, first:F[0] }; };
+  const ok=judge(await nightFirstFrames(page, false)), ctl=judge(await nightFirstFrames(page, true));
+  if(!ok.n || !ok.early) bad.push(`no frame was captured before the page's scripts ran (${ok.n} frames, ${ok.early} early) — the check saw nothing`);
+  else if(ok.wrong.length) bad.push(`${ok.wrong.length} of ${ok.n} frames show Full's start items or miss Night's (first at ${ok.wrong[0].t} ms: Full ${ok.wrong[0].full.join(', ')||'none'}, Night ${ok.wrong[0].night.join(', ')||'none'})`);
+  else lines.push(`the first frames: ${ok.n} frames in 4 s (${ok.early} before the page's scripts, the first at ${ok.first.t} ms) — every one shows Night's title and Begin, none of Full's start card`);
+  if(!(ctl.early && ctl.wrong.some(f=>!f.js && f.full.length))) bad.push(`CONTROL: the page without Night's body class showed no Full item in its early frames (${ctl.n} frames, ${ctl.early} early) — the check cannot fail`);
+  else lines.push(`CONTROL: the NIGHT-8 page (no body class) shows Full's start items in ${ctl.wrong.filter(f=>!f.js).length} of its ${ctl.early} early frames`);
+  return { pass:!bad.length, lines:[...lines.map(l=>`${label}: ${l}`), ...bad.map(b=>`${label}: NOT A PASS — ${b}`)] };
+}
+/* NIGHT-8b — FULL SCREEN WITH THE CAMERA UNDECIDED (the user's Poco: full screen ended at the camera prompt and never came back). The camera
+   permission is taken away (the browser then answers «prompt»), and the Android behaviour is played: the camera request ends full screen
+   (CAM_PROMPT: the query answers «prompt»; getUserMedia ends full screen, a 0.6-s prompt, then the real camera). Begin must NOT ask (deferred, never asked while undecided); the
+   camera runs; the next tap (the calibration offer's «No», or a card) asks and gets it — the real browser's full screen, no stub. CONTROL the
+   old way (fsAskAlwaysDbg: Begin asks anyway) is caught: asked while undecided, and the prompt ends it. */
+/* the browser's side of an undecided camera, played before the page's own code (only while this tab's flag is set): the permission query answers
+   «prompt» (the runner's fake-media flag keeps the real one «granted») and turns «granted», with its change event, once the camera opens; the
+   camera request ends full screen first and keeps the «prompt» up 0.6 s (Android Chrome) */
+const CAM_PROMPT=()=>{ try{ if(sessionStorage.getItem('__camPrompt')!=='1') return; }catch(e){ return; }
+  const P=navigator.permissions, q=P.query.bind(P), st=new EventTarget(); st.state='prompt'; st.name='camera'; st.onchange=null;
+  P.query=dsc=>dsc && dsc.name==='camera' ? Promise.resolve(st) : q(dsc);
+  const md=navigator.mediaDevices, g=md.getUserMedia.bind(md); window.__prompts=0;
+  md.getUserMedia=async c=>{ window.__prompts++; if(document.fullscreenElement) await document.exitFullscreen().catch(()=>{}); await new Promise(r=>setTimeout(r, 600));
+    const s=await g(c); if(st.state!=='granted'){ st.state='granted'; st.dispatchEvent(new Event('change')); } return s; }; };
+const camPromptPages=new WeakSet();
+async function nightFsUndecided(page, oldWay){
+  if(!camPromptPages.has(page)){ await page.addInitScript(CAM_PROMPT); camPromptPages.add(page); }
+  try{
+    await page.evaluate(()=>{ localStorage.clear(); localStorage.setItem('handsong.nightBg', 'dark'); sessionStorage.setItem('__camPrompt', '1'); }); await page.reload();
+    await within(page.waitForFunction(()=>window.P && document.getElementById('start').classList.contains('on') && getComputedStyle(document.getElementById('nightBegin')).display!=='none', null, { timeout:0 }), 60e3, 'reloading the app');
+    const cam=await page.evaluate(async old=>{ (await import('/apps/night/fullscreen.js')).fsAskAlwaysDbg(old);
+      try{ return (await navigator.permissions.query({ name:'camera' })).state; }catch(e){ return 'no query'; } }, oldWay);
+    await page.click('#nightBegin'); await page.waitForTimeout(300);
+    const atBegin=await page.evaluate(async ()=>(await import('/apps/night/fullscreen.js')).fsDbg());
+    await within(page.waitForFunction(()=>!document.getElementById('start').classList.contains('on'), null, { timeout:0 }), LIMIT_START, 'the start after Begin');
+    let tapped=null;
+    for(let i=0;i<40 && !tapped;i++){ const s=await page.evaluate(()=>({ cal:!document.getElementById('nightCal').hidden && getComputedStyle(document.getElementById('nightCalCard')).display!=='none', cards:getComputedStyle(document.getElementById('nightCards')).display!=='none' }));
+      if(s.cal){ await page.click('#nightCalNo'); tapped='the calibration offer'; } else if(s.cards){ await page.click('#nightCardNext'); tapped='a card'; } else await page.waitForTimeout(250); }
+    await page.waitForTimeout(500);
+    const after=await page.evaluate(async ()=>({ fs:(await import('/apps/night/fullscreen.js')).fsDbg(), prompts:window.__prompts }));
+    await page.evaluate(async ()=>{ (await import('/apps/night/fullscreen.js')).fsAskAlwaysDbg(false); if(document.fullscreenElement) await document.exitFullscreen().catch(()=>{}); });
+    return { cam, atBegin, after, tapped };
+  } finally { await page.evaluate(()=>sessionStorage.removeItem('__camPrompt')).catch(()=>{}); }
+}
+async function uiNightFsUndecided(page, label){
+  const lines=[], bad=[], r=await nightFsUndecided(page, false), B=r.atBegin, A=r.after.fs;
+  if(r.cam!=='prompt') bad.push(`the camera permission read «${r.cam}», not «prompt» — the undecided case was not reached`);
+  if(B.asked!==0 || B.deferred!==1) bad.push(`Begin asked for full screen with the camera undecided (asked ${B.asked}, deferred ${B.deferred}, permission «${r.cam}»)`);
+  else lines.push(`camera permission «${r.cam}»: Begin asked for the camera only (full screen deferred, asked 0)`);
+  if(!r.tapped) bad.push('no calibration offer or card came to tap after the camera ran');
+  else if(!(A.on && A.granted>=1 && A.undecided===0 && r.after.prompts>=1)) bad.push(`after the camera ran, a tap on ${r.tapped} did not bring full screen: ${JSON.stringify({ on:A.on, asked:A.asked, granted:A.granted, refused:A.refused, undecided:A.undecided, prompts:r.after.prompts, cam:A.cam })}`);
+  else lines.push(`the camera prompt came (${r.after.prompts}), then the tap on ${r.tapped} asked and full screen is on (asked ${A.asked}, granted ${A.granted}, never while undecided) — the browser's real full screen`);
+  const c=await nightFsUndecided(page, true), CA=c.after.fs;
+  if(c.atBegin.asked>=1 && (c.atBegin.undecided>=1 || CA.undecided>=1) && CA.exits>=1) lines.push(`CONTROL: the old way (Begin asks anyway) is caught — asked while undecided ${CA.undecided}, the prompt ended it (exits ${CA.exits})`);
+  else bad.push(`CONTROL: the old way was not caught: ${JSON.stringify({ begin:c.atBegin, after:CA })}`);
+  return { pass:!bad.length, lines:[...lines.map(l=>`${label}: ${l}`), ...bad.map(b=>`${label}: NOT A PASS — ${b}`)] };
+}
+
+/* NIGHT-10 — THE CAMERA CHOICE with two made-up cameras (TWO_CAMS, played before the page's own code while this tab's flag is set): the list
+   names a front camera (mirrored) and a back one (not mirrored); every open is the runner's real fake camera, its settings telling the chosen
+   device and facing; a device the list no longer has refuses with OverconstrainedError. Checks: Settings → Camera shows both, named «Front» /
+   «Back» on a made-up phone, the open one marked, nothing technical; a tap on Back switches LIVE — the start card never comes back, the music
+   goes on (started once), the hand model keeps detecting — and the back camera is NOT mirrored (camFacing, mirrored(), flipX) while the hands keep
+   their roles (the playing hand unchanged) and the calibration reads this camera's own record; the choice is kept and the next start opens it;
+   a kept camera that is gone opens the default quietly (no message). CONTROLS: the back camera forced mirrored fails the mirroring judgement;
+   a gone camera with core's fallback switched off fails the quiet-start judgement. */
+const TWO_CAMS=()=>{ try{ if(sessionStorage.getItem('__twoCams')!=='1') return; }catch(e){ return; }
+  const CAMS=[{ deviceId:'cam-front', label:'Front camera', facing:'user' }, { deviceId:'cam-back', label:'Back camera', facing:'environment' }];
+  const md=navigator.mediaDevices, g=md.getUserMedia.bind(md); window.__camOpened=[];
+  md.enumerateDevices=async ()=>CAMS.map(c=>({ deviceId:c.deviceId, label:c.label, kind:'videoinput', groupId:'g-'+c.deviceId, toJSON(){ return this; } }));
+  md.getUserMedia=async c=>{ const v=(c && c.video)||{}, want=v.deviceId && (v.deviceId.exact||v.deviceId); let cam;
+    if(want){ cam=CAMS.find(x=>x.deviceId===want); if(!cam) throw new DOMException('the camera is gone', 'OverconstrainedError'); }
+    else cam= v.facingMode==='environment' ? CAMS[1] : CAMS[0];
+    const s=await g({ video:{ width:{ ideal:640 }, height:{ ideal:480 } }, audio:false }), tr=s.getVideoTracks()[0], gs=tr.getSettings.bind(tr);
+    tr.getSettings=()=>({ ...gs(), deviceId:cam.deviceId, facingMode:cam.facing }); Object.defineProperty(tr, 'label', { value:cam.label, configurable:true });
+    window.__camOpened.push(cam.deviceId); return s; }; };
+const twoCamPages=new WeakSet();
+async function camStart(page, kept, noFallback=false){
+  if(!twoCamPages.has(page)){ await page.addInitScript(TWO_CAMS); twoCamPages.add(page); }
+  await page.evaluate(k=>{ localStorage.clear(); localStorage.setItem('handsong.nightBg', 'dark'); localStorage.setItem('handsong.nightCards', '2'); localStorage.setItem('handsong.nightCalOffered', '["*"]'); if(k) localStorage.setItem('handsong.nightCam', JSON.stringify({ deviceId:k })); sessionStorage.setItem('__twoCams', '1'); }, kept);
+  await page.reload();
+  await within(page.waitForFunction(()=>window.P && document.getElementById('start').classList.contains('on') && getComputedStyle(document.getElementById('nightBegin')).display!=='none', null, { timeout:0 }), 60e3, 'reloading the app');
+  if(noFallback) await page.evaluate(async ()=>{ (await import('/core/vision.js')).camOpenDbg({ noFallback:true, noRetry:true }); });
+  await page.click('#nightBegin');
+  const ok=await page.waitForFunction(()=>!document.getElementById('start').classList.contains('on'), null, { timeout:LIMIT_START }).then(()=>true, ()=>false);
+  for(let i=0;ok && i<16;i++){ const c=await page.evaluate(()=>{ const e=document.getElementById('nightCal'); return !!e && !e.hidden && getComputedStyle(document.getElementById('nightCalCard')).display!=='none'; });   // the calibration offer for this camera: «No»
+    if(c){ await page.click('#nightCalNo'); break; } await page.waitForTimeout(250); }
+  await page.waitForTimeout(500);
+  const st=await page.evaluate(async ()=>{ const V=await import('/core/vision.js'), S=await import('/core/state.js'); return { opened:window.__camOpened.slice(), pick:V.cameraPickInfo(), facing:S.camFacing, mirrored:S.mirrored(),
+    msg:(document.getElementById('loadmsg')||{}).textContent||'', retry:!(document.getElementById('camRetry')||{ hidden:true }).hidden, start:document.getElementById('start').classList.contains('on') }; });
+  if(noFallback) await page.evaluate(async ()=>{ (await import('/core/vision.js')).camOpenDbg({ reset:true }); });
+  return { ok, ...st };
+}
+async function uiNightCamera(page, label){
+  const lines=[], bad=[];
+  try{
+    const a=await camStart(page, null);
+    if(!a.ok || a.facing!=='user' || !a.mirrored) bad.push(`the default start: ${JSON.stringify(a)}`);
+    await page.evaluate(async ()=>{ const C=await import('/apps/night/camera.js'); C.camEnvDbg({ ua:'Mozilla/5.0 (Linux; Android 13) Mobile', platform:'Linux armv8l', touch:5 }); document.getElementById('nightInfoBtn').click(); });
+    await page.waitForTimeout(700);
+    const list=await page.evaluate(async ()=>{ const I=await import('/core/i18n.js'), sec=document.getElementById('nightCamSec'), b=[...document.querySelectorAll('#nightCamSeg button')];
+      return { shown:!sec.hidden && getComputedStyle(sec).display!=='none', names:b.map(x=>x.textContent), want:[I.t('night.cam.front'), I.t('night.cam.back')], on:b.map(x=>x.classList.contains('on')) }; });   // the page's own language
+    if(!list.shown || list.names.join()!==list.want.join() || list.on.join()!=='true,false' || list.names.some(x=>/cam-/.test(x))) bad.push('Settings → Camera: '+JSON.stringify(list));
+    else lines.push(`Settings → Camera on a made-up phone: «${list.names[0]}» (open, marked) · «${list.names[1]}»; no ids shown`);
+    const before=await page.evaluate(async ()=>{ const B2=await import('/apps/night/bed2.js'), V=await import('/core/vision.js'), S=await import('/core/state.js'), HC=await import('/core/handcal.js');
+      return { starts:B2.bed2ViewDbg().starts, det:V.pumpStats().detected, hand:JSON.stringify(S.handFn.ld), cal:HC.handCalRead().camera }; });
+    await page.click('#nightCamSeg button:nth-child(2)'); await page.waitForTimeout(2500);
+    const after=await page.evaluate(async ()=>{ const B2=await import('/apps/night/bed2.js'), V=await import('/core/vision.js'), S=await import('/core/state.js'), HC=await import('/core/handcal.js'), A=await import('/core/audio.js'), C=await import('/apps/night/camera.js');
+      return { starts:B2.bed2ViewDbg().starts, playing:B2.bed2ViewDbg().on, ac:A.AC && A.AC.state, det:V.pumpStats().detected, hand:JSON.stringify(S.handFn.ld), cal:HC.handCalRead().camera, facing:S.camFacing, mirrored:S.mirrored(),
+        fx:S.flipX(0.2), start:document.getElementById('start').classList.contains('on'), kept:C.camDbg().saved, opened:window.__camOpened.slice(), on:[...document.querySelectorAll('#nightCamSeg button')].map(x=>x.classList.contains('on')) }; });
+    const mirrorOK=s=>s.facing==='environment' && s.mirrored===false && s.fx===0.2;
+    if(after.start || after.starts!==before.starts || after.ac!=='running') bad.push(`the switch was not live: ${JSON.stringify({ start:after.start, starts:[before.starts, after.starts], ac:after.ac })}`);
+    else if(!(after.det>before.det)) bad.push(`the hand model stopped detecting after the switch (${before.det} → ${after.det})`);
+    else lines.push(`a tap on Back switched live: no start card, the music started once and plays on (audio ${after.ac}), detections ${before.det} → ${after.det}`);
+    if(!mirrorOK(after)) bad.push(`the back camera: ${JSON.stringify({ facing:after.facing, mirrored:after.mirrored, flipX:after.fx })}`); else lines.push('the back camera is not mirrored (camFacing environment, flipX(0.2) = 0.2: the picture and the hands together)');
+    if(after.hand!==before.hand) bad.push(`the hands' roles changed with the camera: ${before.hand} → ${after.hand}`); else lines.push('the hands keep their roles (the playing hand unchanged)');
+    if(after.cal===before.cal) bad.push('the calibration reads the same record for both cameras'); else lines.push(`the calibration is this camera's own (${before.cal.slice(0,10)}… → ${after.cal.slice(0,10)}…)`);
+    if(!after.kept || after.kept.deviceId!=='cam-back' || after.on.join()!=='false,true') bad.push(`the choice: kept ${JSON.stringify(after.kept)}, marked ${after.on}`);
+    { await page.evaluate(async ()=>{ (await import('/core/state.js')).setCamFacing('user'); }); const c=await page.evaluate(async ()=>{ const S=await import('/core/state.js'); return { facing:S.camFacing, mirrored:S.mirrored(), fx:S.flipX(0.2) }; });
+      await page.evaluate(async ()=>{ (await import('/core/state.js')).setCamFacing('environment'); });
+      if(mirrorOK(c)) bad.push('CONTROL: the back camera forced mirrored passed the mirroring judgement'); else lines.push('CONTROL: the back camera forced mirrored fails the mirroring judgement'); }
+    const b=await camStart(page, 'cam-back');
+    if(!b.ok || b.opened[0]!=='cam-back' || !mirrorOK({ facing:b.facing, mirrored:b.mirrored, fx:b.mirrored ? 0.8 : 0.2 })) bad.push(`the kept camera at the next start: ${JSON.stringify(b)}`); else lines.push('the next start opened the kept back camera (not mirrored)');
+    const g=await camStart(page, 'cam-gone');
+    if(!g.ok || g.start || g.retry || g.opened.slice(-1)[0]!=='cam-front' || !g.pick.missed) bad.push(`a kept camera that is gone: ${JSON.stringify(g)}`); else lines.push('a kept camera that is gone: the default opened quietly (the start card closed, no retry, no error), the miss noted');
+    const x=await camStart(page, 'cam-gone', true);
+    if(x.ok && !x.start && !x.retry) bad.push('CONTROL: a gone camera without the fallback still started quietly — the judgement cannot fail'); else lines.push('CONTROL: without core\'s fallback a gone camera fails the start (the judgement catches it)');
+  } finally { await page.evaluate(()=>{ try{ sessionStorage.removeItem('__twoCams'); localStorage.removeItem('handsong.nightCam'); }catch(e){} }).catch(()=>{}); }
   return { pass:!bad.length, lines:[...lines.map(l=>`${label}: ${l}`), ...bad.map(b=>`${label}: NOT A PASS — ${b}`)] };
 }
 
@@ -652,7 +806,14 @@ async function session(port, plan, label){
       for(const l of res.stale.lines) out(l);
       const mu=await within(uiNightMusic(page, `[${label}] NIGHT music and full screen`), 3*LIMIT_START, 'the music check').catch(e=>({ pass:false, lines:[`[${label}] NIGHT music and full screen: ERROR — ${e&&e.message||e}`] }));
       for(const l of mu.lines) out(l);
-      res.stale={ pass:res.stale.pass && mu.pass, lines:[...res.stale.lines, ...mu.lines] };
+      /* NIGHT-8b: full screen with the camera undecided (the Poco), and the first frames of the page */
+      const fu=await within(uiNightFsUndecided(page, `[${label}] NIGHT full screen, camera undecided`), 3*LIMIT_START, 'the undecided-camera check').catch(e=>({ pass:false, lines:[`[${label}] NIGHT full screen, camera undecided: ERROR — ${e&&e.message||e}`] }));
+      for(const l of fu.lines) out(l);
+      const ff=await within(uiNightFirstFrames(page, `[${label}] NIGHT first frames`), 90e3, 'the first-frames check').catch(e=>({ pass:false, lines:[`[${label}] NIGHT first frames: ERROR — ${e&&e.message||e}`] }));
+      for(const l of ff.lines) out(l);
+      const cm=await within(uiNightCamera(page, `[${label}] NIGHT camera choice`), 6*LIMIT_START, 'the camera check').catch(e=>({ pass:false, lines:[`[${label}] NIGHT camera choice: ERROR — ${e&&e.message||e}`] }));   // NIGHT-10
+      for(const l of cm.lines) out(l);
+      res.stale={ pass:res.stale.pass && mu.pass && fu.pass && ff.pass && cm.pass, lines:[...res.stale.lines, ...mu.lines, ...fu.lines, ...ff.lines, ...cm.lines] };
     }
     if(!has('--no-ui') && res.ui){   // AUTOSAVE1: reload → «Continue?» → the same song (last: it reloads the page)
       const ua=await within(uiAutosave(page, `[${label}] UI autosave`), LIMIT_START+120e3, 'the autosave UI check').catch(e=>({ pass:false, lines:[`[${label}] UI autosave: ERROR — ${e&&e.message||e}`] }));
@@ -726,7 +887,7 @@ for(const s of sessions){
   }
   if(!s.runs.length && !s.error && !EVAL && !LEAK && !s.dumped) pass=false;
   if(s.ui){ out(`[${s.label}] UI checks (section rename, bend drag, song file, autosave): ${s.ui.pass?'PASS':'NOT A PASS'}`); if(!s.ui.pass) pass=false; }
-  if(s.stale){ out(`[${s.label}] NIGHT stale saved values, music from Begin, full screen (NIGHT-7b, 7c): ${s.stale.pass?'PASS':'NOT A PASS'}`); if(!s.stale.pass) pass=false; }
+  if(s.stale){ out(`[${s.label}] NIGHT stale saved values, music from Begin, full screen, first frames, camera choice (NIGHT-7b, 7c, 8b, 10): ${s.stale.pass?'PASS':'NOT A PASS'}`); if(!s.stale.pass) pass=false; }
   if(!s.error){ out(`[${s.label}] CSP (PRIV1): ${s.csp&&s.csp.pass?'PASS — no violation, the control fetch refused':'NOT A PASS'}`); if(!(s.csp&&s.csp.pass)) pass=false;
     out(`[${s.label}] network (PRIV1, LAT2): ${s.net&&s.net.pass?`PASS — ${s.net.n} requests, all to the own origin or the MediaPipe paths`:'NOT A PASS'}`); if(!(s.net&&s.net.pass)) pass=false;
     out(`[${s.label}] storage (CORE-11): ${s.store&&s.store.pass?`PASS — ${s.store.list.length} names, ${NIGHT_PAGE?'all of this app or device facts':'the Full names as before'}, the control seen`:'NOT A PASS'}`); if(!(s.store&&s.store.pass)) pass=false; }
