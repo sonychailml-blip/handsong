@@ -30,7 +30,7 @@ export async function checkNightBed(){
   const BD=await import('../../../apps/night/bed.js'), SB=await import('../../../apps/night/sound/bed.js'), AM=await import('../../../apps/night/sound/ambience.js');
   const B2=await import('../../../apps/night/bed2.js'), SB2=await import('../../../apps/night/sound/bed2.js');   // NIGHT-4
   const FR=(await import('../../../apps/night/rooms/forest/pure/room.js')).FOREST_ROOM, B=FR.bed, R2=FR.bed2, { clickOf, kLoud }=await import('./night.js');
-  const KEYS=['handsong.nightMusic','handsong.nightMusicVol','handsong.nightMusicAnswer'], kept=KEYS.map(k=>{ try{ return localStorage.getItem(k); }catch(e){ return null; } });
+  const SH=await import('../../../apps/night/shell.js'), KEYS=[SH.MUSIC_KEYS.mode, SH.MUSIC_KEYS.vol, 'handsong.nightMusicAnswer'], kept=KEYS.map(k=>{ try{ return localStorage.getItem(k); }catch(e){ return null; } });   // NIGHT-7c: the music's new names
   const was={ mode:BD.bedModeOf(), vol:BD.bedVolumeOf(), answer:BD.bedAnswerOf(), engine:BD.bedEngineOf(), palette:BD.bedPaletteOf(), light:BD.bedLightOf() }, UI=await import('../../../core/legacy-ui/ui.js'), D=UI.shellDoors(), mood0=D.mood();
   const wait=ms=>new Promise(r=>setTimeout(r,ms));
   try{
@@ -65,7 +65,7 @@ export async function checkNightBed(){
     const btn=document.getElementById('nightMusic'), val=()=>btn.querySelector('.night-val').textContent.trim(), I=await import('../../../core/i18n.js');
     BD.bedSetMode('off'); { const seen=[]; for(let k=0;k<4;k++){ btn.click(); seen.push(BD.bedModeOf()+'='+val()); }
       const want=['still','drift','glimmer','off'].map(m=>m+'='+I.t('night.music.'+m)); n++; if(seen.join()!==want.join()) miss('the Music button: '+seen.join(' · '));
-      let st=null; try{ st=localStorage.getItem('handsong.nightMusic'); }catch(e){} n++; if(st!=='off') miss('the Music button did not remember its value ('+st+')'); }
+      let st=null; try{ st=localStorage.getItem(SH.MUSIC_KEYS.mode); }catch(e){} n++; if(st!=='off') miss('the Music button did not remember its value ('+st+')'); }
     BD.bedSetEngine('v1'); BD.bedSetMode('drift', B); BD.bedTick(); const L0=BD.bedDbg(), v0=S.CUR(), N0=v0.iv.length; n+=3;
     if(!L0.built || L0.parked || !BD.bedTakesDrone()) miss('On: '+JSON.stringify({ built:L0.built, parked:L0.parked, drone:BD.bedTakesDrone() }));
     if(L0.slots.length!==B.presets.drift.voices) miss('On: the first chord did not come ('+L0.slots.length+' voices)');

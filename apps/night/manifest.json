@@ -1,10 +1,14 @@
 {
+  "id": "./",
   "name": "Handsong Night",
   "short_name": "Handsong Night",
-  "description": "A night forest you play with your hands in front of the camera.",
-  "display": "standalone",
-  "background_color": "#e3e9f5",
-  "theme_color": "#e3e9f5",
+  "description": "Quiet music you play with your hands in front of the camera.",
+  "lang": "en",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "landscape",
+  "background_color": "#060a12",
+  "theme_color": "#060a12",
   "start_url": ".",
   "scope": ".",
   "icons": [

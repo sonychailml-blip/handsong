@@ -83,4 +83,12 @@ function svgEmblem(doc){
   const g=doc.createElementNS(SVGNS,'circle'); g.setAttribute('cx',EMBLEM_GLOW[0]); g.setAttribute('cy',EMBLEM_GLOW[1]); g.setAttribute('r',EMBLEM_GLOW[2]); g.setAttribute('class','emblem-glow'); svg.appendChild(g);
   return svg;
 }
-export { ICONS, icon, iconText, applyIcons, SVG_ICONS, svgIcon, svgEmblem };
+/* CORE-15: an app adds its own drawn icons (the same shapes as SVG_ICONS) before its markup is filled; a taken name is never replaced.
+   → null (added) or a refusal in words. Nothing calls it in Full: the table stays as it was. */
+function svgIconAdd(name, shapes){
+  if(typeof name!=='string' || !/^[a-z][a-z0-9-]*$/.test(name)) return 'not an icon name: '+name;
+  if(Object.prototype.hasOwnProperty.call(SVG_ICONS, name)) return `the icon «${name}» exists already`;
+  if(!Array.isArray(shapes) || !shapes.length || shapes.some(x=>!Array.isArray(x) || x.length!==3)) return `the icon «${name}» has no shapes`;
+  SVG_ICONS[name]=shapes; return null;
+}
+export { ICONS, icon, iconText, applyIcons, SVG_ICONS, svgIcon, svgEmblem, svgIconAdd };

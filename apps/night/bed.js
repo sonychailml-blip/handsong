@@ -13,12 +13,13 @@ import { BUS } from '../../core/pure/bus.js';
 import { seeded } from '../../core/pure/dsp.js';
 import { BED_OFF, BED_PRESETS, BED_ANSWER, bedInit, bedStep, bedSoon } from './pure/bed.js';
 import { BED_POOL, buildBed, bedVoice, bedVoicePark, bedFilter, bedGround, bedGlim, bedLevel, bedPark } from './sound/bed.js';
-import { bed2On, bed2Off, bed2Volume, bed2Tick, bed2Failed, bed2Dbg } from './bed2.js';
+import { bed2On, bed2Off, bed2Volume, bed2Tick, bed2Failed, bed2Dbg, bed2ViewOver } from './bed2.js';
 
 export const BED_SEED=0x42454431, BED_AHEAD=0.5, BED_PARK_S=9, BED_QUIET_TC=8;   // a released voice parks after 8 time constants (−70 dB)
 export const BED_ENGINES=Object.freeze(['v2','v1']), BED_PALETTES=Object.freeze(['a','b']);
 let mode=BED_OFF, vol=null, answer=false, recipe=null, bed=null, st=null, origin=0, view=null, parkAt=0, ons=0, notesSeq=0;
 let engine='v2', palette='a', light=false, recipe2=null, v2want=false, v1on=false, v1tick=null;   // NIGHT-4: v1on — v1 is the one playing (chosen, or the fallback)
+let over=null; const VIEW=()=>over||CUR();   // NIGHT-7c: the view before the profile's is live (bedViewOver)
 const played=[];   // { pc, t } of your recent notes (AC time) — read only with the response on
 const READ=BUS.reader();
 /* a bed object with its seeded per-voice detunes and its two sides' filter positions (× the chord's middle pitch) */
@@ -58,7 +59,7 @@ function v1Set(m, now, E){
   if(m===BED_OFF){ if(bed && v1on){ bedLevel(E, bed, 0, now); bedGround(E, bed, bed.ground.hz[0]||55, bed.ground.hz[1]||82, false, now); allOut(E, bed, now); parkAt=now+BED_PARK_S; } v1on=false; return; }
   if(!bed) bed=makeBed(E, E.master.in, recipe, BED_SEED);
   bedPark(E, bed, false); parkAt=0;
-  if(!v1on){ st=bedInit((BED_SEED+(++ons)*7919)>>>0); origin=now+0.05; view=CUR(); const [r,s2]=groundOf(view); bedGround(E, bed, r, s2, true, now); }
+  if(!v1on){ st=bedInit((BED_SEED+(++ons)*7919)>>>0); origin=now+0.05; view=VIEW(); const [r,s2]=groundOf(view); bedGround(E, bed, r, s2, true, now); }
   else if(st) bedSoon(st, now-origin);   // another preset: its first chord soon
   bedLevel(E, bed, vol==null ? recipe.level : vol, now); v1on=true;
 }
@@ -77,6 +78,10 @@ function apply(){
 }
 
 /* the shell's doors. B the room's v1 recipe, B2 its v2 recipe (NIGHT-4; a caller passing only B keeps the v2 recipe it had) */
+/* NIGHT-7c: the music starts on Begin, before the Night profile applies — it plays in the profile's own view (the very object CUR() becomes,
+   so nothing glides when the profile lands); null = the live view again */
+export function bedViewOver(v){ over=v||null; bed2ViewOver(v); }
+export const bedEngineReady=()=>!!(AC && AC.state==='running' && engineCtx().master.in);   // the master's input exists and the context runs
 export const bedTakesDrone=()=>mode!==BED_OFF;
 export const bedModeOf=()=>mode;
 export function bedSetMode(m, B, B2){
@@ -113,14 +118,14 @@ export function bedTick(at){
   if(!AC) return;
   if(!applied){ if(mode!==BED_OFF && recipe) apply(); return; }   // a remembered mode set before the audio existed
   const E=engineCtx(), now=at!=null ? at : AC.currentTime;
-  if(mode!==BED_OFF){ const N=READ.since('notes', notesSeq); notesSeq=N.seq; const n=sizeOf(CUR());
+  if(mode!==BED_OFF){ const N=READ.since('notes', notesSeq); notesSeq=N.seq; const n=sizeOf(VIEW());
     for(const it of N.items) if(it.kind==='on' && it.role==='ld' && Number.isInteger(it.deg)) played.push({ pc:((it.deg%n)+n)%n, t:now });
     while(played.length && played[0].t<now-BED_ANSWER.window) played.shift(); }
   if(v2want){ const r=bed2On(AC, E, E.master.in, recipe2, mode, bedVolumeOf(), now, opts()); if(r!=='pending') v2want=false; if(r==='failed') v1Set(mode, now, E); }
   bed2Tick(E, now, played.map(p=>p.pc), answer, opts());
   if(!bed) return;
   if(!v1on){ if(parkAt && now>=parkAt){ bedPark(E, bed, true); parkAt=0; } return; }
-  const v=CUR(), n=sizeOf(v);
+  const v=VIEW(), n=sizeOf(v);
   if(v!==view){ view=v; const [r,s2]=groundOf(v); bedGround(E, bed, r, s2, true, now); bedSoon(st, now-origin); }
   parkQuiet(E, bed, now);
   const P=recipe.presets[mode];

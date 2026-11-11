@@ -1347,6 +1347,37 @@ async function nightTextsCore(){
   notes.push(`${keys.size} keys used by the Night page and its code, ${night.length} «night.*» keys: all in English and Russian, none names a room`);
   return { cases:n, total:d.length, differences:d, notes };
 }
+/* NIGHT-7c: THE HOME SCREEN. (1) The «Add to Home Screen» card's law (apps/night/pure/homehint.js) on made-up devices: only Safari on an
+   iPhone / iPad without a full-screen door, outside the home-screen app (CONTROL: a law without the home-screen test would give it there).
+   (2) The page and the manifest make a home-screen app without browser bars: the manifest's name, full-screen display, landscape, dark colours,
+   its icons on disk; the page's iOS tags (capable, black-translucent status bar, title, touch icon on disk) and viewport-fit=cover
+   (CONTROL: a manifest with display «browser» is caught). */
+async function nightHomeScreen(){
+  const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); };
+  const fs=await import('node:fs'), path=await import('node:path'), ROOT=new URL('..', import.meta.url).pathname.replace(/^\/(\w:)/,'$1');
+  const { homeHintFor }=await import(new URL('../apps/night/pure/homehint.js', import.meta.url).href);
+  const SAF='Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
+  const MAC='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15';
+  const AND='Mozilla/5.0 (Linux; Android 14; 22111317PG) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36';
+  const CASES=[['iPhone Safari', { ua:SAF, platform:'iPhone', touch:5 }, true], ['iPad Safari (reports a Mac with touch)', { ua:MAC, platform:'MacIntel', touch:5 }, true],
+    ['iPad Safari with a full-screen door', { ua:MAC, platform:'MacIntel', touch:5, fsApi:true }, false], ['iPhone, opened from the Home Screen', { ua:SAF, platform:'iPhone', touch:5, standalone:true }, false],
+    ['Chrome on iPhone', { ua:SAF.replace('Version/17.5', 'CriOS/126.0'), platform:'iPhone', touch:5 }, false], ['Firefox on iPhone', { ua:SAF.replace('Version/17.5', 'FxiOS/127.0'), platform:'iPhone', touch:5 }, false],
+    ['an in-app browser on iPhone', { ua:SAF+' Instagram 300.0', platform:'iPhone', touch:5 }, false], ['Android Chrome', { ua:AND, platform:'Linux armv8l', touch:5, fsApi:true }, false],
+    ['a Mac (no touch)', { ua:MAC, platform:'MacIntel', touch:0, fsApi:true }, false], ['nothing known', {}, false]];
+  for(const [name, env, want] of CASES) ok(`${name}: the card ${want ? 'missing' : 'shown'}`, homeHintFor(env)===want);
+  { const noStandalone=e=>homeHintFor({ ...e, standalone:false }); ok('CONTROL: a law without the home-screen test gives the same answer there', noStandalone(CASES[3][1])!==homeHintFor(CASES[3][1])); }
+  const dir=path.join(ROOT, 'apps/night'), M=JSON.parse(fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8')), html=fs.readFileSync(path.join(dir, 'index.html'), 'utf8');
+  const manifestOk=m=>m.name==='Handsong Night' && m.short_name==='Handsong Night' && ['fullscreen','standalone'].includes(m.display) && /^landscape/.test(m.orientation||'') && /^#0/.test(m.background_color||'') && /^#0/.test(m.theme_color||'');
+  ok('the manifest: name, display, landscape or dark colours', manifestOk(M)); ok('CONTROL: a manifest with display «browser» passes', !manifestOk({ ...M, display:'browser' }));
+  for(const ic of M.icons||[]) ok('the manifest icon is missing: '+ic.src, fs.existsSync(path.join(dir, ic.src)));
+  const meta=name=>{ const m=new RegExp(`<meta name="${name}" content="([^"]*)"`).exec(html); return m ? m[1] : null; };
+  ok('iOS: apple-mobile-web-app-capable', meta('apple-mobile-web-app-capable')==='yes'); ok('Android: mobile-web-app-capable', meta('mobile-web-app-capable')==='yes');
+  ok('iOS: the status bar style', meta('apple-mobile-web-app-status-bar-style')==='black-translucent'); ok('iOS: the title', meta('apple-mobile-web-app-title')==='Handsong Night');
+  { const m=/<link rel="apple-touch-icon" href="([^"]+)"/.exec(html); ok('iOS: the touch icon', !!m && fs.existsSync(path.join(dir, m[1]))); }
+  ok('the viewport does not cover the notch (viewport-fit=cover)', /viewport-fit=cover/.test(meta('viewport')||''));
+  notes.push(`${CASES.length} made-up devices: the card on ${CASES.filter(c=>c[2]).map(c=>c[0]).join(' and ')} only; manifest ${M.display}, ${M.orientation}, ${M.icons.length} icons; iOS tags in place`);
+  return { cases:n, total:d.length, differences:d, notes };
+}
 /* NIGHT-6: THE FOREST'S FILES (tools/forest-bake.mjs). Every prepared file matches what the tool draws now, pixel for pixel (CONTROL a changed
    pixel is caught); the PNG writer and reader round-trip; the forest's files stay inside the user's budget (CONTROL 16 MB is over it). The
    sizes are printed every run (the user's rule: report the size in every slice). */
@@ -1512,6 +1543,7 @@ const ROWS=[
   ['FOREST paint (app)',        ()=>forestPaintCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 8
   ['FOREST hidden (app)',       ()=>forestHiddenCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 9
   ['NIGHT texts both languages (app)', ()=>nightTextsCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-7
+  ['NIGHT home screen (app)', ()=>nightHomeScreen(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-7c
   ['NIGHT forest files (app)',  ()=>nightForestFiles(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 (the files rule, the size budget)
   ['OLD NAME gone',             ()=>oldNameGone(),  r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // SPLIT-2
   ['NIGHT rare events (core)',  ()=>rareCore(),     r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // RUN 9 (slice 4)

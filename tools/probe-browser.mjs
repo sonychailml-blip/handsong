@@ -343,7 +343,8 @@ async function uiSongFile(page, label){
 const NIGHT_STALE=[['handsong.night.lang','xx'], ['handsong.lang','de'], ['handsong.nightSeen','1'], ['handsong.ca'+'lmSeen','1'], ['handsong.nightCards','old'],
   ['handsong.nightMusic','loud'], ['handsong.nightMusicVol','NaN'], ['handsong.nightForest','abc'], ['handsong.nightJoints','x'], ['handsong.nightLight','maybe'],
   ['handsong.nightField','2'], ['handsong.nightCalSide','middle'], ['handsong.nightCalOffered','{not json'], ['handsong.handCal.night','{not json'],
-  ['handsong.nightRoom','cave'], ['handsong.sceneLevel','ultra'], ['handsong.nightFxHint','?'], ['handsong.nightBg','dark']];   // Dark: no software WebGL here (the background's fallback is a list check)
+  ['handsong.nightRoom','cave'], ['handsong.sceneLevel','ultra'], ['handsong.nightFxHint','?'], ['handsong.nightBg','dark'],
+  ['handsong.nightMusic','off'], ['handsong.nightMusicVol','0'], ['handsong.nightMusicMode','loud'], ['handsong.nightMusicLevel','NaN']];   // NIGHT-7c: an old «off» and volume 0 must not silence the music   // Dark: no software WebGL here (the background's fallback is a list check)
 /* in the page: every visible text element under the given roots — blank, or showing its own key */
 function nightLabels(sels){
   const bad=[], vis=el=>{ const r=el.getBoundingClientRect(), s=getComputedStyle(el); return r.width>0 && r.height>0 && s.visibility!=='hidden' && +s.opacity>0; };
@@ -355,6 +356,22 @@ function nightLabels(sels){
     if(!tx && !icon) bad.push(name+' blank'); else if(/^[a-z]+(\.[\w-]+)+$/.test(tx)) bad.push(`${name} shows its key «${tx}»`); }
   return { n, bad };
 }
+/* NIGHT-7c — after a click on Begin (trusted: a real tap), in the page and in the background: the music bed's OWN output (an analyser on its node)
+   every 100 ms for 10 s → when it first rose above −60 dBFS (ms after the click), its level at 4 s and at the end; then whether it plays in the
+   live view and how often it (re)started (the face must not restart it); the full-screen counters. `stub`: the browser refuses full screen once. */
+async function nightBeginHear(page, stub=false){
+  await page.evaluate(st=>{ window.__t0=performance.now(); if(st){ const el=document.documentElement, real=el.requestFullscreen; el.requestFullscreen=function(){ el.requestFullscreen=real; return Promise.reject(new Error('refused (control)')); }; } }, stub);
+  await page.click('#nightBegin');
+  await page.evaluate(()=>{ window.__hearP=(async ()=>{ const B2=await import('/apps/night/bed2.js'), A=await import('/core/audio.js'), F=await import('/apps/night/fullscreen.js');
+    let an=null, first=null, last=-200, at4=null, fsTap=null; const buf=new Float32Array(2048);
+    for(let k=0;k<100;k++){ const n=B2.bed2NodeDbg(); if(n && !an && A.AC){ an=A.AC.createAnalyser(); an.fftSize=2048; n.connect(an); }
+      if(an){ an.getFloatTimeDomainData(buf); let s=0; for(const x of buf) s+=x*x; last=10*Math.log10(s/buf.length+1e-20); if(first==null && last>-60) first=Math.round(performance.now()-window.__t0); }
+      if(k===40) at4=last; if(k===5) fsTap=F.fsDbg();   // full screen 0.5 s after the tap: before any later tap of the flow could ask again
+      await new Promise(r=>setTimeout(r, 100)); }
+    if(an) try{ B2.bed2NodeDbg().disconnect(an); }catch(e){}
+    return { first, last:+last.toFixed(1), at4:at4==null ? null : +at4.toFixed(1), ac:A.AC && A.AC.state, view:B2.bed2ViewDbg(), fs:fsTap||F.fsDbg() }; })(); });
+}
+const nightHeard=page=>within(page.evaluate(()=>window.__hearP), 30e3, 'the music measure');
 async function uiNightStale(page, label){
   const lines=[], bad=[];
   await page.evaluate(L=>{ for(const [k,v] of L) localStorage.setItem(k,v); }, NIGHT_STALE);
@@ -372,7 +389,7 @@ async function uiNightStale(page, label){
     const c=await page.evaluate(nightLabels, ['#start']);
     await page.evaluate(()=>{ document.getElementById('nightBegin').textContent=window.__nlKeep; delete window.__nlKeep; });
     if(!c.bad.some(x=>/nightBegin/.test(x))) bad.push('CONTROL: a blanked Begin label was not caught'); else lines.push('CONTROL: a blanked Begin label is caught'); }
-  await page.click('#nightBegin');
+  await nightBeginHear(page);
   await within(page.waitForFunction(()=>!document.getElementById('start').classList.contains('on'), null, { timeout:0 }), LIMIT_START, 'the start after Begin');
   const shownNow=()=>page.evaluate(()=>{ const vis=id=>{ const e=document.getElementById(id); return !!e && getComputedStyle(e).display!=='none' && e.getBoundingClientRect().height>0; };
     return { cal:vis('nightCalCard') && !document.getElementById('nightCal').hidden, cards:vis('nightCards') }; });
@@ -392,6 +409,42 @@ async function uiNightStale(page, label){
     else lines.push('the last «Play» closed them (display none)');
     if(after.hands) bad.push(`a hand plays after the cards with no hand in front of the camera (${after.hands})`); else lines.push('no hand plays after them (no demo hand)');
   }
+  /* NIGHT-7c: the music under all this, and full screen on the Begin tap */
+  { const h=await nightHeard(page); musicJudge(h, true, 'with stale values', lines, bad);
+    if(h.fs.asked>=1 && h.fs.granted>=1) lines.push(`full screen asked on the Begin tap and granted (asked ${h.fs.asked}, granted ${h.fs.granted}, now ${h.fs.on ? 'on' : 'off'})`);
+    else bad.push(`full screen on the Begin tap: asked ${h.fs.asked}, granted ${h.fs.granted}, refused ${h.fs.refused} (api ${h.fs.api})`); }
+  return { pass:!bad.length, lines:[...lines.map(l=>`${label}: ${l}`), ...bad.map(b=>`${label}: NOT A PASS — ${b}`)] };
+}
+/* the music measure judged: on = audible within 6 s of the tap, playing in the live view, started once (no restart when the face came) */
+function musicJudge(h, on, what, lines, bad){
+  if(on){ if(h.first!=null && h.first<=6000 && h.view.same && h.view.starts===1) lines.push(`music ${what}: audible ${h.first} ms after Begin, ${h.at4} dBFS at 4 s, ${h.last} at 10 s; in the live view, started once`);
+    else bad.push(`music ${what}: first audible ${h.first==null ? 'never' : h.first+' ms'} (6000 at most), live view ${h.view.same}, started ${h.view.starts} times (once wanted), audio ${h.ac}`); }
+  else { if(h.first==null && h.ac==='running') lines.push(`music ${what}: silent for 10 s with the audio running`); else bad.push(`music ${what}: audible ${h.first} ms after Begin (audio ${h.ac})`); }
+}
+/* NIGHT-7c — the music on a FRESH profile (everything cleared), and the CONTROLS: a stored «off» (the person's own choice) must fail the
+   «music on» judgement — the measure can say «not playing»; a browser that refuses full screen once must fail the Begin-tap judgement, and
+   the next tap in the flow (a card) must ask again and get it */
+async function uiNightMusic(page, label){
+  const lines=[], bad=[];
+  const skipFlow=async ()=>{ for(let i=0;i<40;i++){ const s=await page.evaluate(()=>({ cal:!document.getElementById('nightCal').hidden, cards:getComputedStyle(document.getElementById('nightCards')).display!=='none' }));
+      if(s.cards) return true; if(s.cal) await page.click('#nightCalNo'); await page.waitForTimeout(250); } return false; };
+  const reloadWith=async kv=>{ await page.evaluate(L=>{ localStorage.clear(); for(const [k,v] of L) localStorage.setItem(k,v); }, kv); await page.reload();
+    await within(page.waitForFunction(()=>window.P && document.getElementById('start').classList.contains('on') && getComputedStyle(document.getElementById('nightBegin')).display!=='none', null, { timeout:0 }), 60e3, 'reloading the app'); };
+  const started=()=>within(page.waitForFunction(()=>!document.getElementById('start').classList.contains('on'), null, { timeout:0 }), LIMIT_START, 'the start after Begin');
+  /* fresh */
+  await reloadWith([['handsong.nightBg','dark']]); await nightBeginHear(page); await started();
+  if(await skipFlow()) await page.click('#nightCardSkip');
+  musicJudge(await nightHeard(page), true, 'on a fresh profile', lines, bad);
+  /* the controls */
+  await reloadWith([['handsong.nightBg','dark'], ['handsong.nightMusicMode','off']]); await nightBeginHear(page, true); await started();
+  const cards=await skipFlow(), h=await nightHeard(page);
+  { const l=[], b=[]; musicJudge(h, true, 'with off stored', l, b); if(b.length) lines.push('CONTROL: a stored «off» fails the «music on» judgement'); else bad.push('CONTROL: the «music on» judgement passed with «off» stored — it cannot fail'); }
+  musicJudge(h, false, 'with «off» stored (the person’s choice)', lines, bad);
+  if(h.fs.granted===0 && h.fs.refused>=1) lines.push('CONTROL: a browser that refuses full screen fails the Begin-tap judgement'); else bad.push(`CONTROL: the refusal was not seen (granted ${h.fs.granted}, refused ${h.fs.refused})`);
+  if(!cards) bad.push('no card to tap after the refusal');
+  else { await page.click('#nightCardNext'); await page.waitForTimeout(400); const f=await page.evaluate(async ()=>(await import('/apps/night/fullscreen.js')).fsDbg());
+    if(f.retried===1 && f.granted===1) lines.push(`after the refusal the next tap in the flow asked again and got it (asked ${f.asked}, retried ${f.retried})`); else bad.push(`the next tap did not ask again: ${JSON.stringify(f)}`);
+    await page.click('#nightCardSkip'); }
   return { pass:!bad.length, lines:[...lines.map(l=>`${label}: ${l}`), ...bad.map(b=>`${label}: NOT A PASS — ${b}`)] };
 }
 
@@ -597,6 +650,9 @@ async function session(port, plan, label){
     if(NIGHT_PAGE && !DUMP){   // NIGHT-7b: stale saved values → the start card still fully labelled (last: it reloads the page)
       res.stale=await within(uiNightStale(page, `[${label}] NIGHT stale saved values`), LIMIT_START+120e3, 'the stale-values check').catch(e=>({ pass:false, lines:[`[${label}] NIGHT stale saved values: ERROR — ${e&&e.message||e}`] }));
       for(const l of res.stale.lines) out(l);
+      const mu=await within(uiNightMusic(page, `[${label}] NIGHT music and full screen`), 3*LIMIT_START, 'the music check').catch(e=>({ pass:false, lines:[`[${label}] NIGHT music and full screen: ERROR — ${e&&e.message||e}`] }));
+      for(const l of mu.lines) out(l);
+      res.stale={ pass:res.stale.pass && mu.pass, lines:[...res.stale.lines, ...mu.lines] };
     }
     if(!has('--no-ui') && res.ui){   // AUTOSAVE1: reload → «Continue?» → the same song (last: it reloads the page)
       const ua=await within(uiAutosave(page, `[${label}] UI autosave`), LIMIT_START+120e3, 'the autosave UI check').catch(e=>({ pass:false, lines:[`[${label}] UI autosave: ERROR — ${e&&e.message||e}`] }));
@@ -670,7 +726,7 @@ for(const s of sessions){
   }
   if(!s.runs.length && !s.error && !EVAL && !LEAK && !s.dumped) pass=false;
   if(s.ui){ out(`[${s.label}] UI checks (section rename, bend drag, song file, autosave): ${s.ui.pass?'PASS':'NOT A PASS'}`); if(!s.ui.pass) pass=false; }
-  if(s.stale){ out(`[${s.label}] NIGHT stale saved values → start card fully labelled (NIGHT-7b): ${s.stale.pass?'PASS':'NOT A PASS'}`); if(!s.stale.pass) pass=false; }
+  if(s.stale){ out(`[${s.label}] NIGHT stale saved values, music from Begin, full screen (NIGHT-7b, 7c): ${s.stale.pass?'PASS':'NOT A PASS'}`); if(!s.stale.pass) pass=false; }
   if(!s.error){ out(`[${s.label}] CSP (PRIV1): ${s.csp&&s.csp.pass?'PASS — no violation, the control fetch refused':'NOT A PASS'}`); if(!(s.csp&&s.csp.pass)) pass=false;
     out(`[${s.label}] network (PRIV1, LAT2): ${s.net&&s.net.pass?`PASS — ${s.net.n} requests, all to the own origin or the MediaPipe paths`:'NOT A PASS'}`); if(!(s.net&&s.net.pass)) pass=false;
     out(`[${s.label}] storage (CORE-11): ${s.store&&s.store.pass?`PASS — ${s.store.list.length} names, ${NIGHT_PAGE?'all of this app or device facts':'the Full names as before'}, the control seen`:'NOT A PASS'}`); if(!(s.store&&s.store.pass)) pass=false; }

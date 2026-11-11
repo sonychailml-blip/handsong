@@ -1,6 +1,7 @@
 /* SPLIT-2: the Night app's entry: its shell, its rooms, its profile (NIGHT-7b: the ghost light is gone — the first cards replace it). */
 import './migrate.js';   // first: the shell reads its settings while it loads
 import './texts.js';   // NIGHT-7: Night's own texts join the dictionaries before anything shows
+import './icons.js';   // NIGHT-7c: Night's own drawn icons join the shared table before the markup is filled
 import { boot } from '../../core/legacy-ui/boot.js';
 import { shellDoors, setFaceHook } from '../../core/legacy-ui/ui.js';
 import { sceneRoomAdd, setBackground, backgroundOf, sceneInfo, scenePausing, sceneRoom, sceneLevel } from './scene/host.js';

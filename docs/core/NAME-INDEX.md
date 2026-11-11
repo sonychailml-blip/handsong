@@ -23,12 +23,12 @@ SPLIT-2: the Full app's entry.
 
 ## apps/night/bed.js
 NIGHT-3 stage 4: THE MUSIC BED's DOOR AND ITS v1 DRIVER (live) — the state the Music button and the settings set (off / still / drift / glimmer, the volume, the response switch, all remembered by t…
-- const (10): `BED_SEED`, `BED_ENGINES`, `bedTakesDrone`, `bedModeOf`, `bedVolumeOf`, `bedAnswerOf`, `bedEngineOf`, `bedPaletteOf`, `bedLightOf`, `bedDbg`
-- fn (10): `bedSetMode`, `bedSetVolume`, `bedSetAnswer`, `bedSetEngine`, `bedSetPalette`, `bedSetLight`, `bedHold`, `bedResume`, `bedTick`, `bedPlan`
+- const (11): `BED_SEED`, `BED_ENGINES`, `bedEngineReady`, `bedTakesDrone`, `bedModeOf`, `bedVolumeOf`, `bedAnswerOf`, `bedEngineOf`, `bedPaletteOf`, `bedLightOf`, `bedDbg`
+- fn (11): `bedViewOver`, `bedSetMode`, `bedSetVolume`, `bedSetAnswer`, `bedSetEngine`, `bedSetPalette`, `bedSetLight`, `bedHold`, `bedResume`, `bedTick`, `bedPlan`
 
 ## apps/night/bed2.js
 NIGHT-4: THE MUSIC BED v2's DRIVER (live and offline).
-- const (4): `BED2_AHEAD`, `bed2Failed`, `bed2Dbg`, `bed2StatsLive`
+- const (7): `BED2_AHEAD`, `bed2ViewOver`, `bed2Failed`, `bed2Dbg`, `bed2StatsLive`, `bed2NodeDbg`, `bed2ViewDbg`
 - fn (6): `bed2Load`, `bed2On`, `bed2Off`, `bed2Volume`, `bed2Tick`, `bed2Plan`
 - → ./sound/bed2.js (1): `bed2Stats`
 
@@ -39,12 +39,21 @@ NIGHT-2 stage 2: the hand's calibration screens over CORE-1's engine (core/handc
 
 ## apps/night/cards.js
 NIGHT-7 — THE FIRST CARDS: after the calibration offer on a first start (and from Settings → «How to play»), four short cards with simple drawn pictures, written from the real gestures (core/gestur…
-- const (5): `CARDS_KEY`, `cardsDue`, `cardsDone`, `cardsOpen`, `cardsDbg`
+- const (6): `CARDS_KEY`, `cardsDue`, `cardsDone`, `cardsOpen`, `cardsDbg`, `cardsEnvDbg`
 - fn (2): `cardsShow`, `cardsWire`
 
 ## apps/night/edition.js
 NIGHT-7b — NIGHT'S EDITION: the build's (core/edition.js: 'release' in a players' build) or, on any page, «?release» in the address — so the players' settings can be checked on Live Server without …
 - const (2): `NIGHT_EDITION`, `devItems`
+
+## apps/night/fullscreen.js
+NIGHT-7c — FULL SCREEN on computers and Android (Chrome, Edge, Firefox; iPadOS Safari through its prefixed door).
+- const (8): `fsApi`, `fsOn`, `fsStandalone`, `fsStarted`, `fsFlowEnd`, `fsOnChange`, `fsCanToggle`, `fsDbg`
+- fn (3): `fsBegin`, `fsFlowTap`, `fsToggle`
+
+## apps/night/icons.js
+NIGHT-7c — NIGHT'S OWN DRAWN ICONS (our own work, rule #32), added to the shared table through core's door (CORE-15) before the page's markup is filled (main.js imports this right after the texts).
+- const (1): `NIGHT_ICONS`
 
 ## apps/night/main.js
 SPLIT-2: the Night app's entry: its shell, its rooms, its profile (NIGHT-7b: the ghost light is gone — the first cards replace it).
@@ -78,6 +87,10 @@ RUN 9 — THE NIGHT over the forest, as numbers.
 ## apps/night/pure/heard.js
 NIGHT-6 slice 1 — WHEN A SOUND IS HEARD, on the page's clock.
 - const (1): `heardMs`
+
+## apps/night/pure/homehint.js
+NIGHT-7c — WHO GETS THE «ADD TO HOME SCREEN» CARD (pure: the data row and the cards row feed it made-up devices).
+- fn (1): `homeHintFor`
 
 ## apps/night/pure/room.js
 NIGHT-3: THE ROOM RECORD's shape and validator (pure, rule #36; data row «NIGHT room records» with controls).
@@ -216,8 +229,8 @@ THE SCENE HOST and Night's BACKGROUNDS (VIS1b, RUN 6; Night's own since CORE-8 �
 
 ## apps/night/shell.js
 RUN 7 (C6 + C11, Night plan §5; docs/night/QUALITY.md points 4, 5, 6, 9, 10) — THE NIGHT SHELL (DOM side; the logic is core/nightui.js).
-- const (5): `LEAN_PATH`, `REACH`, `nightClockDbg`, `nightShellDbg`, `nightSleepDbg`
-- fn (2): `nightShellWire`, `nightShellFace`
+- const (8): `LEAN_PATH`, `MUSIC_KEYS`, `musicModeOf`, `REACH`, `nightEarlyDbg`, `nightClockDbg`, `nightShellDbg`, `nightSleepDbg`
+- fn (3): `nightShellWire`, `nightShellFace`, `nightMusicHoldDbg`
 
 ## apps/night/sound/ambience.js
 THE ROOMS' AMBIENCE (RUN 7, C4c; Night's own since CORE-7): drone + wind + distant crickets + one soft echo, built from a room's NATURE recipe (the forest's: apps/night/rooms/forest/pure/room.js).
@@ -378,7 +391,7 @@ tutor — обучающий слой (UI) подписывается СЮДА: 
 ## core/icons.js
 UI1b (DAY run 2026-10-16): THE ICON COMPONENT — every interface glyph is rendered through here, by a NAME of its meaning.
 - const (4): `ICONS`, `icon`, `iconText`, `SVG_ICONS`
-- fn (3): `applyIcons`, `svgIcon`, `svgEmblem`
+- fn (4): `applyIcons`, `svgIcon`, `svgEmblem`, `svgIconAdd`
 
 ## core/legacy-ui/boot.js
 (no head comment)
@@ -1039,7 +1052,7 @@ PROBE1: Arrangement-window and mixer probes: every track reachable, AR1, MX1, MX
 
 ## tools/probes/night.js
 SPLIT-2: the probe entry of the Night page: its own rows and the core rows flagged for both pages.
-- const (2): `all`, `api`
+- const (2): `night`, `api`
 - fn (1): `install`
 - → ./core/engine.js (3): `checkEngineCtx`, `checkCensus`, `dumpCensus`
 - → ./core/gold.js (2): `dumpGold`, `checkGold`
@@ -1047,7 +1060,7 @@ SPLIT-2: the probe entry of the Night page: its own rows and the core rows flagg
 - → ./core/handcal.js (1): `checkHandCal`
 - → ./core/handprint.js (3): `dumpHandPrint`, `checkHandPrint`, `checkHandMap`
 - → ./core/profile.js (1): `checkProfile`
-- → ./core/run.js (2): `material`, `night`
+- → ./core/run.js (1): `material`
 - → ./core/timbres.js (2): `checkTimbresBefore`, `dumpTimbres`
 - → ./core/vis.js (1): `checkVisStack`
 - → ./night/bed.js (1): `checkNightBed`
@@ -1130,7 +1143,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 - const (5): `TEST_ROOM_ID`, `TEST_ROOM`, `testRoomMode`, `testRoomInfo`, `testRoomFreeLeaks`
 - fn (2): `testRoomInstall`, `testRoomRemove`
 
-_221 modules, 2515 exported names._
+_224 modules, 2538 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

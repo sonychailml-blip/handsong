@@ -4,11 +4,14 @@
       keeps it sounding (Notes: follow / stay put is in the controls);
    2. Near and far — the hand's size in the picture is its depth: farther, more space and a deeper echo around the sound (room-neutral, NIGHT-7b);
    3. Your other hand — touch a finger to the thumb and move it up or down: index Echo, middle Warm or Bright, ring Wave; it stays;
-   4. Music — the Music button: a quiet accompaniment (Still, Drift, Glimmer), off again on a further tap.
+   4. Music — the music already playing (NIGHT-7c: on from Begin) is the Music button's: Still, Drift, Glimmer, or off;
+   5. (iPhone Safari outside the home-screen app only, NIGHT-7c) Full screen — Share, then Add to Home Screen.
    Skippable at every card. NIGHT-7b: they replace the old ghost hand (deleted); whether they are due is a key of their own (CARDS_KEY), written
    only once they close — no older flag decides it. The pictures are our own line drawings (inline SVG, currentColor and the accent token). */
 import { t, onLangChange } from '../../core/i18n.js';
 import { svgIcon } from '../../core/icons.js';
+import { homeHintFor } from './pure/homehint.js';   // NIGHT-7c: the home-screen card's device test
+import { fsApi, fsStandalone } from './fullscreen.js';
 
 const $=id=>document.getElementById(id);
 /* a hand seen from the palm, its wrist at (x, y), scale s, mirrored for the left one; pinch: which finger (0 index … 3 little) touches the thumb */
@@ -37,12 +40,21 @@ const PICS=[
     <rect x="164" y="22" width="6" height="70" rx="3" class="np-bar"/><rect x="176" y="22" width="6" height="70" rx="3" class="np-bar"/><rect x="188" y="22" width="6" height="70" rx="3" class="np-bar"/>
     <rect x="164" y="56" width="6" height="36" rx="3" class="np-t1"/><rect x="176" y="40" width="6" height="52" rx="3" class="np-t2"/><rect x="188" y="70" width="6" height="22" rx="3" class="np-t3"/>`,
   /* music: the round button; a soft accompaniment over it */
-  ()=>`<circle cx="100" cy="80" r="26" class="np-btn"/><g class="np-ico" transform="translate(86,66)"></g>
+  ()=>`<circle cx="100" cy="80" r="26" class="np-btn"/><g class="np-ico" data-ico="music" transform="translate(86,66)"></g>
     <path d="M40,40 q15,-12 30,0 t30,0 t30,0 t30,0" class="np-wave"/><path d="M52,24 q12,-9 24,0 t24,0 t24,0 t24,0" class="np-wave np-faint"/>`,
+  /* NIGHT-7c, iPhone Safari only: the browser's bottom bar with its Share button lit → «Add to Home Screen» → the app on its own */
+  ()=>`<rect x="14" y="78" width="96" height="30" rx="8" class="np-line"/><circle cx="62" cy="93" r="13" class="np-glow"/><g class="np-ico" data-ico="share" transform="translate(48,79)"></g>
+    <path d="M118,93 L140,93" class="np-dash"/><path d="M134,88 L140,93 L134,98" class="np-line"/><g class="np-ico" data-ico="add-home" transform="translate(146,79)"></g>
+    <rect x="66" y="10" width="68" height="52" rx="8" class="np-line"/><circle cx="100" cy="36" r="5" class="np-glow"/>`,
 ];
-const CARDS=['play','depth','fx','music'];
+const BASE=['play','depth','fx','music'];
+let env=null;   // probe only: a made-up device for the home-screen card
+const envNow=()=>env || { ua:navigator.userAgent, platform:navigator.platform, touch:navigator.maxTouchPoints||0, standalone:fsStandalone(), fsApi:fsApi() };
+/* the cards this device gets: the four, and on iPhone Safari outside the home-screen app a fifth on how to get full screen (pure/homehint.js) */
+const cardList=()=> homeHintFor(envNow()) ? [...BASE, 'home'] : BASE;
+let CARDS=BASE;
 /* NIGHT-7b: due on a Begin unless this exact value is stored (a new card set raises CARDS_V); anything else stored — old, unknown — means due */
-export const CARDS_KEY='handsong.nightCards', CARDS_V='1';
+export const CARDS_KEY='handsong.nightCards', CARDS_V='2';   // NIGHT-7c: 2 — the music card's words, the home-screen card
 export const cardsDue=store=>{ try{ return store.getItem(CARDS_KEY)!==CARDS_V; }catch(e){ return true; } };
 export const cardsDone=store=>{ try{ store.setItem(CARDS_KEY, CARDS_V); }catch(e){} };
 let open=false, i=0, done=null;
@@ -52,18 +64,21 @@ function render(){ const k=CARDS[i];
   $('nightCardText').textContent=t(`night.card.${k}.b`, { still:t('night.music.still'), drift:t('night.music.drift'), glimmer:t('night.music.glimmer') });
   $('nightCardStep').textContent=t('night.card.of', { n:i+1, m:CARDS.length });
   $('nightCardSkip').textContent=t('night.card.skip'); $('nightCardNext').textContent=t(i===CARDS.length-1 ? 'night.card.go' : 'night.card.next');
-  const pic=$('nightCardPic'); pic.innerHTML=`<svg viewBox="0 0 200 120" class="night-pic" role="presentation">${PICS[i]()}</svg>`;
-  const ico=pic.querySelector('.np-ico'); if(ico){ const g=svgIcon(document, 'music'); if(g){ g.setAttribute('width', '28'); g.setAttribute('height', '28'); ico.appendChild(g); } }   // the icon's own svg, sized inside the picture
+  const pic=$('nightCardPic'); pic.innerHTML=`<svg viewBox="0 0 200 120" class="night-pic" role="presentation">${PICS[BASE.length>i ? i : 4]()}</svg>`;
+  for(const ico of pic.querySelectorAll('.np-ico')){ const g=svgIcon(document, ico.dataset.ico); if(g){ g.setAttribute('width', '28'); g.setAttribute('height', '28'); ico.appendChild(g); } }   // the icons' own svg, sized inside the picture
   for(const d of $('nightCardDots').children) d.classList.toggle('on', +d.dataset.i===i); }
 function close(){ if(!open) return; open=false; $('nightCards').hidden=true; document.body.classList.remove('night-cards-open'); const f=done; done=null; if(f) f(); }
 /* show the cards from the first; then(): called once they close (finished or skipped) */
-export function cardsShow(then){ open=true; i=0; done=then||null; $('nightCards').hidden=false; document.body.classList.add('night-cards-open'); render(); $('nightCardNext').focus({ preventScroll:true }); }
+export function cardsShow(then){ CARDS=cardList(); dots(); open=true; i=0; done=then||null; $('nightCards').hidden=false; document.body.classList.add('night-cards-open'); render(); $('nightCardNext').focus({ preventScroll:true }); }
 export const cardsOpen=()=>open;
+function dots(){ $('nightCardDots').replaceChildren(...CARDS.map((_,k)=>{ const d=document.createElement('span'); d.className='night-cards-dot'; d.dataset.i=String(k); return d; })); }
 export function cardsWire(){
-  $('nightCardDots').replaceChildren(...CARDS.map((_,k)=>{ const d=document.createElement('span'); d.className='night-cards-dot'; d.dataset.i=String(k); return d; }));
+  dots();
   $('nightCardNext').onclick=()=>{ if(i<CARDS.length-1){ i++; render(); } else close(); };
   $('nightCardSkip').onclick=()=>close();
   document.addEventListener('keydown', e=>{ if(open && e.key==='Escape') close(); });
   onLangChange(render); render(); }
 /* probe only: which card, how many */
-export const cardsDbg=()=>({ open, i, n:CARDS.length, title:open ? $('nightCardTitle').textContent : '' });
+export const cardsDbg=()=>({ open, i, n:CARDS.length, list:CARDS.slice(), title:open ? $('nightCardTitle').textContent : '' });
+/* probe only: a made-up device (null = this one) for the home-screen card */
+export const cardsEnvDbg=e=>{ env=e||null; };

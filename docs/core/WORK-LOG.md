@@ -4,6 +4,11 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`. Checkpoints A–E of SPLIT-2 are its last sections.
 
+# CORE-15 (2026-11-11): an app's own drawn icons (for NIGHT-7c)
+Tree hashes before: core fcc89441767f3d57 · apps/full d6b90cf2cb4be6da · apps/night a37f38449a52a06e. After: core b48faaf6170ac8e3 · apps/full d6b90cf2cb4be6da (unchanged) · apps/night 7c0f340534617f72.
+- `core/icons.js` `svgIconAdd(name, shapes)`: adds to `SVG_ICONS` (a bad name, a taken name or no shapes refused in words). Opt-in: Full calls nothing; the table it reads is unchanged. Night's icons stay in the app (`apps/night/icons.js`).
+- Checks: both apps' runs (NIGHT-7c log).
+
 # CORE-14 (2026-11-11): Night texts out of core (for NIGHT-7b)
 Tree hashes before: core 2b6fc141521883a3 · apps/full d6b90cf2cb4be6da · apps/night 117bb0bc77cf38ef. After: core fcc89441767f3d57 · apps/full d6b90cf2cb4be6da (unchanged) · apps/night a37f38449a52a06e.
 - `core/i18n.js`: removed `night.stepPhones`, `night.stepCamera`, `night.firstRun` (no longer used) and `night.phones`, `night.cal.offerB`, `night.cal.doneB` (reworded room-neutral, now in `apps/night/texts.js`), English and Russian. No Full key touched; the debt line «Night's dictionary keys in `i18n.js`» shrinks.

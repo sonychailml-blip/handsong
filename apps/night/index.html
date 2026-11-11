@@ -8,19 +8,23 @@
      core/va-stub.js); 'wasm-unsafe-eval' lets the hand model's WebAssembly compile; inline style attributes stay allowed. A new host needs
      the user's decision, a register entry and a line here. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net/npm/@mediapipe/ 'wasm-unsafe-eval'; connect-src 'self' https://cdn.jsdelivr.net/npm/@mediapipe/ https://storage.googleapis.com/mediapipe-models/; img-src 'self' data: blob:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/>
 <!-- CORE-11: this app's own names in the shared stores (core/storens.js): on one origin with Full it never reads Full's settings or songs -->
 <meta name="handsong-store" content="night">
 <title data-i18n="night.title">Handsong Night</title>
 <!-- PWA: манифест + светлый theme-color под стартовый экран. start_url/scope в манифесте ОТНОСИТЕЛЬНЫЕ
      ("."), чтобы работало и на GitHub Pages в подпапке, и позже на своём домене (камера/звук/ворклет не
      трогаем). iOS не читает display/icons манифеста — для «на домашний экран» дублируем apple-* мета. -->
+<!-- NIGHT-7c: from the Home Screen — no browser bars (iOS: the apple-* tags; Android: the manifest's display), the night's own dark colour,
+     the page drawn under the status bar and the notch (viewport-fit=cover; the corners keep clear through env(safe-area-inset-*) in night.css) -->
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#e3e9f5">
+<meta name="theme-color" content="#060a12">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Handsong Night">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="application-name" content="Handsong Night">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="handsong-profile" href="data/night.json">
 <!-- SPLIT-2: read only under ?probe; the shipped build removes this tag and the tools it names -->
 <link rel="handsong-probes" href="../../tools/probes/night.js">
@@ -571,7 +575,7 @@
   <!-- RUN 8 (slice 3): while the hands play — the forest's depth on the playing hand's side, the three effects on the effects hand's side
        (apps/night/shell.js sets each bar's value, its side and which one glows); the effects hand's one-line hint, shown once on this device -->
   <div id="nightForestBar" class="night-bars" aria-hidden="true">
-    <div class="night-bar" data-bar="forest"><span class="night-bar-ico" data-svg="forest"></span><span class="night-bar-track"><span class="night-bar-fill"></span></span><span class="night-bar-lab" data-i18n="night.depth">Depth</span></div>
+    <div class="night-bar" data-bar="forest"><span class="night-bar-ico" data-svg="depth"></span><span class="night-bar-track"><span class="night-bar-fill"></span></span><span class="night-bar-lab" data-i18n="night.depth">Depth</span></div>
   </div>
   <div id="nightFxBars" class="night-bars" aria-hidden="true">
     <div class="night-bar" data-bar="echo"><span class="night-bar-ico" data-svg="echo"></span><span class="night-bar-track"><span class="night-bar-fill"></span></span><span class="night-bar-lab" data-i18n="night.fx.echo">Echo</span></div>
@@ -584,6 +588,8 @@
   <div id="nightFade" class="night-fade">
     <p id="nightIdle" class="night-idle" data-i18n="night.idle">Raise a hand to play</p>
     <button id="nightInfoBtn" class="night-ibtn night-glass" data-svg="settings" data-i18n-title="night.settings" title="Settings"></button>
+    <!-- NIGHT-7c: full screen in / out, in the other top corner; hidden where the browser has none and in the home-screen app (apps/night/fullscreen.js) -->
+    <button id="nightFsBtn" class="night-ibtn night-fsbtn night-glass" data-svg="fs-enter" data-i18n-title="night.fs.enter" title="Full screen" aria-pressed="false" hidden></button>
     <!-- NIGHT-3 stage 4: five round buttons in 3 + 3 places (Music · Sound / Mood · Notes · Sleep; Room joins the top row once there are two rooms) + settings.
          NIGHT-3 stage 5 part 2: the Room button is first and hidden while there is one room (players: until a second real room) -->
     <div id="nightCtl" class="night-ctl night-glass">
@@ -638,7 +644,7 @@
       <div class="night-sl-lab" data-i18n="night.set.quality">Picture</div>
       <div id="nightQualSeg" class="night-seg night-seg-2"><button data-q="reduced" data-i18n="night.q.standard">Standard</button><button data-q="full" data-i18n="night.q.detailed">Detailed — for strong devices</button></div>
       <button id="nightFieldTg" class="night-tg"><span class="night-vico" data-svg="note-stay"></span><span data-i18n="night.field">Show the full note field</span><span class="night-tsw"><span></span></span></button>
-      <button id="nightLightTg" class="night-tg"><span class="night-vico" data-svg="forest"></span><span data-i18n="night.light">Lightweight mode — for older computers and phones</span><span class="night-tsw"><span></span></span></button>
+      <button id="nightLightTg" class="night-tg"><span class="night-vico" data-svg="lightweight"></span><span data-i18n="night.light">Lightweight mode — for older computers and phones</span><span class="night-tsw"><span></span></span></button>
     </section>
     <div class="night-about">
       <span class="night-mark"><span data-svg="emblem"></span><span class="night-word">hand<span class="night-word-dot">·</span>song</span> <span class="night-sub">night</span></span>

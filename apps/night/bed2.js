@@ -59,6 +59,9 @@ function msgsOf(M, ev, when, v, R, P, o){
 function padsOut(M, when, r){ const out=[]; for(const i of M.cur){ out.push({ k:'off', t:when, slot:i, r }); M.slots[i]={ hz:0, step:null, freeAt:when+2.1*r }; } M.cur=[]; return out; }
 
 /* ---- live ---- */
+/* NIGHT-7c: the view the live bed plays in until the profile's own is live (the music starts on Begin, before the Night profile applies) */
+let over=null; const VIEW=()=>over||CUR();
+export const bed2ViewOver=v=>{ over=v||null; };
 const S={ ready:false, fail:false, loading:false, b:null, on:false, st:null, M:null, R:null, wR:null, preset:null, origin:0, view:null, parkAt:0, ons:0, E:null, tick:null };   // wR: the recipe the worklet holds
 export const bed2Failed=()=>S.fail;
 /* on (or another preset) at AC time `now`: R the room's bed2 recipe, level the bus level 0…1 (volume), o { light, palette }.
@@ -71,13 +74,13 @@ export function bed2On(ac, E, dest, R, preset, vol, now, o){
   const fresh=!S.on, list=[];
   if(S.wR!==R){ list.push({ k:'recipe', t:now, recipe:recipeOf(R) }); S.wR=R; }   // NIGHT-3 stage 5 part 2: another room's bed (no node is made)
   if(!fresh){ list.push(...padsOut(S.M, now, 4), { k:'flush', t:now, layers:['loop', 'glass'], r:3 }); }
-  S.R=R; S.preset=preset; S.on=true; S.origin=now+0.05; S.st=bed2Init((BED2_SEED+(++S.ons)*7919)>>>0, R, R.presets[preset]); S.view=CUR();
+  S.R=R; S.preset=preset; S.on=true; S.origin=now+0.05; S.st=bed2Init((BED2_SEED+(++S.ons)*7919)>>>0, R, R.presets[preset]); S.view=VIEW();
   list.push(...presetMsgs(R, R.presets[preset], now, levelOf(R, vol)), groundMsg(S.view, true, now, fresh ? 2.5 : 1));
   bed2Post(E, S.b, list); return 'on';
 }
 export function bed2Off(E, now){
   if(!S.b || !S.on) return; S.on=false;
-  bed2Post(E, S.b, [{ k:'p', t:now, name:'level', v:0, tc:1.2 }, { ...groundMsg(S.view||CUR(), false, now, 1.2) }, ...padsOut(S.M, now, 3), { k:'flush', t:now, layers:['loop', 'glass'], r:2 }]);
+  bed2Post(E, S.b, [{ k:'p', t:now, name:'level', v:0, tc:1.2 }, { ...groundMsg(S.view||VIEW(), false, now, 1.2) }, ...padsOut(S.M, now, 3), { k:'flush', t:now, layers:['loop', 'glass'], r:2 }]);
   S.parkAt=now+BED2_PARK_S;
 }
 export function bed2Volume(E, vol, now){ if(S.b && S.on && S.R) bed2Post(E, S.b, [{ k:'p', t:now, name:'level', v:levelOf(S.R, vol), tc:1.2 }]); }
@@ -86,7 +89,7 @@ export function bed2Volume(E, vol, now){ if(S.b && S.on && S.R) bed2Post(E, S.b,
 export function bed2Tick(E, now, played, answer, o){
   if(!S.b) return;
   if(!S.on){ if(S.parkAt && now>=S.parkAt){ bed2Park(E, S.b, true); S.parkAt=0; } return; }
-  const v=CUR(), list=[];
+  const v=VIEW(), list=[];
   if(v!==S.view){ S.view=v; list.push(groundMsg(v, true, now, 0.3), { k:'flush', t:now+0.02, layers:['loop', 'glass'], r:2.5 }); bed2Soon(S.st, now-S.origin); }
   const P=S.R.presets[S.preset], evs=bed2Step(S.st, S.R, P, v.iv.length, now-S.origin+BED2_AHEAD, played, answer, !!o.light);
   /* after a gap (a hidden tab stops the frames, not the audio clock): notes more than 1 s late are skipped and only the latest missed chord
@@ -103,6 +106,8 @@ export const bed2Dbg=()=>({ ready:S.ready, fail:S.fail, built:!!S.b, on:S.on, pa
   slots:S.M ? S.M.cur.slice() : [], voices:S.M ? S.M.slots.map(x=>({ hz:x.hz, step:x.step })) : [], density:S.st && S.R && S.preset ? bed2Density(S.st, Math.max(0, (S.E ? S.E.ac.currentTime : 0)-S.origin), S.R.presets[S.preset].arcDepth) : null,
   loops:S.st ? S.st.loops.map(L=>({ len:L.len, active:L.active, notes:L.phrase ? L.phrase.length : 0, cycles:L.cycles })) : [], origin:S.origin, tick:S.tick });
 export const bed2StatsLive=()=> S.b ? bed2Stats(S.E, S.b) : Promise.resolve(null);
+export const bed2NodeDbg=()=> S.b ? S.b.node : null;   // probe only (NIGHT-7c): the bed's own output, to hear it alone
+export const bed2ViewDbg=()=>({ same:S.view===CUR(), over:!!over, starts:S.ons });   // probe only: whether it plays in the live view, how often it (re)started
 
 /* ---- offline ---- */
 /* a whole timeline into an engine context E (an offline render): preset `preset` of recipe R for `sec` s from 0, everything posted up front

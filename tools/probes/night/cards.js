@@ -9,7 +9,7 @@
    «first steps again» (the ghost is gone). */
 import { row } from '../core/rows.js';
 import { withLang, t } from '../../../core/i18n.js';
-import { cardsShow, cardsOpen, cardsDbg, cardsDue, cardsDone, CARDS_KEY } from '../../../apps/night/cards.js';
+import { cardsShow, cardsOpen, cardsDbg, cardsDue, cardsDone, CARDS_KEY, cardsEnvDbg } from '../../../apps/night/cards.js';
 import { sceneLevel, setSceneLevel } from '../../../apps/night/scene/host.js';
 
 const CYR=/[а-яё]/i;
@@ -48,16 +48,27 @@ export async function checkNightCards(){
     $('nightCardNext').click(); ok('the last card did not take them off the screen', !cardsOpen() && !onScreen($('nightCards'))); ok('closing called back '+calls+' times', calls===1);
     $('nightCardSkip').click(); ok('CONTROL: a second close called back again', calls===1);
     let skipped=0; cardsShow(()=>skipped++); $('nightCardNext').click(); $('nightCardSkip').click(); ok('Skip did not close them at the second card', !cardsOpen() && !onScreen($('nightCards')) && skipped===1);
+    /* NIGHT-7c: the home-screen card — a made-up iPhone Safari gets a fifth card, labelled, its picture with the Share icon; this computer, the
+       home-screen app and another iPhone browser do not (CONTROL: the iPhone Safari case must give it, so the test can tell) */
+    { const IPH={ ua:'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1', platform:'iPhone', touch:5, standalone:false, fsApi:false };
+      cardsShow(); ok('this computer gets the home-screen card', cardsDbg().n===4); $('nightCardSkip').click();
+      cardsEnvDbg(IPH); cardsShow(); const L=cardsDbg().list; ok('CONTROL: iPhone Safari gets no fifth card ('+L.join()+')', L.length===5 && L[4]==='home');
+      for(let k=0;k<4;k++) $('nightCardNext').click();
+      ok('the home card: its title', $('nightCardTitle').textContent===t('night.card.home.t')); ok('the home card: no Share picture', !!$('nightCardPic').querySelector('[data-ico="share"] svg'));
+      ok('the home card is not the last', $('nightCardNext').textContent===t('night.card.go')); $('nightCardSkip').click();
+      cardsEnvDbg({ ...IPH, standalone:true }); cardsShow(); ok('the home-screen app gets the card', cardsDbg().n===4); $('nightCardSkip').click();
+      cardsEnvDbg({ ...IPH, ua:IPH.ua.replace('Version/17.5', 'CriOS/126.0') }); cardsShow(); ok('Chrome on iPhone gets the card', cardsDbg().n===4); $('nightCardSkip').click();
+      cardsEnvDbg(null); }
     $('nightInfoBtn').click(); $('nightHowTo').click(); ok('«How to play» did not open them from Settings', cardsOpen() && $('nightInfo').hidden);
     ok('the controls show over the cards', !$('nightShell').classList.contains('show')); $('nightCardSkip').click();
-    for(const L of ['en','ru']) withLang(L, ()=>{ const keys=['play','depth','fx','music'].flatMap(k=>[`night.card.${k}.t`, `night.card.${k}.b`]).concat(['night.card.skip','night.card.next','night.card.go','night.privacyLine','night.howTo','night.q.standard','night.q.detailed']);
+    for(const L of ['en','ru']) withLang(L, ()=>{ const keys=['play','depth','fx','music'].flatMap(k=>[`night.card.${k}.t`, `night.card.${k}.b`]).concat(['night.card.skip','night.card.next','night.card.go','night.privacyLine','night.howTo','night.q.standard','night.q.detailed','night.card.home.t','night.card.home.b','night.fs.enter','night.fs.exit']);
       const miss=keys.filter(k=>t(k)===k), wrong=keys.filter(k=>L==='ru' ? !CYR.test(t(k)) : CYR.test(t(k))); ok(`${L}: ${miss.length} texts missing (${miss.join(', ')})`, !miss.length); ok(`${L}: ${wrong.length} texts in the other language`, !wrong.length); });
     ok('the privacy line is not on the start screen', !!$('nightPrivacyLine') && $('nightPrivacyLine').textContent.length>20);
     const Q=[...$('nightQualSeg').children], hi=Q.find(b=>b.dataset.q==='full'), lo=Q.find(b=>b.dataset.q==='reduced');
     hi.click(); await new Promise(r=>setTimeout(r, 60)); ok('Detailed did not set the high level: '+sceneLevel(), sceneLevel()==='full'); lo.click(); await new Promise(r=>setTimeout(r, 60)); ok('Standard did not set medium: '+sceneLevel(), sceneLevel()==='reduced');
     notes.push(`four cards: ${seen.join(' · ')}; Skip, the last Next and «How to play» work and leave the screen (computed style); due by their own key; both languages complete`);
   } catch(e){ d.push('error: '+(e&&e.stack||e)); }
-  finally{ if(cardsOpen()) $('nightCardSkip').click(); if(!$('nightInfo').hidden) $('nightInfoClose').click(); try{ await setSceneLevel(keepLevel); }catch(e){} }
+  finally{ cardsEnvDbg(null); if(cardsOpen()) $('nightCardSkip').click(); if(!$('nightInfo').hidden) $('nightInfoClose').click(); try{ await setSceneLevel(keepLevel); }catch(e){} }
   return { cases:n, total:d.length, differences:d, notes };
 }
 row({ at:1009.972, night:true, name:'NIGHT first cards', run:()=>checkNightCards(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });

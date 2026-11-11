@@ -3,8 +3,13 @@ import * as SELF from './night.js';
 import { night as runNight } from './core/run.js';
 import { guardWire, api as guardApi } from './core/guard.js';
 
-export { material, night } from './core/run.js';
-export const all=(opt={})=>runNight(opt), quick=(opt={})=>runNight({ ...opt, quick:true });
+export { material } from './core/run.js';
+/* NIGHT-7c: the music is on by default now — every run holds it off (the live-sound rows measure the room without it) and waits out its
+   tail (about 9 s) when it was playing; afterwards it plays again as the person chose */
+async function quiet(run){ const SH=await import('../../apps/night/shell.js'), was=SH.nightMusicHoldDbg(true);
+  if(was){ console.log('[probe] the music is held off for the rows (its tail: 9 s)'); await new Promise(r=>setTimeout(r, 9000)); }   // eslint-disable-line no-console
+  try{ return await run(); } finally{ SH.nightMusicHoldDbg(false); } }
+export const night=(opt={})=>quiet(()=>runNight(opt)), all=night, quick=(opt={})=>quiet(()=>runNight({ ...opt, quick:true }));
 export { checkEngineCtx, checkCensus, dumpCensus } from './core/engine.js';
 export { dumpGold, checkGold } from './core/gold.js';
 export { dumpGesture, checkGesture } from './core/hand.js';

@@ -24,7 +24,7 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 - **Eye check from the split:** `tools/split-baseline/side-by-side-E/`, the four structure-only screens.
 - **Not done by a machine:** ears, hands, phones. Old setting names do not carry over to the new `handsong-night` address, so first-run steps may appear again there.
 
-- **Step 144, the test version's fixes** (five checks; replaces step 143's (2) and (4)): `archive/CLAUDE-history.md`, step 144. Step 143's (1), (3), (5) still stand.
+- **Step 145, music and full screen** (five checks; covers step 144's and 143's phone parts): `archive/CLAUDE-history.md`, step 145. Steps 143 (1), (3) and 144 (1)–(4) still stand on the laptop.
 - **Step 127, the quiet floor by ear:** `http://127.0.0.1:5500/apps/night/?probe&tails=off` and `…&tails=on`; `archive/CLAUDE-history.md`.
 - **The Poco headroom page, later:** `<Night preview>/?probe&headroom`, about 25 minutes (user, 2026-11-03).
 
@@ -36,6 +36,13 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 5. The falling star passes in front of the trees. Natural?
 
 ## Records (English, at most about 15 lines each; older ones go to `archive/HANDOFF-history.md`)
+### NIGHT-7c (2026-11-11): music from the first moment, and full screen (+ CORE-15, an icon door). Log: `docs/night/WORK-LOG.md`
+- Music is on by default («Покой» / Still) and starts on the tap on Begin: once the audio engine is up (about 1 s; the camera, its prompt and the model still loading) the bed plays in the Night profile's own view, fades in (level ~3 s, ground 2.5 s), and plays on under the calibration and the cards; the face does not restart it. Turning it off is remembered. New storage names (`handsong.nightMusicMode`, `…MusicLevel`): an old «off» or volume 0 from development runs never silences a new player.
+- iPhone: `navigator.audioSession.type='playback'` on Begin where it exists (Safari 16.4+); elsewhere nothing changes (on older iOS the silent switch mutes Web Audio).
+- Full screen (`apps/night/fullscreen.js`): asked in the Begin tap (navigation hidden where allowed; Android: landscape lock tried, refusals quiet); asked again on the next tap of the calibration or the cards if refused or ended before the camera ran; an exit afterwards is the person's. A corner toggle (top-left in portrait, top-right in landscape) shows the state; hidden where there is no full screen and in the home-screen app.
+- Home screen: manifest dark, `fullscreen` display, landscape, room-neutral description; page tags for iOS (capable, black-translucent status bar, title, icon) and Android, `viewport-fit=cover`. On iPhone / iPad Safari without full screen and outside the home-screen app a fifth card «Full screen: Share → Add to Home Screen» (`pure/homehint.js`); the cards' set is version 2 (seen again once).
+- Icons (`apps/night/icons.js` through `core/icons.js svgIconAdd`): Depth (layers going away), Lightweight (a feather), full screen in / out, Share, Add to Home Screen.
+- Probes: the facade holds the music off during P.night (9 s tail wait when it played). Rows: data «NIGHT home screen (app)» 22; «NIGHT first cards» + the home card; runner «NIGHT music and full screen» (fresh profile, stale values, CONTROLS stored «off» and a refused full screen). Waiting for step 145.
 ### NIGHT-7b (2026-11-11): fixes from the user's first look at the test version (+ CORE-14, texts). Log: `docs/night/WORK-LOG.md`
 - The empty card and the card that would not close had ONE cause: `.night-card.night-cards{display:block}` beat `[hidden]`, so the cards stayed on screen whatever the attribute said. In a window that had begun before (old `handsong.nightSeen`), no first run filled them: four dots, two blank buttons. The NIGHT-7 row checked the attribute, so it could not fail. Fixed: `#nightShell [hidden]` always hides; the cards are labelled from load; the row judges the computed style (CONTROL).
 - The cards are due by their own key `handsong.nightCards` (written when they close); no older flag decides. The ghost hand is deleted (`ghost.js`, its row, «first steps again»): the cards replace it.
@@ -103,11 +110,3 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 - Level near the nature sound (K-like −1.0 / +1.1 / +1.9 dB).
 - v1 is unchanged behind the dev A/B pills `?probe&bed=v1|v2&voices=a|b`, and plays by itself if AudioWorklet is missing.
 - Accepted by ear (user, 2026-11-09): v2 with the «voices» palette stays the default; v1 stays as the fallback (NIGHT-5 gave it v2's gap rule).
-### NIGHT-3 stage 5 part 1 (2026-11-08): the settings card for rooms (CORE-10). Log: `docs/night/WORK-LOG.md`
-- «Что на экране»: «Комната · Тёмный · Камера». «Звуки комнаты» (was «Лес» under View) sits under Music beside «Громкость музыки» and sets only the room's sound; the hand's reach is fixed at the old default 0.6, so nothing changed at the default position. «Руки на экране» moved to Hand. The Lantern switch is gone (it stays off; what it did: the work log).
-- Landscape: Hand on the left, Music and View stacked on the right. Approved and committed by the user (2026-11-09).
-- ⛳ **Stopped here. Next: stage 5 part 2, the switching machinery** (the user starts it in a new window). Scope, the user's notes (judge the row «NIGHT room switch» on exact controls and only print the real-time dropouts; fix the stale `shell.js` line in `CLAUDE.md`; the playing bar named after the current room) and the proposed design: `docs/night/design/NIGHT-3-rooms/PLAN.md`, top. The lantern's return as a «Подсветить руки» offer in the low-light message: `docs/night/BACKLOG.md`.
-### NIGHT-3 stage 4 (2026-11-04): the music bed for the forest. Log: `docs/night/WORK-LOG.md`
-- The Music button (Music · Sound / Mood · Notes · Sleep, 3 + 3 places): off → «Покой» → «Течение» → «Мерцание»; off at first start, remembered. Settings → Music: volume, «Музыка отвечает моим нотам» (off by default).
-- One generator, the forest's recipe as data: chords of the scale's own degrees under the playing, two detuned oscillators per voice, slow filter drift, a ground that takes the drone over, rare glimmer; its own slow clock (no stepping back). The response leans only which chord comes next, never when.
-- Cost on the laptop 2.1–2.5 % of a quantum (gate 3 %); level 0.3 dB from the nature sound. Step 130 checked by the user (2026-11-08): all works; the response stays off by default.

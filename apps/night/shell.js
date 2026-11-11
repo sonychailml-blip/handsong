@@ -12,11 +12,14 @@ import { outputFade, ambienceOn, ambienceRetune, ambienceTick, fxInstance, setTi
 import { fxDenorm } from '../../core/modules/effects/param.js';
 import { NIGHT_FX } from '../../core/modules/effects/night-fx.js';
 import { ROOMS, roomById } from './rooms/index.js';   // NIGHT-3: the current room's nature recipe (its default level, its wind)
-import { bedNext } from './pure/bed.js';
-import { bedSetMode, bedModeOf, bedSetVolume, bedVolumeOf, bedSetAnswer, bedAnswerOf, bedTick, bedSetLight } from './bed.js';   // NIGHT-3 stage 4: the music bed (NIGHT-4: v2, Lighter)
+import { bedNext, BED_PRESETS } from './pure/bed.js';
+import { bedSetMode, bedModeOf, bedSetVolume, bedVolumeOf, bedSetAnswer, bedAnswerOf, bedTick, bedSetLight, bedViewOver, bedEngineReady } from './bed.js';   // NIGHT-3 stage 4: the music bed (NIGHT-4: v2, Lighter)
 import { t, L, onLangChange } from '../../core/i18n.js';
 import { svgIcon } from '../../core/icons.js';
 import { nightView, setNightView, chainKeyOf, setVolFloor } from '../../core/state.js';
+import { scaleById, scaleView } from '../../core/scales.js';   // NIGHT-7c: the profile's own view for the music before the profile applies
+import { profileOf } from '../../core/profile.js';
+import { fsBegin, fsStarted, fsFlowTap, fsFlowEnd, fsToggle, fsOn, fsOnChange, fsCanToggle } from './fullscreen.js';   // NIGHT-7c: full screen
 import { devItems } from './edition.js';   // NIGHT-7b: the release edition (a players' build, or ?release) hides the development items
 import { calWire, calOfferIfNew, calActive, calSideApply, calSideSet, calSettingsRender, calAbort } from './calib.js';   // NIGHT-2: the hand's calibration (its picture is drawn by the loop: main.js afterDraw)
 import { setSceneLevel, sceneLevel, setBackground, backgroundOf, sceneInfo, sceneRoom, sceneRooms, sceneOptDbg } from './scene/host.js';   // RUN 8 (slice 4): the scene's quality (development switch); C8 the measurement
@@ -28,7 +31,11 @@ const $=id=>document.getElementById(id), READ=BUS.reader();
 /* NIGHT-1 stage 2: what this app never plays leaves the graph (the sound stays the same to rounding; row «NIGHT lean path»). Its chain has no drive, brightness or tremolo; its one role is solo */
 export const LEAN_PATH=Object.freeze({ expr:true, voice:true, roles:true, closedFx:true, park:true });
 const KEY={ field:'handsong.nightField', roomSound:'handsong.nightForest', fxHint:'handsong.nightFxHint', joints:'handsong.nightJoints', light:'handsong.nightLight', lightScene:'handsong.nightLightScene',
-  music:'handsong.nightMusic', musicVol:'handsong.nightMusicVol', musicAnswer:'handsong.nightMusicAnswer' };   // NIGHT-3 stage 4: the bed's mode (off at first start), volume, response
+  musicAnswer:'handsong.nightMusicAnswer' };   // NIGHT-3 stage 4: the bed's response (its mode and volume: MUSIC_KEYS)
+/* NIGHT-7c: THE MUSIC IS ON until the person turns it off (that choice is remembered). New names: an «off» or a volume of 0 that development runs
+   left under the old names («handsong.nightMusic», «…MusicVol») never silences a new player; anything unknown reads as the default */
+export const MUSIC_KEYS=Object.freeze({ mode:'handsong.nightMusicMode', vol:'handsong.nightMusicLevel' }), MUSIC_DEFAULT='still';
+export const musicModeOf=v=> v==='off' || BED_PRESETS.includes(v) ? v : MUSIC_DEFAULT;
 const load=k=>{ try{ return localStorage.getItem(k); }catch(e){ return null; } };
 const save=(k,v)=>{ try{ localStorage.setItem(k,v); }catch(e){} };
 const STORE={ getItem:load, setItem:save };   // the cards' key through the same guarded doors
@@ -53,7 +60,9 @@ export function nightShellFace(p){
   setNightView(on ? { glow:p.noteField==='glow', plain:p.labels==='plain', fieldAll:load(KEY.field)==='1', tips:load(KEY.joints)!=='all' } : null);   // RUN 8: tips — fingertips only (dev switch)
   document.body.classList.toggle('night-plain', on && !!(D && D.plain()));
   /* NIGHT-3 stage 4: the music bed (its mode before the ambience: with the bed on, the drone stays out) */
-  if(on){ const v=parseFloat(load(KEY.musicVol)); if(Number.isFinite(v)) bedSetVolume(v); bedSetAnswer(load(KEY.musicAnswer)==='1'); bedSetMode(load(KEY.music)||'off', room().bed, room().bed2); }
+  if(on){ musicLevel(); bedSetAnswer(load(KEY.musicAnswer)==='1'); const m=musicNow();
+    if(!(early.on && bedModeOf()===m)) bedSetMode(m, room().bed, room().bed2);   // NIGHT-7c: started on Begin already — it plays on, no restart
+    bedViewOver(null); early.on=false; fsStarted(); }   // the profile's view is live now (the same object: nothing glides); an exit from full screen is the person's from here
   else bedSetMode('off');
   amb=on && !!p.ambience; ambienceOn(amb, roomSound());
   setTimbreTrim(on ? p.levels : null);   // RUN 8: the face's per-timbre level trim (Full: none)
@@ -91,6 +100,9 @@ function render(){
   for(const b of $('nightQualSeg').children) b.classList.toggle('on', b.dataset.q===sceneLevel());   // NIGHT-7: the players' picture choice
   $('nightRoomSoundRow').hidden= !amb; $('nightRoomSound').value=String(roomSound());
   $('nightMusicVol').value=String(bedVolumeOf()); $('nightMusicAnswerTg').classList.toggle('on', bedAnswerOf());
+  { const b=$('nightFsBtn'), full=fsOn(), tt=t(full ? 'night.fs.exit' : 'night.fs.enter'); b.hidden=!fsCanToggle();   // NIGHT-7c: the full-screen toggle shows its state
+    if(b.dataset.svg!==(full ? 'fs-exit' : 'fs-enter')){ b.dataset.svg= full ? 'fs-exit' : 'fs-enter'; const g=svgIcon(document, b.dataset.svg); if(g) b.replaceChildren(g); }
+    b.title=tt; b.setAttribute('aria-label', tt); b.setAttribute('aria-pressed', full ? 'true' : 'false'); }
   document.body.classList.toggle('night-plain', !!D.plain() || load(KEY.light)==='1');   // C8: the Lighter forest has no glass blur
 }
 function sleepLabel(now){ const L=sleepLevel(sleep.t0, sleep.mins, now);
@@ -103,15 +115,18 @@ function infoShow(v){ info=v; $('nightInfo').hidden=!v; if(v) render(); }
 function wire(){
   const tap=(id,f)=>{ $(id).onclick=()=>{ if(!D) return; f(); glint($(id)); render(); }; };
   tap('nightRoom', ()=>{ const id=roomNext(); if(id) roomSwitch(id).then(()=>render()); });   // NIGHT-3 stage 5 part 2: the next room
-  tap('nightMusic', ()=>{ const m=bedNext(bedModeOf()); bedSetMode(m, room().bed, room().bed2); save(KEY.music, m); if(amb) ambienceOn(true, roomSound()); });   // NIGHT-3 stage 4: off → still → drift → glimmer → off; the drone hands over
+  tap('nightMusic', ()=>{ const m=bedNext(bedModeOf()); bedSetMode(m, room().bed, room().bed2); save(MUSIC_KEYS.mode, m); if(amb) ambienceOn(true, roomSound()); });   // NIGHT-3 stage 4: off → still → drift → glimmer → off; the drone hands over
   tap('nightSound', ()=>D.setTimbre(nextOf(D.timbres(), D.timbre())));
   tap('nightMood', ()=>D.setMood(nextOf(D.moods(), D.mood())));
   tap('nightNotes', ()=>D.setNoteMode(D.noteMode()==='hold' ? 'note' : 'hold'));
   tap('nightSleep', ()=>sleepSet(nextOf(NIGHT_UI.sleepMins, sleep.mins)));
   $('nightInfoBtn').onclick=()=>infoShow(true); $('nightInfoClose').onclick=()=>infoShow(false);
+  $('nightFsBtn').onclick=()=>{ fsToggle().then(()=>render()); };   // NIGHT-7c: the corner toggle
+  fsOnChange(()=>render());
+  for(const id of ['nightCal', 'nightCards']) $(id).addEventListener('click', ()=>{ fsFlowTap(); }, true);   // a tap in the first-launch flow asks again if it is due
   $('nightFieldTg').onclick=()=>{ const all=!(nightView && nightView.fieldAll); save(KEY.field, all ? '1' : '0'); if(nightView) setNightView({ ...nightView, fieldAll:all }); render(); };
   $('nightToSound').onclick=()=>{ infoShow(false); if(D.sound) D.sound(); };   // dev: the Sound panel (Diagnostics → Latency meter — step 105)
-  $('nightMusicVol').oninput=e=>{ const v=+e.target.value; save(KEY.musicVol, String(v)); bedSetVolume(v); };
+  $('nightMusicVol').oninput=e=>{ const v=+e.target.value; save(MUSIC_KEYS.vol, String(v)); bedSetVolume(v); };
   $('nightMusicAnswerTg').onclick=()=>{ const v=!bedAnswerOf(); save(KEY.musicAnswer, v ? '1' : '0'); bedSetAnswer(v); render(); };
   $('nightRoomSound').oninput=e=>{ const v=+e.target.value; save(KEY.roomSound, String(v)); if(amb) ambienceOn(true, v); };   // the room's sound only (NIGHT-3 stage 5)
   $('nightSceneTg').onclick=()=>{ const L=['full','reduced','minimal'], v=L[(L.indexOf(sceneLevel())+1)%L.length]; setSceneLevel(v).then(()=>render()); };
@@ -153,12 +168,34 @@ function tick(now){
    them), Begin, the privacy line. «Begin» runs the very same start handler as Play, inside this click (rule #1). Only a person's own tap leads
    to the first cards (never a profile switch — the probes switch). */
 document.body.classList.add('night-boot');
-$('nightBegin').onclick=()=>{ const go=$('startBtn').onclick; begun=true; firstRun=cardsDue(STORE); if(go) go(); };
+$('nightBegin').onclick=()=>{ const go=$('startBtn').onclick; begun=true; firstRun=cardsDue(STORE); audioSessionPlayback(); if(go) go(); fsBegin(); musicEarly(); };   // NIGHT-7c: the audio context first (rule #1), then full screen (it spends the tap's activation), then the music
 /* NIGHT-2: once the camera runs after a Begin: the calibration offer for a camera not offered yet, then the first cards when due. NIGHT-7b: the
    cards alone — the old ghost hand is gone; they count as seen only once they close (finished or skipped) */
 function startFlow(){ const first=firstRun; firstRun=false;
-  const then=()=>{ if(first) cardsShow(()=>cardsDone(STORE)); };
+  const then=()=>{ if(first) cardsShow(()=>{ cardsDone(STORE); fsFlowEnd(); }); else fsFlowEnd(); };   // NIGHT-7c: the flow's end: no more asking for full screen
   if(!calOfferIfNew(then)) then(); }
+/* NIGHT-7c: THE MUSIC FROM THE TAP ON BEGIN — once the engine's master exists and the context runs (the camera, its prompt and the hand model
+   still on their way), the bed starts in the Night profile's own view with its own fade-in (the level rises over about 3 s, the ground over 2.5 s);
+   this little loop drives it until the face's tick takes over. */
+const early={ on:false, raf:0 };
+let musicHold=false;   // probe only (nightMusicHoldDbg): the rows run with the bed silent
+const musicNow=()=> musicHold ? 'off' : musicModeOf(load(MUSIC_KEYS.mode));
+function musicLevel(){ const v=parseFloat(load(MUSIC_KEYS.vol)); if(Number.isFinite(v)) bedSetVolume(v); }
+function nightView0(){ const P=profileOf('profile.night'), s=P && P.moods ? scaleById(P.moods[0]) : null; if(!s) return null;
+  return P.key ? scaleView(s, undefined, undefined, P.key.tonic, P.key.cents) : scaleView(s); }   // the very object CUR() gives once the profile has set its mood and key
+function musicEarly(){
+  const m=musicNow(); if(m==='off' || early.raf || on) return;
+  const step=()=>{ early.raf=0; if(on) return;
+    if(bedEngineReady()){
+      if(!early.on){ musicLevel(); bedSetLight(load(KEY.light)==='1' || WEAK); bedViewOver(nightView0()); bedSetMode(m, room().bed, room().bed2); early.on=true; }
+      bedTick(); }
+    early.raf=requestAnimationFrame(step); };
+  early.raf=requestAnimationFrame(step); }
+/* NIGHT-7c: iPhone and iPad — sound even with the silent switch on, where the browser has the door (Safari 16.4+); elsewhere nothing changes */
+function audioSessionPlayback(){ try{ const a=navigator.audioSession; if(a && a.type!=='playback') a.type='playback'; return a ? a.type : null; }catch(e){ return null; } }
+/* probe only: hold the music off (true) or let it play as the person chose (false) → whether it was playing */
+export function nightMusicHoldDbg(v){ const was=bedModeOf()!=='off'; musicHold=!!v; if(musicHold) bedSetMode('off'); else if(on) bedSetMode(musicNow(), room().bed, room().bed2); return was; }
+export const nightEarlyDbg=()=>({ ...early });
 /* RUN 8 (slice 3): THE BARS while the hands play — the hand's depth («Глубина»: the room and the light; NIGHT-5 no mark) on the playing hand's side, the
    three effects (Echo · Warmth ↔ Brightness from the middle · Wave) on the effects hand's side; the bar of the finger in use glows; each set
    fades in with its hand and out when it leaves; a set's side follows where its hand is on the screen (40 / 60 % of the width, hysteresis),
