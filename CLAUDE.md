@@ -57,6 +57,21 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   - Probe work stays under about a third of a slice's effort. If a probe is still flaky after two fix rounds, stop and report the
     evidence instead of continuing.
   - When a probe row becomes redundant (covered by another), propose merging or removing it in the report.
+- ⛳ **Check levels** (user, 2026-11-12; the laptop is weak — not every run runs every suite): the checks follow what the change touches;
+  when unsure, go ONE LEVEL HIGHER. This picks the runner commands; where the probe budget's «Every slice» line or core rule 6 asks more, this wins
+  for Levels 1–2, and a core change is always Level 3 or 4.
+  - **Level 1 — texts, styles, docs, small interface changes in one app:** `node tools/check-static.mjs` (+ `node --check` on changed files),
+    `node tools/probe-data.mjs`, that app's UI checks (Full: `node tools/probe-browser.mjs --quick`; Night: `--app night` — no lighter Night mode
+    exists yet, so on Night Levels 1 and 2 run the same command). A docs-only change: the static check, the data runner and its proofs.
+  - **Level 2 — a room or the picture** (`apps/night/rooms/`, the scene, shaders): Level 1 + the full Night suite (`--app night`).
+  - **Level 3 — core or the engine** (`core/`, worklets, hand tracking, audio, loading): Level 2 + Full `--quick`; Full `--all` when core's sound,
+    tuning or recording paths change.
+  - **Level 4 — before a publish, or when the founder asks:** everything, `node tools/smoke-paths.mjs --build` included.
+  - **Timing** (start times, frame costs, `--measure-start`, `--throttle`, `--repeat`): only when the run is about speed, on an idle machine; real
+    phones decide. The founder says the laptop is busy → no timing runs. A timing row that fails on a busy machine is rerun ONCE, then reported as
+    load noise — ⛔ never «fixed» by widening it.
+  - **Every check that waits for an event keeps an upper time limit and FAILS when it is reached** (never waits forever, never reads on as if
+    the event came).
 - ⛳ **Code comments** (user's rule, DOCS-EN): English, short — one or two lines of "why". No mass translation of existing
   (Russian) comments; when you edit a function, rewrite its comment into short English. ⛔ Never touch user-facing text
   (`i18n.js`, UI strings) for this purpose — the app's languages stay as they are.

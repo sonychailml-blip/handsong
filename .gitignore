@@ -10,3 +10,5 @@ tools/.build/
 tools/.ktx-lab/
 tools/design/reference/
 commitmsg-*.txt
+tools/.design-lab/
+tools/design/compare/
