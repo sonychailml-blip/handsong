@@ -275,6 +275,13 @@ body.night-boot .night-only[hidden]{ display:none !important; }
 .night-inapp-url{ display:block; width:100%; box-sizing:border-box; margin:0 0 var(--night-gap-sm); padding:var(--night-gap-sm); border:1px solid var(--night-hair); border-radius:var(--night-r-pill); background:var(--night-fill); color:var(--night-ink); font-size:var(--night-fs-small); }
 .night-inapp-copy{ width:100%; min-height:44px; border:1px solid var(--night-hair); border-radius:var(--night-r-pill); background:var(--night-fill); color:var(--night-ink); font-size:var(--night-fs-value); }
 .night-privacy-line{ margin:var(--night-gap) 0 0; color:var(--night-dim); font-size:var(--night-fs-small); text-align:center; }
+/* NIGHT-12: «How to play» under Begin — a quiet link (Begin stays the main action), inactive while Begin loads; its cards show over the start
+   screen: the shell is lifted above the start card with only the cards in it, its own state untouched */
+#nightStartHowTo{ display:block; margin:0 auto !important; min-height:44px; padding:0 var(--night-pad); border:0; background:none; color:var(--night-accent);
+  font-family:var(--night-font-body); font-size:var(--night-fs-value); cursor:pointer; }
+body.night-loading #nightStartHowTo{ opacity:.5; pointer-events:none; }
+body.night-cards-start #nightShell, body.night-cards-start #nightShell[hidden]{ display:block; z-index:calc(var(--z-menu) + 1); }   /* the start card is at --z-menu */
+body.night-cards-start #nightShell > :not(#nightCards){ display:none !important; }
 .night-card.night-cards{ display:block; width:min(460px, calc(100vw - 28px)); }
 .night-card-pic{ display:flex; justify-content:center; margin:0 0 var(--night-gap); color:var(--night-ink); }
 .night-pic{ width:100%; max-width:340px; height:auto; overflow:visible; }

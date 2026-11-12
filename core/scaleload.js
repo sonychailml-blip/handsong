@@ -23,6 +23,7 @@
    ⚠️ Сервис-воркер (sw.js) по-прежнему ничего не кэширует: файлы данных приходят из сети при каждом запуске (запрос с cache:'no-cache' —
    условный, неизменный файл отвечает 304). Офлайн приложение не работает и без этого (MediaPipe — с CDN). */
 import { userAll } from './userstore.js';   // F6: файлы пользователя
+import { scalesOnlyOf, pageProfileRead } from './scalepick.js';   // CORE-20 (opt-in): only the modes a page plays
 const BASE=new URL('./data/', import.meta.url);
 export const loadReport={ ms:0, files:0, problems:[], emergency:false, user:0 };   // user — сколько файлов пользователя принято (F6)   // итог загрузки — читают main (известие) и консоль
 
@@ -81,9 +82,49 @@ async function loadBuiltins(problems){
   if(!D.manifest.modes.length) return { D:emergency(problems,'no mode could be loaded'), n:files.length+1 };
   return { D, n:files.length+1 };
 }
+/* ═══ CORE-20 — ONLY SOME MODES (core/scalepick.js; absent: loadBuiltins above, untouched). The index and the menu, the named modes (the app's
+   list and, with profile, the page profile's moods) and what each names — its tuning, its palette, its chord-mode set and that set's palettes —
+   each asked as soon as the file naming it has come. The same checks and assembly in the index's order; a mode the index does not list is
+   skipped like a broken file. → { D, n, files } (files: what was asked). profP: a promise of { rec } (scalepick.pageProfileRead) or null. ═══ */
+const SAFE_ID=/^[a-z0-9][a-z0-9._-]*$/i;
+export async function loadScaleSubset(ids, profP, problems=[]){
+  const got={}, asked=new Map();
+  const ask=f=>{ if(!asked.has(f)) asked.set(f, readJSON(f).then(v=>{ got[f]={ val:v }; return v; }, e=>{ got[f]={ err:(e && e.message) || 'not read' }; return null; })); return asked.get(f); };
+  const ref=(folder, id)=>typeof id==='string' && SAFE_ID.test(id) ? ask(`${folder}/${id}.json`) : null;
+  const setOf=c=>Promise.all((c && Array.isArray(c.modes) ? c.modes : []).map(x=>x && x.set ? ref('palettes', x.set.palette) : null));
+  const mode=id=>ref('modes', id).then(m=>{ if(!m) return null; const ch=(m && m.chords) || {};
+    return Promise.all([ ref('tunings', m.tuning), ref('palettes', ch.palette), typeof ch.modes==='string' ? ref('chordmodes', ch.modes).then(setOf) : null ]); });
+  const want=[], take=list=>Promise.all((Array.isArray(list) ? list : []).filter(id=>typeof id==='string' && SAFE_ID.test(id) && !want.includes(id) && want.push(id)).map(mode));
+  const fromProfile= profP ? Promise.resolve(profP).then(r=>take(r && r.rec && r.rec.moods)) : null;
+  await Promise.all([ ask('index.json'), ask('menu.json'), take(ids), fromProfile ]);
+  const n=asked.size, files=[...asked.keys()], fail=(file, e, why)=>{ problems.push({ file, why:e.message||String(e) }); return { D:emergency(problems, why+(e.message||e)), n, files }; };
+  let man, menu;
+  try{ man=got['index.json'].val; if(got['index.json'].err) throw new Error(got['index.json'].err); checkManifest(man); } catch(e){ return fail('index.json', e, 'index.json: '); }
+  try{ menu=got['menu.json'].val; if(got['menu.json'].err) throw new Error(got['menu.json'].err); checkMenu(menu); } catch(e){ return fail('menu.json', e, 'menu.json: '); }
+  for(const id of want) if(!man.modes.includes(id)){ problems.push({ file:`modes/${id}.json`, why:'not listed in index.json' }); console.warn(`[scales] skipped data/modes/${id}.json — not listed in index.json`); }
+  const has=(folder, id)=>!!got[`${folder}/${id}.json`];
+  const sub={ ...man, tunings:man.tunings.filter(id=>has('tunings', id)), palettes:man.palettes.filter(id=>has('palettes', id)),
+    chordModeSets:man.chordModeSets.filter(id=>has('chordmodes', id)), modes:man.modes.filter(id=>want.includes(id)) };
+  if(!sub.modes.includes(sub.start) && sub.modes.length) sub.start=want.find(id=>sub.modes.includes(id));   // the page's own first mode, not the index's
+  const D=assemble(sub, menu, got, problems);
+  if(!D.manifest.modes.length) return { D:emergency(problems, 'none of the named modes could be loaded'), n, files };
+  return { D, n, files };
+}
+/* CORE-20: the built-in records of the index that D does not hold — read and migrated, dependencies first ([kind, record]); core/scales.js checks
+   and registers them (scalesLoadRest). → { list, problems } */
+const FOLDER={ tuning:'tunings', palette:'palettes', chordmodes:'chordmodes', mode:'modes' };
+export async function builtinRest(D){
+  const problems=[]; let man;
+  try{ man=await readJSON('index.json'); checkManifest(man); } catch(e){ return { list:[], problems:['index.json: '+(e.message||e)] }; }
+  const todo=[]; for(const [kind,sect,list] of KINDS) for(const id of man[list]) if(!D[sect][id]) todo.push([kind, `${FOLDER[kind]}/${id}.json`]);
+  const res=await Promise.allSettled(todo.map(x=>readJSON(x[1]))), list=[];
+  todo.forEach(([kind, file], i)=>{ if(res[i].status!=='fulfilled'){ problems.push(file+': '+((res[i].reason && res[i].reason.message) || 'not read')); return; }
+    try{ list.push([kind, upgrade(res[i].value)]); } catch(e){ problems.push(file+': '+(e.message||e)); } });
+  return { list, problems };
+}
 export async function loadScaleData(){
-  const t0=performance.now(), problems=[];
-  const { D, n }=await loadBuiltins(problems);
+  const t0=performance.now(), problems=[], only=scalesOnlyOf();
+  const { D, n }= only ? await loadScaleSubset(only.modes, only.profile ? pageProfileRead() : null, problems) : await loadBuiltins(problems);   // CORE-20
   loadReport.user=await addUserFiles(D, problems);   // F6: после встроенных; ошибки — только пропуски, встроенным не мешают
   loadReport.problems=problems;
   return finish(D, t0, n);

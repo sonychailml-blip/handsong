@@ -41,6 +41,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';   // CORE-20: --measure-start's ETags
 
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 /* --cdn-cache: the pinned MediaPipe files (library, WASM, hand model — versioned URLs) are fetched once into tools/.cdn-cache/ and served
@@ -175,7 +176,12 @@ function serve(){
     try{
       const u=new URL(q.url,'http://x'); let p=decodeURIComponent(u.pathname); if(p.endsWith('/')) p+='index.html';
       const base=p.startsWith('/tools/.probe-logs/') ? ROOT : SERVE_ROOT, f=path.join(base, p); if(!f.startsWith(base)){ r.writeHead(403); r.end(); return; }
-      const b=await readFile(f);
+      let b=await readFile(f);
+      /* the measured page: its probes tag out (only what a visitor loads is counted); &nomp also takes out the build's modulepreload links (no routes: they turn the HTTP cache off) */
+      if(MEASURE && /\/index\.html$/.test(p) && !p.startsWith('/tools/')){ let h=b.toString('utf8').replace(/<link rel="handsong-probes"[^>]*>\r?\n?/, ''); if(u.searchParams.has('nomp')) h=h.replace(/<link rel="modulepreload"[^>]*>\r?\n?/g, ''); b=Buffer.from(h, 'utf8'); }
+      if(MEASURE){ const tag='"'+createHash('sha1').update(b).digest('hex').slice(0,16)+'"';   // CORE-20 --measure-start: revalidated like a static host (Vercel: max-age=0, must-revalidate, ETag)
+        if(q.headers['if-none-match']===tag){ r.writeHead(304,{ etag:tag, 'cache-control':'public, max-age=0, must-revalidate' }); r.end(); return; }
+        r.writeHead(200,{ 'content-type':MIME[path.extname(f).toLowerCase()]||'application/octet-stream', 'cache-control':'public, max-age=0, must-revalidate', etag:tag }); r.end(b); return; }
       r.writeHead(200,{ 'content-type':MIME[path.extname(f).toLowerCase()]||'application/octet-stream', 'cache-control':'no-store' }); r.end(b);
     }catch(e){ r.writeHead(404); r.end(); }
   });
@@ -371,7 +377,15 @@ async function nightBeginHear(page, stub=false){
     if(an) try{ B2.bed2NodeDbg().disconnect(an); }catch(e){}
     return { first, last:+last.toFixed(1), at4:at4==null ? null : +at4.toFixed(1), ac:A.AC && A.AC.state, view:B2.bed2ViewDbg(), fs:fsTap||F.fsDbg(), faceAt }; })(); });
 }
-const nightHeard=page=>within(page.evaluate(()=>window.__hearP), 30e3, 'the music measure');
+/* CORE-20: the live view is judged once the START has ended (the start card gone, bounded by LIMIT_START) and the face has had 3 s to take over — not
+   at a fixed 10 s after the tap (a lottery: a start on this machine takes 8–14 s, the old way too; measured by --measure-start) */
+async function nightHeard(page){
+  const h=await within(page.evaluate(()=>window.__hearP), 30e3, 'the music measure');
+  const ended=await page.waitForFunction(()=>!document.getElementById('start').classList.contains('on'), null, { timeout:LIMIT_START }).then(()=>true, ()=>false);
+  if(ended) await page.waitForFunction(async ()=>{ const v=(await import('/apps/night/bed2.js')).bed2ViewDbg(); return v.ticked && !v.over; }, null, { timeout:3000, polling:100 }).catch(()=>{});
+  h.view=await page.evaluate(async ()=>(await import('/apps/night/bed2.js')).bed2ViewDbg()); h.startEnded=ended;
+  return h;
+}
 async function uiNightStale(page, label){
   const lines=[], bad=[];
   await page.evaluate(L=>{ for(const [k,v] of L) localStorage.setItem(k,v); }, NIGHT_STALE);
@@ -420,7 +434,7 @@ async function uiNightStale(page, label){
 /* the music measure judged: on = audible within 6 s of the tap, playing in the live view, started once (no restart when the face came) */
 function musicJudge(h, on, what, lines, bad){
   if(on){ if(h.first!=null && h.first<=6000 && h.view.same && h.view.starts===1) lines.push(`music ${what}: audible ${h.first} ms after Begin, ${h.at4} dBFS at 4 s, ${h.last} at 10 s; in the live view, started once`);
-    else bad.push(`music ${what}: first audible ${h.first==null ? 'never' : h.first+' ms'} (6000 at most), live view ${h.view.same} ${JSON.stringify(h.view)}, started ${h.view.starts} times (once wanted), audio ${h.ac}, the profile (the camera) took over ${h.faceAt==null ? 'not within 10 s' : 'at '+h.faceAt+' ms'}`); }
+    else bad.push(`music ${what}: first audible ${h.first==null ? 'never' : h.first+' ms'} (6000 at most), live view ${h.view.same} ${JSON.stringify(h.view)}, started ${h.view.starts} times (once wanted), audio ${h.ac}, the start ${h.startEnded ? 'ended' : 'did not end'}, the profile took over ${h.faceAt==null ? 'after the first 10 s' : 'at '+h.faceAt+' ms'}`); }
   else { if(h.first==null && h.ac==='running') lines.push(`music ${what}: silent for 10 s with the audio running`); else bad.push(`music ${what}: audible ${h.first} ms after Begin (audio ${h.ac})`); }
 }
 /* NIGHT-7c — the music on a FRESH profile (everything cleared), and the CONTROLS: a stored «off» (the person's own choice) must fail the
@@ -713,6 +727,39 @@ async function uiNightStart(page, label){
   return { pass:!bad.length, lines:[...lines.map(l=>`${label}: ${l}`), ...bad.map(b=>`${label}: NOT A PASS — ${b}`)] };
 }
 
+/* NIGHT-12 — «HOW TO PLAY» ON THE START SCREEN, real taps on a fresh profile: the link under Begin (labelled in English, then in Russian after a reload)
+   opens the same cards OVER the start card (the topmost element at the card's Next button belongs to the cards), the start card stays; Next through
+   every card, then Skip on a second opening: the cards close and the start card is back as it was (still shown, the lift class gone, Begin live).
+   CONTROL: the lift taken away as it is set (a mutation observer strips the class) — the cards must be found NOT on top. */
+async function howToState(p){ return p.evaluate(()=>{ const c=document.getElementById('nightCards'), n=document.getElementById('nightCardNext'), r=n.getBoundingClientRect(), top=document.elementFromPoint(r.x+r.width/2, r.y+r.height/2);
+  return { open:!c.hidden, onTop:!!top && !!top.closest('#nightCards') && getComputedStyle(c).display!=='none', start:document.getElementById('start').classList.contains('on'), lift:document.body.classList.contains('night-cards-start'),
+    title:document.getElementById('nightCardTitle').textContent, link:document.getElementById('nightStartHowTo').textContent, focus:document.activeElement && document.activeElement.id, begin:getComputedStyle(document.getElementById('nightBegin')).pointerEvents }; }); }
+async function uiNightHowTo(page, label){
+  const lines=[], bad=[];
+  for(const control of [false, true]){ const c=await freshPage(page, control ? { init:[()=>{ document.addEventListener('DOMContentLoaded', ()=>{ new MutationObserver(()=>{ if(document.body.classList.contains('night-cards-start')) document.body.classList.remove('night-cards-start'); }).observe(document.body, { attributes:true, attributeFilter:['class'] }); }); }, null] } : {});
+    try{
+      await c.p.goto(c.url); await c.p.waitForFunction(()=>window.__nightBoot && window.__nightBoot.state().done, null, { timeout:60e3 }); await c.p.waitForTimeout(200);
+      const T=await c.p.evaluate(async ()=>{ const I=await import('/core/i18n.js'); return { how:I.t('night.howTo') }; });
+      await tapAt(c.p, '#nightStartHowTo'); await c.p.waitForTimeout(200); const a=await howToState(c.p);
+      if(control){ if(a.onTop) bad.push('CONTROL: with the lift taken away the cards were still on top — the check cannot fail'); else lines.push('CONTROL: with the lift taken away the cards are under the start card'); continue; }
+      if(a.link!==T.how) bad.push(`the link reads «${a.link}», wanted «${T.how}»`);
+      if(!(a.open && a.onTop && a.start && a.lift && a.title)) bad.push('the link did not open the cards over the start card: '+JSON.stringify(a));
+      else lines.push(`«${a.link}» under Begin opens the cards over the start card («${a.title}»)`);
+      let k=0; for(;k<8;k++){ const s=await howToState(c.p); if(!s.open) break; await tapAt(c.p, '#nightCardNext'); await c.p.waitForTimeout(80); }
+      const b=await howToState(c.p);
+      if(b.open || !b.start || b.lift || b.focus!=='nightStartHowTo' || b.begin==='none') bad.push('after the last card the start card did not come back as it was: '+JSON.stringify(b)); else lines.push(`Next through ${k} cards closes them; the start card is back (focus on the link, Begin live)`);
+      await tapAt(c.p, '#nightStartHowTo'); await c.p.waitForTimeout(150); await tapAt(c.p, '#nightCardSkip'); await c.p.waitForTimeout(150); const s2=await howToState(c.p);
+      if(s2.open || !s2.start || s2.lift) bad.push('Skip did not return to the start card: '+JSON.stringify(s2)); else lines.push('Skip returns to the start card');
+      await c.p.evaluate(()=>localStorage.setItem('handsong.night.lang','ru')); await c.p.reload(); await c.p.waitForFunction(()=>window.__nightBoot && window.__nightBoot.state().done, null, { timeout:60e3 }); await c.p.waitForTimeout(200);
+      await tapAt(c.p, '#nightStartHowTo'); await c.p.waitForTimeout(200); const r=await howToState(c.p), CYR=/[а-яё]/i;
+      if(!(CYR.test(r.link) && r.open && r.onTop && CYR.test(r.title))) bad.push('in Russian: '+JSON.stringify(r)); else lines.push(`in Russian: «${r.link}» opens «${r.title}»`);
+      await tapAt(c.p, '#nightCardSkip'); await c.p.waitForTimeout(100);
+      await tapAt(c.p, '#nightBegin'); const go=await c.p.waitForFunction(()=>{ const s=document.getElementById('start'); return s.classList.contains('busy') || !s.classList.contains('on'); }, null, { timeout:5000 }).then(()=>true, ()=>false);
+      if(!go) bad.push('after the cards a tap on Begin did not start the app'); else lines.push('then Begin starts the app');
+    } finally { await c.ctx.close().catch(()=>{}); } }
+  return { pass:!bad.length, lines:[...lines.map(l=>`${label}: ${l}`), ...bad.map(b=>`${label}: NOT A PASS — ${b}`)] };
+}
+
 /* NIGHT-11 part 3 — THE START TIMELINE on a fresh profile (a new context: no cache, no storage; the forest chosen). The page loads, the start card
    is read for 3 s, then a real tap on Begin; times from the tap: the audio context made, the camera requested, the hand model ready, the first
    processed camera frame, the forest's opening begun and its first frame, the start card gone. Judged with the options on: the context made inside
@@ -959,6 +1006,8 @@ async function session(port, plan, label){
       out(`[${label}] --leak: ${L&&L.ok ? `${L.track} (no KS timbre), ${L.n} renders each, ${L.msPerRender} ms per render · with the fix ${L.fixMB>=0?'+':''}${L.fixMB} MB (margin ${LEAK_MARGIN_MB} MB), threads ${L.thr.join(' → ')} · CONTROL without the fix +${L.ctrlMB} MB (must exceed the margin) → ${L.pass?'PASS':'NOT A PASS'}` : 'ERROR — '+(L&&L.why)}`); }
     if(EVAL){   // --eval <файл>: тело async-функции, выполняется на странице после посева; печатается её JSON (отладка проб)
       const src=await readFile(path.resolve(EVAL),'utf8');
+      /* CORE-20: --throttle with --eval slows this page's processor 4× (Chrome's own protocol) — a loaded machine for a determinism check */
+      if(THROTTLE){ const tc=await ctx.newCDPSession(page); await tc.send('Emulation.setCPUThrottlingRate', { rate:4 }); out(`[${label}] --throttle: the page's processor slowed 4×`); }
       out(`[${label}] --eval ${EVAL}`);
       // evaluated as an expression through the debugger (the page's CSP forbids new Function — PRIV1)
       const expr=`(async()=>{ try{ return { ok:true, value:await (async()=>{${src}\n})() }; }catch(e){ return { ok:false, error:String(e&&e.stack||e) }; } })()`;
@@ -1013,7 +1062,7 @@ async function session(port, plan, label){
       out(`[${label}] network (PRIV1, LAT2): ${N.n} request(s) of the page and its workers (${N.workers} worker(s) started${N.workerUrls.length?': '+[...new Set(N.workerUrls)].join(', '):''}) — ${N.bad.length?N.bad.length+' OUTSIDE the own origin and the MediaPipe paths: '+N.bad.slice(0,5).join(', '):'all to the own origin or the MediaPipe paths'} · control (a worker asking an unlisted host) ${N.ctl?'caught':'NOT CAUGHT'} → ${N.pass?'PASS':'NOT A PASS'}`); }
     { const C=res.csp; C.pass=C.meta && !C.list.length && C.blocked && C.ctl;
       out(`[${label}] CSP (PRIV1): policy ${C.meta?'present':'MISSING'} · ${C.list.length} violation(s) during the run${C.list.length?' — '+C.list.slice(0,5).map(x=>`${x.dir} ${x.uri} (${x.src}:${x.line})`).join('; '):''} · control fetch to https://example.com ${C.blocked&&C.ctl?'refused by connect-src':'NOT REFUSED ('+(C.err||'it went out')+')'} → ${C.pass?'PASS':'NOT A PASS'}`); }
-    if(NIGHT_PAGE && !DUMP){   // NIGHT-7b: stale saved values → the start card still fully labelled (last: it reloads the page)
+    if(NIGHT_PAGE && !DUMP && !(EVAL && THROTTLE)){   // CORE-20: not after a throttled --eval (its page runs 4× slower); NIGHT-7b: stale saved values → the start card still fully labelled (last: it reloads the page)
       res.stale=await within(uiNightStale(page, `[${label}] NIGHT stale saved values`), LIMIT_START+120e3, 'the stale-values check').catch(e=>({ pass:false, lines:[`[${label}] NIGHT stale saved values: ERROR — ${e&&e.message||e}`] }));
       for(const l of res.stale.lines) out(l);
       const mu=await within(uiNightMusic(page, `[${label}] NIGHT music and full screen`), 3*LIMIT_START, 'the music check').catch(e=>({ pass:false, lines:[`[${label}] NIGHT music and full screen: ERROR — ${e&&e.message||e}`] }));
@@ -1027,11 +1076,13 @@ async function session(port, plan, label){
       for(const l of cm.lines) out(l);
       const hs=await within(uiNightStart(page, `[${label}] NIGHT honest start`), 8*LIMIT_START, 'the honest-start check').catch(e=>({ pass:false, lines:[`[${label}] NIGHT honest start: ERROR — ${e&&e.message||e}`] }));   // NIGHT-11 part 2
       for(const l of hs.lines) out(l);
+      const ht=await within(uiNightHowTo(page, `[${label}] NIGHT how to play`), 4*LIMIT_START, 'the how-to-play check').catch(e=>({ pass:false, lines:[`[${label}] NIGHT how to play: ERROR — ${e&&e.message||e}`] }));   // NIGHT-12
+      for(const l of ht.lines) out(l);
       const tl=await within(uiNightTimeline(page, `[${label}] NIGHT start timeline`), (THROTTLE ? 25 : 8)*60e3, 'the start timeline').catch(e=>({ pass:false, lines:[`[${label}] NIGHT start timeline: ERROR — ${e&&e.message||e}`] }));   // NIGHT-11 part 3
       for(const l of tl.lines) out(l);
       const od=await within(uiNightOrder(page, `[${label}] NIGHT first contact order`), 4*LIMIT_START, 'the order check').catch(e=>({ pass:false, lines:[`[${label}] NIGHT first contact order: ERROR — ${e&&e.message||e}`] }));   // NIGHT-11 part 4
       for(const l of od.lines) out(l);
-      res.stale={ pass:res.stale.pass && mu.pass && fu.pass && ff.pass && cm.pass && hs.pass && tl.pass && od.pass, lines:[...res.stale.lines, ...mu.lines, ...fu.lines, ...ff.lines, ...cm.lines, ...hs.lines, ...tl.lines, ...od.lines] };
+      res.stale={ pass:res.stale.pass && mu.pass && fu.pass && ff.pass && cm.pass && hs.pass && ht.pass && tl.pass && od.pass, lines:[...res.stale.lines, ...mu.lines, ...fu.lines, ...ff.lines, ...cm.lines, ...hs.lines, ...ht.lines, ...tl.lines, ...od.lines] };
     }
     if(!has('--no-ui') && res.ui){   // AUTOSAVE1: reload → «Continue?» → the same song (last: it reloads the page)
       const ua=await within(uiAutosave(page, `[${label}] UI autosave`), LIMIT_START+120e3, 'the autosave UI check').catch(e=>({ pass:false, lines:[`[${label}] UI autosave: ERROR — ${e&&e.message||e}`] }));
@@ -1079,12 +1130,86 @@ await mkdir(LOGDIR,{ recursive:true });
 const mode=REPEAT?`repeat${REPEAT}`:[QUICK&&'quick',ALL&&'all',has('--night')&&'night',LEAK&&'leak'].filter(Boolean).join('+');
 LOG=path.join(LOGDIR, `${stamp()}-${mode}.log`);
 await writeFile(LOG, `probe-browser ${argv.join(' ')}\n`);
+/* CORE-20 — --measure-start [--throttle] [--root DIR]: THE START, MEASURED (no probe rows). Night's page (the repo's, or a built tree's root page with
+   --root) with its probes tag taken out in flight, so only what a visitor loads is counted; two ways on the same code: «now», and ?probe&oldload (every
+   scale file, no model preload from the head — the old loading). Each on a fresh profile, then a second visit in the same profile (the server answers
+   like a static host: ETag, max-age=0, must-revalidate; the MediaPipe files from the real CDN — no routes, they turn the HTTP cache off —, with --throttle at
+   10 Mbit/s, 150 ms and CPU 4×); on a built tree (--root) also «now» without the build's modulepreload links (stripped in flight). Per visit: requests and bytes before Begin works (own origin and MediaPipe apart; bytes = what crossed the wire),
+   the time to a working Begin, and from a real tap on Begin to the first processed camera frame. Judged: every visit finished, and each MediaPipe
+   preloads add no request (each MediaPipe file asked no more often than in the old way; a preload that does not match its later request would
+   download twice); CONTROL: a second, uncached model download must be counted. --measure-reps N (2): the ways alternate N times (a cold browser
+   favours whoever comes second; a first warm-up visit is shown, not compared). */
+const MEASURE=has('--measure-start');
+const MP_RE=/^https:\/\/(cdn\.jsdelivr\.net\/npm\/@mediapipe|storage\.googleapis\.com\/mediapipe-models)\//;
+async function measureVisit(ctx, p, cdp, url, origin){
+  const req=new Map(), t0={ v:null };
+  const onReq=e=>{ if(/^(data|blob):/.test(e.request.url)) return; if(t0.v==null && e.type==='Document') t0.v=e.timestamp; if(!req.has(e.requestId)) req.set(e.requestId, { url:e.request.url, t:e.timestamp, bytes:0, done:null, status:0 }); };
+  const onResp=e=>{ const r=req.get(e.requestId); if(r) r.status=e.response.status; };
+  const onFin=e=>{ const r=req.get(e.requestId); if(r){ r.bytes=e.encodedDataLength||0; r.done=e.timestamp; } };
+  cdp.on('Network.requestWillBeSent', onReq); cdp.on('Network.responseReceived', onResp); cdp.on('Network.loadingFinished', onFin);
+  try{
+    await p.goto(url, { waitUntil:'commit' });
+    await p.waitForFunction(()=>window.__readyAt!=null, null, { timeout:THROTTLE ? 600e3 : 120e3 });
+    const readyMs=await p.evaluate(()=>window.__readyAt);
+    await p.waitForTimeout(1000);
+    await p.evaluate(()=>{ (async ()=>{ const V=await import('/core/vision.js'); for(let i=0;i<24000 && window.__frameAt==null;i++){ if(V.pumpStats().processed>0) window.__frameAt=Math.round(performance.now()); await new Promise(r=>setTimeout(r, 25)); } })(); });
+    const r=await p.evaluate(()=>{ const b=document.getElementById('nightBegin').getBoundingClientRect(); return [b.x+b.width/2, b.y+b.height/2]; });
+    await p.mouse.click(r[0], r[1]); const tap=await p.evaluate(()=>window.__tapAt);
+    const got=await p.waitForFunction(()=>window.__frameAt!=null || (!document.getElementById('camRetry').hidden && document.getElementById('start').classList.contains('on')), null, { timeout:THROTTLE ? 600e3 : 180e3 }).then(()=>true, ()=>false);
+    const frame=await p.evaluate(()=>window.__frameAt);
+    if(!got || frame==null){ const why=await p.evaluate(()=>({ msg:(document.getElementById('loadmsg')||{}).textContent||'', retry:!document.getElementById('camRetry').hidden, start:document.getElementById('start').classList.contains('on') })); throw new Error('no camera frame after the tap: '+JSON.stringify(why)); }
+    await p.waitForTimeout(500);
+    const all=[...req.values()], ready=t0.v+readyMs/1000, before=all.filter(x=>x.t<=ready), own=x=>x.url.startsWith(origin), mp=x=>MP_RE.test(x.url);
+    const sum=(L, f)=>L.filter(f).reduce((n,x)=>n+((x.done!=null && x.done<=ready) ? x.bytes : 0), 0);
+    const perMp={}, kbMpFile={}; for(const x of all) if(mp(x)){ const k=x.url.replace(/^.*\//, ''); perMp[k]=(perMp[k]||0)+1; kbMpFile[k]=(kbMpFile[k]||0)+Math.round(x.bytes/1024); }
+    return { readyMs:Math.round(readyMs), tapToFrame:frame-tap, nOwn:before.filter(own).length, n304:before.filter(x=>own(x) && x.status===304).length, kbOwn:Math.round(sum(before, own)/1024),
+      nMp:before.filter(mp).length, kbMp:Math.round(sum(before, mp)/1024), scale:before.filter(x=>/\/core\/data\/(modes|tunings|palettes|chordmodes)\//.test(x.url)).length, perMp, kbMpFile };
+  } finally { cdp.off('Network.requestWillBeSent', onReq); cdp.off('Network.responseReceived', onResp); cdp.off('Network.loadingFinished', onFin); }
+}
+const MEASURE_INIT=()=>{ document.addEventListener('DOMContentLoaded', ()=>{ const b=document.body, done=()=>{ if(window.__readyAt==null && !b.classList.contains('night-loading')) window.__readyAt=Math.round(performance.now()); };
+  done(); new MutationObserver(done).observe(b, { attributes:true, attributeFilter:['class'] }); });
+  document.addEventListener('click', e=>{ if(window.__tapAt==null && e.target && e.target.closest && e.target.closest('#nightBegin')) window.__tapAt=Math.round(performance.now()); }, true);
+  try{ localStorage.setItem('handsong.nightBg', 'forest'); }catch(e){} };
+async function measureStart(port){
+  const args=['--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream','--autoplay-policy=no-user-gesture-required','--disable-background-timer-throttling','--disable-backgrounding-occluded-windows','--disable-renderer-backgrounding','--disable-features=CalculateNativeWinOcclusion'];
+  const browser=await chromium.launch({ channel:BROWSER, headless:!HEADED, args, handleSIGINT:false, handleSIGTERM:false, handleSIGHUP:false }); LIVE.browsers.add(browser);
+  const origin=`http://127.0.0.1:${port}`, page=SERVE_ROOT!==ROOT ? '/index.html' : '/apps/night/index.html', bad=[], lines=[];
+  try{
+    const reps=Math.max(1, +val('--measure-reps', 2)||2), seen={};
+    const ways=[['warm-up', '', false, 0]]; for(let k=1;k<=reps;k++) ways.push(['now', '', false, k], ['old', '&oldload', false, k], ...(SERVE_ROOT!==ROOT ? [['now without modulepreload', '&nomp', false, k]] : []));
+    ways.push(['CONTROL', '', true, 0]);
+    for(const [way, q, ctl, k] of ways){
+      const ctx=await browser.newContext({ viewport:{ width:1280, height:800 } }); await ctx.grantPermissions(['camera','microphone'], { origin });
+      try{
+        await ctx.addInitScript(MEASURE_INIT);   // no routes: Playwright turns the HTTP cache off when a context routes anything
+        if(ctl) await ctx.addInitScript(()=>{ document.addEventListener('DOMContentLoaded', ()=>{ fetch('https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task', { cache:'no-store' }).catch(()=>{}); }); });
+        const p=await ctx.newPage(), cdp=await ctx.newCDPSession(p); await cdp.send('Network.enable'); p.on('console', m=>{ log(`[${way} #${k}] [${m.type()}] ${m.text()}`).catch(()=>{}); });
+        if(THROTTLE){ await cdp.send('Network.emulateNetworkConditions', { offline:false, latency:150, downloadThroughput:1.25e6, uploadThroughput:4e5 }); await cdp.send('Emulation.setCPUThrottlingRate', { rate:4 }); }
+        const url=origin+page+'?probe'+q;
+        for(const v of (ctl || way==='warm-up') ? ['fresh'] : ['fresh', 'second']){
+          const m=await within(measureVisit(ctx, p, cdp, url, origin), THROTTLE ? 1500e3 : 400e3, `${way} ${v}`), tag=`${way} #${k}, ${v} visit`;
+          if(ctl){ const base=(seen['now fresh']||{})['hand_landmarker.task']||0, got=m.perMp['hand_landmarker.task']||0;
+            if(!(got>base)) bad.push(`CONTROL: a second, uncached model download was not counted (${got} vs ${base}) — the «no extra request» check cannot fail`); else lines.push(`CONTROL: a second, uncached model download is counted (${got} model requests vs ${base}) — the check can fail`); continue; }
+          if(way==='warm-up'){ lines.push(`warm-up (a cold browser, not compared): Begin works at ${(m.readyMs/1000).toFixed(2)} s; tap → first camera frame ${(m.tapToFrame/1000).toFixed(2)} s`); continue; }
+          if(v==='fresh'){ const key=`${way==='now without modulepreload' ? 'now' : way} fresh`; if(!seen[key]) seen[key]=m.perMp; }
+          lines.push(`${tag}: before Begin works ${m.nOwn} own requests (${m.n304} answered 304, ${m.scale} scale files), ${m.kbOwn} KB; MediaPipe ${m.nMp} requests started, ${m.kbMp} KB arrived; Begin works at ${(m.readyMs/1000).toFixed(2)} s; tap → first camera frame ${(m.tapToFrame/1000).toFixed(2)} s; MediaPipe requests ${JSON.stringify(m.perMp)}, KB over the wire ${JSON.stringify(m.kbMpFile)}`);
+        }
+      } finally { await ctx.close().catch(()=>{}); }
+    }
+    /* the head's preloads add no request: every MediaPipe file asked no more often than the old way asks it (the binary twice: one per model) */
+    { const a=seen['now fresh']||{}, o=seen['old fresh']||{}, more=Object.keys(a).filter(f=>(a[f]||0)>(o[f]||0));
+      if(more.length) bad.push('the preloads added requests: '+more.map(f=>`${f} ${a[f]} vs ${o[f]||0}`).join(', ')); else lines.push(`the preloads add no request (each MediaPipe file asked as often as the old way: ${JSON.stringify(o)})`); }
+  } finally { await closeBrowser(browser); }
+  return { pass:!bad.length, lines:[...lines, ...bad.map(b=>'NOT A PASS — '+b)] };
+}
 const srv=await serve(), port=srv.address().port; LIVE.srv=srv;
 out(`[probe-browser] ${BROWSER}, ${HEADED?'headed window placed off-screen':'headless'}; static server http://127.0.0.1:${port}; full console log → ${path.relative(ROOT,LOG)}`);
 const T00=Date.now();
 const sessions=[];
 let pass=true;
 try{
+  if(MEASURE){ const M=await measureStart(port); out(`\n=== start measured (CORE-20)${THROTTLE ? ' — THROTTLED 10 Mbit/s, 150 ms, CPU 4×, the real CDN' : ' — the machine’s own connection, the real CDN'}${SERVE_ROOT!==ROOT ? ' — tree '+path.relative(ROOT, SERVE_ROOT) : ''} ===`); for(const l of M.lines) out(l);
+    await closeAll(); out(`\n[probe-browser] ${M.pass ? 'PASS' : 'NOT A PASS'} — the start measured (--measure-start) · ${((Date.now()-T00)/1000).toFixed(1)} s total`); process.exit(M.pass ? 0 : 1); }
   if(REPEAT){
     for(let i=1;i<=REPEAT;i++){ out(`\n[probe-browser] run ${i} of ${REPEAT} — fresh browser, fresh profile`); await log(`===== run ${i} of ${REPEAT} =====`);
       sessions.push(await session(port, QUICK?['quick','all']:['all'], `run ${i}/${REPEAT}`)); }
@@ -1105,7 +1230,7 @@ for(const s of sessions){
   }
   if(!s.runs.length && !s.error && !EVAL && !LEAK && !s.dumped) pass=false;
   if(s.ui){ out(`[${s.label}] UI checks (section rename, bend drag, song file, autosave): ${s.ui.pass?'PASS':'NOT A PASS'}`); if(!s.ui.pass) pass=false; }
-  if(s.stale){ out(`[${s.label}] NIGHT stale saved values, music from Begin, full screen, first frames, camera choice, honest start, start timeline, first contact order (NIGHT-7b, 7c, 8b, 10, 11): ${s.stale.pass?'PASS':'NOT A PASS'}`); if(!s.stale.pass) pass=false; }
+  if(s.stale){ out(`[${s.label}] NIGHT stale saved values, music from Begin, full screen, first frames, camera choice, honest start, how to play, start timeline, first contact order (NIGHT-7b, 7c, 8b, 10, 11, 12): ${s.stale.pass?'PASS':'NOT A PASS'}`); if(!s.stale.pass) pass=false; }
   if(!s.error){ out(`[${s.label}] CSP (PRIV1): ${s.csp&&s.csp.pass?'PASS — no violation, the control fetch refused':'NOT A PASS'}`); if(!(s.csp&&s.csp.pass)) pass=false;
     out(`[${s.label}] network (PRIV1, LAT2): ${s.net&&s.net.pass?`PASS — ${s.net.n} requests, all to the own origin or the MediaPipe paths`:'NOT A PASS'}`); if(!(s.net&&s.net.pass)) pass=false;
     out(`[${s.label}] storage (CORE-11): ${s.store&&s.store.pass?`PASS — ${s.store.list.length} names, ${NIGHT_PAGE?'all of this app or device facts':'the Full names as before'}, the control seen`:'NOT A PASS'}`); if(!(s.store&&s.store.pass)) pass=false; }

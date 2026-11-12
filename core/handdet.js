@@ -24,12 +24,12 @@ export const EMPTY_RESULT=Object.freeze({ landmarks:[], handednesses:[] });
    loader with a script tag or importScripts; in a module worker the second model could not start). */
 /* CORE-18 (opt-in; NIGHT-11 part 2, audit W9): the model file with its progress (progress(frac 0…1, or NaN without a known size, bytes)) and a stall
    timeout — no byte for stallMs fails it (an Error with modelKind 'stall' | 'net', for the app's words and «Try again») */
-async function modelFetch(progress, stallMs){
+async function modelFetch(progress, stallMs, fresh=false){
   const ac=typeof AbortController!=='undefined' ? new AbortController() : null; let tm=0;
   const arm=()=>{ clearTimeout(tm); if(ac && stallMs>0) tm=setTimeout(()=>ac.abort(), stallMs); };
   arm();
   try{
-    const r=await fetch(MP_MODEL, ac ? { signal:ac.signal } : {}); if(!r.ok) throw new Error('the hand model answered '+r.status);
+    const r=await fetch(MP_MODEL, { ...(ac ? { signal:ac.signal } : {}), ...(fresh ? { cache:'reload' } : {}) }); if(!r.ok) throw new Error('the hand model answered '+r.status);   // CORE-20: a retry never takes a failed preloaded copy
     const total=+(r.headers.get('content-length')||0);
     if(!r.body || !r.body.getReader){ const b=new Uint8Array(await r.arrayBuffer()); progress(1, b.length); return b; }
     const rd=r.body.getReader(), parts=[]; let got=0;
@@ -40,10 +40,13 @@ async function modelFetch(progress, stallMs){
     throw Object.assign(e instanceof Error ? e : new Error(String(e)), { modelKind:'net' });
   } finally { clearTimeout(tm); }
 }
-export async function createDetector({ delegate='GPU', blank=null, step=null, progress=null, stallMs=0 }={}){
+/* CORE-20 (opt-in): fresh — a RETRY after a failed start: the model with cache 'reload' and MediaPipe's loader and binary with «?retry», so nothing
+   preloaded by the page that failed is taken again (absent: exactly as before) */
+export async function createDetector({ delegate='GPU', blank=null, step=null, progress=null, stallMs=0, fresh=false }={}){
   const files=await FilesetResolver.forVisionTasks(MP_WASM);
+  if(fresh){ files.wasmLoaderPath+='?retry'; files.wasmBinaryPath+='?retry'; }
   if(step) await step('model');
-  const buf= progress ? await modelFetch(progress, stallMs) : new Uint8Array(await (await fetch(MP_MODEL)).arrayBuffer());   // the model file once, for both models (CORE-18: with its progress when asked)
+  const buf= progress ? await modelFetch(progress, stallMs, fresh) : new Uint8Array(await (await fetch(MP_MODEL, fresh ? { cache:'reload' } : undefined)).arrayBuffer());   // the model file once, for both models (CORE-18: with its progress when asked)
   const mk=n=>HandLandmarker.createFromOptions(files,{ baseOptions:{ modelAssetBuffer:buf.slice(), delegate },
     runningMode:'VIDEO', numHands:n, minHandDetectionConfidence:0.5, minTrackingConfidence:0.5 });
   const L2=await mk(2), L1=await mk(1);

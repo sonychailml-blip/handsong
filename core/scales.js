@@ -1,6 +1,6 @@
 import { scaleId, tonic, tonicCents, seventh, aRef, rectPref, tunedFrom, chordModeSel, setScaleId, setTunedFrom, setChordMode } from './state.js';   // F7: setTunedFrom/setChordMode — предустановка псевдонима (applyScaleId)   // tunedFrom — P3 «строй от»: читает ТОЛЬКО scaleView (CUR); chordModeSel — T7b, выбранный режим аккордов лада (тоже только scaleView/chordModeOf)
 import { t, L } from './i18n.js';   // t — для regWord (слово-регистр); L — для имён списка строя (listName, F3) и слова периода строя пользователя (имена ладов/групп резолвят L() на стороне рисующих)
-import { loadScaleData, loadReport } from './scaleload.js';
+import { loadScaleData, loadReport, builtinRest, checkRecord } from './scaleload.js';
 import { hooks } from './hooks.js';   // F6: hooks.scales — реестр ладов изменился (установка/удаление файла пользователя) → ui перестраивает меню   // F5: данные ладов — ФАЙЛЫ data/ (форма v1), загрузчик с проверкой; сборщик ниже
 export { loadReport };   // F5: итог загрузки (пропущенные файлы, аварийная пара) — известие на стартовой карточке (main)
 
@@ -172,6 +172,13 @@ export function registerRecord(kind,rec,notify=true){
   else { const s=buildMode(rec); if(index>=0) SCALES.splice(index,0,s); else SCALES.push(s); SCALE_BY_ID.set(id,s); addAliases(rec); if(wasLive) setScaleId(id); }   // заменённый живой лад остаётся живым (новая сборка)
   if(notify && hooks.scales) hooks.scales({ op:'add', kind, id, switched:wasLive });
   return { ok:true };
+}
+/* CORE-20: a page that loaded only some modes (core/scalepick.js) adds the other built-ins on demand — each checked against the live set, then
+   registered in the index's order (dependencies first), as a user file is. Night's probes call it before their rows. → { added, skipped } */
+export async function scalesLoadRest(notify=false){
+  const R=await builtinRest(D), skipped=[...R.problems]; let added=0;
+  for(const [kind, rec] of R.list){ const why=checkRecord(kind, rec, D); if(why){ skipped.push(`${kind} ${rec && rec.id}: ${why}`); continue; } registerRecord(kind, rec, notify); added++; }
+  return { added, skipped };
 }
 
 /* Лады традиции — в порядке массива; отдаём вместе с АБСОЛЮТНЫМ индексом,

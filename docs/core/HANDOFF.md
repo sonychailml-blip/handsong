@@ -30,6 +30,7 @@ Index: `/HANDOFF.md`. Rules: `CLAUDE.md`; on demand (DOC2): module map `docs/cor
 - ✅ **CORE-17** (2026-11-12): `core/vision.js` opt-in camera watch (`cameraWatch`, `cameraWatchRetry`): a track that ends or stays muted is reopened once, then the app is told. For NIGHT-11.
 - ✅ **CORE-18** (2026-11-12): opt-in start words and the model's progress: boot `failText`, `startSay`, `modelStallMs`; `initDetector(msg, { say, stallMs })`; `handdet.js` streams the model with a stall timeout; a camera refusal carries `gumMs`. For NIGHT-11.
 - ✅ **CORE-19** (2026-11-12): opt-in parallel start: boot `parallel` (camera beside the model in the tap), `earlyModel` (the model before the tap, not with Save-Data), `onCamera`. For NIGHT-11. Full sets none of the three runs' options (FULL untouched 0).
+- ✅ **CORE-20** (2026-11-12): opt-in `core/scalepick.js` `scalesOnly({ modes, profile })` — a page loads only the modes it plays (and what they name), the profile read once; `scales.scalesLoadRest()` adds the others on demand; boot loads `render.js` only where songs are kept (`keepsSongs()`); `tools/build.mjs` writes `modulepreload` for the static closure. For NIGHT-12. Full calls none (FULL untouched).
 - 74 modes, 18 tunings. Target: phone, portrait. Branch `dev`, main `main`.
 
 ## The foundation (full plan and contracts: `archive/HANDOFF-history.md`, «STAGE 3 — FOUNDATION PLAN»)

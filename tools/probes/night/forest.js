@@ -161,16 +161,27 @@ export async function checkForestPicture(){
       if(!(h1>=0.9 && Math.abs(h1-el)<0.25) || h2!==null || !(hr>=Math.min(h1,30)-0.25)) miss('the held note seen by the host: '+h1+' s after '+el.toFixed(3)+' s, '+h2+' after its end; the room got '+hr); }
     /* RUN 9 (slice 2): the ground wave of a note RENDERS — ONE frame rendered twice, the waves' gain 1 then 0 (exact: nothing else changes
        between the two renders); CONTROL: the same pair with nothing switched differs by exactly 0 */
-    if(room && room.lifeDbg){ const clk={ t:7e6, W:c2.width, H:c2.height }, U=room.lifeDbg.U, dif=[]; handsProbe(clk, ()=>true);
+    if(room && room.lifeDbg){ const clk={ t:7e6, W:c2.width, H:c2.height }, U=room.lifeDbg.U, dif=[], exact=[]; handsProbe(clk, ()=>true);
       try{ for(let i=0;i<14;i++){ clk.t+=33; processHandsProbe({ landmarks:[pose({ x:0.5, y:0.75, s:0.22 })], handednesses:[[{ categoryName:'Right' }]] }); }
         await sleep(1500);
         for(let k=0;k<3;k++){ room.glint(0,1); await sleep(280); } await sleep(150);   // three rings on the ground in the measured frame
         const ab=await sceneSnapDbg(on=>{ U.uGWK.value= on ? 0 : 1; }), cc=await sceneSnapDbg(()=>{});
         if(ab && cc){ dif.push(ab[0]-ab[1], cc[0]-cc[1]); }
+        /* CORE-20: the same frame twice is EXACT under any load — byte for byte at 64 × 36 and at full size (one room frame keeps one mirror picture);
+           CONTROL: the old way (the mirror redrawn by the second draw, reading the shadow map the first draw renewed) while the playing light moves
+           must differ (the hand jumps across just before the frame) */
+        const fz=await sceneSnapDbg(()=>{}, true); if(cc && fz) exact.push(cc[2], fz[2]);
+        const M=room.mirrorDbg; if(M && M.state().on){ M.sameRedrawDbg(true);
+          try{ clk.t+=33; processHandsProbe({ landmarks:[pose({ x:0.15, y:0.6, s:0.22 })], handednesses:[[{ categoryName:'Right' }]] }); const zc=await sceneSnapDbg(()=>{}, true); if(zc) exact.push(zc[2]); }
+          finally { M.sameRedrawDbg(false); } }
       } finally { U.uGWK.value=1; handsProbe(null); }
       if(dif.length===2){ n+=2; notes.push(`three notes' ground waves add ${dif[0].toFixed(2)} to the mean RGB sum of one frame (CONTROL the same frame twice: ${dif[1].toFixed(3)})`);
         if(!(dif[0]>=1)) miss('the ground wave does not show in the picture: '+dif[0].toFixed(2)); if(dif[1]!==0) miss('CONTROL: one frame rendered twice differs by '+dif[1]); }
-      else notes.push('the room rendered no frame — the drawn wave check does not apply'); }
+      else notes.push('the room rendered no frame — the drawn wave check does not apply');
+      if(exact.length>=2){ n+=2; if(exact[0]!==0) miss(`one frame drawn twice: ${exact[0]} of 64 × 36 × 3 bytes differ`); if(exact[1]!==0) miss(`one frame drawn twice at full size: ${exact[1]} bytes differ`);
+        let line=`one frame drawn twice: ${exact[0]} bytes differ at 64 × 36, ${exact[1]} at full size`;
+        if(exact.length===3){ n++; line+=` (CONTROL the old mirror redraw with the light moving: ${exact[2]})`; if(!(exact[2]>0)) miss('CONTROL: the old mirror redraw with the light moving gave the same picture — the exact check cannot fail'); }
+        notes.push(line); } }
   } catch(e){ miss('error: '+(e&&e.stack||e)); }
   finally{ try{ await setSceneLevel(keepLevel); }catch(e){} if(profileCurrent()!==was) profileApply(was); await setBackground('camera'); await sleep(30); }
   return { cases:n, total:d.length, differences:d, notes };

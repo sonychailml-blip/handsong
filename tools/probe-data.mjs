@@ -1589,6 +1589,65 @@ const loadMs=Math.round(performance.now()-T00);
    (closed axis-aligned outlines of six corners, one per quarter, at least 4 units apart), the whole drawing mirror-symmetric left ↔ right and
    top ↔ bottom (a pinwheel is turned, never mirrored); «in»: each bracket's corner at the outer corner, «out»: towards the middle. CONTROL a
    pinwheel (one uneven L turned four times round the middle) fails the mirror test. */
+/* CORE-20: NIGHT LOADS ONLY ITS OWN MODES — core/scaleload.js loadScaleSubset (the very loader the page runs, reading core/data/ from disk) with Night's
+   rooms (apps/night/rooms/index.js, through pure/room.js roomModes) and its profile's moods (apps/night/data/night.json): every mode Night names is
+   loaded with what it needs, nothing else, no problem; the files asked are the index, the menu, those modes and what they name; each record equals
+   the full loader's value for value. CONTROLS: (A) a room naming a mode the loading never saw («dorian») fails the «named ⊆ loaded» check; (B) the
+   same room given to the loading gets it (adding a mode = naming it in a room); (C) a room naming a mode that does not exist fails; (D) a profile
+   mood alone gets its mode loaded. */
+async function nightScalesLoad(){
+  const d=[], notes=[]; let n=0; const miss=s=>d.push(s), U=f=>new URL(f, import.meta.url).href;
+  const SL=await import(U('../core/scaleload.js')), RI=await import(U('../apps/night/rooms/index.js')), PR=await import(U('../apps/night/pure/room.js'));
+  const prof=JSON.parse(await readFile(new URL('../apps/night/data/night.json', import.meta.url), 'utf8'));
+  const recs=RI.ROOMS.map(R=>R.record), roomIds=PR.roomModes(recs), named=ids=>[...new Set([...prof.moods, ...ids])];
+  const load=async (ids, rec)=>{ const problems=[]; const r=await SL.loadScaleSubset(ids, Promise.resolve({ rec }), problems); return { ...r, problems }; };
+  const lacks=(want, L)=>want.filter(id=>!L.D.manifest.modes.includes(id));
+  const L=await load(roomIds, prof), want=named(roomIds);
+  n+=4; const lk=lacks(want, L);
+  if(lk.length) miss('named by Night but not loaded: '+lk.join(', '));
+  if(L.D.manifest.modes.length!==want.length) miss(`loaded ${L.D.manifest.modes.join(', ')} — Night names ${want.join(', ')}`);
+  if(L.problems.length) miss('problems: '+L.problems.map(p=>p.file+': '+p.why).join('; '));
+  if(SL.loadReport.emergency) miss('the emergency pair was used');
+  /* the files asked: exactly the index, the menu, the modes and what each names */
+  { n++; const need=new Set(['index.json','menu.json']); for(const id of want){ const m=L.D.modes[id]; if(!m) continue; need.add(`modes/${id}.json`); need.add(`tunings/${m.tuning}.json`);
+      const ch=m.chords||{}; if(ch.palette) need.add(`palettes/${ch.palette}.json`); if(ch.modes){ need.add(`chordmodes/${ch.modes}.json`); for(const x of (L.D.chordModeSets[ch.modes]||{ modes:[] }).modes) if(x.set && x.set.palette) need.add(`palettes/${x.set.palette}.json`); } }
+    const extra=L.files.filter(f=>!need.has(f)), short=[...need].filter(f=>!L.files.includes(f));
+    if(extra.length || short.length) miss(`files asked: extra ${extra.join(', ')||'none'}, missing ${short.join(', ')||'none'}`);
+    notes.push(`Night: ${want.length} modes (${want.join(', ')}) from ${L.files.length} files (${L.files.join(', ')}) instead of every built-in`); }
+  /* each record equals the full loader's */
+  { const F=await SL.loadScaleData(); for(const [sect, ids] of [['modes', L.D.manifest.modes], ['tunings', L.D.manifest.tunings], ['chordModeSets', L.D.manifest.chordModeSets], ['palettes', L.D.manifest.palettes]]) for(const id of ids){ n++;
+      if(JSON.stringify(L.D[sect][id])!==JSON.stringify(F[sect][id])) miss(`${sect} ${id}: not the full loader's record`); } }
+  /* CONTROLS */
+  { const room={ ...recs[0], moods:{ ...recs[0].moods, dorian:recs[0].look } }, ri=PR.roomModes([...recs, room]);
+    n++; if(!lacks(named(ri), L).includes('dorian')) miss('CONTROL A: a room naming a mode the loading never saw passed the check');
+    n++; const B=await load(ri, prof); if(lacks(named(ri), B).length) miss('CONTROL B: a mode named in a room was not loaded: '+lacks(named(ri), B).join(', '));
+    n++; const ghost={ ...recs[0], moods:{ ...recs[0].moods, 'no-such-mode':recs[0].look } }, gi=PR.roomModes([...recs, ghost]), C=await load(gi, prof);
+    if(!lacks(named(gi), C).includes('no-such-mode') || !C.problems.some(p=>/no-such-mode/.test(p.file))) miss('CONTROL C: a room naming a mode that does not exist was not caught');
+    n++; const Dp=await load(roomIds, { ...prof, moods:[...prof.moods, 'phrygian'] }); if(!Dp.D.manifest.modes.includes('phrygian')) miss('CONTROL D: a mood named only in the profile was not loaded');
+    notes.push('CONTROLS: an unloaded room mode caught; a room mode loaded once named; a missing mode caught; a profile mood loaded'); }
+  return { cases:n, total:d.length, differences:d, notes };
+}
+/* CORE-20: MEDIAPIPE'S BINARY EARLY, NEVER AGAINST THE PAGE'S OWN FILES — apps/night/early.js names the very files core/handdet.js loads (its MP_WASM
+   folder under the library it imports: the SIMD loader and binary MediaPipe picks); it waits for the load event and for Begin to work before it
+   preloads, never preloads the model (the early model build already asks for it), skips Save-Data and the old-start / old-load CONTROLS, and the
+   page loads it right after the guard, before any module. CONTROL: an address one character off is caught. */
+async function nightEarlyModel(){
+  const d=[], notes=[]; let n=0; const miss=s=>d.push(s), rd=f=>readFile(new URL(f, import.meta.url), 'utf8');
+  const H=await rd('../core/handdet.js'), E=await rd('../apps/night/early.js'), page=await rd('../apps/night/index.html');
+  const code=E.replace(/\/\*[\s\S]*?\*\//g, ' ');
+  const c=(src, re)=>{ const m=re.exec(src); return m ? m[1] : null; };
+  const lib=c(H, /from\s+"(https:\/\/cdn\.jsdelivr\.net\/npm\/@mediapipe\/tasks-vision@[\d.]+)"/), wasm=c(H, /MP_WASM="([^"]+)"/), eMP=c(E, /MP='([^']+)'/);
+  const judge=mp=>{ const b=[]; if(mp!==lib) b.push(`library ${mp} ≠ ${lib}`); if(mp+'/wasm'!==wasm) b.push(`wasm folder ${mp}/wasm ≠ ${wasm}`); return b; };
+  n++; const bad=judge(eMP); if(bad.length) miss('early.js names other files than core/handdet.js: '+bad.join('; '));
+  n++; if(!judge(eMP+'x').length) miss('CONTROL: an address one character off passed');
+  n++; if(!/vision_wasm_internal\.wasm/.test(code) || !/vision_wasm_internal\.js/.test(code)) miss('early.js does not name the SIMD loader and binary');
+  n++; if(/hand_landmarker|mediapipe-models|modulepreload/.test(code)) miss('early.js preloads the model or the library (the early model build asks for them already: a later preload downloads twice)');
+  n++; if(!/addEventListener\('load'/.test(code) || !/__nightBoot/.test(code) || !/requestIdleCallback/.test(code)) miss('early.js does not wait for the load event, Begin working and an idle moment');
+  n++; if(!/saveData/.test(code) || !/oldstart/.test(code) || !/oldload/.test(code)) miss('early.js does not skip Save-Data or the old-start / old-load CONTROLS');
+  n++; { const iG=page.indexOf('src="guard.js"'), iE=page.indexOf('src="early.js"'), iM=page.indexOf('type="module"'); if(!(iG>0 && iE>iG && (iM<0 || iE<iM))) miss('the page does not load early.js right after the guard, before the modules'); }
+  notes.push(`early files: ${wasm}/vision_wasm_internal.{js,wasm}, after the load event and Begin working`);
+  return { cases:n, total:d.length, differences:d, notes };
+}
 async function nightFsIcons(){
   const d=[], notes=[]; let n=0; const miss=s=>d.push(s), I=await import(new URL('../apps/night/pure/fsicons.js', import.meta.url).href).catch(e=>({ err:e }));
   if(I.err){ return { cases:1, total:1, differences:['apps/night/pure/fsicons.js does not load in node: '+I.err.message], notes }; }
@@ -1957,6 +2016,8 @@ const ROWS=[
   ['FOREST fireflies visit the light (app)', ()=>forestFliesVisit(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-8b
   ['NIGHT stream recording (app)', ()=>nightStreamRec(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-8b
   ['NIGHT full-screen icons (app)', ()=>nightFsIcons(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-8b
+  ['NIGHT scales loaded (app)', ()=>nightScalesLoad(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // CORE-20
+  ['NIGHT early model files (app)', ()=>nightEarlyModel(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // CORE-20
   ['FOREST relief (app)',       ()=>forestRelief(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-9
   ['FOREST water flow (app)',   ()=>forestWaterFlow(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-9
   ['NIGHT camera names (app)',  ()=>nightCameraNames(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-10

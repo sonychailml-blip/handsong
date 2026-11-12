@@ -185,6 +185,9 @@ function tick(now){
    to the first cards (never a profile switch — the probes switch). */
 document.body.classList.add('night-boot');   // NIGHT-8b: the page's markup carries it already (the first paint is Night's); kept for a page without it
 $('nightBegin').onclick=()=>{ const go=$('startBtn').onclick; begun=true; firstRun=cardsDue(STORE); audioSessionPlayback(); if(go) go(); fsBegin(); musicEarly(); if(!START_OLD) forestEarly(); };   // NIGHT-11 part 3: the forest begins opening in the tap
+/* NIGHT-12: «How to play» on the start screen — the same cards over it; closing them returns to the start card (nothing else of the flow changes) */
+$('nightStartHowTo').onclick=()=>{ if(!$('start').classList.contains('on') || cardsOpen()) return; document.body.classList.add('night-cards-start');
+  cardsShow(()=>{ document.body.classList.remove('night-cards-start'); $('nightStartHowTo').focus({ preventScroll:true }); }); };
 /* NIGHT-11 part 3: the room the face will show begins opening now, so its first (cold) shader compile overlaps the model and the camera prompt; the
    choice read as ui.js reads it (this device's, else the profile's first); the face's own call finds it opening and leaves it */
 function forestEarly(){ const P=profileOf('profile.night'), B=P && P.backgrounds; if(!B) return; let st=null; try{ st=localStorage.getItem('handsong.nightBg'); }catch(e){}

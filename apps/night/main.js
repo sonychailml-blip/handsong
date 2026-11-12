@@ -1,5 +1,6 @@
 /* SPLIT-2: the Night app's entry: its shell, its rooms, its profile (NIGHT-7b: the ghost light is gone — the first cards replace it). */
-import './migrate.js';   // first: the shell reads its settings while it loads
+import './scalepick.js';   // CORE-20 — first of all: only the modes Night plays are fetched (before core/scales.js loads its data)
+import './migrate.js';   // then: the shell reads its settings while it loads
 import './texts.js';   // NIGHT-7: Night's own texts join the dictionaries before anything shows
 import './icons.js';   // NIGHT-7c: Night's own drawn icons join the shared table before the markup is filled
 import { boot } from '../../core/legacy-ui/boot.js';
@@ -32,7 +33,7 @@ const Q=new URLSearchParams(location.search), probeQ=Q.has('probe');
 boot({ profile:'profile.night', afterDraw:()=>calTick(),
   detectPause:scenePausing,   // CORE-12: no camera frame is taken while a room builds (NIGHT-3 stage 5 part 2)
   failText:startFailText, startSay, modelStallMs:probeQ && +Q.get('modelstall') || 0,
-  parallel:!START_OLD, earlyModel:!START_OLD, onCamera:fsCamera });   // CORE-19: the camera beside the model, the model before the tap   // CORE-18: Night's start words; ?probe&modelstall=MS the runner's short stall
+  parallel:!START_OLD, earlyModel:!START_OLD, onCamera:fsCamera, freshRetry:true });   // CORE-20: a retry never takes a failed preload of early.js   // CORE-19: the camera beside the model, the model before the tap   // CORE-18: Night's start words; ?probe&modelstall=MS the runner's short stall
 startWire();
 /* NIGHT-11 part 2: Begin works from here — the loading look goes (apps/night/guard.js) */
 if(window.__nightBoot) window.__nightBoot.ready();

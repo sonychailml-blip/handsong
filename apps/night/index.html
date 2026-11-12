@@ -39,6 +39,8 @@
 <script src="../../core/va-stub.js"></script>
 <!-- NIGHT-11 part 2: Begin reads as loading until it works; a failed load says so (a classic script: it runs even when the modules fail) -->
 <script src="guard.js"></script>
+<!-- CORE-20: MediaPipe's binary and loader preloaded once the page's own files have arrived and Begin works (not with Save-Data) -->
+<script src="early.js"></script>
 <script defer src="/_vercel/insights/script.js"></script>
 </head>
 <!-- NIGHT-8b: Night's start look from the very first paint (it used to wait for shell.js, so Full's start card showed for about a second) -->
@@ -62,6 +64,8 @@
       <li><span class="night-vico" data-svg="hand"></span><span data-i18n="night.stepStand">Stand your phone or laptop so both hands are free.</span></li>
     </ol>
     <button id="nightBegin" class="night-only night-begin" data-i18n="night.begin" aria-busy="true">Begin</button>
+    <!-- NIGHT-12: the same cards as Settings → How to play, over the start screen; closing them returns here (apps/night/shell.js) -->
+    <button id="nightStartHowTo" class="night-only night-start-howto" data-i18n="night.howTo">How to play</button>
     <!-- NIGHT-11 part 2: «Still loading» or a failed load (apps/night/guard.js); a messenger's own browser: open the page in Chrome or Safari (apps/night/start.js) -->
     <p id="nightBootMsg" class="night-only night-boot-msg" role="alert" hidden><span id="nightBootText"></span> <button id="nightBootReload" class="night-lnk" data-i18n="night.load.reload" hidden>Reload</button></p>
     <div id="nightInApp" class="night-only night-inapp" hidden><p id="nightInAppText"></p><input id="nightInAppUrl" class="night-inapp-url" readonly aria-label="Link"><button id="nightInAppCopy" class="night-inapp-copy" data-i18n="night.inapp.copy">Copy link</button></div>
@@ -664,8 +668,7 @@
     </section>
     <div class="night-about">
       <span class="night-mark"><span data-svg="emblem"></span><span class="night-word">hand<span class="night-word-dot">·</span>song</span> <span class="night-sub">night</span></span>
-      <p data-i18n="night.privacy">Pictures and sound never leave this device.</p>
-      <p data-i18n="night.phones">Headphones help: everything here plays quietly.</p>
+      <!-- NIGHT-12 (the founder): no privacy or headphones lines here; the privacy line lives on the start screen only -->
       <button id="nightHowTo" class="night-lnk" data-i18n="night.howTo">How to play</button>
       <!-- NIGHT-7b: the development items below are hidden in the release edition (apps/night/edition.js; ?release shows it locally) -->
       <button id="nightSceneTg" class="night-lnk night-dev" hidden>Room picture: high (development)</button>

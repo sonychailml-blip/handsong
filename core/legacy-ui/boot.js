@@ -133,7 +133,7 @@ function detStart(){
   if(stage.det) return Promise.resolve();
   if(detP) return detP;
   const show=s=>{ detLast=s; if(detShow) detShow(s); };
-  const p= OPT.startSay ? initDetector(show, { say:(k,f)=>show(OPT.startSay(k,f)||t(k)), stallMs:OPT.modelStallMs }) : initDetector(show);
+  const p= OPT.startSay ? initDetector(show, { say:(k,f)=>show(OPT.startSay(k,f)||t(k)), stallMs:OPT.modelStallMs, ...(OPT.freshRetry ? { freshRetry:true } : {}) }) : initDetector(show);   // CORE-20: freshRetry
   detP=p.then(()=>{ stage.det=true; detP=null; }, e=>{ detP=null; throw e; });
   return detP;
 }
@@ -167,7 +167,7 @@ async function startApp(){
     if(!stage.audio){ await initAudio(); stage.audio=true; }   // rule #1: the context is created in this click's synchronous part (first press only)
     await AC.resume();
     const say=OPT.startSay ? (k,f)=>msg(OPT.startSay(k,f)||t(k)) : null;   // CORE-18 (opt-in): the app's own loading words, the model's progress
-    if(!stage.det){ if(say) await initDetector(msg, { say, stallMs:OPT.modelStallMs }); else await initDetector(msg); stage.det=true; }
+    if(!stage.det){ if(say) await initDetector(msg, { say, stallMs:OPT.modelStallMs, ...(OPT.freshRetry ? { freshRetry:true } : {}) }); else await initDetector(msg); stage.det=true; }
     if(say) say('load.camera'); else msg(t('load.camera'));
     await startCamera();                     // 0b: one getUserMedia, one retry after ~1 s, tracks released on failure
     if(OPT.onCamera) OPT.onCamera();
@@ -181,7 +181,7 @@ async function startApp(){
     loop();
     latStart();                              // LAT1: the latency meter starts with the camera and the audio
     if(keepsSongs()) asStart();              // AUTOSAVE1: the autosave poll (writes only after a change has settled); CORE-11: not in a profile that records nothing
-    import('../render.js').catch(e=>console.warn('[autoFreeze] render.js failed to load', e));   // AF3: auto-freeze (watcher + queue) lives behind render.js — loaded once the engine runs
+    if(keepsSongs()) import('../render.js').catch(e=>console.warn('[autoFreeze] render.js failed to load', e));   // AF3: auto-freeze (watcher + queue) lives behind render.js — loaded once the engine runs; CORE-20: not in a profile that records nothing (its probes load it themselves)
     return true;
   }catch(err){
     console.warn('[start] failed:', err);
@@ -189,7 +189,7 @@ async function startApp(){
     return false;
   }finally{ starting=false; }
 }
-/* SPLIT-2: an app's entry calls this once. CORE-19: parallel, earlyModel, onCamera (above). CORE-18: failText (err) → the app's words for a failed start or null; startSay (key, frac) → its loading words or null (with the model's progress); modelStallMs. opt: profile (the id to open in), frameFilter (res, t) → res, afterDraw (t) once per play-screen frame (CORE-6), detectPause () → true while no camera frame may be taken (CORE-12). Returns startApp for the entry's own buttons (still inside their click: rule #1).
+/* SPLIT-2: an app's entry calls this once. CORE-19: parallel, earlyModel, onCamera (above). CORE-20: freshRetry — a retried model build skips what the page preloaded (vision.initDetector). CORE-18: failText (err) → the app's words for a failed start or null; startSay (key, frac) → its loading words or null (with the model's progress); modelStallMs. opt: profile (the id to open in), frameFilter (res, t) → res, afterDraw (t) once per play-screen frame (CORE-6), detectPause () → true while no camera frame may be taken (CORE-12). Returns startApp for the entry's own buttons (still inside their click: rule #1).
    ?probe loads what the page declares in <link rel="handsong-probes">: without the flag, or without the tag (a shipped page), nothing is loaded. */
 export function boot(opt={}){
   OPT=opt; if(opt.parallel && opt.earlyModel) setTimeout(earlyDetector, 0);   // CORE-19: the model before the tap

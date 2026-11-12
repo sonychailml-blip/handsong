@@ -2,11 +2,13 @@
 import * as SELF from './night.js';
 import { night as runNight } from './core/run.js';
 import { guardWire, api as guardApi } from './core/guard.js';
+import { nightScalesRest } from './night/scales.js';   // CORE-20
 
 export { material } from './core/run.js';
 /* NIGHT-7c: the music is on by default now — every run holds it off (the live-sound rows measure the room without it) and waits out its
    tail (about 9 s) when it was playing; afterwards it plays again as the person chose */
-async function quiet(run){ const SH=await import('../../apps/night/shell.js'), was=SH.nightMusicHoldDbg(true);
+/* CORE-20: Night loads only its own modes; the rows (core rows among them) use others — added once, before the first rows run */
+async function quiet(run){ await nightScalesRest(); const SH=await import('../../apps/night/shell.js'), was=SH.nightMusicHoldDbg(true);
   if(was){ console.log('[probe] the music is held off for the rows (its tail: 9 s)'); await new Promise(r=>setTimeout(r, 9000)); }   // eslint-disable-line no-console
   try{ return await run(); } finally{ SH.nightMusicHoldDbg(false); } }
 export const night=(opt={})=>quiet(()=>runNight(opt)), all=night, quick=(opt={})=>quiet(()=>runNight({ ...opt, quick:true }));
@@ -22,6 +24,7 @@ export { checkForestRoom, checkBackgrounds } from './night/forest.js';
 export { checkSoloFirefly } from './night/night.js';
 export { checkNightUntouched, dumpNight } from './night/nightguard.js';
 export { checkNightProfile } from './night/nightprofile.js';
+export { checkNightScales } from './night/scales.js';   // CORE-20: only its own modes at start
 export { checkNightMigrate } from './night/nightmigrate.js';
 export { checkNightLean, checkQuietFloor } from './night/lean.js';   // NIGHT-1 stages 2, 3
 export { checkNightCalib } from './night/calib.js';   // NIGHT-2 stage 2

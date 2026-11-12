@@ -59,6 +59,8 @@ export async function checkNightCards(){
       cardsEnvDbg(null); }
     $('nightInfoBtn').click(); $('nightHowTo').click(); ok('«How to play» did not open them from Settings', cardsOpen() && $('nightInfo').hidden);
     ok('the controls show over the cards', !$('nightShell').classList.contains('show')); $('nightCardSkip').click();
+    /* NIGHT-12: Settings keep «How to play» and no longer carry the privacy or headphones lines (the privacy line: the start screen only) */
+    ok('Settings still carry a privacy or headphones line', !$('nightInfo').querySelector('[data-i18n="night.privacy"],[data-i18n="night.phones"]') && !!$('nightInfo').querySelector('#nightHowTo'));
     for(const L of ['en','ru']) withLang(L, ()=>{ const keys=['play','depth','fx','music'].flatMap(k=>[`night.card.${k}.t`, `night.card.${k}.b`]).concat(['night.card.skip','night.card.next','night.card.go','night.privacyLine','night.howTo','night.q.standard','night.q.detailed','night.card.home.t','night.card.home.b','night.fs.enter','night.fs.exit']);
       const miss=keys.filter(k=>t(k)===k), wrong=keys.filter(k=>L==='ru' ? !CYR.test(t(k)) : CYR.test(t(k))); ok(`${L}: ${miss.length} texts missing (${miss.join(', ')})`, !miss.length); ok(`${L}: ${wrong.length} texts in the other language`, !wrong.length); });
     ok('the privacy line is not on the start screen', !!$('nightPrivacyLine') && $('nightPrivacyLine').textContent.length>20);

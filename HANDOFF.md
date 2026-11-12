@@ -4,15 +4,15 @@ Two apps, one engine. Rules: `CLAUDE.md`. Every run belongs to one track: `CORE-
 
 | Track | Folder | Read | Where it stands |
 |---|---|---|---|
-| **CORE** | `core/` | `docs/core/HANDOFF.md`, `BACKLOG.md`, `WORK-LOG.md` | Stage 3 foundation and `CORE-1`…`CORE-19` done, all opt-in (48-kHz renders, hand calibration, lean path, quiet floor, Night texts, far hands, sound module door, scene host out, storage namespace, detection pause, camera choice, camera watch, start words, parallel start). |
+| **CORE** | `core/` | `docs/core/HANDOFF.md`, `BACKLOG.md`, `WORK-LOG.md` | Stage 3 foundation and `CORE-1`…`CORE-20` done, all opt-in (latest: camera choice and watch, start words, parallel start, only the modes a page plays). |
 | **FULL** | `apps/full/` | `docs/full/HANDOFF.md`, `BACKLOG.md`, `WORK-LOG.md`, `UI-MAP.md`, `UX-INVENTORY.md` | Waits for the first release. Next: stage 5 (saving, export, audio take, mixer) and the calibration screen. |
-| **NIGHT** | `apps/night/` | `docs/night/HANDOFF.md`, `BACKLOG.md`, `WORK-LOG.md`, `STAGE4-NIGHT-plan.md`, `QUALITY.md` | The first public release. RUN 9 done. `NIGHT-1` stages 1–3 done. `NIGHT-2` calibration screens built (stage 3), waiting for step 129 (five checks, laptop + Poco). `NIGHT-3` (rooms): stages 2–4 and 5 part 1 done. `NIGHT-4`, `NIGHT-5`, stage 5 part 2 and `NIGHT-6` (forest polish) accepted. `NIGHT-7`–`7c` wait for step 145, `NIGHT-8`…`8c` for 146–150, `NIGHT-11` (ready for testers) for 151. Then steps 120–124, C8 rest, C9, C10, C12. |
+| **NIGHT** | `apps/night/` | `docs/night/HANDOFF.md`, `BACKLOG.md`, `WORK-LOG.md`, `STAGE4-NIGHT-plan.md`, `QUALITY.md` | The first public release. RUN 9 done. `NIGHT-1` stages 1–3 done. `NIGHT-2` calibration screens built (stage 3), waiting for step 129 (five checks, laptop + Poco). `NIGHT-3` (rooms): stages 2–4 and 5 part 1 done. `NIGHT-4`, `NIGHT-5`, stage 5 part 2 and `NIGHT-6` (forest polish) accepted. `NIGHT-7`–`7c` wait for step 145, `NIGHT-8`…`8c` for 146–150, `NIGHT-11` (ready for testers) for 151, `NIGHT-12` (last touches, faster start) for 152. Then steps 120–124, C8 rest, C9, C10, C12. |
 
 **Handsong** is a gesture synthesizer and tuning tutorial in the browser: camera → MediaPipe → pinches → Web Audio, with a multitrack recorder, piano roll and lessons. **Handsong Night** (code id `night`) is the quiet one: a night forest played with the hands, free, nothing leaves the device.
 
 **Who does what:** the user commits; Claude Code never runs git, not even read-only. A strategist writes the prompts and explains in Russian. Terminal replies are in English.
 
-**Deploy:** two Vercel projects, `HANDSONG_APP=full` and `HANDSONG_APP=night`. `dev` pushes give previews, which keep `?probe` for on-device measurement. Full's production builds `main`; `handsong-night`'s builds `night-release`, a stopper copy of the old `main`. Merging `dev` into `main` updates only Full's production, and neither new app goes public yet (`CLAUDE.md`, Build and deploy). Build: `tools/build.mjs`.
+**Deploy:** two Vercel projects, `HANDSONG_APP=full` and `HANDSONG_APP=night`. `dev` pushes give previews, which keep `?probe` for on-device measurement. Full's production builds `main`; `handsong-night`'s builds `night-release`, Night's test build at https://night.handsong.app (`handsong-night.vercel.app` still works). Merging `dev` into `main` updates only Full's production (`CLAUDE.md`, Build and deploy). Build: `tools/build.mjs`.
 
 **Local addresses (Live Server):** `http://127.0.0.1:5500/apps/full/`, `http://127.0.0.1:5500/apps/night/`; add `?probe` for `window.P`.
 

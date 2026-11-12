@@ -60,5 +60,14 @@ if(!PREVIEW){ if(existsSync(path.join(OUT,'tools'))) bad.push('production holds 
 else if(existsSync(path.join(OUT,'apps',other)) && (other==='full' || all.some(f=>f.startsWith('apps/night/')&&f!=='apps/night/data/night.json'))) bad.push('a preview holds more of the other app than the probes need');
 if(!/rel="handsong-profile"/.test(page)) bad.push('the page declares no profile');
 if(bad.length){ for(const b of bad.slice(0,30)) console.error('  '+b); die(bad.length+' problem(s)'); }
+/* CORE-20 (audit P5 item 3): the page's module script and its STATIC closure (import … from / import '…' / export … from; never import()) as
+   <link rel="modulepreload"> before </head>, so the built page fetches its modules in one wave instead of one per import depth */
+const STATIC=SPEC.slice(0,2), closure=[], seenS=new Set();
+function walkStatic(f){ if(seenS.has(f) || !f.endsWith('.js') || !existsSync(path.join(OUT,f))) return; seenS.add(f); closure.push(f);
+  const t=stripComments(readFileSync(path.join(OUT,f),'utf8')); for(const re of STATIC) for(const m of t.matchAll(re)){ if(m[1].includes('?')) continue; walkStatic(posix.normalize(posix.join(posix.dirname(f),m[1]))); } }
+for(const m of page.matchAll(/<script\b[^>]*\btype="module"[^>]*\bsrc="([^"]+)"/g)) if(!/^([a-z]+:|\/|#)/i.test(m[1])) walkStatic(m[1].split(/[?#]/)[0]);
+{ const html=readFileSync(path.join(OUT,'index.html'),'utf8'), tags=closure.map(f=>`<link rel="modulepreload" href="${f}">`).join('\n');
+  if(!closure.length || !html.includes('</head>')) die('no module closure to preload, or the page has no </head>');
+  writeFileSync(path.join(OUT,'index.html'), html.replace('</head>', `<!-- CORE-20: the static module closure, preloaded (written by tools/build.mjs) -->\n${tags}\n</head>`)); }
 const bytes=all.reduce((n,f)=>n+statSync(path.join(OUT,f)).size,0), h=createHash('sha256'); for(const f of all){ h.update(f); h.update(readFileSync(path.join(OUT,f))); }
-console.log(`[build] PASS — ${app}${PREVIEW?' · preview: ?probe kept':' · production: no probes'}${RELEASE?' · release edition':''} · ${all.length} files, ${(bytes/1048576).toFixed(1)} MB, ${seen.size} loads resolved · tree ${h.digest('hex').slice(0,16)} → ${path.relative(ROOT,OUT).replace(/\\/g,'/')}`);
+console.log(`[build] PASS — ${app}${PREVIEW?' · preview: ?probe kept':' · production: no probes'}${RELEASE?' · release edition':''} · ${all.length} files, ${(bytes/1048576).toFixed(1)} MB, ${seen.size} loads resolved, ${closure.length} modules preloaded · tree ${h.digest('hex').slice(0,16)} → ${path.relative(ROOT,OUT).replace(/\\/g,'/')}`);

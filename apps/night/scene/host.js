@@ -272,9 +272,11 @@ export function sceneSnapDbg(alt, full=false){
   if(!renderer || !glCanvas) return Promise.resolve(null);
   const gw=full ? glCanvas.width : 64, gh=full ? glCanvas.height : 36;
   const grab=()=>{ const t=document.createElement('canvas'); t.width=gw; t.height=gh; const g=t.getContext('2d'); g.drawImage(glCanvas,0,0,gw,gh);
-    const px=g.getImageData(0,0,gw,gh).data; let sum=0; for(let i=0;i<px.length;i+=4) sum+=px[i]+px[i+1]+px[i+2]; return sum/(px.length/4); };
+    const px=g.getImageData(0,0,gw,gh).data; let sum=0; for(let i=0;i<px.length;i+=4) sum+=px[i]+px[i+1]+px[i+2]; return { mean:sum/(px.length/4), px }; };
+  /* CORE-20: a pair also gives [2], the RGB bytes that differ between the two copies (exact: a mean can hide two changes that cancel) */
+  const differ=(p, q)=>{ let k=0; for(let i=0;i<p.length;i+=4) k+=(p[i]!==q[i])+(p[i+1]!==q[i+1])+(p[i+2]!==q[i+2]); return k; };
   return new Promise(res=>{ const to=setTimeout(()=>{ snapWant=null; res(null); }, 2000);
-    snapWant=()=>{ clearTimeout(to); const a=grab(); if(!alt){ res(a); return; } try{ alt(true); renderer.info.reset(); draw(); res([a, grab()]); } finally { alt(false); } }; }); }   // a new frame: three uploads changed attributes once per frame
+    snapWant=()=>{ clearTimeout(to); const a=grab(); if(!alt){ res(a.mean); return; } try{ alt(true); renderer.info.reset(); draw(); const b=grab(); res([a.mean, b.mean, differ(a.px, b.px)]); } finally { alt(false); } }; }); }   // a new frame: three uploads changed attributes once per frame
 /* NIGHT-6 slice 8: one frame on the screen — the room's own passes when it has them (the painted distance), else the scene in one */
 function draw(){ if(room.render) room.render(renderer, performance.now()/1000); else renderer.render(room.scene, room.camera); }
 /* NIGHT-6, capture only: the next rendered frame at full size as a PNG data URL (null without WebGL; after 2 s) */

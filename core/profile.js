@@ -5,6 +5,7 @@
 import { checkProfile, PROFILE_IDS } from './pure/profile.js';
 import { scaleById } from './scales.js';
 import { timbreKnownId } from './timbreload.js';
+import { pageProfileOf } from './scalepick.js';   // CORE-20: a page with only some modes has read its profile already
 
 const FULL={ format:'handsong/profile', version:1, id:'profile.full', name:{ en:'Full', ru:'Полный' }, roles:['ld','ch','bs','dr'], handFn:null,
   noteModes:null, key:null, moods:null, timbres:null, effects:null, scene:null, backgrounds:['camera'], shell:'full', noteField:'full',
@@ -19,7 +20,8 @@ if(LINK){
   const name=LINK.getAttribute('href');
   rec:{
     let rec=null;
-    try{ const q=await fetch(LINK.href, { cache:'no-cache' }); if(!q.ok) throw new Error('HTTP '+q.status); rec=await q.json(); }
+    const pre=pageProfileOf();   // CORE-20: read once with the page's modes (absent: read here, as before)
+    try{ if(pre){ const r=await pre; if(r.err) throw new Error(r.err); rec=r.rec; } else { const q=await fetch(LINK.href, { cache:'no-cache' }); if(!q.ok) throw new Error('HTTP '+q.status); rec=await q.json(); } }
     catch(e){ report.skipped.push(name+': '+String(e&&e.message||e)); console.warn('[profiles] the page\'s profile could not be read: '+name); break rec; }
     const why= BYID.has(rec&&rec.id) ? 'a second record with this id' : !PROFILE_IDS.includes(rec&&rec.id) ? 'not a pinned profile id' : checkProfile(rec, KNOWN);
     if(why){ report.skipped.push((rec&&rec.id||name)+': '+why); console.warn('[profiles] skipped '+name+' — '+why); break rec; }   // eslint-disable-line no-console

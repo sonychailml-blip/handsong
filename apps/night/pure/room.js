@@ -13,6 +13,8 @@ const plain=o=> o!==null && typeof o==='object' && !Array.isArray(o);
 const num=v=> typeof v==='number' && Number.isFinite(v);
 /* a room's look for a mood (a mode id, or a look's own key) → the look; unknown → the room's default look */
 export const roomLook=(room, mood)=> room.looks[room.moods[mood]||mood] || room.looks[room.look];
+/* CORE-20: the modes the rooms name (their moods' keys), once each, in order — with the profile's moods, all the modes Night loads */
+export const roomModes=records=>[...new Set(records.flatMap(r=>Object.keys((r && r.moods) || {})))];
 /* null = valid; otherwise ONE line naming the field. known (optional): modes — the app's mode ids (each mood must be one); ids — the room ids
    allowed (default ROOM_IDS; a development room passes its own, never pinned and never remembered) */
 export function checkRoom(r, known={}){

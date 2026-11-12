@@ -198,6 +198,7 @@ const GLOBALS=new Set((
   'cancelAnimationFrame innerWidth innerHeight devicePixelRatio MediaRecorder MediaStream KeyboardEvent AudioContext OfflineAudioContext webkitAudioContext OscillatorNode BiquadFilterNode GainNode WaveShaperNode DelayNode ConstantSourceNode '+
   'AudioWorkletNode OfflineAudioCompletionEvent DOMException addEventListener removeEventListener MessageChannel PerformanceObserver '+
   /* LAT2: frames to the detection worker */ 'Worker createImageBitmap ImageBitmap '+
+  /* CORE-20: MediaPipe's SIMD test before preloading its binary (apps/night/early.js) */ 'WebAssembly '+
   /* AUTOSAVE1: the write waits for an idle moment */ 'requestIdleCallback '+
   /* AUD1a: the engine-context probe tells Web Audio objects apart */ 'AudioNode AudioParam AudioBuffer MessagePort BaseAudioContext '+
   /* PACK1: base64 for licence keys (core/pack.js; browser and node) */ 'btoa atob '+
@@ -246,6 +247,7 @@ const NET_LISTED={
   'tools/probes/core/engine.js':{ fetch:[1,'probe only (?probe): reads tools/prints/census.print.json from the own origin (AUD1a node census)'] },
   'core/timbreload.js': { fetch:[1,'reads data/timbres.bundle.json (the timbre records, TIM3a) from the own origin'] },
   'core/profile.js': { fetch:[1,'reads the profile record its page declares (C0) from the own origin'] },
+  'core/scalepick.js': { fetch:[1,'CORE-20: reads the profile its page declares (own origin) once, when a page loads only some modes; core/profile.js takes that read'] },
   'tools/probes/core/timbres.js':{ fetch:[3,'probe only (?probe): reads tools/prints/timbres.before.json (TIM3 timbres = before; RUN 8 FULL untouched) and Night\'s record for that row\'s control, from the own origin'] },
   'tools/probes/night/night.js':   { fetch:[1,'probe only (?probe): reads Night\'s profile record from the own origin (RUN 7 NIGHT timbres)'] },
   'tools/probes/night/nightguard.js': { fetch:[1,'probe only (?probe): reads tools/prints/night.print.json from the own origin (SPLIT-2 NIGHT untouched)'] },

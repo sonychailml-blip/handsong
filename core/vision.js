@@ -197,7 +197,7 @@ async function mainDet(step, dl=null){
   const H=await import('./handdet.js');
   const blank=()=>{ const c=typeof OffscreenCanvas!=='undefined' ? new OffscreenCanvas(640,480) : Object.assign(document.createElement('canvas'),{ width:640, height:480 });
     const g=c.getContext('2d'); g.fillStyle='#000'; g.fillRect(0,0,640,480); return c; };
-  const D=await H.createDetector({ delegate:opts.delegate, blank, step:async s=>{ if(step) step(s); await nextPaint(); }, ...(dl ? { progress:dl.progress, stallMs:dl.stallMs } : {}) });   // CORE-18: the download's progress only when asked
+  const D=await H.createDetector({ delegate:opts.delegate, blank, step:async s=>{ if(step) step(s); await nextPaint(); }, ...(dl ? { progress:dl.progress, stallMs:dl.stallMs } : {}), ...(dl && dl.fresh ? { fresh:true } : {}) });   // CORE-18: the download's progress only when asked; CORE-20: a fresh retry
   return { kind:'main', warmMs:D.warmMs,
     run(job){ try{ const w0=performance.now(), r=D.run(job.bmp, job.t, job.action, job.policy); return Promise.resolve({ ...r, w0, w1:performance.now(), bmp:job.bmp }); }
               catch(e){ return Promise.reject(e); } },
@@ -289,13 +289,16 @@ function setHandsSink(fn, paused){ sink=fn; isPaused=paused||(()=>false); }
 
 /* 0b: the start in two steps — the hand model once, the camera (retried by startCamera) as often as the person presses «Try again» */
 /* CORE-18 (opt-in): o.say(key, frac) speaks instead of msg(t(key)) and hears the model file's progress; o.stallMs — no byte for that long fails the
-   download (MODEL_STALL_MS by default when o.say is given). Without o: exactly as before */
+   download (MODEL_STALL_MS by default when o.say is given). Without o: exactly as before. CORE-20 (opt-in): o.freshRetry — every call after the
+   first builds the model past anything the page preloaded (handdet createDetector fresh) */
 const MODEL_STALL_MS=20000;
+let detTries=0;
 async function initDetector(msg, o={}){
+  const fresh=detTries++>0 && !!o.freshRetry;
   const say=o.say || (k=>msg(t(k)));
   say('load.model');
   newWindow();
-  await setPath(opts.path, s=>{ if(s==='warm') say('load.warm'); }, o.say ? { progress:f=>o.say('load.model', f), stallMs:o.stallMs>0 ? o.stallMs : MODEL_STALL_MS } : null);
+  await setPath(opts.path, s=>{ if(s==='warm') say('load.warm'); }, o.say ? { progress:f=>o.say('load.model', f), stallMs:o.stallMs>0 ? o.stallMs : MODEL_STALL_MS, ...(fresh ? { fresh:true } : {}) } : null);
 }
 async function initVision(msg){ await initDetector(msg); msg(t('load.camera')); await startCamera(camFacing); }
 

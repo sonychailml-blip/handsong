@@ -55,6 +55,7 @@ THERE in full and here as one index entry):
   149 Choosing the camera: Front / Back on a phone, a USB webcam on a computer, live switch, not mirrored at the back, kept per device (NIGHT-10, CORE-16)
   150 Every trunk its own bark, moss and lichen: no repeated oval blotches, natural patches, the merged wood too (NIGHT-8c)
   151 Ready for the first testers: play first, the phone's lifecycle, the honest start, messengers' browsers, the sharp phone picture (NIGHT-11)
+  152 Last touches and a faster start: How to play on the start screen, Settings' two lines gone, MediaPipe's binary preloaded early, only Night's own modes (NIGHT-12, CORE-20)
 
 ## Moved to `archive/CLAUDE-history.md` at DOC1 (grep by title; read only what the slice needs)
 - «Module map (full, moved at DOC1)» — every module's detailed paragraph (AUD1a … IDS1, SONG1, AUTOSAVE1, PACK1 …).

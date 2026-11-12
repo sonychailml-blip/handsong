@@ -52,6 +52,10 @@ NIGHT-11 part 4 — PLAY FIRST, TEACH INSIDE: the DOM side of the one coaching l
 - const (3): `coachShown`, `coachDbg`, `coachSpeedDbg`
 - fn (4): `coachBegin`, `coachTick`, `coachWire`, `coachResetDbg`
 
+## apps/night/early.js
+CORE-20 (audit P1) — MEDIAPIPE'S BINARY EARLY, NEVER AGAINST THE PAGE'S OWN FILES.
+- exports: none
+
 ## apps/night/edition.js
 NIGHT-7b — NIGHT'S EDITION: the build's (core/edition.js: 'release' in a players' build) or, on any page, «?release» in the address — so the players' settings can be checked on Live Server without …
 - const (2): `NIGHT_EDITION`, `devItems`
@@ -152,7 +156,7 @@ NIGHT-11 part 5 — THE SCENE'S PIXEL BUDGET (audit P4).
 
 ## apps/night/pure/room.js
 NIGHT-3: THE ROOM RECORD's shape and validator (pure, rule #36; data row «NIGHT room records» with controls).
-- const (6): `ROOM_FORMAT`, `ROOM_IDS`, `ROOM_LEVELS`, `ROOM_ACOUSTICS`, `roomLook`, `ROOM_DAMAGES`
+- const (7): `ROOM_FORMAT`, `ROOM_IDS`, `ROOM_LEVELS`, `ROOM_ACOUSTICS`, `roomLook`, `roomModes`, `ROOM_DAMAGES`
 - fn (1): `checkRoom`
 
 ## apps/night/rooms/forest/forest-answers.js
@@ -305,6 +309,10 @@ NIGHT-3: THE ROOMS — the order a player meets them (ids, rule #37) and each ro
 NIGHT-3 stage 5 part 2: THE ROOM SWITCH — one door for everything a room change touches, in this order: the music bed fades out and holds (it takes the new room's recipes while silent); the picture…
 - const (8): `ROOM_KEY`, `ROOM_NAME_MS`, `roomCurrent`, `roomNature`, `natureModule`, `roomNext`, `roomSwitchDbg`, `natureAmbDbg`
 - fn (6): `natureLoad`, `natureRecOf`, `natureRecPcm`, `natureLight`, `roomRestore`, `roomSwitch`
+
+## apps/night/scalepick.js
+CORE-20: Night fetches only the modes it plays — every room's moods and the page profile's moods (core/scalepick.js reads the profile) — and what they need.
+- exports: none
 
 ## apps/night/scene/host.js
 THE SCENE HOST and Night's BACKGROUNDS (VIS1b, RUN 6; Night's own since CORE-8 — the shared UI reaches it through hooks.scene).
@@ -792,14 +800,19 @@ TIM3a (RUN 4) — THE TIMBRE RECORD and its validator.
 ## core/scaleload.js
 ═══ ⛳ ЗАГРУЗЧИК ДАННЫХ ЛАДОВ (слайс F5 плана «СТРОИ И ЛАДЫ ФАЙЛАМИ», HANDOFF) ═══ Данные ладов — ФАЙЛЫ в data/ (форма v1: index.json — манифест, menu.json, по файлу на строй, лад, палитру и набор р…
 - const (3): `loadReport`, `KINDS`, `kindOfRecord`
-- fn (4): `loadScaleData`, `idHolder`, `checkRecord`, `checkRecordList`
+- fn (6): `loadScaleSubset`, `builtinRest`, `loadScaleData`, `idHolder`, `checkRecord`, `checkRecordList`
 - → ./pure/format.js (1): `CM_MAX`
 - → ./pure/registry.js (1): `USER_ID`
+
+## core/scalepick.js
+CORE-20 (opt-in) — ONLY THE MODES A PAGE PLAYS.
+- const (3): `scalesOnly`, `scalesOnlyOf`, `pageProfileOf`
+- fn (1): `pageProfileRead`
 
 ## core/scales.js
 (no head comment)
 - const (61): `NOTE_NAMES`, `ROMAN`, `OCT_ROMAN`, `range`, `TRADITIONS`, `GRP`, `TUNINGS`, `CHORD_FAM_SETS`, `chordModeName`, `chordModeHint`, `SCALES`, `scaleById`, `resolveScaleId`, `anchorHints`, `scaleData`, `scalesOfTrad`, `tradOfScale`, `CUR`, `IVX`, `keyFollowsDbg`, `viewKey`, `keyCDbg`, `viewKeyC`, `baseF`, `keyByOneOne`, `historicalKeyOf`, `viewKeyIdOf`, `keyOf`, `cFix`, `tonicFreq`, `periodOf`, `regWord`, `regWordFull`, `supportsProgressions`, `backingRhythmOf`, `supportsChords`, `typedChords`, `REG_N`, `rectEligible`, `rectGrid`, `rectDefault`, `rectRows`, `rectNotes`, `rectRowsFull`, `rectBase`, `rectBaseMax`, `rectNoteAt`, `rectSlotOf`, `thereminSpan`, `thereminHz`, `chordFams`, `rootName`, `fifthStep`, `modesLikeView`, `centsOf`, `DRONE_TOL`, `droneNonOct`, `setDroneNonOct`, `listLbl`, `SEV`, `chordNotesStr`
-- fn (46): `viewOfId`, `applyScaleId`, `userRecordsOf`, `dependentsOf`, `unregisterRecord`, `registerRecord`, `menuOf`, `chordModeOf`, `scaleView`, `viewIdOf`, `namingOf`, `tuningStatus`, `rectLayout`, `seventhAddsNote`, `ruleChordSteps`, `pitchHz`, `tuningOf`, `tuningIndexOf`, `leadFreqTi`, `bassFreqTi`, `chordReadsTi`, `chordNotesAt`, `chordRowFreqAt`, `modeSlotOfTi`, `shiftDegrees`, `mapDegrees`, `chordFreqsAt`, `leadFreq`, `bassFreq`, `chordFreqs`, `chordUnit`, `chordBuildOf`, `chordAtRoot`, `chordTypeFits`, `chordRowFreq`, `chordNotes`, `name24`, `stepName`, `rowLabel`, `degCentsExact`, `droneDegree`, `droneSecondHz`, `chordPitchHz`, `listName`, `qual`, `chordLabel`
+- fn (47): `viewOfId`, `applyScaleId`, `userRecordsOf`, `dependentsOf`, `unregisterRecord`, `registerRecord`, `scalesLoadRest`, `menuOf`, `chordModeOf`, `scaleView`, `viewIdOf`, `namingOf`, `tuningStatus`, `rectLayout`, `seventhAddsNote`, `ruleChordSteps`, `pitchHz`, `tuningOf`, `tuningIndexOf`, `leadFreqTi`, `bassFreqTi`, `chordReadsTi`, `chordNotesAt`, `chordRowFreqAt`, `modeSlotOfTi`, `shiftDegrees`, `mapDegrees`, `chordFreqsAt`, `leadFreq`, `bassFreq`, `chordFreqs`, `chordUnit`, `chordBuildOf`, `chordAtRoot`, `chordTypeFits`, `chordRowFreq`, `chordNotes`, `name24`, `stepName`, `rowLabel`, `degCentsExact`, `droneDegree`, `droneSecondHz`, `chordPitchHz`, `listName`, `qual`, `chordLabel`
 - → ./scaleload.js (1): `loadReport`
 
 ## core/song/automation.js
@@ -1168,6 +1181,7 @@ SPLIT-2: the probe entry of the Night page: its own rows and the core rows flagg
 - → ./night/nightprofile.js (1): `checkNightProfile`
 - → ./night/pixels.js (2): `checkNightPixels`, `checkNightDetailedGuard`
 - → ./night/roomswitch.js (1): `checkNightRoomSwitch`
+- → ./night/scales.js (1): `checkNightScales`
 - → ./night/stream.js (1): `checkNightStream`
 - → ./night/testroom.js (3): `testRoomInstall`, `testRoomRemove`, `testRoomMode`
 
@@ -1238,6 +1252,11 @@ NIGHT-11 part 5 — rows «NIGHT pixel budget» and «NIGHT Detailed guard», on
 NIGHT-3 stage 5 part 2: row «NIGHT room switch» (P.night, drawn) — the switching machinery, on the test room (./testroom.js), judged on EXACT controls (the user, 2026-11-09): (1) hand detection tak…
 - fn (1): `checkNightRoomSwitch`
 
+## tools/probes/night/scales.js
+CORE-20 — row «NIGHT scales (only its own)»: the page loaded by itself exactly the modes Night names — the profile's moods and every room's moods — (read when this module first ran, before the prob…
+- const (2): `SCALES_AT_LOAD`, `nightScalesRest`
+- fn (1): `checkNightScales`
+
 ## tools/probes/night/stream.js
 NIGHT-8: row «NIGHT stream, water and ground» — (1) BUILT without a renderer, at each level: today's seven aisle rocks are instances of the stream's stones (no rock mesh of their own), every stone …
 - fn (1): `checkNightStream`
@@ -1251,7 +1270,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 - const (5): `TEST_ROOM_ID`, `TEST_ROOM`, `testRoomMode`, `testRoomInfo`, `testRoomFreeLeaks`
 - fn (2): `testRoomInstall`, `testRoomRemove`
 
-_246 modules, 2676 exported names._
+_250 modules, 2688 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 
