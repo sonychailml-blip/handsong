@@ -23,6 +23,7 @@ const NOISY=new Set((val('--noisy')||'').split(',').filter(Boolean));   // SPLIT
 const ONLY=val('--only');   // comma list of screens
 const FOREST=argv.includes('--forest');   // RUN 9: the forest's own screens (GPU capture, the Night face)
 const NIGHT=argv.includes('--night') || FOREST;   // RUN 7 (C6/C11): the Night face's screens instead (a phone viewport, the page apps/night/)
+const DPR=+val('--dpr')||0;   // NIGHT-11: the device pixel ratio of the capture (a mid phone is about 2.75; default 2 on the Night screens, 1 elsewhere)
 const LEVEL=val('--level');   // NIGHT-8: the forest's picture level for the capture (full = Detailed, reduced = Standard; stored before the page loads)
 const TINT=val('--tint');   // NIGHT-8c: diagnosis — canvas tokens replaced before the page reads them ('forest-lichen=#ff00ff,forest-moss=#00ffff')
 const GROUND=val('--ground');   // NIGHT-9: 'baked' | 'scan' — which bare floor the forest draws (the user's comparison; forest.js forestGroundDbg, set before the room opens)
@@ -93,10 +94,9 @@ const nightWait=async p=>{ await p.waitForTimeout(2200); };
 const cardTo=async (p, f)=>{ await p.evaluate(f=>{ const c=document.getElementById('nightInfo'); c.scrollTop=Math.round(f*(c.scrollHeight-c.clientHeight)); }, f); await p.waitForTimeout(150); };
 const SCREENS_NIGHT=[
   ['night-start',     async p=>{}],
-  ['night-offer',     async p=>{ await p.click('#nightBegin'); await p.waitForFunction(()=>{ const c=document.getElementById('nightCal'); return c && !c.hidden; }, null, { timeout:180e3 }); await p.waitForTimeout(600); }],   // NIGHT-2: Begin → the calibration offer
-  ['night-cards',     async p=>{ await p.click('#nightCalNo');   // NIGHT-2 + NIGHT-7b: skip the offer; a first run then shows the first cards (the ghost light is gone)
-                       await p.waitForFunction(()=>{ const s=document.getElementById('start'); return s && !s.classList.contains('on'); }, null, { timeout:180e3 });
-                       await p.evaluate(async ()=>{ const Q=await import('/core/frzqueue.js'); Q.afPause('runner', true); document.querySelector('#nightBgSeg [data-bg="dark"]').click(); });
+  ['night-offer',     async p=>{ await p.click('#nightBegin'); await p.waitForFunction(()=>{ const s=document.getElementById('start'); return s && !s.classList.contains('on'); }, null, { timeout:180e3 }); await p.waitForTimeout(1500); }],   // NIGHT-11: Begin → the coaching line «Raise a hand» (no offer, no card first)
+  ['night-cards',     async p=>{   // NIGHT-11: the cards from Settings → How to play (a first run shows none)
+                       await p.evaluate(async ()=>{ const Q=await import('/core/frzqueue.js'); Q.afPause('runner', true); document.querySelector('#nightBgSeg [data-bg="dark"]').click(); document.getElementById('nightInfoBtn').click(); document.getElementById('nightHowTo').click(); });
                        await p.waitForFunction(async ()=>{ const C=await import('/apps/night/cards.js'); return C.cardsOpen(); }, null, { timeout:30e3, polling:250 }); await p.waitForTimeout(600); }],
   ['night-dark',      async p=>{ for(let k=0;k<4;k++) await p.click('#nightCardNext'); await p.waitForTimeout(1800); }],   // the last «Play» closes them
   ['night-info',      async p=>{ await p.click('#nightInfoBtn'); await p.waitForTimeout(500); }],
@@ -124,7 +124,7 @@ const SCREENS_NIGHT=[
   ['night-play-land', async p=>{ await p.evaluate(async ()=>{ const M=await import('/core/legacy-ui/latmeter.js'); M.darkHideDbg(); }); await playHands(p); }],
   ['night-play',      async p=>{ await p.setViewportSize({ width:390, height:844 }); await p.waitForFunction(()=>innerWidth===390 && document.querySelector('canvas').width===390); await p.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))); await playHands(p); }],  /* SPLIT-2: the hands read the canvas size and the per-frame cover rect: wait for the resize */
   /* RUN 8 (slice 4): the forest picture behind the playing hands (WebGL with screen-blended lights; the room renders at its own rate) */
-  ['night-forest',    async p=>{ await p.evaluate(()=>{ document.getElementById('nightFxHint').hidden=true; document.querySelector('#nightBgSeg [data-bg="forest"]').click(); }); await p.waitForTimeout(2500); await playHands(p); await p.waitForTimeout(800); }],
+  ['night-forest',    async p=>{ await p.evaluate(()=>{ document.querySelector('#nightBgSeg [data-bg="forest"]').click(); }); await p.waitForTimeout(2500); await playHands(p); await p.waitForTimeout(800); }],
   ['night-forest-land', async p=>{ await p.setViewportSize({ width:844, height:390 }); await p.waitForTimeout(1500); await playHands(p); await p.waitForTimeout(800); }],
   ['night-cal-land',  async p=>{ await p.evaluate(async ()=>{ const G=await import('/core/gestures.js'); G.handsProbe(null); const C=await import('/apps/night/calib.js'); C.calStep(); }); await p.waitForTimeout(1200); }],   // NIGHT-2
   ['night-cal',       async p=>{ await p.setViewportSize({ width:390, height:844 }); await p.waitForTimeout(1200); }],
@@ -147,7 +147,7 @@ const trunkLight=async (p, x=0.72, sz=0.22)=>{ await p.evaluate(async ([x,sz])=>
     G.handsProbe(null); const clk={ t:5e6, W:V.canvas.width, H:V.canvas.height }; G.handsProbe(clk, ()=>true);
     for(let i=0;i<14;i++){ clk.t+=1000/30; G.processHandsProbe({ landmarks:[PO.pose({ x, y:0.5, s:sz, gaps:[0.05,1,1,1] }), PO.pose({ x:0.26, y:0.37, s:0.2, gaps:[1,0.05,1,1] })], handednesses:[[{ categoryName:'Right' }],[{ categoryName:'Left' }]] }); } }, [x, sz]); await p.waitForTimeout(1500); };   // x 0.5: in front of the view's centre; a large hand: the nearest depth
 const SCREENS_FOREST=[
-  ['f-start',        async p=>{ await p.click('#nightBegin'); await p.waitForFunction(()=>{ const s=document.getElementById('start'); return s && !s.classList.contains('on'); }, null, { timeout:180e3 }); await p.waitForFunction(()=>{ const c=document.getElementById('nightCal'); return c && !c.hidden; }, null, { timeout:180e3 }); await p.click('#nightCalNo');
+  ['f-start',        async p=>{ await p.click('#nightBegin'); await p.waitForFunction(()=>{ const s=document.getElementById('start'); return s && !s.classList.contains('on'); }, null, { timeout:180e3 }); await p.waitForTimeout(800); if(await p.evaluate(()=>{ const c=document.getElementById('nightCal'); return !!c && !c.hidden; })) await p.click('#nightCalNo');   // NIGHT-11: no offer after Begin any more
                        await p.evaluate(async ()=>{ const Q=await import('/core/frzqueue.js'); Q.afPause('runner', true); const C=await import('/apps/night/cards.js'); if(C.cardsOpen()) document.getElementById('nightCardSkip').click(); document.querySelector('#nightBgSeg [data-bg="forest"]').click(); });
                        await forestAt(p, 60); await p.waitForTimeout(3000); await playHands(p, false); await p.waitForTimeout(1500); }],
   ['f-moon',         async p=>{ await forestAt(p, 60); await playHands(p); await p.waitForTimeout(900); }],
@@ -202,7 +202,7 @@ const MSG_KNOWN=new Set([]);   // NIGHT-2 fixed the landscape low-light hint ove
 const msgSeen=new Set();
 async function msgCheck(p, name){
   const r=await p.evaluate(()=>{ const vis=e=>{ if(!e) return false; const c=getComputedStyle(e); if(c.display==='none'||c.visibility==='hidden'||+c.opacity===0) return false; for(let q=e.parentElement;q;q=q.parentElement){ const k=getComputedStyle(q); if(k.display==='none'||+k.opacity===0) return false; } return true; };
-    const els=['darkHint','nightIdle','nightFxHint','nightFxBars','nightForestBar','nightCtl'].map(id=>document.getElementById(id)).filter(vis), R=els.map(e=>[e.id, e.getBoundingClientRect()]), hits=[];
+    const els=['darkHint','nightIdle','nightCoach','nightNotice','nightFxBars','nightForestBar','nightCtl'].map(id=>document.getElementById(id)).filter(vis), R=els.map(e=>[e.id, e.getBoundingClientRect()]), hits=[];
     const bar=id=>/Bar/.test(id);   // the two bar sets may sit side by side; a message may touch neither, nor the panel
     for(let i=0;i<R.length;i++) for(let j=i+1;j<R.length;j++){ if(bar(R[i][0])&&bar(R[j][0])) continue; const a=R[i][1], b=R[j][1]; if(!(a.right<=b.left||b.right<=a.left||a.bottom<=b.top||b.bottom<=a.top)) hits.push(R[i][0]+' × '+R[j][0]); }
     return { shown:R.map(x=>x[0]), hits }; });
@@ -223,7 +223,7 @@ async function capture(tag){
     `--use-file-for-fake-video-capture=${y4m}`,'--autoplay-policy=no-user-gesture-required','--disable-background-timer-throttling','--disable-renderer-backgrounding','--hide-scrollbars'] });
   const res={ tag, screens:{} };
   try{
-    const ctx=await browser.newContext({ viewport: NIGHT ? { width:390, height:844 } : { width:1280, height:800 }, deviceScaleFactor: NIGHT ? 2 : 1, locale:'en-US' });
+    const ctx=await browser.newContext({ viewport: NIGHT ? { width:390, height:844 } : { width:1280, height:800 }, deviceScaleFactor: DPR || (NIGHT ? 2 : 1), locale:'en-US' });
     await ctx.grantPermissions(['camera','microphone'],{ origin:`http://127.0.0.1:${port}` }); await cdnCache(ctx);
     await ctx.addInitScript(()=>{ try{ localStorage.setItem('handsong.lang','en'); }catch(e){} });
     if(LEVEL) await ctx.addInitScript(lv=>{ try{ localStorage.setItem('handsong.sceneLevel', lv); }catch(e){} }, LEVEL);

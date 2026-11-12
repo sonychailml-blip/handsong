@@ -90,6 +90,9 @@ export function calWire(doors, opt={}){ D=doors; OPT=opt;
 /* the offer, when this camera has neither a calibration nor an offer made: false = nothing shown (then() is not called) */
 export function calOfferIfNew(then){ const r=handCalRead(); if(mode || r.status==='closed' || r.calibrated || !r.camera || offeredList().includes(r.camera)) return false;
   onEnd=then||null; show('offer'); return true; }
+/* NIGHT-11 part 4: the coaching line's calibration offer — due on this camera (the same test as the offer's), and marked offered once it was shown */
+export function calDueNow(){ const r=handCalRead(); return !mode && r.status!=='closed' && !r.calibrated && !!r.camera && !offeredList().includes(r.camera); }
+export function calOffered(){ markOffered(); }
 export function calStep(then){ if(mode) return; onEnd=then||null; begin(); }
 export const calActive=()=>mode!==null;
 /* the face: a saved side sets the roles again (nothing saved: the profile's roles stay) */

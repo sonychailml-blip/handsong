@@ -506,12 +506,14 @@ export async function checkNightBars(){
   const PR=await import('../../../core/profile.js'), G=await import('../../../core/gestures.js'), REC=await import('../../../core/recorder.js'), PO=await import('../../../core/gestures/pose.js'), ST=await import('../../../core/state.js');
   const SH=await import('../../../apps/night/shell.js'), PV=await import('../../../core/legacy-ui/views/play.js'), LM=await import('../../../core/legacy-ui/latmeter.js'), V=await import('../../../core/vision.js');   // LM: darkHideDbg
   const was=PR.profileCurrent(), clk={ t:1e6, W:V.canvas.width, H:V.canvas.height }, raf=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+  const CO=await import('../../../apps/night/coach.js'), keepCoach=(()=>{ try{ return localStorage.getItem('handsong.nightHints'); }catch(e){ return null; } })();
   const wait=ms=>new Promise(r=>setTimeout(r,ms)), HINT='handsong.nightFxHint', keepHint=(()=>{ try{ return localStorage.getItem(HINT); }catch(e){ return null; } })();
   let view=null;
   try{
     const why=PR.profileApply('profile.night'); n++; if(why){ miss('Night did not apply: '+why); return { cases:n, total:d.length, differences:d, notes }; }
     view={ ...ST.nightView }; ST.setNightView({ ...view, tips:true });
     try{ localStorage.removeItem(HINT); }catch(e){}
+    CO.coachResetDbg({ clear:true });   // NIGHT-11: the effects hint is a coaching line — shown once, so the row starts with nothing seen
     G.handsProbe(clk, ()=>true); REC.wTapSet(()=>{});
     const frame=(hands,k=3)=>{ for(let i=0;i<k;i++){ clk.t+=1000/30; G.processHandsProbe({ landmarks:hands.map(h=>PO.pose(h.p)), handednesses:hands.map(h=>[{ categoryName:h.key }]) }); } };
     const two=(px,fx,s)=>[{ key:'Right', p:{ x:px, y:0.5, s, gaps:[0.05,1,1,1] } }, { key:'Left', p:{ x:fx, y:0.45, s:0.2, gaps:[1,0.05,1,1] } }];
@@ -550,7 +552,8 @@ export async function checkNightBars(){
     if(getComputedStyle(idle).visibility!=='visible') miss('CONTROL: «Raise a hand» stays hidden without the low-light message — the check cannot fail');
     LM.darkHideDbg(); fade.style.visibility=''; fade.style.opacity=''; fade.style.transition='';
   } catch(e){ miss('error: '+(e&&e.stack||e)); }
-  finally{ try{ G.handsProbe(null); }catch(e){} REC.wTapSet(null); REC.liveAllOff(); try{ if(keepHint==null) localStorage.removeItem(HINT); else localStorage.setItem(HINT, keepHint); }catch(e){}
+  finally{ try{ G.handsProbe(null); }catch(e){} REC.wTapSet(null); REC.liveAllOff(); try{ if(keepHint==null) localStorage.removeItem(HINT); else localStorage.setItem(HINT, keepHint); if(keepCoach==null) localStorage.removeItem('handsong.nightHints'); else localStorage.setItem('handsong.nightHints', keepCoach); }catch(e){}
+    CO.coachResetDbg();
     if(view) ST.setNightView(view); PR.profileApply(was||'profile.full'); }
   return { cases:n, total:d.length, differences:d, notes };
 }

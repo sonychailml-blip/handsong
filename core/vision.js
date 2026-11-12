@@ -41,13 +41,13 @@ async function accessGranted(){ try{ const p=await navigator.permissions.query({
 async function gumOnce(c){
   const ms=camOpenDbgO.timeoutMs || (await accessGranted() ? GUM_MS : 0);
   return new Promise((resolve, reject)=>{
-    let done=false, tm=0;
+    let done=false, tm=0; const g0=performance.now();
     CS.calls++; CS.live++; CS.max=Math.max(CS.max, CS.live);
     const p=Promise.resolve().then(()=>(camOpenDbgO.gum || (x=>navigator.mediaDevices.getUserMedia(x)))(c));
     const settled=()=>{ CS.live--; if(CS.pending===p) CS.pending=null; };
     CS.pending=p;
     p.then(s=>{ settled(); CS.obtained.add(s); if(done){ CS.late++; stopStream(s); return; } done=true; clearTimeout(tm); resolve(s); },
-           e=>{ settled(); if(done) return; done=true; clearTimeout(tm); reject(e); });
+           e=>{ settled(); if(done) return; done=true; clearTimeout(tm); try{ if(e && typeof e==='object') e.gumMs=performance.now()-g0; }catch(x){} reject(e); });   // CORE-18: how fast the refusal came (none prompted: at once)
     if(ms) tm=setTimeout(()=>{ if(done) return; done=true; reject(camErr('TimeoutError', `the camera did not answer within ${Math.round(ms/1000)} s`)); }, ms);
   });
 }
@@ -61,6 +61,7 @@ function openCamera(facing){
 /* CAM-FIX: before the old track stops, a low-light test gives the device back its own settings; 0a: the new track gets back only what a
    test of ours left behind (the stored record). Both bounded and after the track started — a hanging camera call never blocks the start. */
 async function openOnce(facing){
+  watchDetach();   // CORE-17: our own stop is never a loss
   if(stream){ if(opts.low!=='off' || low.touched.size){ low.gen++; await bounded(devRestore(vtrack(), 'restore')); } stopStream(stream); stream=null; video.srcObject=null; }
   if(CS.pending){ await bounded(CS.pending, PEND_WAIT_MS); if(CS.pending) throw camErr('AbortError', 'an earlier camera request still has not answered'); }
   /* CORE-16 (opt-in): a picked camera opens by its device; when it is gone the default (by facing) opens quietly. No pick: exactly as before */
@@ -81,6 +82,7 @@ async function openOnce(facing){
   camStartT=performance.now();
   if(opts.low!=='off'){ opts.low='off'; low.note='reopened'; low.asked=null; }   // LAT3: a reopened camera gets today's request
   low.orig=null; low.touched.clear();
+  if(watchFn) watchAttach();   // CORE-17 (opt-in): Full never sets a watch
   await bounded(camHeal().catch(e=>console.warn('[camera] settings repair at open failed — carrying on:', e)));
   pumpStart();
 }
@@ -100,6 +102,7 @@ async function startCamera(facing=camFacing){
    restore, bounded); a page shown again from the back/forward cache reopens it */
 let camWasOn=false;
 function camRelease(restoring){
+  watchDetach();
   camWasOn=!!stream; opening=null;
   const s=stream; stream=null;
   const done=()=>{ stopStream(s); for(const x of [...CS.obtained]) stopStream(x); };
@@ -190,28 +193,28 @@ function workerDet(step){
     w.postMessage({ type:'init', delegate:opts.delegate, w:640, h:480, failInit:workerFailDbg });
   });
 }
-async function mainDet(step){
+async function mainDet(step, dl=null){
   const H=await import('./handdet.js');
   const blank=()=>{ const c=typeof OffscreenCanvas!=='undefined' ? new OffscreenCanvas(640,480) : Object.assign(document.createElement('canvas'),{ width:640, height:480 });
     const g=c.getContext('2d'); g.fillStyle='#000'; g.fillRect(0,0,640,480); return c; };
-  const D=await H.createDetector({ delegate:opts.delegate, blank, step:async s=>{ if(step) step(s); await nextPaint(); } });
+  const D=await H.createDetector({ delegate:opts.delegate, blank, step:async s=>{ if(step) step(s); await nextPaint(); }, ...(dl ? { progress:dl.progress, stallMs:dl.stallMs } : {}) });   // CORE-18: the download's progress only when asked
   return { kind:'main', warmMs:D.warmMs,
     run(job){ try{ const w0=performance.now(), r=D.run(job.bmp, job.t, job.action, job.policy); return Promise.resolve({ ...r, w0, w1:performance.now(), bmp:job.bmp }); }
               catch(e){ return Promise.reject(e); } },
     setDelegate:d=>D.setDelegate(d), dbg:o=>D.dbg(o), close:()=>D.close() };
 }
-async function buildDet(asked, step){
+async function buildDet(asked, step, dl=null){
   if(asked==='worker'){
-    if(typeof Worker==='undefined' || typeof OffscreenCanvas==='undefined') return { d:await mainDet(step), runs:'main', why:'no OffscreenCanvas or Worker in this browser' };
+    if(typeof Worker==='undefined' || typeof OffscreenCanvas==='undefined') return { d:await mainDet(step, dl), runs:'main', why:'no OffscreenCanvas or Worker in this browser' };
     try{ return { d:await workerDet(step), runs:'worker', why:'' }; }
     catch(e){ const why=String(e&&e.message||e); console.warn('[vision] hand detection worker unavailable — the main thread detects instead:', why);
-      return { d:await mainDet(step), runs:'main', why }; }
+      return { d:await mainDet(step, dl), runs:'main', why }; }
   }
-  return { d:await mainDet(step), runs:'main', why:'' };
+  return { d:await mainDet(step, dl), runs:'main', why:'' };
 }
 /* (re)build the detection path; the old one keeps working until the new one is ready, then it is closed */
-async function setPath(asked, step){
-  const b=await buildDet(asked, step), old=det;
+async function setPath(asked, step, dl=null){
+  const b=await buildDet(asked, step, dl), old=det;
   det=b.d; detGen++; path.runs=b.runs; path.why=b.why; path.warmMs=b.d.warmMs;
   sched=schedNew(); if(old) old.close();
 }
@@ -285,10 +288,14 @@ async function pump(){
 function setHandsSink(fn, paused){ sink=fn; isPaused=paused||(()=>false); }
 
 /* 0b: the start in two steps — the hand model once, the camera (retried by startCamera) as often as the person presses «Try again» */
-async function initDetector(msg){
-  msg(t('load.model'));
+/* CORE-18 (opt-in): o.say(key, frac) speaks instead of msg(t(key)) and hears the model file's progress; o.stallMs — no byte for that long fails the
+   download (MODEL_STALL_MS by default when o.say is given). Without o: exactly as before */
+const MODEL_STALL_MS=20000;
+async function initDetector(msg, o={}){
+  const say=o.say || (k=>msg(t(k)));
+  say('load.model');
   newWindow();
-  await setPath(opts.path, s=>{ if(s==='warm') msg(t('load.warm')); });
+  await setPath(opts.path, s=>{ if(s==='warm') say('load.warm'); }, o.say ? { progress:f=>o.say('load.model', f), stallMs:o.stallMs>0 ? o.stallMs : MODEL_STALL_MS } : null);
 }
 async function initVision(msg){ await initDetector(msg); msg(t('load.camera')); await startCamera(camFacing); }
 
@@ -403,6 +410,34 @@ function lowLeave(){
 }
 addEventListener('pagehide', ()=>camRelease(lowLeave()));   // 0b: the camera is released after the test restore
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') lowLeave(); });
+/* CORE-17 (opt-in; NIGHT-11 part 1, audit W3) — THE CAMERA WATCH. A track that ends (unplugged, taken by another app) or stays muted while the page
+   is visible (a phone that suspended it) is reopened ONCE; another loss within WATCH.againMs, or a failed reopen, tells the app ('lost'), which says
+   so; cameraWatchRetry() after the person's tap ('back' once it runs). An end while the page is hidden waits for it to be visible. Our own stops
+   detach first (they are never a loss). Nothing in Full calls cameraWatch: no listener is ever added there. */
+const WATCH={ muteMs:3000, againMs:30000 }, CW={ ended:0, muted:0, reopens:0, lost:0, back:0 };
+let watchFn=null, watchTr=null, watchMuteT=0, watchLastT=-Infinity, watchDue=false;
+function watchDetach(){ if(watchTr){ watchTr.removeEventListener('ended', onTrEnd); watchTr.removeEventListener('mute', onTrMute); watchTr.removeEventListener('unmute', onTrUnmute); watchTr=null; } clearTimeout(watchMuteT); watchMuteT=0; }
+function watchAttach(){ watchDetach(); const tr=stream && stream.getVideoTracks()[0]; if(!watchFn || !tr) return; watchTr=tr;
+  tr.addEventListener('ended', onTrEnd); tr.addEventListener('mute', onTrMute); tr.addEventListener('unmute', onTrUnmute); }
+const shownNow=()=>document.visibilityState==='visible';
+function onTrEnd(){ CW.ended++; watchDetach(); if(!shownNow()){ watchDue=true; return; } watchReopen('ended'); }
+function onTrMute(){ CW.muted++; clearTimeout(watchMuteT); watchMuteT=0; if(!shownNow()) return; const tr=watchTr;
+  watchMuteT=setTimeout(()=>{ watchMuteT=0; if(tr && tr===watchTr && tr.muted && shownNow()) watchReopen('muted'); }, WATCH.muteMs); }
+function onTrUnmute(){ clearTimeout(watchMuteT); watchMuteT=0; }
+function watchReopen(why){
+  const now=performance.now();
+  if(now-watchLastT<WATCH.againMs){ CW.lost++; if(watchFn) watchFn('lost', why, null); return; }
+  watchLastT=now; CW.reopens++;
+  openCamera(camFacing).then(()=>{ if(watchFn) watchFn('reopened', why, null); }, e=>{ CW.lost++; console.warn('[camera] reopen after a loss failed:', e&&e.name, e&&e.message); if(watchFn) watchFn('lost', why, camErrKind(e)); });
+}
+document.addEventListener('visibilitychange', ()=>{ if(!watchFn || !shownNow()) return; if(watchDue){ watchDue=false; watchReopen('ended'); } else if(watchTr && watchTr.muted) onTrMute(); });
+/* fn(kind 'reopened'|'lost'|'back', why 'ended'|'muted', errKind) — or null to stop watching */
+function cameraWatch(fn){ watchFn= typeof fn==='function' ? fn : null; if(watchFn){ if(!watchTr) watchAttach(); } else { watchDetach(); watchDue=false; } return !!watchFn; }
+/* after the person's tap on the app's message: one more open (its failure throws to the caller) */
+async function cameraWatchRetry(){ watchLastT=performance.now(); await openCamera(camFacing); CW.back++; if(watchFn) watchFn('back', null, null); }
+/* probe only: { muteMs, againMs } (null = the default), reset (forget the last reopen) → the counters */
+function cameraWatchDbg(o={}){ if('muteMs' in o) WATCH.muteMs=o.muteMs==null ? 3000 : +o.muteMs; if('againMs' in o) WATCH.againMs=o.againMs==null ? 30000 : +o.againMs; if(o.reset) watchLastT=-Infinity;
+  return { ...CW, watching:!!watchTr, due:watchDue, muteMs:WATCH.muteMs, againMs:WATCH.againMs }; }
 async function setLowLight(m){
   if(!LOW_MODES.includes(m)) throw new Error('low light: '+LOW_MODES.join(', '));
   const tr=vtrack(); if(!tr || !tr.applyConstraints) throw new Error('the camera is not running');
@@ -484,4 +519,5 @@ function pumpDbg(o={}){
 /* Экспорт: детектор живёт здесь; кадры и результаты отдаются стоку (main.js). */
 export { video, canvas, ctx, initVision, initDetector, startCamera, switchCamera, setHandsSink, pollFrame,
   camInfo, camLabel, modelInfo, visionOpts, VISION_DEF, setHandsTracked, setModelDelegate, setCamFps, setDetectPath, setLowLight, lowInfo,
-  pathInfo, pumpStats, pumpDbg, pumpStepDbg, detRunDbg, lowDbg, camSimDbg, camOpenDbg, camStats, camStatsDbg, setCameraPick, cameraSwitch, cameraList, cameraPickInfo };
+  pathInfo, pumpStats, pumpDbg, pumpStepDbg, detRunDbg, lowDbg, camSimDbg, camOpenDbg, camStats, camStatsDbg, setCameraPick, cameraSwitch, cameraList, cameraPickInfo,
+  cameraWatch, cameraWatchRetry, cameraWatchDbg };

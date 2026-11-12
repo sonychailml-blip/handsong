@@ -8539,3 +8539,19 @@ not a control · run a "random" failure many times and print WHERE and HOW MUCH 
 - Picture: Standard (medium, the default) / Detailed (high) in Settings → View. The cold first opening at medium stays about 7 s on the laptop (shader compile; the bark's shader trimmed 1.8 → 1.3 s); it now runs in slices, so the start card stays responsive (longest block 2.5 s). Under 4 s was not reached cheaply.
 - Privacy: one line under Begin. Found on the way: a level change during the sliced compile dropped the picture to minimal (row «NIGHT low power» caught it) — fixed in the host.
 - Rows: data «NIGHT texts both languages (app)»; browser «NIGHT first cards» 24. Waiting for step 143 (the user's five checks, the Poco, an iPhone).
+
+## Moved from docs/night/HANDOFF.md at NIGHT-11 (2026-11-12)
+### NIGHT-7b (2026-11-11): fixes from the user's first look at the test version (+ CORE-14, texts). Log: `docs/night/WORK-LOG.md`
+- The empty card and the card that would not close had ONE cause: `.night-card.night-cards{display:block}` beat `[hidden]`, so the cards stayed on screen whatever the attribute said. In a window that had begun before (old `handsong.nightSeen`), no first run filled them: four dots, two blank buttons. The NIGHT-7 row checked the attribute, so it could not fail. Fixed: `#nightShell [hidden]` always hides; the cards are labelled from load; the row judges the computed style (CONTROL).
+- The cards are due by their own key `handsong.nightCards` (written when they close); no older flag decides. The ghost hand is deleted (`ghost.js`, its row, «first steps again»): the cards replace it.
+- Shared texts are room-neutral (6 keys, both languages; the data row checks every «night.*» text). Three of them moved from core to `texts.js` (CORE-14).
+- Start screen: the title with a real space («hand·song night»), two tips (always shown), Begin, the privacy line.
+- `?release` shows the players' edition on Live Server (`apps/night/edition.js`); it hides Measure this device, Room picture, the Sound panel and diagnostics, the calibration's side-vote line. Smoke test checks it.
+- New runner check «NIGHT stale saved values» (18 stale values, reload, the real start card and first launch). Waiting for step 144.
+### NIGHT-6 slice 9 (2026-11-10): hidden things the light finds. Log: `docs/night/WORK-LOG.md`; as built: `docs/night/design/NIGHT-6-forest/PLAN.md` top
+- Step 141: the glows stay crisp; the strokes' strength and the grain at medium were left open by the user (asked again in the report); unchanged.
+- Foxfire: thin glowing veins on the dead and fallen wood and on the feet of some old trunks, near the playing light's trail (12 / 8 recent places); each patch holds 8–12 s after the light, then fades in 2.5 s (the wood's and the bark's shaders; no new program).
+- Night flowers: 14 / 8 small closed buds among the herbs, in view and in the light's reach; within a metre of the light they open (0.6 s) and glow softly, stay 20 s, close (3 s). Their petals: one small shader (+1 program); their glow: the mushrooms' glow points.
+- Found on the way: the probe snapshot's second drawing kept the frame's geometry uploads (three uploads attributes once per frame; since slice 8 the host counts frames itself) — the snapshot now starts a new frame.
+- Laptop medium: detections = Dark (0.0 / 0.0 %), frame 2.5–2.7 ms, draws 69–70, programs 29, textures 16.9 MB; first opening 5.1 s after high. High −52.4 / −45.7 %. Files unchanged (3.29 MB of 30).
+- Rows: data «FOREST hidden (app)» 16; browser «FOREST hidden» 13. Waiting for step 142 (and the two open answers of step 141).

@@ -1943,6 +1943,13 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
     4. The lichen: faint pale crust patches between knee and head height, more on some trunks than others. Too much, too little or right?
     5. The Poco (a `dev` preview): Standard as smooth as before.
 
+151. Ready for the first testers (NIGHT-11, with CORE-17/18/19), at most five checks by hand; the rest is in the rows «NIGHT phone lifecycle», «NIGHT context lost», «NIGHT pixel budget», «NIGHT Detailed guard» (P.night), the runner's «NIGHT honest start», «NIGHT start timeline», «NIGHT first contact order», and the data rows «NIGHT in-app browsers», «NIGHT coaching line», «NIGHT pixel budget law» (all app). Use a `dev` preview of `handsong-night` on the phones.
+    1. The Poco, a fresh tab: Begin → the camera prompt at once (the start card shows the model's percent meanwhile); the forest comes out of the dark; «Raise a hand», then «Touch your thumb to your first finger», then the first note. On a second visit, time it from the tap to the first note (target 15–20 s). Play on for a minute: the other fingers, near/far, the second hand's hint and the calibration line come one at a time.
+    2. The Poco, Standard: is the forest sharp now (no blocky trunks)? Smooth enough? Settings → Measure this device (with `?probe` on the preview) and send the text: its «resolution guard» line says whether the phone stepped down. Try Detailed once (a note sits beside it on the phone).
+    3. An iPhone: during play lock the screen (or take a call, or ask Siri), then come back: the sound returns, or «Tap to continue» and a tap brings it back. Switch to another app and back: the screen does not dim during play.
+    4. Telegram on both phones: send yourself the link and open it inside Telegram: the start card says «Open this page in Chrome / Safari» with Copy link; if Begin is tapped and the camera is refused, the same words. Note what Telegram's browser really does with the camera.
+    5. The laptop: during play unplug the USB webcam (or open it in another app) and plug it back: the camera reopens by itself, or the line «The camera stopped…» and a tap on it brings it back.
+
 ## Superseded at DOC1 (old lines verbatim, replaced in place above by a later slice)
 - NIGHT-2 stage 3 (2026-11-03, the rule of at most five manual checks) updated this line of CLAUDE.md's report format:
   probe verdict lines and fix rounds; what was left undone; docs found stale; the user's remaining steps (ear, camera, phone).

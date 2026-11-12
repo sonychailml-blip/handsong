@@ -10,7 +10,8 @@
    room's picture (the stored value keeps its old name). The background changes only the picture: sound, note layout and crop are untouched. */
 import { stackAdd, stackSet } from '../../../core/legacy-ui/views/stack.js';
 import { cv } from '../../../core/palette.js';
-import { ctx, canvas as cv2d } from '../../../core/vision.js';
+import { ctx, canvas as cv2d, pumpStats } from '../../../core/vision.js';
+import { sceneRatio, stepsOf, guardNew, guardNext } from '../pure/pixels.js';   // NIGHT-11 part 5: the pixel budget and its guard
 import { BUS } from '../../../core/pure/bus.js';
 import { heardMs } from '../pure/heard.js';   // NIGHT-6 slice 1: the music bed's events shown when heard
 const READ=BUS.reader();   // RUN 9: the mood at the room's opening, read-only (the frames read the bus they are given)
@@ -40,7 +41,18 @@ const storedLevel=()=>{ try{ const v=localStorage.getItem(LEVEL_KEY); return v &
 export const SCENE_LEVEL_DEFAULT='reduced';   // RUN 9 (slice 5): medium — high costs 30–40 % of hand detection on the user's laptop (measured); high stays a choice
 /* NIGHT-3 stage 5 part 2: a device that reports 2 GB or less starts its rooms at medium at most (a stored «high» included) */
 const LOW_MEM=typeof navigator!=='undefined' && navigator.deviceMemory>0 && navigator.deviceMemory<=2;
-const startLevel=()=>{ const v=storedLevel()||SCENE_LEVEL_DEFAULT; return LOW_MEM && v==='full' ? 'reduced' : v; };
+/* NIGHT-11 part 5: THE DETAILED CRASH GUARD — a flag kept while the room runs at Detailed with the page visible, cleared on a clean exit (pagehide),
+   when the page hides, when the level changes or the room closes. Found at the next start (the page was killed at Detailed): the start opens at
+   Standard (remembered) and says why once (sceneStartNote). */
+const RUN_KEY='handsong.nightDetailedRun';
+let runOn=false, startNote=null;
+const runFlag=v=>{ runOn=!!v; try{ if(v) localStorage.setItem(RUN_KEY, '1'); else localStorage.removeItem(RUN_KEY); }catch(e){} };
+const runFound=()=>{ try{ return localStorage.getItem(RUN_KEY)==='1'; }catch(e){ return false; } };
+const startLevel=()=>{ const v=storedLevel()||SCENE_LEVEL_DEFAULT;
+  if(v==='full' && runFound()){ runFlag(false); startNote='detailed-crash'; try{ localStorage.setItem(LEVEL_KEY, 'reduced'); }catch(e){} return 'reduced'; }
+  return LOW_MEM && v==='full' ? 'reduced' : v; };
+addEventListener('pagehide', ()=>{ if(runOn) runFlag(false); });
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden' && runOn) runFlag(false); });
 const heldAt=new Map();   // RUN 9: owner → when its note began (ms)
 let THREE=null, loading=null, renderer=null, glCanvas=null, onLost=null, room=null, want=null, level=startLevel(), made=0, live=0, last=0, notesSeq=0, bg='camera';
 /* NIGHT-6: the music bed's events (bus «bed», each at its audio time) reach the room at the page time they are heard (the bus «audioClock», the
@@ -66,23 +78,52 @@ function makeRenderer(){
     made++; live++;
     r.outputEncoding=THREE.sRGBEncoding; r.toneMapping=THREE.ACESFilmicToneMapping; r.toneMappingExposure=1.0; r.info.autoReset=false;   // NIGHT-6 slice 8: the frame resets it (a frame may take several passes)
     r.shadowMap.enabled=shadowOn(); r.shadowMap.type=THREE.PCFSoftShadowMap;
-    onLost=e=>{ e.preventDefault(); errors.push('context lost'); level='minimal'; dropRenderer(false); stackSet('scene', false); if(opening) openEnd(opening); };   // a real loss (our own close removes it first)
+    onLost=e=>{ e.preventDefault(); errors.push('context lost'); lostOne(); };   // a real loss (our own close removes it first)
     c.addEventListener('webglcontextlost', onLost);
     cv2d.parentNode.insertBefore(c, cv2d); glCanvas=c;
     return r;
   }catch(e){ errors.push('no WebGL: '+(e&&e.message||e)); return null; }
 }
+/* NIGHT-11 part 1 (audit W6): a LOST CONTEXT — phones lose them when a page sits in the background. The room's 2D stand-in at once, then ONE reopen
+   at the level it had, once the page is visible (after LOST.delayMs); a second loss in the session is final (the stand-in stays, as before). */
+const LOST={ n:0, reopened:0, final:false, reopen:true, delayMs:1000, want:null, stepDown:true, stepped:0 };   // NIGHT-11 part 5: a loss at Detailed reopens at Standard
+let lostT=0;
+function lostOne(){ const was=level; LOST.n++; level='minimal'; dropRenderer(false); stackSet('scene', false); if(opening) openEnd(opening);
+  if(!LOST.reopen || LOST.reopened>=1 || was==='minimal'){ LOST.final=true; LOST.want=null; return; }
+  LOST.want=was;
+  if(was==='full' && LOST.stepDown){ LOST.want='reduced'; LOST.stepped++; try{ localStorage.setItem(LEVEL_KEY, 'reduced'); }catch(e){} }   // NIGHT-11 part 5: a step down instead of losing the room
+  lostWhenVisible(); }
+function lostWhenVisible(){ clearTimeout(lostT); lostT=0; if(!LOST.want || document.visibilityState!=='visible') return;
+  lostT=setTimeout(()=>{ lostT=0; const lv=LOST.want; LOST.want=null; if(!lv || renderer || bg!=='forest') return; LOST.reopened++;
+    sceneOpen(roomId, { level:lv }).catch(e=>{ errors.push('reopen: '+String(e&&e.message||e)); level='minimal'; }); }, LOST.delayMs); }
+document.addEventListener('visibilitychange', ()=>{ if(LOST.want) lostWhenVisible(); });
 function dropRenderer(force){
   if(glCanvas && onLost){ glCanvas.removeEventListener('webglcontextlost', onLost); onLost=null; }
   if(renderer){ try{ renderer.dispose(); if(force) renderer.forceContextLoss(); }catch(e){} renderer=null; live=Math.max(0, live-1); }
   if(glCanvas){ glCanvas.remove(); glCanvas=null; }
 }
+/* NIGHT-11 part 5: THE PIXEL BUDGET (pure/pixels.js) — the ratio for this screen and level, less the guard's steps; the measurement's scale override
+   keeps today's law. The guard samples the scene's frame rate and the hand detection rate once a second while the room shows (not while it opens). */
+let guard=guardNew(), gT=0, gLast=null, gPeriod=1000, viewOver=null, sampleOver=null;
+const view=()=>viewOver || { w:innerWidth, h:innerHeight, dpr:devicePixelRatio||1 };
+function ratioNow(){ if(optOver && optOver.scale) return Math.min(devicePixelRatio||1, 1)*optOver.scale; const v=view(); return sceneRatio(v.w, v.h, v.dpr, level, guard.step); }
+const guardReset=()=>{ guard=guardNew(); gLast=null; gT=0; };
+function guardTick(t){
+  if(t-gT<gPeriod) return; const P=pumpStats();
+  if(gLast){ const sec=Math.max(1e-3, (t-gLast.t)/1000), x= sampleOver ? sampleOver() : { fps:info.fps, cap:LV[level].fps, det:(P.detected-gLast.det)/sec, cam:(P.snapped-gLast.snap)/sec };
+    const v=view(), was=guard.step; guard=guardNext(guard, { ...x, t:t/1000 }, stepsOf(v.w, v.h, v.dpr, level)); if(guard.step!==was) resize(); }
+  gT=t; gLast={ t, det:P.detected, snap:P.snapped }; }
+/* a phone that starts driving another display (or a window moved to another monitor) changes its ratio without a resize */
+let dprMq=null;
+function dprWatch(){ try{ if(dprMq) dprMq.removeEventListener('change', dprChanged); dprMq=matchMedia(`(resolution: ${devicePixelRatio||1}dppx)`); dprMq.addEventListener('change', dprChanged); }catch(e){} }
+function dprChanged(){ guardReset(); if(renderer) resize(); dprWatch(); }
+dprWatch();
 function resize(){
   if(!renderer || !room) return;
-  renderer.setPixelRatio(Math.min(devicePixelRatio||1, 1)*(optOver && optOver.scale || LV[level].scale)); renderer.setSize(innerWidth, innerHeight, false);
+  renderer.setPixelRatio(ratioNow()); renderer.setSize(innerWidth, innerHeight, false);   // NIGHT-11 part 5: the pixel budget (was min(dpr, 1) × the level's scale)
   const v=new THREE.Vector2(); renderer.getDrawingBufferSize(v); room.resize(innerWidth, innerHeight, v.y);
 }
-addEventListener('resize', ()=>{ if(renderer) resize(); });
+addEventListener('resize', ()=>{ guardReset(); if(renderer) resize(); });
 /* NIGHT-3 stage 5 part 2: the opening's dark moment — begun, ended (the veil lifts: the picture fades in), failed (the stand-in) */
 const settle=op=>{ for(const f of op.waits.splice(0)) f(); };
 function openBegin(id){ if(opening) settle(opening); const op={ id, t0:performance.now(), frames:0, late:false, waits:[] }; opening=op; OPENS.begun++;
@@ -148,7 +189,7 @@ export async function sceneSwitch(id, o={}){
   if(!o.fast && roomId===id) await new Promise(r=>setTimeout(r, SCENE_FADE.in));
   return sceneInfo();
 }
-export function sceneClose(){ want=null; if(opening) openEnd(opening); stackSet('scene', false); if(room){ room.dispose(); room=null; } dropRenderer(true); info.fps=0; }
+export function sceneClose(){ if(runOn) runFlag(false); want=null; if(opening) openEnd(opening); stackSet('scene', false); if(room){ room.dispose(); room=null; } dropRenderer(true); info.fps=0; }
 /* the scene module (layer «scene»): the room at its own rate; a new solo note-on makes the playing light glint */
 function sceneFrame(t, bus){
   if(!renderer || !room || compiling>0) return;
@@ -168,6 +209,8 @@ function sceneFrame(t, bus){
   if(opening && opening.id===room.id && ++opening.frames>=2) openEnd(opening);   // NIGHT-3 stage 5 part 2: two frames drawn — detection resumes, the picture fades in
   if(snapWant){ const f=snapWant; snapWant=null; f(); }   // RUN 8 probe: copy the frame JUST rendered (the drawing buffer is cleared once presented)
   const ms=performance.now()-t0; info.ms= info.ms ? info.ms*0.9+ms*0.1 : ms;
+  if(level==='full' && !runOn) runFlag(true);   // NIGHT-11 part 5: the crash guard's flag while Detailed runs
+  if(!opening) guardTick(t);
   info.frames++; info.total=(info.total||0)+1; if(!info.t0) info.t0=t; if(t-info.t0>=1000){ info.fps=Math.round(info.frames*1000/(t-info.t0)); info.frames=0; info.t0=t; }
 }
 stackAdd({ kind:'visual', id:'scene', layer:'scene', cost:{ cls:'heavy', gpu:true }, frame:sceneFrame }); stackSet('scene', false);
@@ -188,11 +231,12 @@ stackAdd({ kind:'visual', id:'backdrop', layer:'background', cost:{ cls:'light',
 /* choose the background → a promise of sceneInfo() (the room opens asynchronously: three.js loads once) */
 export function setBackground(mode){
   if(!BACKGROUNDS.includes(mode)) mode='camera';
-  bg=mode; stackSet('camera', mode==='camera');
+  const was=bg; bg=mode; stackSet('camera', mode==='camera');
   /* RUN 8: the 2D canvas is OPAQUE (vision.js: alpha:false — Full's text and picture rely on it), so its «clear» was black over the room:
      the user saw a plain black forest. On the Forest background the canvas is composited with SCREEN (style.css): its black lets the room
      through, its lights (fireflies, glow, halo) add on top. Night draws no text on the canvas. */
   document.body.classList.toggle('bg-room', mode==='forest');
+  if(mode==='forest' && was==='forest' && opening && opening.id===roomId) return Promise.resolve(sceneInfo());   // NIGHT-11 part 3: already opening (from the Begin tap) — not begun again
   if(mode==='forest') return sceneOpen(roomId).catch(e=>{ errors.push(String(e&&e.message||e)); level='minimal'; return sceneInfo(); });
   sceneClose(); return Promise.resolve(sceneInfo());
 }
@@ -200,7 +244,7 @@ export const backgroundOf=()=>bg;
 /* choose the scene's quality → a promise of sceneInfo(); an open room is rebuilt at the new level (its WebGL context released first) */
 export function setSceneLevel(v){
   if(!LV[v]) return Promise.resolve(sceneInfo());
-  level=v; try{ localStorage.setItem(LEVEL_KEY, v); }catch(e){}
+  level=v; try{ localStorage.setItem(LEVEL_KEY, v); }catch(e){} guardReset(); if(v!=='full' && runOn) runFlag(false);
   if(bg!=='forest') return Promise.resolve(sceneInfo());
   if(room){ room.dispose(); room=null; } dropRenderer(true); stackSet('scene', false);
   return sceneOpen(roomId).catch(e=>{ errors.push(String(e&&e.message||e)); level='minimal'; return sceneInfo(); });
@@ -212,8 +256,9 @@ export const sceneOptDbg=o=>{ optOver=o||null; return optOver; };   // measureme
 export const sceneInfo=()=>({ id:room?room.id:null, room:roomId, bg, level, webgl:!!renderer, contextsMade:made, contextsLive:live, fps:info.fps, frameMs:Math.round(info.ms*10)/10,
   opening:opening ? { id:opening.id, frames:opening.frames, late:opening.late, ms:Math.round(performance.now()-opening.t0) } : null, opens:{ ...OPENS },
   memory:renderer ? { geometries:renderer.info.memory.geometries, textures:renderer.info.memory.textures } : null,
-  pixelRatio: renderer ? renderer.getPixelRatio() : 0, fpsCap:LV[level].fps, shadow: renderer ? renderer.shadowMap.enabled : false, openMs:info.openMs||0,   // RUN 9 (slice 5)
+  pixelRatio: renderer ? renderer.getPixelRatio() : 0, guard:(()=>{ const v=view(); return { step:guard.step, steps:stepsOf(v.w, v.h, v.dpr, level), downs:guard.downs, ups:guard.ups, buffer:glCanvas ? [glCanvas.width, glCanvas.height] : null }; })(),   /* NIGHT-11 part 5 */ fpsCap:LV[level].fps, shadow: renderer ? renderer.shadowMap.enabled : false, openMs:info.openMs||0,   // RUN 9 (slice 5)
   programs: renderer ? (renderer.info.programs||[]).length : 0, rendered:info.total||0,
+  lost:{ n:LOST.n, reopened:LOST.reopened, final:LOST.final, due:!!LOST.want },   // NIGHT-11
   calls:renderer ? info.calls||0 : 0, triangles:renderer ? info.tris||0 : 0, texBytes:room && room.texBytes ? room.texBytes() : 0, openings:OPEN_LOG.map(o=>({ ...o })),   // NIGHT-6 slice 0
   errors:errors.slice(-5) });
 /* probes: the room object (numbers through its state()/project()); a level for the next open */
@@ -235,6 +280,17 @@ function draw(){ if(room.render) room.render(renderer, performance.now()/1000); 
 /* NIGHT-6, capture only: the next rendered frame at full size as a PNG data URL (null without WebGL; after 2 s) */
 export function sceneShotDbg(){ if(!renderer || !glCanvas) return Promise.resolve(null);
   return new Promise(res=>{ const to=setTimeout(()=>{ snapWant=null; res(null); }, 2000); snapWant=()=>{ clearTimeout(to); res(glCanvas.toDataURL('image/png')); }; }); }
+/* NIGHT-11 probe only: lose the live WebGL context the way a phone does (true when it could); the reopen rule { reopen, delayMs (null = 1 s), reset } */
+export function sceneLoseDbg(){ try{ const gl=renderer && renderer.getContext(), x=gl && gl.getExtension('WEBGL_lose_context'); if(!x) return false; x.loseContext(); return true; }catch(e){ return false; } }
+export const sceneLostDbg=(o={})=>{ if('stepDown' in o) LOST.stepDown=!!o.stepDown; if('reopen' in o) LOST.reopen=!!o.reopen; if('delayMs' in o) LOST.delayMs=o.delayMs==null ? 1000 : +o.delayMs;
+  if(o.reset){ LOST.n=0; LOST.reopened=0; LOST.final=false; LOST.want=null; clearTimeout(lostT); lostT=0; } return { ...LOST }; };
+/* NIGHT-11 part 5: the start's note (once: 'detailed-crash' when the last run was killed at Detailed) */
+export const sceneStartNote=()=>{ const n=startNote; startNote=null; return n; };
+/* probe only: the start's level decision again (with its side effects); the pixel guard's inputs — view {w,h,dpr} (the law's screen), sample() →
+   {fps,cap,det,cam}, periodMs, reset (null clears each) */
+export const sceneStartLevelDbg=()=>startLevel();
+export const sceneGuardDbg=(o={})=>{ if('view' in o) viewOver=o.view||null; if('sample' in o) sampleOver=o.sample||null; if('periodMs' in o) gPeriod=o.periodMs==null ? 1000 : +o.periodMs;
+  if(o.reset) guardReset(); if(renderer && ('view' in o || o.reset)) resize(); return { ...guard, view:view(), ratio:renderer ? renderer.getPixelRatio() : 0 }; };
 export const sceneLevelDbg=v=>{ if(LV[v]) level=v; return level; };
 /* RUN 9 probe only: how long a playing note (by owner) has been held, as the host sees it (null: not held) */
 export const sceneHeldDbg=owner=>heldAt.has(owner) ? (performance.now()-heldAt.get(owner))/1000 : null;

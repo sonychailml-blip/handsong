@@ -21,12 +21,19 @@ import { scaleById, scaleView } from '../../core/scales.js';   // NIGHT-7c: the 
 import { profileOf } from '../../core/profile.js';
 import { fsBegin, fsStarted, fsToggle, fsOn, fsOnChange, fsCanToggle } from './fullscreen.js';   // NIGHT-7c: full screen (NIGHT-8b: never while the camera is undecided)
 import { devItems } from './edition.js';   // NIGHT-7b: the release edition (a players' build, or ?release) hides the development items
-import { calWire, calOfferIfNew, calActive, calSideApply, calSideSet, calSettingsRender, calAbort } from './calib.js';   // NIGHT-2: the hand's calibration (its picture is drawn by the loop: main.js afterDraw)
-import { setSceneLevel, sceneLevel, setBackground, backgroundOf, sceneInfo, sceneRoom, sceneRooms, sceneOptDbg } from './scene/host.js';   // RUN 8 (slice 4): the scene's quality (development switch); C8 the measurement
+import { calWire, calOfferIfNew, calActive, calSideApply, calSideSet, calSettingsRender, calAbort, calDueNow, calOffered, calStep } from './calib.js';   // NIGHT-2: the hand's calibration (its picture is drawn by the loop: main.js afterDraw)
+import { setSceneLevel, sceneLevel, setBackground, backgroundOf, sceneInfo, sceneRoom, sceneRooms, sceneOptDbg, sceneStartNote } from './scene/host.js';   // RUN 8 (slice 4): the scene's quality (development switch); C8 the measurement
 import { roomSwitch, roomNext, natureLight } from './roomswitch.js';   // NIGHT-3 stage 5 part 2: the Room button
 import { latReport } from '../../core/legacy-ui/latmeter.js';   // C8: the device measurement reads the latency meter
-import { cardsWire, cardsShow, cardsOpen, cardsDue, cardsDone } from './cards.js';   // NIGHT-7: the first cards
+import { cardsWire, cardsShow, cardsOpen, cardsDue, cardsDone, cardsEnvNow } from './cards.js';   // NIGHT-7: the first cards
 import { camWire, camRender } from './camera.js';   // NIGHT-10: Settings → Camera
+import { lifeStart } from './lifecycle.js';   // NIGHT-11 part 1: the sound, the screen and the camera after the phone looks away
+import { noticeWire } from './notice.js';   // NIGHT-11: the one notice line
+import { START_OLD, FLOW_OLD } from './start.js';   // NIGHT-11 part 3: the start-timeline row's CONTROL; part 4: the order row's
+import { coachBegin, coachTick, coachWire, coachShown } from './coach.js';   // NIGHT-11 part 4: play first, teach inside
+import { homeHintFor } from './pure/homehint.js';
+import { scenePausing } from './scene/host.js';
+import { noticeOf, noticeShow, noticeHide } from './notice.js';
 
 const $=id=>document.getElementById(id), READ=BUS.reader();
 /* NIGHT-1 stage 2: what this app never plays leaves the graph (the sound stays the same to rounding; row «NIGHT lean path»). Its chain has no drive, brightness or tremolo; its one role is solo */
@@ -48,6 +55,8 @@ let begun=false, firstRun=false, startDue=false, defHand='right';   // NIGHT-2: 
 const room=()=>(roomById(sceneRoom())||ROOMS[0]).record, nature=()=>room().nature;
 const roomSound=()=>{ const v=parseFloat(load(KEY.roomSound)); return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : nature().level; };
 /* NIGHT-4: a weak device (≤ 2 GB or ≤ 2 cores, as the browser reports) gets the music bed's lighter variant whatever the setting */
+/* NIGHT-11 part 5: a small touch screen (a phone) — Detailed gets a short note there */
+const SMALL_TOUCH=(()=>{ try{ return matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height)<=820; }catch(e){ return false; } })();
 const WEAK=!!((navigator.deviceMemory && navigator.deviceMemory<=2) || (navigator.hardwareConcurrency && navigator.hardwareConcurrency<=2));
 export const REACH=1;   // the hand's reach in the room (Forest depth's `reach`): always the whole range, whatever the calibration and settings (user, NIGHT-5)
 
@@ -72,9 +81,10 @@ export function nightShellFace(p){
   setLeanPath(on ? LEAN_PATH : null);
   setVolFloor(on && p.volume ? p.volume.left : null);
   defHand= p && p.handFn && p.handFn.ld && p.handFn.ld.R==='fx' ? 'left' : 'right';
-  if(on){ calSideApply(); if(begun){ begun=false; startDue=true; } }   // NIGHT-2: a calibrated side sets the roles; the offer follows a person's own Begin
+  if(on){ calSideApply(); coachBegin(); if(begun){ begun=false; startDue=true; } }   // NIGHT-11 part 4: the coaching line runs once the app does   // NIGHT-2: a calibrated side sets the roles; the offer follows a person's own Begin
   else calAbort();   // RUN 8: Night's gentler left-to-right volume (Full: its own curve)   // RUN 8: Night's strike caps and cheaper strikes (Full: RUN 7's strike exactly)
-  if(on){ reachSet(REACH); lightApply(load(KEY.light)==='1', true); }   // the hand's reach: the whole range (NIGHT-5); C8 the person's «Lighter forest»
+  if(on){ reachSet(REACH); lightApply(load(KEY.light)==='1', true); lifeStart();
+    if(sceneStartNote()==='detailed-crash'){ noticeShow('info', 'night.q.crashNote', ()=>noticeHide('info')); setTimeout(()=>noticeHide('info'), 9000); } }   // NIGHT-11 part 5: said once   // NIGHT-11: once the app runs   // the hand's reach: the whole range (NIGHT-5); C8 the person's «Lighter forest»
   else setLowPower(false);
   if(on){ st=null; render(); if(!raf) raf=requestAnimationFrame(tick); }
   else { if(raf) cancelAnimationFrame(raf); raf=0; infoShow(false); sleepSet(0); }
@@ -100,6 +110,7 @@ function render(){
   calSettingsRender();
   $('nightSceneTg').hidden=!devItems(); $('nightSceneTg').textContent=t('night.scene', { lvl:t('night.scene.'+sceneLevel()) });
   for(const b of $('nightQualSeg').children) b.classList.toggle('on', b.dataset.q===sceneLevel());   // NIGHT-7: the players' picture choice
+  $('nightQualNote').hidden=!SMALL_TOUCH;   // NIGHT-11 part 5: Detailed stays offered (a phone may drive a TV); a note on small touch screens
   $('nightRoomSoundRow').hidden= !amb; $('nightRoomSound').value=String(roomSound());
   { const ic=$('nightRoomSoundRow').querySelector('.night-vico'), name=room().icon||'forest';   // NIGHT-8: the room gives its own Room-sounds icon (the forest keeps the leaf)
     if(ic && ic.dataset.svg!==name){ const g=svgIcon(document, name); if(g){ ic.dataset.svg=name; ic.replaceChildren(g); } } }
@@ -139,7 +150,7 @@ function wire(){
   /* NIGHT-7: the picture's quality (Detailed ends the Lightweight mode, which keeps the picture standard); the first cards again */
   for(const b of $('nightQualSeg').children) b.onclick=()=>{ const q=b.dataset.q; if(q==='full' && load(KEY.light)==='1'){ save(KEY.light, '0'); lightApply(false, false); } setSceneLevel(q).then(()=>render()); render(); };
   $('nightHowTo').onclick=()=>{ infoShow(false); cardsShow(); };
-  cardsWire();
+  cardsWire(); noticeWire(); coachWire();
   /* NIGHT-2: the background and the hand's points in settings (fingertips only, the default, or all points) */
   for(const b of $('nightBgSeg').children) b.onclick=()=>{ if(!D) return; D.setBg(b.dataset.bg); render(); };
   for(const b of $('nightHandSeg').children) b.onclick=()=>{ if(!D) return; calSideSet(b.dataset.hand); render(); };   // saved: the last choice wins
@@ -154,6 +165,7 @@ function tick(now){
   st=showStep(st, n, now);
   $('nightShell').classList.toggle('show', st.shown && !info && !asleep && !calActive() && !cardsOpen());
   if(startDue){ startDue=false; startFlow(); }
+  coachNow(now);   // NIGHT-11 part 4
   if(amb){ ambienceRetune(); ambienceTick(); }   // the drone follows the mood; the crickets are scheduled ahead
   bedTick();   // NIGHT-3 stage 4: the music bed's next events, ahead on the audio clock
   if(AC) BUS.set('audioClock', clockNow());   // NIGHT-6 slice 1: the room shows the bed's events when they are heard
@@ -172,12 +184,27 @@ function tick(now){
    them), Begin, the privacy line. «Begin» runs the very same start handler as Play, inside this click (rule #1). Only a person's own tap leads
    to the first cards (never a profile switch — the probes switch). */
 document.body.classList.add('night-boot');   // NIGHT-8b: the page's markup carries it already (the first paint is Night's); kept for a page without it
-$('nightBegin').onclick=()=>{ const go=$('startBtn').onclick; begun=true; firstRun=cardsDue(STORE); audioSessionPlayback(); if(go) go(); fsBegin(); musicEarly(); };   // NIGHT-7c: the audio context first (rule #1), then full screen (only with the camera already granted — NIGHT-8b), then the music
+$('nightBegin').onclick=()=>{ const go=$('startBtn').onclick; begun=true; firstRun=cardsDue(STORE); audioSessionPlayback(); if(go) go(); fsBegin(); musicEarly(); if(!START_OLD) forestEarly(); };   // NIGHT-11 part 3: the forest begins opening in the tap
+/* NIGHT-11 part 3: the room the face will show begins opening now, so its first (cold) shader compile overlaps the model and the camera prompt; the
+   choice read as ui.js reads it (this device's, else the profile's first); the face's own call finds it opening and leaves it */
+function forestEarly(){ const P=profileOf('profile.night'), B=P && P.backgrounds; if(!B) return; let st=null; try{ st=localStorage.getItem('handsong.nightBg'); }catch(e){}
+  if((B.includes(st) ? st : B[0])==='forest') setBackground('forest'); }   // NIGHT-7c: the audio context first (rule #1), then full screen (only with the camera already granted — NIGHT-8b), then the music
 /* NIGHT-2: once the camera runs after a Begin: the calibration offer for a camera not offered yet, then the first cards when due. NIGHT-7b: the
    cards alone — the old ghost hand is gone; they count as seen only once they close (finished or skipped) */
-function startFlow(){ const first=firstRun; firstRun=false;
+/* NIGHT-11 part 4: PLAY FIRST — after Begin nothing is asked and no card shows; the coaching line leads to the first note (coach.js). ?probe&oldflow keeps
+   the old order (the calibration offer, then the cards) — the order row's CONTROL */
+function startFlow(){ const first=firstRun; firstRun=false; if(!FLOW_OLD) return;
   const then=()=>{ if(first) cardsShow(()=>{ cardsDone(STORE); }); };   // NIGHT-8b: full screen needs no end of the flow (the next tap after the camera asks while it is wished)
   if(!calOfferIfNew(then)) then(); }
+/* NIGHT-11 part 4: the coaching line's inputs once a frame — ready while the room shows and nothing else is on screen; paused while detection is;
+   the calibration offer due on this camera (read at most once a second); the home-screen hint on iPhone Safari outside the home-screen app */
+let calDueC={ t:-1e9, v:false }; const homeDue=homeHintFor(cardsEnvNow());
+function coachNow(now){
+  if(now-calDueC.t>1000) calDueC={ t:now, v:FLOW_OLD ? false : calDueNow() };
+  const paused=scenePausing() || calActive();
+  const ready=!info && !asleep && !paused && !cardsOpen() && !noticeOf() && !document.body.classList.contains('dark-on') && !FLOW_OLD;
+  coachTick(now, { ready, paused, calDue:calDueC.v, homeDue }, yes=>{ calOffered(); calDueC.t=-1e9; if(yes){ infoShow(false); calStep(()=>{}); } });
+}
 /* NIGHT-7c: THE MUSIC FROM THE TAP ON BEGIN — once the engine's master exists and the context runs (the camera, its prompt and the hand model
    still on their way), the bed starts in the Night profile's own view with its own fade-in (the level rises over about 3 s, the ground over 2.5 s);
    this little loop drives it until the face's tick takes over. */
@@ -220,7 +247,7 @@ function bars(now, hv, fxv){
   F.classList.toggle('on', !!play); if(play) place(F, sideOf('play', play.x, W));
   X.classList.toggle('on', !!fx);
   if(fx){ let sd=sideOf('fx', fx.x, W); if(play && sd===SIDE.play) sd= SIDE.play==='left' ? 'right' : 'left'; place(X, sd);
-    if(load(KEY.fxHint)!=='1' && !hintT){ save(KEY.fxHint,'1'); $('nightFxHint').hidden=false; hintT=setTimeout(()=>{ $('nightFxHint').hidden=true; hintT=0; }, 7000); } }
+  }   // NIGHT-11 part 4: the effects hand's hint is the coaching line's now
   const vals={ echo:fxv.echo, tone:fxv.tone, wave:fxv.wave };
   for(const id of FXB){ const b=X.querySelector(`[data-bar="${id}"]`); fill(b, vals[id]); b.classList.toggle('act', !!fx && fx.finger===FXB.indexOf(id)); }
   fb.classList.toggle('act', !!play && play.pinch);
@@ -263,10 +290,12 @@ async function measure(){
     for(let s=0;s<steps.length;s++){ out.textContent=t('night.measuring', { n:s+1, m:steps.length }); await steps[s][1](); await wait(3000);
       const r0=latReport(), u0=pb(), d0=r0.camera.framesDetected, t0=performance.now(); await wait(SEC*1000);
       const r=latReport(), sec=(performance.now()-t0)/1000, sc=sceneInfo();
+      const G=sc.guard||{};
       rows.push(`${steps[s][0]}: dropouts ${Number.isFinite(u0) ? Math.round((pb()-u0)*60/sec) : '—'}/min · detection ${((r.camera.framesDetected-d0)/sec).toFixed(1)}/s, ${r.stages.detect.mean} ms · camera ${r.camera.fps} fps · picture ${sc.webgl ? sc.fps+' fps' : 'no WebGL'}`
-        +(sc.webgl ? ` · frame ${sc.frameMs} ms, draws ${sc.calls}, triangles ${sc.triangles}, programs ${sc.programs}, textures ${(sc.texBytes/1048576).toFixed(1)} MB` : '')); }
+        +(sc.webgl ? ` · frame ${sc.frameMs} ms, draws ${sc.calls}, triangles ${sc.triangles}, programs ${sc.programs}, textures ${(sc.texBytes/1048576).toFixed(1)} MB, picture ${G.buffer ? G.buffer.join('×') : '—'} (guard step ${G.step}/${G.steps})` : ''));   /* NIGHT-11 part 5: the buffer and the guard */ }
     const O=sceneInfo().openings, op=o=>`${o.level==='full' ? 'high' : 'medium'} ${o.ms} ms (${o.programs} programs)`;
     const text=['Handsong Night — device measurement', navigator.userAgent, (latReport().gpu||{}).renderer||'', ...rows,
+      (G=>`resolution guard: ${G.steps} step(s) on this screen at the level now; lowered ${G.downs} time(s), raised ${G.ups}; picture ${G.buffer ? G.buffer.join('×') : '—'}`)(sceneInfo().guard||{}),   // NIGHT-11 part 5
       O.length ? `openings: first ${op(O[0])}; later ${O.slice(1).map(op).join(', ')||'none'}` : 'openings: none',
       `device: ${navigator.deviceMemory||'?'} GB, ${navigator.hardwareConcurrency||'?'} cores, ${devicePixelRatio} device px per CSS px, screen ${screen.width}×${screen.height}`].join('\n');
     out.textContent=t('night.measured')+'\n'+text; try{ await navigator.clipboard.writeText(text); }catch(e){}
@@ -287,6 +316,6 @@ export const nightShellDbg=()=>{ const F=$('nightForestBar'), X=$('nightFxBars')
   return { on, shown:!!(st && st.shown), info, sleep:{ ...sleep }, asleep, fade:lastFade,
     bars:{ forest:{ on:F.classList.contains('on'), side:F.classList.contains('left')?'left':'right', ...bar(F.querySelector('.night-bar')) },
       fx:{ on:X.classList.contains('on'), side:X.classList.contains('left')?'left':'right', bars:Object.fromEntries(FXB.map(id=>[id, bar(X.querySelector(`[data-bar="${id}"]`))])) } },
-    hint:!$('nightFxHint').hidden }; };
+    hint:coachShown()==='fx' }; };   // NIGHT-11: the effects hint is a coaching line
 /* probe only: a sleep timer of `mins` minutes started `ago` ms ago (the fade without waiting minutes) */
 export const nightSleepDbg=(mins, ago)=>{ sleepSet(mins); sleep.t0=performance.now()-ago; };

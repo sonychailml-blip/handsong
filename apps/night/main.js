@@ -12,6 +12,8 @@ import { ROOMS } from './rooms/index.js';
 import { soundModAdd } from '../../core/soundmods.js';
 import { natureModule, roomRestore } from './roomswitch.js';
 import { camRestore } from './camera.js';   // NIGHT-10: the camera kept on this device
+import { startWire, startFailText, startSay, START_OLD } from './start.js';
+import { fsCamera } from './fullscreen.js';   // NIGHT-11 part 3: full screen when the camera runs, while the Begin tap still counts   // NIGHT-11 part 2: the start's own words
 
 for(const R of ROOMS) sceneRoomAdd(R.record.id, { load:R.load, standIn:R.standIn, three:()=>import('./vendor/three-r128/three.min.js') });   // NIGHT-3: the rooms, by id
 roomRestore();   // NIGHT-3 stage 5 part 2: the room remembered on this device, before the first picture
@@ -26,5 +28,11 @@ hooks.scene={ set:setBackground, of:backgroundOf, info:sceneInfo };   // CORE-8:
   if(why) console.warn('[night] the ambience was not registered:', why); }   // eslint-disable-line no-console
 nightShellWire(shellDoors()); setFaceHook(nightShellFace);
 /* afterDraw: the calibration's picture is drawn in the loop, while the camera snapshot is still open (NIGHT-2 stage 3) */
+const Q=new URLSearchParams(location.search), probeQ=Q.has('probe');
 boot({ profile:'profile.night', afterDraw:()=>calTick(),
-  detectPause:scenePausing });   // CORE-12: no camera frame is taken while a room builds (NIGHT-3 stage 5 part 2)
+  detectPause:scenePausing,   // CORE-12: no camera frame is taken while a room builds (NIGHT-3 stage 5 part 2)
+  failText:startFailText, startSay, modelStallMs:probeQ && +Q.get('modelstall') || 0,
+  parallel:!START_OLD, earlyModel:!START_OLD, onCamera:fsCamera });   // CORE-19: the camera beside the model, the model before the tap   // CORE-18: Night's start words; ?probe&modelstall=MS the runner's short stall
+startWire();
+/* NIGHT-11 part 2: Begin works from here — the loading look goes (apps/night/guard.js) */
+if(window.__nightBoot) window.__nightBoot.ready();

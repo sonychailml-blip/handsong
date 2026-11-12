@@ -92,6 +92,12 @@ body.night-plain .night-glass{ background:var(--night-glass-plain); -webkit-back
 .night-roomname{ position:absolute; top:42%; left:0; right:0; margin:0; text-align:center; pointer-events:none; color:var(--night-ink); font-family:var(--night-font-display);
   font-weight:var(--night-fw-light); font-size:var(--night-fs-title); letter-spacing:var(--night-track-wide); opacity:0; transition:opacity var(--night-name-fade) var(--night-ease); }
 .night-roomname.on{ opacity:1; }
+/* NIGHT-11: the notice line (apps/night/notice.js) — in the middle, above everything else of the shell; while it shows, the other lines give way */
+#nightShell .night-notice{ position:absolute; left:50%; top:42%; transform:translate(-50%,-50%); width:min(520px, calc(100vw - 4 * var(--night-edge))); margin:0;
+  padding:var(--night-pad); border-radius:var(--night-r-card); border:1px solid var(--night-hair); text-align:center; color:var(--night-ink); font-size:var(--night-fs-body); line-height:var(--night-lh);
+  pointer-events:auto; cursor:pointer; box-shadow:var(--night-shadow); }
+#nightShell .night-notice[hidden]{ display:none; }
+body.night-notice-on .night-idle, body.night-notice-on .night-hint, body.night-notice-on .night-coach{ visibility:hidden; }
 .night-rb{ display:flex !important; flex-direction:column; align-items:center; gap:var(--night-gap-sm); min-width:0; }
 .night-circ{ width:var(--night-btn); height:var(--night-btn); border-radius:var(--night-r-pill); display:flex; align-items:center; justify-content:center;
   background:var(--night-fill); border:1px solid var(--night-hair); transition:border-color var(--night-fade), box-shadow var(--night-fade), color var(--night-fade); }
@@ -159,7 +165,15 @@ body.night-plain .night-card{ -webkit-backdrop-filter:none; backdrop-filter:none
   padding:var(--night-gap) var(--night-pad); border-radius:var(--night-r-card); text-align:center; color:var(--night-ink); font-size:var(--night-fs-value); line-height:var(--night-lh); }
 .night-hint[hidden]{ display:none; }
 /* one message at a time: while the low-light message shows (latmeter.js sets body.dark-on) the Night lines at the top give way */
-body.dark-on .night-idle, body.dark-on .night-hint{ visibility:hidden; }
+body.dark-on .night-idle, body.dark-on .night-hint, body.dark-on .night-coach{ visibility:hidden; }
+/* NIGHT-11 part 4: the coaching line, where the idle line sits (centred); while it shows the idle line gives way — one message at a time */
+#nightShell .night-coach{ position:absolute; left:50%; top:12%; transform:translateX(-50%); width:max-content; max-width:min(560px, calc(100vw - 4 * var(--night-edge))); margin:0;
+  padding:var(--night-gap) var(--night-pad); border-radius:var(--night-r-card); border:1px solid var(--night-hair); text-align:center; color:var(--night-ink); font-size:var(--night-fs-value); line-height:var(--night-lh); pointer-events:none; }
+#nightShell .night-coach.night-coach-ask{ pointer-events:auto; }
+#nightShell .night-coach[hidden], #nightShell .night-coach [hidden]{ display:none; }
+.night-coach p{ margin:0; }
+.night-coach .night-btns{ margin-top:var(--night-gap); justify-content:center; }
+body.night-coach-on .night-idle{ visibility:hidden; }
 /* NIGHT-2: THE SETTINGS CARD — sections Hand and View, two named sliders without numbers, segments, and the about lines at the bottom */
 .night-set-title{ font-family:var(--night-font-display); font-weight:var(--night-fw-light); font-size:calc(var(--night-fs-body) * 1.5); line-height:var(--night-lh-tight); color:var(--night-ink); }
 .night-sec{ min-width:0; }
@@ -211,7 +225,8 @@ body.night-cal #darkHint{ display:none !important; }
     margin:0; }
   .night-ibtn{ right:auto; left:max(var(--night-edge), env(safe-area-inset-left)); }
   .night-ibtn.night-fsbtn{ left:auto; right:max(var(--night-edge), env(safe-area-inset-right)); }
-  .night-idle{ top:8%; right:calc(36vw + 28px); }
+  .night-idle{ top:8%; }   /* NIGHT-11 part 4: centred (it sat off-centre, across the moon) */
+  #nightShell .night-coach{ top:8%; }
   .night-hint{ top:auto; bottom:max(var(--night-edge), env(safe-area-inset-bottom)); }   /* RUN 8: below the bars (a short screen) */
   .night-bars{ --night-bar-h:min(24vh, 200px); }
   .night-card{ width:min(760px, calc(100vw - 28px)); display:grid; grid-template-columns:1fr 1fr; column-gap:var(--night-pad-lg); align-content:start; }
@@ -250,9 +265,17 @@ body.night-boot #start .startLang [data-icon]{ display:none; }
 body.night-boot #langSel{ background:var(--night-fill); color:var(--night-ink); border:1px solid var(--night-hair); }
 
 /* NIGHT-7: the start screen's privacy line; the first cards (their pictures: our own line drawings, apps/night/cards.js) */
+/* NIGHT-11 part 2: Begin reads as loading until it really works (apps/night/guard.js removes the class); the start's messages; a hidden Night-only item stays hidden */
+body.night-loading #nightBegin{ opacity:.5; pointer-events:none; cursor:progress; }
+body.night-boot .night-only[hidden]{ display:none !important; }
+.night-boot-msg{ margin:var(--night-gap) 0 0; color:var(--night-ink); font-size:var(--night-fs-value); line-height:var(--night-lh); text-align:center; }
+.night-boot-msg .night-lnk{ margin:0 0 0 var(--night-gap-sm); }
+.night-inapp{ margin:var(--night-gap) 0; padding:var(--night-gap); border:1px solid var(--night-hair); border-radius:var(--night-r-card); text-align:left; }
+.night-inapp p{ margin:0 0 var(--night-gap-sm); color:var(--night-ink); font-size:var(--night-fs-value); line-height:var(--night-lh); }
+.night-inapp-url{ display:block; width:100%; box-sizing:border-box; margin:0 0 var(--night-gap-sm); padding:var(--night-gap-sm); border:1px solid var(--night-hair); border-radius:var(--night-r-pill); background:var(--night-fill); color:var(--night-ink); font-size:var(--night-fs-small); }
+.night-inapp-copy{ width:100%; min-height:44px; border:1px solid var(--night-hair); border-radius:var(--night-r-pill); background:var(--night-fill); color:var(--night-ink); font-size:var(--night-fs-value); }
 .night-privacy-line{ margin:var(--night-gap) 0 0; color:var(--night-dim); font-size:var(--night-fs-small); text-align:center; }
 .night-card.night-cards{ display:block; width:min(460px, calc(100vw - 28px)); }
-body.night-cards-open #nightFxHint{ display:none !important; }   /* the effects hand's hint waits while the cards show */
 .night-card-pic{ display:flex; justify-content:center; margin:0 0 var(--night-gap); color:var(--night-ink); }
 .night-pic{ width:100%; max-width:340px; height:auto; overflow:visible; }
 .night-cards-foot{ display:flex; align-items:center; justify-content:space-between; gap:var(--night-gap); margin-top:var(--night-gap); }

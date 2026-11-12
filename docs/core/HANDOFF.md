@@ -27,6 +27,9 @@ Index: `/HANDOFF.md`. Rules: `CLAUDE.md`; on demand (DOC2): module map `docs/cor
 - ✅ **CORE-14** (2026-11-11): six Night keys left `core/i18n.js` (three deleted, three reworded into `apps/night/texts.js`). For NIGHT-7b.
 - ✅ **CORE-12** (2026-11-09): boot option `detectPause` (an app's pause joins the editor's; absent = as before); Night's texts «Облегчённый режим», «Картинка комнаты», the Room button. For NIGHT-3 stage 5 part 2.
 - ✅ **CORE-11** (2026-11-09): the page's storage namespace (`core/storens.js`, opt-in by a page `<meta>`; Full: every name as before); boot runs no autosave and no offer for a profile that records nothing; Night's text «Глубина». For NIGHT-5.
+- ✅ **CORE-17** (2026-11-12): `core/vision.js` opt-in camera watch (`cameraWatch`, `cameraWatchRetry`): a track that ends or stays muted is reopened once, then the app is told. For NIGHT-11.
+- ✅ **CORE-18** (2026-11-12): opt-in start words and the model's progress: boot `failText`, `startSay`, `modelStallMs`; `initDetector(msg, { say, stallMs })`; `handdet.js` streams the model with a stall timeout; a camera refusal carries `gumMs`. For NIGHT-11.
+- ✅ **CORE-19** (2026-11-12): opt-in parallel start: boot `parallel` (camera beside the model in the tap), `earlyModel` (the model before the tap, not with Save-Data), `onCamera`. For NIGHT-11. Full sets none of the three runs' options (FULL untouched 0).
 - 74 modes, 18 tunings. Target: phone, portrait. Branch `dev`, main `main`.
 
 ## The foundation (full plan and contracts: `archive/HANDOFF-history.md`, «STAGE 3 — FOUNDATION PLAN»)

@@ -54,6 +54,7 @@ THERE in full and here as one index entry):
   148 Real ground and real water: relief, soil colour, the scanned floor against the baked one, occlusion; the water's reflection, clarity, flow and edge (NIGHT-9)
   149 Choosing the camera: Front / Back on a phone, a USB webcam on a computer, live switch, not mirrored at the back, kept per device (NIGHT-10, CORE-16)
   150 Every trunk its own bark, moss and lichen: no repeated oval blotches, natural patches, the merged wood too (NIGHT-8c)
+  151 Ready for the first testers: play first, the phone's lifecycle, the honest start, messengers' browsers, the sharp phone picture (NIGHT-11)
 
 ## Moved to `archive/CLAUDE-history.md` at DOC1 (grep by title; read only what the slice needs)
 - «Module map (full, moved at DOC1)» — every module's detailed paragraph (AUD1a … IDS1, SONG1, AUTOSAVE1, PACK1 …).

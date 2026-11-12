@@ -119,8 +119,40 @@ const stage={ audio:false, det:false };
 function startFail(err){
   const btn=$('startBtn'), learn=$('learnBtn'), retry=$('camRetry'), kind=err&&err.camKind;
   btn.disabled=false; if(learn) learn.disabled=false; $('start').classList.remove('busy');
-  $('loadmsg').textContent= kind&&kind!=='other' ? t('cam.'+kind) : t('load.error',{msg:(err&&err.message?err.message:err)});
+  const own=OPT.failText ? OPT.failText(err) : null;   // CORE-18 (opt-in): the app's own words for a failed start
+  $('loadmsg').textContent= own || (kind&&kind!=='other' ? t('cam.'+kind) : t('load.error',{msg:(err&&err.message?err.message:err)}));
   if(retry) retry.hidden=false;
+}
+/* CORE-19 (opt-in; NIGHT-11 part 3, audit P1) — THE START IN PARALLEL. opt.parallel: in the tap the audio context is made first (rule #1, the
+   synchronous part), then the camera request and the hand model run TOGETHER (the permission prompt appears at once, while the model loads);
+   opt.earlyModel: the model starts before the tap, when the page has loaded (not with Save-Data on). The first failure ends the start with its
+   message as before; the other half goes on and a retry reuses it. opt.onCamera() once the camera runs (both paths). Without the options: the old
+   staged order, untouched. */
+let detP=null, detShow=null, detLast='';
+function detStart(){
+  if(stage.det) return Promise.resolve();
+  if(detP) return detP;
+  const show=s=>{ detLast=s; if(detShow) detShow(s); };
+  const p= OPT.startSay ? initDetector(show, { say:(k,f)=>show(OPT.startSay(k,f)||t(k)), stallMs:OPT.modelStallMs }) : initDetector(show);
+  detP=p.then(()=>{ stage.det=true; detP=null; }, e=>{ detP=null; throw e; });
+  return detP;
+}
+function earlyDetector(){
+  try{ const c=navigator.connection; if(c && c.saveData) return false; }catch(e){}
+  detStart().catch(e=>console.warn('[start] the hand model failed before the tap — the tap tries again:', e));
+  return true;
+}
+async function startParallel(msg){
+  const audioP= stage.audio ? null : initAudio();   // rule #1: the context is created in this click's synchronous part
+  const det=detStart(); detShow=msg; if(detLast) msg(detLast);
+  let camDone=false, over=false;   // over: this start has ended (a failure's message is never overwritten by the half still running)
+  const camP=startCamera().then(()=>{ camDone=true; if(OPT.onCamera) OPT.onCamera(); });
+  det.catch(()=>{}); camP.catch(()=>{});
+  try{
+    if(audioP){ await audioP; stage.audio=true; }
+    await AC.resume();
+    await Promise.all([ det.then(()=>{ detShow=null; if(!camDone && !over) msg(OPT.startSay && OPT.startSay('load.camera') || t('load.camera')); }), camP ]);
+  } finally { detShow=null; over=true; }
 }
 async function startApp(){
   if(started) return true;
@@ -130,11 +162,16 @@ async function startApp(){
   btn.disabled=true; if(learn) learn.disabled=true; if(retry) retry.hidden=true;
   const card=$('start'); card.classList.add('busy');   // LAT2: the start card shows that it is loading (a pulse on the message line)
   try{
+    if(OPT.parallel) await startParallel(msg);   // CORE-19 (opt-in): the camera beside the model
+    else {
     if(!stage.audio){ await initAudio(); stage.audio=true; }   // rule #1: the context is created in this click's synchronous part (first press only)
     await AC.resume();
-    if(!stage.det){ await initDetector(msg); stage.det=true; }
-    msg(t('load.camera'));
+    const say=OPT.startSay ? (k,f)=>msg(OPT.startSay(k,f)||t(k)) : null;   // CORE-18 (opt-in): the app's own loading words, the model's progress
+    if(!stage.det){ if(say) await initDetector(msg, { say, stallMs:OPT.modelStallMs }); else await initDetector(msg); stage.det=true; }
+    if(say) say('load.camera'); else msg(t('load.camera'));
     await startCamera();                     // 0b: one getUserMedia, one retry after ~1 s, tracks released on failure
+    if(OPT.onCamera) OPT.onCamera();
+    }
     try{await navigator.wakeLock.request('screen');}catch(e){}
     card.classList.remove('busy','on');
     $('bar').classList.add('on');
@@ -152,10 +189,11 @@ async function startApp(){
     return false;
   }finally{ starting=false; }
 }
-/* SPLIT-2: an app's entry calls this once. opt: profile (the id to open in), frameFilter (res, t) → res, afterDraw (t) once per play-screen frame (CORE-6), detectPause () → true while no camera frame may be taken (CORE-12). Returns startApp for the entry's own buttons (still inside their click: rule #1).
+/* SPLIT-2: an app's entry calls this once. CORE-19: parallel, earlyModel, onCamera (above). CORE-18: failText (err) → the app's words for a failed start or null; startSay (key, frac) → its loading words or null (with the model's progress); modelStallMs. opt: profile (the id to open in), frameFilter (res, t) → res, afterDraw (t) once per play-screen frame (CORE-6), detectPause () → true while no camera frame may be taken (CORE-12). Returns startApp for the entry's own buttons (still inside their click: rule #1).
    ?probe loads what the page declares in <link rel="handsong-probes">: without the flag, or without the tag (a shipped page), nothing is loaded. */
 export function boot(opt={}){
-  OPT=opt; setHandsSink(onHands, opt.detectPause ? ()=>studio() || !!opt.detectPause() : studio);   // CORE-12: an app's pause joins the editor's (absent: the editor's alone)
+  OPT=opt; if(opt.parallel && opt.earlyModel) setTimeout(earlyDetector, 0);   // CORE-19: the model before the tap
+  setHandsSink(onHands, opt.detectPause ? ()=>studio() || !!opt.detectPause() : studio);   // CORE-12: an app's pause joins the editor's (absent: the editor's alone)
   if(new URLSearchParams(location.search).has('probe')){ const l=document.querySelector('link[rel="handsong-probes"]');
     if(l) import(l.href).then(m=>m.install()).catch(e=>console.warn('[probe] the probes failed to load', e)); }
   $('startBtn').onclick=()=>{ startApp().then(ok=>{ if(ok && keepsSongs()) songResumeOffer(); }); };   // AUTOSAVE1: «Continue where you left off?» (Play only, not a lesson)

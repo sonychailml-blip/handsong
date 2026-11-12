@@ -22,10 +22,28 @@ export const EMPTY_RESULT=Object.freeze({ landmarks:[], handednesses:[] });
 /* build both models (sequentially: MediaPipe's loader keeps one global while it starts a model) and warm each on a blank frame.
    `blank` makes the warm-up frame (OffscreenCanvas). Runs on the main thread or in a CLASSIC worker (MediaPipe loads its WebAssembly
    loader with a script tag or importScripts; in a module worker the second model could not start). */
-export async function createDetector({ delegate='GPU', blank=null, step=null }={}){
+/* CORE-18 (opt-in; NIGHT-11 part 2, audit W9): the model file with its progress (progress(frac 0…1, or NaN without a known size, bytes)) and a stall
+   timeout — no byte for stallMs fails it (an Error with modelKind 'stall' | 'net', for the app's words and «Try again») */
+async function modelFetch(progress, stallMs){
+  const ac=typeof AbortController!=='undefined' ? new AbortController() : null; let tm=0;
+  const arm=()=>{ clearTimeout(tm); if(ac && stallMs>0) tm=setTimeout(()=>ac.abort(), stallMs); };
+  arm();
+  try{
+    const r=await fetch(MP_MODEL, ac ? { signal:ac.signal } : {}); if(!r.ok) throw new Error('the hand model answered '+r.status);
+    const total=+(r.headers.get('content-length')||0);
+    if(!r.body || !r.body.getReader){ const b=new Uint8Array(await r.arrayBuffer()); progress(1, b.length); return b; }
+    const rd=r.body.getReader(), parts=[]; let got=0;
+    for(;;){ const { done, value }=await rd.read(); if(done) break; parts.push(value); got+=value.length; arm(); progress(total>0 ? Math.min(1, got/total) : NaN, got); }
+    const out=new Uint8Array(got); let o=0; for(const p of parts){ out.set(p, o); o+=p.length; } progress(1, got); return out;
+  }catch(e){
+    if(ac && ac.signal.aborted) throw Object.assign(new Error(`the hand model stopped arriving (nothing for ${Math.round(stallMs/1000)} s)`), { name:'TimeoutError', modelKind:'stall' });
+    throw Object.assign(e instanceof Error ? e : new Error(String(e)), { modelKind:'net' });
+  } finally { clearTimeout(tm); }
+}
+export async function createDetector({ delegate='GPU', blank=null, step=null, progress=null, stallMs=0 }={}){
   const files=await FilesetResolver.forVisionTasks(MP_WASM);
   if(step) await step('model');
-  const buf=new Uint8Array(await (await fetch(MP_MODEL)).arrayBuffer());   // the model file once, for both models
+  const buf= progress ? await modelFetch(progress, stallMs) : new Uint8Array(await (await fetch(MP_MODEL)).arrayBuffer());   // the model file once, for both models (CORE-18: with its progress when asked)
   const mk=n=>HandLandmarker.createFromOptions(files,{ baseOptions:{ modelAssetBuffer:buf.slice(), delegate },
     runningMode:'VIDEO', numHands:n, minHandDetectionConfidence:0.5, minTrackingConfidence:0.5 });
   const L2=await mk(2), L1=await mk(1);

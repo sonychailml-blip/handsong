@@ -13,7 +13,7 @@ export const fsOn=()=>!!(D.fullscreenElement || D.webkitFullscreenElement);
 export const fsStandalone=()=>{ try{ return navigator.standalone===true || matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches; }catch(e){ return false; } };
 export const FS_RETRIES=2;   // asks after the Begin tap's own, per Begin
 let want=false, started=false, camRan=false, retries=0, asking=null, onChange=null, cam='unknown', askAlways=false;
-const S={ asked:0, granted:0, refused:0, exits:0, retried:0, deferred:0, undecided:0, locked:null };
+const S={ asked:0, granted:0, refused:0, exits:0, retried:0, deferred:0, undecided:0, locked:null, atCamera:0 };
 /* the camera permission as the browser reports it: 'granted' | 'prompt' | 'denied' | 'unknown' (no query for the camera) */
 try{ const q=navigator.permissions && navigator.permissions.query({ name:'camera' });
   if(q) q.then(p=>{ cam=p.state; p.addEventListener('change', ()=>{ cam=p.state; }); }, ()=>{}); }catch(e){}
@@ -41,6 +41,9 @@ function tapped(){ if(want && started && !fsOn() && !asking && retries<FS_RETRIE
 D.addEventListener('click', tapped, true);
 /* the doors the shell uses */
 export function fsBegin(){ want=true; started=false; retries=0; if(camOk() || askAlways) return ask(); S.deferred++; return Promise.resolve(false); }   // the tap on Begin
+/* NIGHT-11 part 3: the camera runs (core's onCamera) — its permission is decided now; while the Begin tap still counts (the browser's user activation)
+   full screen is asked at once instead of waiting for the next tap */
+export function fsCamera(){ camRan=true; if(want && !fsOn() && !asking && navigator.userActivation && navigator.userActivation.isActive){ S.atCamera++; ask(); } }
 export const fsStarted=()=>{ started=true; camRan=true; if(fsOn()) want=false; };   // the camera runs: a full screen now on is done; an exit from here is the person's
 export function fsToggle(){ if(!fsOn()){ want=false; return ask(); } want=false; try{ const p=D.exitFullscreen ? D.exitFullscreen() : D.webkitExitFullscreen && D.webkitExitFullscreen(); if(p && p.catch) p.catch(()=>{}); }catch(e){} return Promise.resolve(false); }
 export const fsOnChange=f=>{ onChange=f; };

@@ -10,7 +10,6 @@
    only once they close — no older flag decides it. The pictures are our own line drawings (inline SVG, currentColor and the accent token). */
 import { t, onLangChange } from '../../core/i18n.js';
 import { svgIcon } from '../../core/icons.js';
-import { homeHintFor } from './pure/homehint.js';   // NIGHT-7c: the home-screen card's device test
 import { fsApi, fsStandalone } from './fullscreen.js';
 
 const $=id=>document.getElementById(id);
@@ -49,9 +48,9 @@ const PICS=[
 ];
 const BASE=['play','depth','fx','music'];
 let env=null;   // probe only: a made-up device for the home-screen card
-const envNow=()=>env || { ua:navigator.userAgent, platform:navigator.platform, touch:navigator.maxTouchPoints||0, standalone:fsStandalone(), fsApi:fsApi() };
+export const cardsEnvNow=()=>env || { ua:navigator.userAgent, platform:navigator.platform, touch:navigator.maxTouchPoints||0, standalone:fsStandalone(), fsApi:fsApi() };   // NIGHT-11: the coaching line's home-screen test reads it
 /* the cards this device gets: the four, and on iPhone Safari outside the home-screen app a fifth on how to get full screen (pure/homehint.js) */
-const cardList=()=> homeHintFor(envNow()) ? [...BASE, 'home'] : BASE;
+const cardList=()=> BASE;   // NIGHT-11 part 4: the home-screen card became a one-time coaching line after the first minute (coach.js); homeHintFor stays its test
 let CARDS=BASE;
 /* NIGHT-7b: due on a Begin unless this exact value is stored (a new card set raises CARDS_V); anything else stored — old, unknown — means due */
 export const CARDS_KEY='handsong.nightCards', CARDS_V='2';   // NIGHT-7c: 2 — the music card's words, the home-screen card

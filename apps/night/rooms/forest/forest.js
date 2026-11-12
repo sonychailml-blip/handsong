@@ -62,7 +62,7 @@ const TEX=Object.freeze({ 'web-1024':new URL('./tex/web-1024.png', import.meta.u
 const GROUND_TILE=6;   // NIGHT-7: metres of floor one copy of the ground's files covers (tools/forest-bake.mjs GROUND.tile)
 export const GROUND_ALBEDO=Object.freeze({ scan:0.27, baked:3.0 });   // NIGHT-9: the floors' colour scale, the same mean brightness at night
 const SCAN_TILE=2.2;   // NIGHT-9: metres one copy of the scanned floor covers (photographed ≈ 1.26 m; a little larger reads at night and repeats less)
-export const FOREST_TEX=Object.freeze({ full:Object.freeze({ web:'web-1024', floor:'floor-2048', shade:'shade-2048', crown:'crown-1024', dapple:'dapple-1024', moon:'moon-512', ground:'ground-2048', groundN:'groundn-2048', groundM:'groundm-1024', litter:'litter-col-2048', litterN:'litter-nor-2048', litterA:'litter-arm-1024' }),
+export const FOREST_TEX=Object.freeze({ full:Object.freeze({ web:'web-1024', floor:'floor-2048', shade:'shade-2048', crown:'crown-1024', dapple:'dapple-1024', moon:'moon-512', ground:'ground-2048', groundN:'groundn-2048', groundM:'groundm-1024', litter:'litter-col-1024', litterN:'litter-nor-1024', litterA:'litter-arm-1024' }),   // NIGHT-11 part 5: the scan at 1024 (2048 showed no visible change in the close view, f-close-foot)
   reduced:Object.freeze({ web:'web-512', floor:'floor-1024', shade:'shade-1024', crown:'crown-512', dapple:'dapple-512', moon:'moon-256', ground:'ground-1024', groundN:'groundn-1024', groundM:'groundm-512', litter:'litter-col-1024', litterN:'litter-nor-1024', litterA:'litter-arm-512' }) });
 /* NIGHT-9: which bare floor a level draws — the photo-scanned one (levels' groundScan) or our baked one; a level fetches only that set's files.
    forestGroundDbg('scan' | 'baked' | null): captures and probes only (the comparison the user asked for); null = the level's own choice */
@@ -135,8 +135,9 @@ export function buildForest(T, opt){
   const fileTex=(img, srgb)=>{ const t=new T.Texture(img); t.wrapS=t.wrapT=T.RepeatWrapping; t.repeat.set(90/GROUND_TILE, 90/GROUND_TILE); t.anisotropy=8; if(srgb) t.encoding=T.sRGBEncoding; t.needsUpdate=true; own.push(t); return t; };
   const scanOn=Lv.groundTex && scanOf(opt.level) && files.litter && files.litterN && files.litterA, nsc=Lv.groundSeg>160 ? 1.35 : 1;   // NIGHT-9: Detailed's relief stronger in the shading too
   const scanTex=(img, srgb)=>{ const t=fileTex(img, srgb); t.repeat.set(90/SCAN_TILE, 90/SCAN_TILE); return t; };
-  if(scanOn) gg.setAttribute('uv2', gg.attributes.uv);   // the scan's occlusion map reads the second uv set (the same coordinates)
-  const groundM= scanOn ? new T.MeshStandardMaterial({ map:scanTex(files.litter, true), normalMap:scanTex(files.litterN, false), normalScale:new T.Vector2(nsc, nsc), roughnessMap:scanTex(files.litterA, false), aoMap:scanTex(files.litterA, false), aoMapIntensity:0.85, roughness:1 })
+  if(scanOn) gg.setAttribute('uv2', gg.attributes.uv);
+  const litterArm= scanOn ? scanTex(files.litterA, false) : null;   // NIGHT-11 part 5: ONE texture for the roughness and the occlusion (it was uploaded twice)   // the scan's occlusion map reads the second uv set (the same coordinates)
+  const groundM= scanOn ? new T.MeshStandardMaterial({ map:scanTex(files.litter, true), normalMap:scanTex(files.litterN, false), normalScale:new T.Vector2(nsc, nsc), roughnessMap:litterArm, aoMap:litterArm, aoMapIntensity:0.85, roughness:1 })
     : Lv.groundTex && files.ground && files.groundN ? new T.MeshStandardMaterial({ map:fileTex(files.ground, true), normalMap:fileTex(files.groundN, false), normalScale:new T.Vector2(nsc, nsc), roughness:0.93 })
     : new T.MeshStandardMaterial({ map:tex(gc,true,24,24), bumpMap:tex(gb,false,24,24), bumpScale:0.05, roughness:0.95 });
   if(Lv.groundAO && Lv.groundTex && (scanOn || (files.ground && files.groundN))) groundM.color.setScalar(scanOn ? GROUND_ALBEDO.scan : GROUND_ALBEDO.baked);   // NIGHT-9: both floors at one night brightness (the scan's photo is ≈ 8× brighter in linear light than our baked colour)

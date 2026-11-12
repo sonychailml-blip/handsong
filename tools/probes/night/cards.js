@@ -51,11 +51,9 @@ export async function checkNightCards(){
     /* NIGHT-7c: the home-screen card — a made-up iPhone Safari gets a fifth card, labelled, its picture with the Share icon; this computer, the
        home-screen app and another iPhone browser do not (CONTROL: the iPhone Safari case must give it, so the test can tell) */
     { const IPH={ ua:'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1', platform:'iPhone', touch:5, standalone:false, fsApi:false };
-      cardsShow(); ok('this computer gets the home-screen card', cardsDbg().n===4); $('nightCardSkip').click();
-      cardsEnvDbg(IPH); cardsShow(); const L=cardsDbg().list; ok('CONTROL: iPhone Safari gets no fifth card ('+L.join()+')', L.length===5 && L[4]==='home');
-      for(let k=0;k<4;k++) $('nightCardNext').click();
-      ok('the home card: its title', $('nightCardTitle').textContent===t('night.card.home.t')); ok('the home card: no Share picture', !!$('nightCardPic').querySelector('[data-ico="share"] svg'));
-      ok('the home card is not the last', $('nightCardNext').textContent===t('night.card.go')); $('nightCardSkip').click();
+      cardsShow(); ok('this computer gets a fifth card', cardsDbg().n===4); $('nightCardSkip').click();
+      cardsEnvDbg(IPH); cardsShow(); const L=cardsDbg().list; ok('iPhone Safari still gets a fifth card ('+L.join()+') — it is a coaching line now (NIGHT-11)', L.length===4); $('nightCardSkip').click();
+      { const { homeHintFor }=await import('../../../apps/night/pure/homehint.js'); ok('CONTROL: iPhone Safari is not due the home-screen line', homeHintFor(IPH)); }
       cardsEnvDbg({ ...IPH, standalone:true }); cardsShow(); ok('the home-screen app gets the card', cardsDbg().n===4); $('nightCardSkip').click();
       cardsEnvDbg({ ...IPH, ua:IPH.ua.replace('Version/17.5', 'CriOS/126.0') }); cardsShow(); ok('Chrome on iPhone gets the card', cardsDbg().n===4); $('nightCardSkip').click();
       cardsEnvDbg(null); }

@@ -35,7 +35,7 @@ NIGHT-4: THE MUSIC BED v2's DRIVER (live and offline).
 ## apps/night/calib.js
 NIGHT-2 stage 2: the hand's calibration screens over CORE-1's engine (core/handcal.js; design docs/night/design/NIGHT-2-calibration/DESIGN.md).
 - const (8): `CAL_KEY`, `CAL_OPEN`, `travelS`, `travelPos`, `fxV`, `fxPos`, `calActive`, `calDbg`
-- fn (9): `calWire`, `calOfferIfNew`, `calStep`, `calSideApply`, `calSideSet`, `calResetAll`, `calAbort`, `calSettingsRender`, `calTick`
+- fn (11): `calWire`, `calOfferIfNew`, `calDueNow`, `calOffered`, `calStep`, `calSideApply`, `calSideSet`, `calResetAll`, `calAbort`, `calSettingsRender`, `calTick`
 
 ## apps/night/camera.js
 NIGHT-10 — CHOOSING THE CAMERA (Settings → Camera).
@@ -44,8 +44,13 @@ NIGHT-10 — CHOOSING THE CAMERA (Settings → Camera).
 
 ## apps/night/cards.js
 NIGHT-7 — THE FIRST CARDS: after the calibration offer on a first start (and from Settings → «How to play»), four short cards with simple drawn pictures, written from the real gestures (core/gestur…
-- const (6): `CARDS_KEY`, `cardsDue`, `cardsDone`, `cardsOpen`, `cardsDbg`, `cardsEnvDbg`
+- const (7): `cardsEnvNow`, `CARDS_KEY`, `cardsDue`, `cardsDone`, `cardsOpen`, `cardsDbg`, `cardsEnvDbg`
 - fn (2): `cardsShow`, `cardsWire`
+
+## apps/night/coach.js
+NIGHT-11 part 4 — PLAY FIRST, TEACH INSIDE: the DOM side of the one coaching line (the law: pure/coach.js).
+- const (3): `coachShown`, `coachDbg`, `coachSpeedDbg`
+- fn (4): `coachBegin`, `coachTick`, `coachWire`, `coachResetDbg`
 
 ## apps/night/edition.js
 NIGHT-7b — NIGHT'S EDITION: the build's (core/edition.js: 'release' in a players' build) or, on any page, «?release» in the address — so the players' settings can be checked on Live Server without …
@@ -54,11 +59,20 @@ NIGHT-7b — NIGHT'S EDITION: the build's (core/edition.js: 'release' in a playe
 ## apps/night/fullscreen.js
 NIGHT-7c — FULL SCREEN on computers and Android (Chrome, Edge, Firefox; iPadOS Safari through its prefixed door).
 - const (9): `fsApi`, `fsOn`, `fsStandalone`, `FS_RETRIES`, `fsStarted`, `fsOnChange`, `fsCanToggle`, `fsDbg`, `fsAskAlwaysDbg`
-- fn (2): `fsBegin`, `fsToggle`
+- fn (3): `fsBegin`, `fsCamera`, `fsToggle`
+
+## apps/night/guard.js
+NIGHT-11 part 2 (audit P2, W5) — AN HONEST START, before any module runs.
+- exports: none
 
 ## apps/night/icons.js
 NIGHT-7c — NIGHT'S OWN DRAWN ICONS (our own work, rule #32), added to the shared table through core's door (CORE-15) before the page's markup is filled (main.js imports this right after the texts).
 - const (1): `NIGHT_ICONS`
+
+## apps/night/lifecycle.js
+NIGHT-11 part 1 — WHEN THE PHONE LOOKS AWAY (audit W1, W2, W3).
+- const (3): `lifeDbg`, `lifeLockDropDbg`, `lifeOldDbg`
+- fn (1): `lifeStart`
 
 ## apps/night/main.js
 SPLIT-2: the Night app's entry: its shell, its rooms, its profile (NIGHT-7b: the ghost light is gone — the first cards replace it).
@@ -68,6 +82,11 @@ SPLIT-2: the Night app's entry: its shell, its rooms, its profile (NIGHT-7b: the
 SPLIT-2: one-time move of this app's old setting names, on one origin only (plan §5.3).
 - const (1): `OLD_PREFIX`
 - fn (1): `migrateKeys`
+
+## apps/night/notice.js
+NIGHT-11 — ONE NOTICE LINE for what needs the person's tap now: the sound stopped by the phone («Tap to continue»), the camera that stopped (part 1), a start problem shown in the forest.
+- const (3): `NOTICE_PRI`, `noticeOf`, `noticeDbg`
+- fn (3): `noticeShow`, `noticeHide`, `noticeWire`
 
 ## apps/night/pure/ambience.js
 THE AMBIENCE'S SEEDED LAWS (RUN 7, C4c; docs/night/QUALITY.md points 1, 5, 8; Night's own since CORE-7): pure (rule #36), node-tested (data row «NIGHT cricket schedule (app)»).
@@ -99,6 +118,11 @@ NIGHT-10 — THE CAMERAS AS THE PERSON READS THEM (pure, rule #36; data row «NI
 - const (2): `cleanCamName`, `camMobile`
 - fn (1): `cameraNames`
 
+## apps/night/pure/coach.js
+NIGHT-11 part 4 — PLAY FIRST, TEACH INSIDE (REVIEW-1 wow-gap §1).
+- const (4): `COACH`, `COACH_IDS`, `COACH_KEY`, `coachNew`
+- fn (3): `coachSeen`, `coachStep`, `coachOrderOk`
+
 ## apps/night/pure/cycle.js
 RUN 9 — THE NIGHT over the forest, as numbers.
 - const (7): `NIGHT`, `CLOUD_PASSES`, `sleepProgress`, `MOOD_TC`, `RARE`, `EMBLEM_AT`, `emblemPoints`
@@ -115,6 +139,16 @@ NIGHT-6 slice 1 — WHEN A SOUND IS HEARD, on the page's clock.
 ## apps/night/pure/homehint.js
 NIGHT-7c — WHO GETS THE «ADD TO HOME SCREEN» CARD (pure: the data row and the cards row feed it made-up devices).
 - fn (1): `homeHintFor`
+
+## apps/night/pure/inapp.js
+NIGHT-11 part 2 — LINKS OPENED INSIDE A MESSENGER (audit W4).
+- const (3): `IN_APPS`, `QUICK_DENY_MS`, `quickDeny`
+- fn (1): `inAppOf`
+
+## apps/night/pure/pixels.js
+NIGHT-11 part 5 — THE SCENE'S PIXEL BUDGET (audit P4).
+- const (6): `PIX_LEVELS`, `PIX_STEP`, `GUARD`, `ratioOld`, `bufferOf`, `guardNew`
+- fn (3): `sceneRatio`, `stepsOf`, `guardNext`
 
 ## apps/night/pure/room.js
 NIGHT-3: THE ROOM RECORD's shape and validator (pure, rule #36; data row «NIGHT room records» with controls).
@@ -274,8 +308,8 @@ NIGHT-3 stage 5 part 2: THE ROOM SWITCH — one door for everything a room chang
 
 ## apps/night/scene/host.js
 THE SCENE HOST and Night's BACKGROUNDS (VIS1b, RUN 6; Night's own since CORE-8 — the shared UI reaches it through hooks.scene).
-- const (22): `BACKGROUNDS`, `sceneRoomAdd`, `sceneRoomRemove`, `sceneRooms`, `sceneRoom`, `sceneRoomSet`, `SCENE_LEVEL_DEFAULT`, `SCENE_FADE`, `scenePausing`, `COMPILE_LOG`, `backgroundOf`, `sceneLevel`, `sceneShadowDbg`, `sceneOptDbg`, `sceneInfo`, `sceneRoomDbg`, `sceneLevelDbg`, `sceneHeldDbg`, `sceneProgramsDbg`, `sceneClockDbg`, `sceneBedDbg`, `sceneOpenDbg`
-- fn (8): `loadThree`, `sceneOpen`, `sceneSwitch`, `sceneClose`, `setBackground`, `setSceneLevel`, `sceneSnapDbg`, `sceneShotDbg`
+- const (26): `BACKGROUNDS`, `sceneRoomAdd`, `sceneRoomRemove`, `sceneRooms`, `sceneRoom`, `sceneRoomSet`, `SCENE_LEVEL_DEFAULT`, `SCENE_FADE`, `scenePausing`, `COMPILE_LOG`, `backgroundOf`, `sceneLevel`, `sceneShadowDbg`, `sceneOptDbg`, `sceneInfo`, `sceneRoomDbg`, `sceneLostDbg`, `sceneStartNote`, `sceneStartLevelDbg`, `sceneGuardDbg`, `sceneLevelDbg`, `sceneHeldDbg`, `sceneProgramsDbg`, `sceneClockDbg`, `sceneBedDbg`, `sceneOpenDbg`
+- fn (9): `loadThree`, `sceneOpen`, `sceneSwitch`, `sceneClose`, `setBackground`, `setSceneLevel`, `sceneSnapDbg`, `sceneShotDbg`, `sceneLoseDbg`
 
 ## apps/night/shell.js
 RUN 7 (C6 + C11, Night plan §5; docs/night/QUALITY.md points 4, 5, 6, 9, 10) — THE NIGHT SHELL (DOM side; the logic is core/nightui.js).
@@ -296,6 +330,11 @@ NIGHT-3 stage 4: THE MUSIC BED's SOUND — built once on the first On into the m
 NIGHT-4: THE MUSIC BED v2's NODE — one AudioWorkletNode («night-bed», apps/night/worklets/bed-worklet.js) into the master's input (the sleep fade and the limiter cover it; live sound, never a track…
 - const (3): `BED2_WORKLET`, `BED2_POOLS`, `BED2_DIV`
 - fn (4): `buildBed2`, `bed2Post`, `bed2Park`, `bed2Stats`
+
+## apps/night/start.js
+NIGHT-11 part 2 — THE START'S OWN WORDS (audit W4, W9).
+- const (5): `START_OLD`, `FLOW_OLD`, `startEnv`, `startEnvDbg`, `startDbg`
+- fn (4): `inAppShow`, `startWire`, `startFailText`, `startSay`
 
 ## apps/night/texts.js
 NIGHT-7 — NIGHT'S OWN TEXTS, both languages.
@@ -892,7 +931,7 @@ Vercel Web Analytics queue stub — a classic script, not a module: calls made b
 ## core/vision.js
 (no head comment)
 - const (12): `video`, `canvas`, `ctx`, `camLabel`, `modelInfo`, `visionOpts`, `VISION_DEF`, `lowInfo`, `pathInfo`, `pumpStats`, `camStats`, `setCameraPick`
-- fn (22): `initVision`, `initDetector`, `startCamera`, `switchCamera`, `setHandsSink`, `pollFrame`, `camInfo`, `setHandsTracked`, `setModelDelegate`, `setCamFps`, `setDetectPath`, `setLowLight`, `pumpDbg`, `pumpStepDbg`, `detRunDbg`, `lowDbg`, `camSimDbg`, `camOpenDbg`, `camStatsDbg`, `cameraSwitch`, `cameraList`, `cameraPickInfo`
+- fn (25): `initVision`, `initDetector`, `startCamera`, `switchCamera`, `setHandsSink`, `pollFrame`, `camInfo`, `setHandsTracked`, `setModelDelegate`, `setCamFps`, `setDetectPath`, `setLowLight`, `pumpDbg`, `pumpStepDbg`, `detRunDbg`, `lowDbg`, `camSimDbg`, `camOpenDbg`, `camStatsDbg`, `cameraSwitch`, `cameraList`, `cameraPickInfo`, `cameraWatch`, `cameraWatchRetry`, `cameraWatchDbg`
 
 ## tools/probes/core/calpanel.js
 CORE-1 CP4: a development panel for the calibration, no app UI and no console needed: run it, set the sliders, measure the wrist.
@@ -1122,10 +1161,12 @@ SPLIT-2: the probe entry of the Night page: its own rows and the core rows flagg
 - → ./night/cards.js (1): `checkNightCards`
 - → ./night/forest.js (2): `checkForestRoom`, `checkBackgrounds`
 - → ./night/lean.js (2): `checkNightLean`, `checkQuietFloor`
+- → ./night/life.js (2): `checkNightLife`, `checkNightContextLost`
 - → ./night/night.js (1): `checkSoloFirefly`
 - → ./night/nightguard.js (2): `checkNightUntouched`, `dumpNight`
 - → ./night/nightmigrate.js (1): `checkNightMigrate`
 - → ./night/nightprofile.js (1): `checkNightProfile`
+- → ./night/pixels.js (2): `checkNightPixels`, `checkNightDetailedGuard`
 - → ./night/roomswitch.js (1): `checkNightRoomSwitch`
 - → ./night/stream.js (1): `checkNightStream`
 - → ./night/testroom.js (3): `testRoomInstall`, `testRoomRemove`, `testRoomMode`
@@ -1168,6 +1209,10 @@ NIGHT-1 stage 1: Night's sound headroom, dev only.
 NIGHT-1 stage 2: row «NIGHT lean path» (P.night; slow: offline renders).
 - fn (2): `checkNightLean`, `checkQuietFloor`
 
+## tools/probes/night/life.js
+NIGHT-11 part 1 — rows «NIGHT phone lifecycle» and «NIGHT context lost» (the audit's W1, W2, W3, W6), on the running app.
+- fn (2): `checkNightLife`, `checkNightContextLost`
+
 ## tools/probes/night/night.js
 C4a (RUN 6, Night plan §4.1, §10): row «C4a solo Firefly» (quick and all; three short offline renders through the engine copy).
 - const (2): `NIGHT_TIMBRES`, `NIGHT_SET`
@@ -1184,6 +1229,10 @@ SPLIT-2: row «NIGHT migrate»: old setting names move to the new ones, are remo
 ## tools/probes/night/nightprofile.js
 SPLIT-2: row «NIGHT profile round trip» on Night's page: the checks of C0 that need Night's record, its shell and its CSS (they ran on the one page before the split, word for word).
 - fn (1): `checkNightProfile`
+
+## tools/probes/night/pixels.js
+NIGHT-11 part 5 — rows «NIGHT pixel budget» and «NIGHT Detailed guard», on the running app with the forest open.
+- fn (2): `checkNightPixels`, `checkNightDetailedGuard`
 
 ## tools/probes/night/roomswitch.js
 NIGHT-3 stage 5 part 2: row «NIGHT room switch» (P.night, drawn) — the switching machinery, on the test room (./testroom.js), judged on EXACT controls (the user, 2026-11-09): (1) hand detection tak…
@@ -1202,7 +1251,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 - const (5): `TEST_ROOM_ID`, `TEST_ROOM`, `testRoomMode`, `testRoomInfo`, `testRoomFreeLeaks`
 - fn (2): `testRoomInstall`, `testRoomRemove`
 
-_236 modules, 2610 exported names._
+_246 modules, 2676 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

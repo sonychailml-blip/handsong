@@ -6,7 +6,8 @@
 const SURFACE={
   'core/autosave.js':['AC'],
   'apps/night/bed.js':['AC', 'engineCtx'],   // CORE-9: the music bed's driver (NIGHT-3 stage 4)
-  'apps/night/roomswitch.js':['ambienceOn', 'ambienceInfo'],   // CORE-12: the room switch's nature crossfade (NIGHT-3 stage 5 part 2)
+  'apps/night/roomswitch.js':['ambienceOn', 'ambienceInfo'],
+  'apps/night/lifecycle.js':['AC'],   // NIGHT-11 part 1: the context resumed after the phone looked away   // CORE-12: the room switch's nature crossfade (NIGHT-3 stage 5 part 2)
   'apps/night/shell.js':['outputFade', 'ambienceOn', 'ambienceRetune', 'ambienceTick', 'fxInstance', 'setTimbreTrim', 'setLowPower', 'setNightStrikes', 'AC', 'leadOn', 'leadOff', 'timbreIdx', 'ambienceInfo', 'setLeanPath', 'leadParkTick'],   // RUN 8: + the device measurement's notes; RUN 9: the wind's phase
   'core/clip.js':['createRecordingTap'],
   'apps/full/demo.js':['AC', 'initAudio'],

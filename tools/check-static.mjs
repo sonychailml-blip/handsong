@@ -193,7 +193,7 @@ const GLOBALS=new Set((
   'Int16Array Int32Array Uint8Array Uint8ClampedArray Uint16Array Uint32Array parseInt parseFloat isNaN isFinite encodeURIComponent '+
   'decodeURIComponent encodeURI decodeURI globalThis queueMicrotask structuredClone console setTimeout clearTimeout setInterval clearInterval '+
   /* браузер */ 'window self document navigator location history screen performance localStorage sessionStorage indexedDB IDBKeyRange crypto '+
-  'fetch URL URLSearchParams Blob File FileReader Image ImageData Path2D OffscreenCanvas TextEncoder TextDecoder AbortController Event '+
+  'fetch URL URLSearchParams Blob File FileReader Image ImageData Path2D OffscreenCanvas TextEncoder TextDecoder AbortController Event EventTarget '+
   'CustomEvent HTMLElement HTMLCanvasElement HTMLVideoElement alert confirm prompt matchMedia getComputedStyle requestAnimationFrame '+
   'cancelAnimationFrame innerWidth innerHeight devicePixelRatio MediaRecorder MediaStream KeyboardEvent AudioContext OfflineAudioContext webkitAudioContext OscillatorNode BiquadFilterNode GainNode WaveShaperNode DelayNode ConstantSourceNode '+
   'AudioWorkletNode OfflineAudioCompletionEvent DOMException addEventListener removeEventListener MessageChannel PerformanceObserver '+
@@ -267,7 +267,7 @@ const NET_LISTED={
   'core/legacy-ui/ui.js': { swRegister:[1,'registers sw.js (own origin, cache-free) so the app is installable'] },
   'core/vision.js':     { worker:[1,'starts our own core/hand-worker.js (own origin, CSP worker-src self): hand detection off the main thread (LAT2b)'] },
   'core/handdet.js':    { external:[1,'imports MediaPipe Tasks Vision from jsDelivr (register entry mediapipe-tasks-vision; it loads its WASM — CSP script-src/connect-src); in the worker too'],
-                     fetch:[1,'downloads the hand model once (register entry mediapipe-hand-landmarker, storage.googleapis.com/mediapipe-models — CSP connect-src) for both models (L1, L2)'] },
+                     fetch:[2,'downloads the hand model once (register entry mediapipe-hand-landmarker, storage.googleapis.com/mediapipe-models — CSP connect-src) for both models (L1, L2); CORE-18: the same file streamed with its progress when the app asks (one of the two runs)'] },
 };
 function netSites(m){   // kind → count for one module (external = static import from an http(s) address)
   const n={}; for(const [k,re] of Object.entries(NET_KINDS)){ const c=(m.bare.match(re)||[]).length; if(c) n[k]=c; }

@@ -1812,6 +1812,90 @@ async function forestWaterFlow(){
   return { cases:n, total:d.length, differences:d, notes };
 }
 
+/* NIGHT-11 part 2: IN-APP BROWSERS (apps/night/pure/inapp.js) on made-up devices — the messengers' own browsers (named, or a bare web view) are
+   recognised, real browsers and the home-screen app are not; the device words (phone or computer); a camera refusal faster than a person could
+   answer counts as «refused without asking» (CONTROL: a law that ignores the missing «Safari/» would pass an iOS web view as Safari). */
+async function nightInApp(){
+  const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); };
+  const { inAppOf, quickDeny, QUICK_DENY_MS }=await import(new URL('../apps/night/pure/inapp.js', import.meta.url).href);
+  const SAF='Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
+  const WKV='Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148';
+  const AND='Mozilla/5.0 (Linux; Android 14; 22111317PG) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36';
+  const AWV='Mozilla/5.0 (Linux; Android 14; 22111317PG; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/126.0.0.0 Mobile Safari/537.36';
+  const WIN='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
+  const C=[['iPhone Safari', { ua:SAF, platform:'iPhone', touch:5 }, null, 'ios'], ['Chrome on iPhone', { ua:SAF.replace('Version/17.5','CriOS/126.0'), platform:'iPhone', touch:5 }, null, 'ios'],
+    ['the home-screen app on iPhone', { ua:WKV, platform:'iPhone', touch:5, standalone:true }, null, 'ios'], ['Android Chrome', { ua:AND, touch:5 }, null, 'android'], ['Windows Chrome', { ua:WIN }, null, 'other'],
+    ['Instagram on iPhone', { ua:WKV+' Instagram 300.0.0.0 (iPhone14,5; iOS 17_5)', platform:'iPhone', touch:5 }, 'instagram', 'ios'], ['Facebook on iPhone', { ua:WKV+' [FBAN/FBIOS;FBAV/450.0]', platform:'iPhone', touch:5 }, 'facebook', 'ios'],
+    ['Facebook on Android', { ua:AWV+' [FB_IAB/FB4A;FBAV/450.0;]', touch:5 }, 'facebook', 'android'], ['Instagram on Android', { ua:AWV+' Instagram 300.0.0.0 Android', touch:5 }, 'instagram', 'android'],
+    ['Telegram on Android', { ua:AWV+' Telegram-Android/10.14.5', touch:5 }, 'telegram', 'android'], ['WhatsApp on Android', { ua:AWV+' WhatsApp/2.24', touch:5 }, 'whatsapp', 'android'],
+    ['a bare web view on Android (Telegram without its name)', { ua:AWV, touch:5 }, 'webview', 'android'], ['a bare web view on iPhone', { ua:WKV, platform:'iPhone', touch:5 }, 'webview', 'ios'],
+    ['LINE', { ua:AWV+' Line/13.1.0', touch:5 }, 'line', 'android'], ['WeChat', { ua:AWV+' MicroMessenger/8.0.47', touch:5 }, 'wechat', 'android'], ['TikTok', { ua:AWV+' musical_ly_2023', touch:5 }, 'tiktok', 'android']];
+  for(const [name, env, app, os] of C){ const r=inAppOf(env); ok(`${name}: ${JSON.stringify(r)} (wanted app ${app}, ${os})`, r.app===app && r.inApp===!!app && r.os===os && r.phone===(os!=='other')); }
+  ok('nothing known reads as a browser', !inAppOf({}).inApp && inAppOf({}).os==='other');
+  ok('a refusal at once is not «without asking»', quickDeny('NotAllowedError', 40)); ok('a refusal after 2 s counts as «without asking»', !quickDeny('NotAllowedError', 2000));
+  ok('another error counts as a refusal', !quickDeny('NotReadableError', 40)); ok('an unknown time counts', !quickDeny('NotAllowedError', NaN));
+  { const noSafariTest=e=>/iPhone/.test(e.ua) && /AppleWebKit/.test(e.ua); ok('CONTROL: a law without the «Safari/» test tells Safari from a web view', noSafariTest({ ua:SAF })!==!!inAppOf({ ua:SAF, platform:'iPhone', touch:5 }).inApp); }
+  notes.push(`${C.length} made-up devices: ${C.filter(c=>c[2]).length} in-app browsers recognised, ${C.filter(c=>!c[2]).length} browsers left alone; «without asking» below ${QUICK_DENY_MS} ms`);
+  return { cases:n, total:d.length, differences:d, notes };
+}
+/* NIGHT-11 part 4: THE COACHING LINE's law (apps/night/pure/coach.js) on a made-up first session with exact times: «Raise a hand» at once, «Touch
+   your thumb…» 0.5 s after the hand, the first note ends it; the other fingers after 30 s of playing, near / far after 60 s, the effects hint when the
+   second hand comes, the calibration offer and the home-screen hint after the first minute, one at a time with their gaps; nothing before the
+   first note but the first two; a returning visit (everything seen) shows nothing; a stale stored list reads as nothing seen. The order judge
+   passes this session; CONTROLS: the old order (the calibration offer and the cards before the first note) and a hint shown twice must fail it. */
+async function nightCoachLaw(){
+  const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); };
+  const { coachNew, coachStep, coachSeen, coachOrderOk, COACH }=await import(new URL('../apps/night/pure/coach.js', import.meta.url).href);
+  /* a session: from t=0 the room is ready; the hand at 3 s; the first note at 6 s; playing on; the second hand 50–58 s */
+  const run=(seen, o={})=>{ let st=coachNew(seen); const log=[], DT=100; let cur=null; const mk=[];
+    for(let t=0;t<=150e3;t+=DT){ const hand=t>=3000, x={ now:t, dt:DT, ready:true, hands:hand ? (t>=50e3 && t<58e3 ? 2 : 1) : 0, play:hand, second:t>=50e3 && t<58e3, note:t===6000 || (t>6000 && t%2000===0),
+        calDue:o.calDue!==false, homeDue:!!o.homeDue, paused:!!(o.pauseAt && t>=o.pauseAt[0] && t<o.pauseAt[1]) };
+      if(x.note) log.push({ t, kind:'note' });
+      const r=coachStep(st, x); st=r.st; mk.push(...r.mark); if(r.show!==cur){ cur=r.show; if(cur) log.push({ t, kind:'show', id:cur }); } }
+    return { log, shows:log.filter(e=>e.kind==='show').map(e=>`${e.id}@${e.t}`), mark:mk, st }; };
+  const A=run([], { homeDue:true });
+  const want=['raise@0','pinch@3500','fingers@36000','fx@50000','depth@66000','calib@77500','home@96000'];
+  ok(`a first session: ${A.shows.join(' ')} (wanted ${want.join(' ')})`, A.shows.join()===want.join());
+  ok('the order judge fails the law\'s own session: '+coachOrderOk(A.log).join('; '), coachOrderOk(A.log).length===0);
+  ok('remembered: '+A.mark.join(), A.mark.join()==='raise,pinch,fingers,fx,depth,home');
+  { const B=run(A.st.seen, { homeDue:true, calDue:false }); ok('a returning visit showed '+B.shows.join(' '), B.shows.length===0); }
+  { const C=run([], { pauseAt:[60e3, 140e3] }); ok('the calibration offer while detection is paused: '+C.shows.join(' '), !C.shows.some(s=>s.startsWith('calib@') && +s.split('@')[1]<140e3)); }
+  ok('a stale stored list reads as seen', coachSeen('{not json').length===0 && coachSeen('"raise"').length===0 && coachSeen('["raise","zz",7,"raise"]').join()==='raise' && coachSeen(null).length===0);
+  { const old=[{ t:2000, kind:'cal' }, { t:9000, kind:'card' }, { t:30000, kind:'note' }]; ok('CONTROL: the old order (calibration and cards first) passes the judge', coachOrderOk(old).length===2); }
+  { const twice=[...A.log, { t:140e3, kind:'show', id:'fingers' }]; ok('CONTROL: a hint shown twice passes the judge', coachOrderOk(twice).length===1); }
+  notes.push(`first session: ${A.shows.join(' · ')} (ms); fingers after ${COACH.fingersMs/1000} s of playing, depth after ${COACH.depthMs/1000} s`);
+  return { cases:n, total:d.length, differences:d, notes };
+}
+/* NIGHT-11 part 5: THE PIXEL BUDGET (apps/night/pure/pixels.js). The laptop (1366 × 768, one device pixel per CSS pixel) keeps today's numbers exactly at
+   both levels, and so does every screen with one device pixel per CSS pixel (CONTROL); a phone in portrait (390 × 844 at 2.75) gets about 430 × 930 at
+   Standard (CONTROL: today's law gives it 234 × 506); a hi-dpi laptop stays where it was; a phone driving a large display as a monitor follows that
+   display; the guard's steps never go below today's law; the guard lowers after 4 s too low, raises after 20 s comfortably good, and holds after a
+   raise that went bad. */
+async function nightPixels(){
+  const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); };
+  const P=await import(new URL('../apps/night/pure/pixels.js', import.meta.url).href), B=(w,h,dpr,l,k=0)=>P.bufferOf(w,h,P.sceneRatio(w,h,dpr,l,k)).join('×');
+  ok('the laptop at Standard: '+B(1366,768,1,'reduced'), B(1366,768,1,'reduced')==='819×460' && P.sceneRatio(1366,768,1,'reduced')===0.6);
+  ok('the laptop at Detailed: '+B(1366,768,1,'full'), P.sceneRatio(1366,768,1,'full')===0.85);
+  for(const [w,h] of [[1280,800],[1366,657],[800,600],[1920,1080],[390,844]]) for(const l of ['reduced','full']) ok(`a ${w}×${h} screen at one device pixel per CSS pixel moved (${l})`, P.sceneRatio(w,h,1,l)===P.ratioOld(1,l));
+  ok('a zoomed-out screen (0.8) moved', P.sceneRatio(1366,768,0.8,'reduced')===0.8*0.6);
+  const ph=B(390,844,2.75,'reduced'); ok('a phone in portrait at Standard: '+ph+' (about 430 × 930)', /^4(2\d|3\d)×9(2\d|3\d)$/.test(ph));
+  ok('CONTROL: today\'s law gives the phone about 430 × 930', P.bufferOf(390,844,P.ratioOld(2.75,'reduced')).join('×')!==ph);
+  notes.push(`phone 390×844 at 2.75: Standard ${ph} (before ${P.bufferOf(390,844,P.ratioOld(2.75,'reduced')).join('×')}), Detailed ${B(390,844,2.75,'full')} (before ${P.bufferOf(390,844,P.ratioOld(2.75,'full')).join('×')}); laptop ${B(1366,768,1,'reduced')} / ${B(1366,768,1,'full')}`);
+  ok('a hi-dpi laptop (1440×900 at 2) moved at Standard', P.sceneRatio(1440,900,2,'reduced')===0.6);
+  ok('above the device pixels', P.sceneRatio(200,300,1.5,'full')===1.5);
+  ok('a phone as a monitor (1920×1080 at 1) does not follow the display', P.sceneRatio(1920,1080,1,'reduced')===0.6);
+  { const k=P.stepsOf(390,844,2.75,'reduced'); ok('the guard has no steps on the phone', k>0); ok('a guard step went below today\'s law', P.sceneRatio(390,844,2.75,'reduced',k+3)===P.ratioOld(2.75,'reduced'));
+    ok('the guard has steps on the laptop', P.stepsOf(1366,768,1,'reduced')===0 && P.stepsOf(1366,768,1,'full')===0); notes.push(`guard steps on the phone at Standard: ${k}`); }
+  { let s=P.guardNew(); const bad={ fps:12, cap:30, det:10, cam:30 }, good={ fps:29, cap:30, det:10, cam:30 };
+    for(let t=1;t<=3;t++) s=P.guardNext(s, { ...bad, t }, 3); ok('lowered before 4 s', s.step===0); s=P.guardNext(s, { ...bad, t:4 }, 3); ok('not lowered after 4 s too low', s.step===1);
+    for(let t=5;t<=8;t++) s=P.guardNext(s, { fps:29, cap:30, det:2, cam:30, t }, 3); ok('slow hand detection did not lower', s.step===2);
+    for(let t=9;t<=28;t++) s=P.guardNext(s, { ...good, t }, 3); ok('not raised after 20 s good', s.step===1);
+    for(let t=29;t<=32;t++) s=P.guardNext(s, { ...bad, t }, 3); ok('the raise that went bad not lowered again with a hold', s.step===2 && s.holdTo>=32+100);
+    for(let t=33;t<=80;t++) s=P.guardNext(s, { ...good, t }, 3); ok('raised again inside the hold', s.step===2);
+    for(let t=1;t<=20;t++) s=P.guardNext(s, { ...bad, t:200+t }, 3); ok('past the steps it has', s.step===3);
+    let z=P.guardNew(); for(let t=1;t<=30;t++) z=P.guardNext(z, { ...bad, t }, 0); ok('the laptop (no steps) was lowered', z.step===0); }
+  return { cases:n, total:d.length, differences:d, notes };
+}
 /* NIGHT-10: THE CAMERAS' NAMES (apps/night/pure/camera.js) — a phone: front and back cameras read «Front» / «Back» (a second back camera
    «Back 2»), one of unknown facing by its name; a computer: device names without hardware numbers («HD Webcam (046d:0825)» → «HD Webcam»);
    labels empty before the permission → «Camera 1», «Camera 2»; never an id in a name; the phone hint from the browser (Android, iPhone, an iPad
@@ -1876,6 +1960,9 @@ const ROWS=[
   ['FOREST relief (app)',       ()=>forestRelief(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-9
   ['FOREST water flow (app)',   ()=>forestWaterFlow(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-9
   ['NIGHT camera names (app)',  ()=>nightCameraNames(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-10
+  ['NIGHT in-app browsers (app)', ()=>nightInApp(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-11 part 2
+  ['NIGHT coaching line (app)', ()=>nightCoachLaw(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-11 part 4
+  ['NIGHT pixel budget law (app)', ()=>nightPixels(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-11 part 5
   ['FOREST gust (app)',         ()=>forestGustCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 6
   ['FOREST canopy (app)',       ()=>forestCanopyCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 7
   ['FOREST paint (app)',        ()=>forestPaintCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 8
