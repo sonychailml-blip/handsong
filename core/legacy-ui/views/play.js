@@ -460,9 +460,9 @@ function drawNightField(x0,x1,playH,actSlots,actDegs){
    where the camera sees them: the hit-tests' remapped points of THIS frame, no smoothing (the short trail lies behind, never ahead). The playing
    hand: the finger that sounds (else the index, ready) is the firefly lime with a HALO whose size and softness follow the depth — near: small
    and sharp, far: wide and soft —, the other four warm amber. The effects hand: index · middle · ring glow with Echo · Warmth / Brightness ·
-   Wave (the values their bars show), thumb and little finger dim amber. The dev switch «tips» off draws all joints as before. */
+   Wave (the values their bars show), thumb and little finger dim amber. CORE-21: «All points» (tips off) adds the other sixteen points in the same look (drawGlowJoints). */
 const TIP_LM=[4,8,12,16,20], TRAIL_N=6, TRAIL_MS=140, trails=new Map();
-let tipsDrawn=[];
+let tipsDrawn=[], jointsDrawn=[];   // CORE-21: jointsDrawn — Night's «all points»
 function halo(x,y,r,soft,col,a){   // soft 0 = a sharp edge … 1 = a wide soft glow
   const g=ctx.createRadialGradient(x,y,0,x,y,r); g.addColorStop(0, hexA(col, a)); g.addColorStop(0.35-0.25*soft, hexA(col, a*(0.75-0.45*soft)));
   g.addColorStop(0.75-0.2*soft, hexA(col, a*0.18)); g.addColorStop(1, hexA(col, 0)); ctx.fillStyle=g; ctx.fillRect(x-r,y-r,2*r,2*r); }
@@ -482,8 +482,17 @@ function drawNightTips(S,k,lm,W,H){
     ctx.fillStyle=hexA(col, Math.min(1,a+0.15)); ctx.beginPath(); ctx.arc(x,y,(big?3.2:2.4)*u,0,7); ctx.fill();
     tipsDrawn.push({ key:k, tip:j, x, y, lit:col===lime, a, halo: big ? (14+30*d)*u : 0 }); }
 }
+/* CORE-21 (Night's «all points»): the hand's other sixteen points in the fingertips' own look — small, soft, dim amber glows under the five fireflies */
+function drawGlowJoints(lm,W,H){
+  const amber=cv('hn-amber'), u=Math.min(W,H)/600;
+  for(let i=0;i<lm.length;i++){ if(TIP_LM.includes(i)) continue; const x=sx(lm[i].x,W), y=sy(lm[i].y,H);
+    halo(x,y,5*u, 0.3, amber, 0.28); ctx.fillStyle=hexA(amber, 0.5); ctx.beginPath(); ctx.arc(x,y,1.5*u,0,7); ctx.fill();
+    jointsDrawn.push({ i, x, y }); }
+}
 /* probe only: the fingertip fireflies drawn in the last frame (positions in canvas pixels, which are lit, the halo's radius) */
 export const nightTipsDbg=()=>tipsDrawn.map(t=>({ ...t }));
+/* probe only (CORE-21): the other points drawn in Night's look in the last frame («all points») */
+export const glowJointsDbg=()=>jointsDrawn.map(t=>({ ...t }));
 /* probe only: draw the hands overlay once NOW from HANDS (the next screen frame redraws the canvas) → the fingertips drawn */
 export function nightTipsDrawDbg(){ drawHandsPhone({ landmarks:[] }, canvas.width, canvas.height, canvas.height); return nightTipsDbg(); }
 function drawPhone(res){ drawSurface(); drawHandsLayer(res); }
@@ -555,11 +564,11 @@ function drawDrumGrid(rx0,rx1,playH){
   }
 }
 function drawHandsPhone(res,W,H,playH){
-  tipsDrawn=[];
+  tipsDrawn=[]; jointsDrawn=[];
   if(!res||!res.landmarks)return;
   for(const k in HANDS){
     const S=HANDS[k], lm=S.lm; if(!lm)continue;
-    if(nightView && nightView.tips){ drawNightTips(S,k,lm,W,H); continue; }   // RUN 8: Night's hands are five fireflies (dev switch: all joints)
+    if(nightView){ if(!nightView.tips) drawGlowJoints(lm,W,H); drawNightTips(S,k,lm,W,H); continue; }   // RUN 8: Night's hands are five fireflies; CORE-21: «all points» in the same look (the other points added, Full's style never in Night)
     /* Роль и X-диапазон ЭТОЙ руки: при сплите — щипок берёт ЗАМОРОЗКУ на S (совпадает с попаданием),
        до щипка — живую половину под указательным (lm[8]); вне сплита — глобальный phoneInstr на весь
        холст (single-role, байт-в-байт). Раздел палитра|ноты — palSplitX того же диапазона. */

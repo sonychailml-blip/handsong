@@ -12,6 +12,7 @@ import { seeded } from '../../../../core/pure/dsp.js';
 import { fliesInit, fliesStep, forestGround, depthDistance, FOREST_FLIES, holdK, rateK, fliesDart } from './pure/fireflies.js';
 import { CLOUD_PASSES, NIGHT, nightAt, nightDeep, MOOD_TC } from '../../pure/cycle.js';   // RUN 9: the night's cycle, sleep, the moods' easing
 import { FOREST_ROOM } from './pure/room.js';   // NIGHT-3: the record — levels and the moods' looks
+import { roomFov } from '../../pure/room.js';   // NIGHT-13: the lens law (the start still is placed by it too)
 import { roomLook } from '../../pure/room.js';
 import { buildLife, patchGroundWaves, patchSway, patchSoftEdges, patchWetGround } from './forest-life.js';   // RUN 9 (slice 2): the forest answers the playing
 import { buildDetail } from './forest-detail.js';   // RUN 9 (slice 3): grass, leaves, moths, moonbeams, silhouettes
@@ -33,6 +34,7 @@ import { buildCanopy, patchDapple } from './forest-canopy.js';   // NIGHT-6 slic
 import { buildPaint } from './forest-paint.js';   // NIGHT-6 slice 8: the painted distance and the film
 import { buildHidden, foxUniforms } from './forest-hidden.js';   // NIGHT-6 slice 9: hidden things the light finds
 import { breathAt } from './pure/paint.js';   // NIGHT-6 slice 5: moss, roots, fallen wood, contact shadows
+import { handLightK, HANDLIGHT_GLOW_OLD } from '../../pure/handlight.js';   // NIGHT-13: the hand's light brighter as its finger closes
 import { patchGroundMacro, patchGroundNight } from './forest-ground.js';   // NIGHT-8: the bare ground's large scale
 import { litterPlaces } from './pure/ground.js';   // NIGHT-8: leaves, pebbles and twigs on the ground
 
@@ -212,7 +214,7 @@ export function buildForest(T, opt){
     if(i===0 && SH){ light.castShadow=true; light.shadow.mapSize.set(SH,SH); light.shadow.bias=-0.005; light.shadow.camera.near=0.08; }
     const core=sprite(col('core')), halo=sprite(i?col('fx'):col('halo'),0.5); grp.add(core,halo); grp.visible=false; s.add(grp, light);   // RUN 9: the light stays in the scene (intensity 0 when off) — a light count that changes recompiles every lit shader
     const trail=[]; for(let j=0;j<Lv.trail;j++){ const t=sprite(col('trail'),0); t.scale.set(0.05,0.05,1); s.add(t); trail.push(t); }
-    return { i, grp, light, core, halo, trail, hist:[], ht:0, cur:V(0,1.5,0), prev:V(0,1.5,0), tgt:V(0,1.5,0), on:0, glint:0, sat:false, d:0.5 }; });
+    return { i, grp, light, core, halo, trail, hist:[], ht:0, cur:V(0,1.5,0), prev:V(0,1.5,0), tgt:V(0,1.5,0), on:0, glint:0, sat:false, d:0.5, gl:HANDLIGHT_GLOW_OLD }; });
   /* RUN 7 (C5): the effects hand seen in the forest (values from the bus «nightFx», published by the Night shell): Echo — soft rings of light
      leave the firefly at each echo of a note (timed from the echo's own delay and feedback, not from audio analysis); Warmth / Brightness —
      the light's colour, amber ↔ the firefly lime ↔ a cold green-white; Wave — the light trembles at the effect's own 4.5 Hz */
@@ -260,10 +262,18 @@ export function buildForest(T, opt){
   const bedQ=[], fired=[], twinkles=[], glow1=new Float32Array(flies.length); let glassN=0, tLast=-Infinity;
   const ray=new T.Raycaster(), ndc=new T.Vector2(), fwd=V(0,0,0), tmp=V(0,0,0);
   let W=opt.w||800, H=opt.h||600, pxH=H;
-  let viewOver=null;   // NIGHT-8, captures only: { pos, look } — a fixed close view (viewDbg)
-  function aimCamera(){ if(viewOver){ camera.position.set(...viewOver.pos); camera.lookAt(...viewOver.look); camera.updateMatrixWorld(); return; } camera.position.copy(camPos).add(camOff); look.copy(camLook).addScaledVector(camOff,-1.2); camera.lookAt(look); camera.updateMatrixWorld(); }
-  function resize(w,h,bufH){ W=w; H=h; pxH=bufH||h; camera.aspect=w/h; camera.fov= w/h<0.8 ? 68 : 55; camera.updateProjectionMatrix();
-    fm.uniforms.uScale.value=pxH/(2*Math.tan(camera.fov*Math.PI/360)); life.resize(fm.uniforms.uScale.value); canopy.resize(fm.uniforms.uScale.value); aimCamera(); detail.resize(w, h, camera, fm.uniforms.uScale.value); answers.resize(fm.uniforms.uScale.value); }
+  let viewOver=null;   // NIGHT-8, captures only: { pos, look } — a fixed close view (viewDbg); NIGHT-13: { rest:true, fov } — the camera at rest through another lens (the start still)
+  /* NIGHT-13: THE CAMERA AT REST — while the start still hands over (host sceneRest), the camera holds the pose the still was drawn from: no lean towards
+     the light, no breath; let go, the lean and the breath come back gently (motionK over REST_TC seconds) */
+  const REST_TC=2, goalOf=(f0, out)=>{ out.set(clamp(f0.x,-4,4)*0.16, (clamp(f0.y,0,5)-1.7)*0.1, 0); if(reduce) out.multiplyScalar(0.3); return out; };
+  let restOn=false, motionK=1;
+  function aimCamera(){ if(viewOver && viewOver.rest){ const o=goalOf(camLook, V(0,0,0)); camera.position.copy(camPos).add(o); look.copy(camLook).addScaledVector(o,-1.2); camera.lookAt(look); camera.updateMatrixWorld(); return; }
+    if(viewOver){ camera.position.set(...viewOver.pos); camera.lookAt(...viewOver.look); camera.updateMatrixWorld(); return; } camera.position.copy(camPos).add(camOff); look.copy(camLook).addScaledVector(camOff,-1.2); camera.lookAt(look); camera.updateMatrixWorld(); }
+  function resize(w,h,bufH){ W=w; H=h; pxH=bufH||h; camera.aspect=w/h; camera.fov= viewOver && viewOver.fov ? viewOver.fov : roomFov(FOREST_ROOM.view, w, h); camera.updateProjectionMatrix();   // NIGHT-13: the record's lens law (was 68 below 0.8, else 55)
+    fm.uniforms.uScale.value=pxH/(2*Math.tan(camera.fov*Math.PI/360)); life.resize(fm.uniforms.uScale.value); canopy.resize(fm.uniforms.uScale.value); aimCamera();
+    /* NIGHT-13: the silhouettes are pinned from the camera AT REST (not wherever it leaned at this moment) — the start still's screen layer draws them there */
+    if(!viewOver || viewOver.rest){ const keep=camOff.clone(); goalOf(camLook, camOff); aimCamera(); detail.resize(w, h, camera, fm.uniforms.uScale.value); camOff.copy(keep); aimCamera(); }
+    else detail.resize(w, h, camera, fm.uniforms.uScale.value); answers.resize(fm.uniforms.uScale.value); }
   /* the hand's play point (canvas pixels px, py) and depth 0…1 → the light's world place on THIS camera's ray (it projects back onto the
      point); saturates at the room's bounds and the ground → out; returns true when it saturated */
   function place(px, py, d01, out){
@@ -306,7 +316,7 @@ export function buildForest(T, opt){
     tLast=t;
     const kk=(reduce?0.4:1)*deep.motion, H2=hands||[], play=H2.find(h=>h.play), other=H2.find(h=>h!==play);
     rigs.forEach((r,i)=>{ const h= i===0 ? play : other; let on=0;
-      if(h){ r.sat=place(h.x, h.y, h.d, r.tgt); on=1; if(r.on<0.02) r.cur.copy(r.tgt); r.d+=(h.d-r.d)*Math.min(1, dt*8); }
+      if(h){ r.sat=place(h.x, h.y, h.d, r.tgt); on=1; if(r.on<0.02) r.cur.copy(r.tgt); r.d+=(h.d-r.d)*Math.min(1, dt*8); r.gl+=((h.glow==null ? HANDLIGHT_GLOW_OLD : h.glow)-r.gl)*Math.min(1, dt*12); }   // NIGHT-13: glow — its finger closing on the thumb
       r.on+=(on-r.on)*Math.min(1, dt*(on>r.on?6:2.5));
       r.prev.copy(r.cur); r.cur.lerp(r.tgt, 1-Math.exp(-dt*13));
       r.glint*=Math.exp(-dt*2.4);
@@ -315,9 +325,10 @@ export function buildForest(T, opt){
       let wob=1; if(i===0){   // C5: the light's colour (Warmth / Brightness) and its tremble (Wave)
         const u=Math.abs(fxv.tone-0.5)*2, to= fxv.tone<0.5 ? WARM : COLD; lc.copy(LC).lerp(to,u); hlc.copy(HC).lerp(to,u); r.light.color.copy(lc); r.halo.material.color.copy(hlc);
         if(fxv.wave>0.005 && !reduce){ const ph=2*Math.PI*4.5*t; wob=1+0.3*fxv.wave*Math.sin(ph); r.grp.position.x+=0.06*fxv.wave*Math.sin(ph); r.grp.position.y+=0.04*fxv.wave*Math.cos(ph*1.3); } }
-      r.light.position.copy(r.grp.position); r.light.intensity= r.on>0.01 ? 1.9*dim*r.on*pul*(1+r.glint)*wob : 0; r.core.scale.setScalar((i?0.1:0.16)*(1+r.glint*0.7)); r.core.material.opacity=r.on;
+      const gk=handLightK(r.gl);   // NIGHT-13: brighter as the finger closes (1 = as before, at the glow of a view without fingertips)
+      r.light.position.copy(r.grp.position); r.light.intensity= r.on>0.01 ? 1.9*dim*r.on*pul*(1+r.glint)*wob*gk : 0; r.core.scale.setScalar((i?0.1:0.16)*(1+r.glint*0.7)); r.core.material.opacity=r.on;
       /* RUN 8: the playing light's halo follows the depth — near: small and bright, far: wide and soft (as the 2D fingertip's halo) */
-      const dk= i ? 1 : 0.7+0.9*r.d, hs=(i?0.9:1.5)*(1+r.glint*0.9)*pul*dk; r.halo.scale.set(hs,hs,1); r.halo.material.opacity=0.55*r.on*dim*(i ? 1 : 1.15-0.45*r.d);
+      const dk= i ? 1 : 0.7+0.9*r.d, hs=(i?0.9:1.5)*(1+r.glint*0.9)*pul*dk; r.halo.scale.set(hs,hs,1); r.halo.material.opacity=Math.min(1, 0.55*r.on*dim*(i ? 1 : 1.15-0.45*r.d)*gk);
       r.ht+=dt; if(r.ht>0.03){ r.ht=0; r.hist.unshift(r.cur.clone()); if(r.hist.length>r.trail.length) r.hist.pop(); }
       r.trail.forEach((sp,j)=>{ const p=r.hist[j]; if(!p){ sp.material.opacity=0; return; } sp.position.copy(p); sp.material.opacity=r.on*0.3*dim*(1-j/r.trail.length); sp.scale.setScalar(0.1*(1-j/r.trail.length)+0.02); });
     });
@@ -358,9 +369,10 @@ export function buildForest(T, opt){
     answers.update(dt, t, { light:rigs[0].cur, on:rigs[0].on, light1:rigs[1].cur, on1:rigs[1].on, lightCol:rigs[0].light.color, fxCol:rigs[1].light.color, moonCol:pal.moonhalo,
       moonK:nt.moonLight*deep.light, dim:deep.light, fogD:s.fog.density, cam:camera.position });   // NIGHT-6 slice 1
     /* parallax: the camera leans a little towards the playing light (near and far things slide past each other) */
-    const f0=rigs[0].on>0.05 ? rigs[0].cur : camLook;
-    camGoal.set(clamp(f0.x,-4,4)*0.16, (clamp(f0.y,0,5)-1.7)*0.1, 0); if(reduce) camGoal.multiplyScalar(0.3);
-    camOff.lerp(camGoal, 1-Math.exp(-dt*1.6)); aimCamera(); if(!reduce && !viewOver){ camera.position.y+=Math.sin(t*0.23)*0.025; if(Lv.breath) camera.position.x+=breathAt(t); camera.updateMatrixWorld(); }   // NIGHT-6 slice 8: + the sideways breath
+    const f0=rigs[0].on>0.05 && !restOn ? rigs[0].cur : camLook;   // NIGHT-13: at rest the camera does not lean
+    goalOf(f0, camGoal); motionK= restOn ? 0 : motionK+(1-motionK)*(1-Math.exp(-dt/REST_TC));
+    if(restOn) camOff.copy(camGoal); else camOff.lerp(camGoal, 1-Math.exp(-dt*1.6));
+    aimCamera(); if(!reduce && !viewOver){ camera.position.y+=Math.sin(t*0.23)*0.025*motionK; if(Lv.breath) camera.position.x+=breathAt(t)*motionK; camera.updateMatrixWorld(); }   // NIGHT-6 slice 8: + the sideways breath; NIGHT-13: × motionK
   }
   /* a note began on this rig's hand (from the bus `notes` ring) */
   const glint=(i,vel)=>{ const r=rigs[i]; if(r) r.glint=Math.max(r.glint, clamp(vel==null?0.6:vel,0.18,1)); music=Math.min(1.5, music+0.35*clamp(vel==null?0.6:vel,0.18,1));
@@ -371,6 +383,14 @@ export function buildForest(T, opt){
       for(let k=1;k<=6 && amp>0.03;k++){ echoes.push({ at:now+k*fxv.time, amp, pos:r.cur.clone() }); amp*=Math.max(0, fxv.fb); } } };
   /* probes: numbers only (never pixels) */
   function project(i){ const r=rigs[i]; tmp.copy(r.cur).project(camera); return { x:(tmp.x+1)/2*W, y:(1-tmp.y)/2*H, sat:r.sat, on:r.on }; }
+  /* NIGHT-13: a firefly on the screen — its place (the room's view px), its drawn radius (px of the view: the point's size law over the pixel ratio), its glow,
+     its distance; flyPick: the one the start's dot becomes — far (≥ 8 m), glowing, nearest to the deep middle of the picture (0.56, 0.5) */
+  const flyTmp=V(0,0,0), flyAt=i=>{ const q=flies[i]; if(!q) return null; flyTmp.set(q.p[0], q.p[1], q.p[2]); const z=flyTmp.clone().applyMatrix4(camera.matrixWorldInverse).z; flyTmp.project(camera);
+    const px=Math.max(1.5, fm.uniforms.uSize.value*fm.uniforms.uScale.value/Math.max(0.1, -z)), k=pxH>0 ? H/pxH : 1;
+    return { i, x:(flyTmp.x+1)/2*W, y:(1-flyTmp.y)/2*H, r:px*k/2, glow:q.glow*fkNow, dist:-z, front:z<0 && Math.abs(flyTmp.x)<1 && Math.abs(flyTmp.y)<1 }; };
+  function flyPick(){ let best=null, bd=Infinity;
+    flies.forEach((q,i)=>{ const f=flyAt(i); if(!f || !f.front || f.dist<8) return; const d=Math.hypot(f.x/W-0.56, (f.y/H-0.5)*0.8)-0.15*Math.min(1, f.glow); if(d<bd){ bd=d; best=i; } });
+    return best; }
   const state=()=>({ rigs:rigs.map(r=>({ x:r.cur.x, y:r.cur.y, z:r.cur.z, on:r.on, sat:r.sat })), shadows:rigs.filter(r=>r.light.castShadow).length, shadowSize:SH,
     flies:flies.length, trail:Lv.trail, fov:camera.fov, cam:[camera.position.x, camera.position.y, camera.position.z], fliesAt:flies.map(q=>q.p.slice()),
     fx:{ ...fxv, color:[rigs[0].light.color.r, rigs[0].light.color.g, rigs[0].light.color.b], echoesDue:echoes.length, rings:rings.filter(g=>g.t0>=0).length },   // C5
@@ -402,5 +422,8 @@ export function buildForest(T, opt){
   const render=r=>{ mirror.render(r, now*1000); paint.render(r, now); };   // NIGHT-9: the mirror first, when due by the room's own clock (one frame drawn twice stays one picture)   // the room's own frame time: one frame drawn twice is the same picture (the grain too)
   resize(W,H);
   return { id:FOREST_ROOM.id, scene:s, camera, update, resize, place, glint, project, state, dispose, lightsOf, lifeDbg:life, detailDbg:detail, bed, texBytes, answersDbg:answers, floorDbg:floor, streamDbg:stream, woodDbg:wood, gustDbg:gust, canopyDbg:canopy, dappleDbg:DU, render, paintDbg:paint, mirrorDbg:mirror, hiddenDbg:hidden, foxDbg:FU, fernsDbg:{ fronds, frondM, frondD }, groundDbg:{ U:macroU, branches, brs:brs.length, litter },   // NIGHT-8: probes
-    held:sec=>{ heldNow= sec>0 ? sec : 0; rare.held(sec); }, rareDbg:kind=>rare.force(kind, now, { light:rigs[0].cur, flies }), viewDbg:o=>{ viewOver=o||null; aimCamera(); return viewOver; } };   // RUN 9 (slice 4): held — how long the playing note is held (host); rareDbg — probes / captures   // RUN 9: lifeDbg / detailDbg — probes only (uniforms, silhouette boxes)
+    held:sec=>{ heldNow= sec>0 ? sec : 0; rare.held(sec); }, rareDbg:kind=>rare.force(kind, now, { light:rigs[0].cur, flies }), viewDbg:o=>{ const lens=v=>!!(v && (v.fov || v.rest)), had=lens(viewOver); viewOver=o||null; if(had || lens(viewOver)) resize(W, H, pxH); else aimCamera(); return viewOver; },
+    rest:on=>{ const was=restOn; restOn=!!on; if(restOn && !was){ goalOf(camLook, camGoal); camOff.copy(camGoal); motionK=0; aimCamera(); } return restOn; },   // NIGHT-13: the camera at rest (host sceneRest)
+    flyAt, flyPick,   // NIGHT-13: the start's dot becomes one of the fireflies
+    restDbg:()=>({ rest:restOn, motionK, off:[camOff.x, camOff.y, camOff.z], cam:[camera.position.x, camera.position.y, camera.position.z], fov:camera.fov }) };   // RUN 9 (slice 4): held — how long the playing note is held (host); rareDbg — probes / captures   // RUN 9: lifeDbg / detailDbg — probes only (uniforms, silhouette boxes)
 }

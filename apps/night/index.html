@@ -47,7 +47,7 @@
 <body class="night-boot night-loading">
 <!-- DESIGN-1 part D: the start screen's still of the room (night.css shows the first room's from the first paint; apps/night/still.js the remembered room's,
      its drifting lights and the reveal after Begin) and the emblem's dot that drifts into the picture -->
-<div id="nightStill" class="night-only night-still" aria-hidden="true"><canvas id="nightStillLights" class="night-still-lights"></canvas></div>
+<div id="nightStill" class="night-only night-still" aria-hidden="true"><canvas id="nightStillOver" class="night-still-lights"></canvas><canvas id="nightStillLights" class="night-still-lights"></canvas></div>
 <div id="nightStillMist" class="night-only night-still-mist" aria-hidden="true" hidden></div>
 <span id="nightStillDot" class="night-only night-still-dot" aria-hidden="true" hidden></span>
  
@@ -620,7 +620,8 @@
     </div>
   </div>
   <!-- DESIGN-1 part C: THE SETTINGS CARD IN THREE SHORT TABS (apps/night/settabs.js) — Sound · Picture · Hands; one line per control with a short label, any
-       explanation small and dim under it; the rarely used behind «More» in their tab; the about block (How to play) under every tab. Every control keeps its id
+       explanation small and dim under it; the about block (How to play) under every tab. NIGHT-13: no «More», every tab shows all its controls; the panes share
+       one grid cell (#nightPanes), so the card keeps the tallest tab's height and does not jump on a switch. Every control keeps its id
        and its behaviour (shell.js, calib.js, camera.js). The card before the tabs, word for word, and how to revert: docs/night/design/DESIGN-1-settings-before.html -->
   <div id="nightInfo" class="night-card night-glass night-set" role="dialog" aria-modal="true" aria-labelledby="nightSetTitle" hidden>
     <div class="night-ihead"><span id="nightSetTitle" class="night-set-title" data-i18n="night.settings">Settings</span>
@@ -630,13 +631,14 @@
       <button id="nightTabPicture" class="night-tab" role="tab" data-tab="picture" aria-controls="nightPanePicture" aria-selected="false" tabindex="-1" data-i18n="night.tab.picture">Picture</button>
       <button id="nightTabHands" class="night-tab" role="tab" data-tab="hands" aria-controls="nightPaneHands" aria-selected="false" tabindex="-1" data-i18n="night.tab.hands">Hands</button>
     </div>
+    <div id="nightPanes" class="night-panes">
     <!-- Sound: the music bed's volume, the room's own sound, the music's answer (its preset is the Music button) -->
     <section id="nightPaneSound" class="night-sec night-pane" data-pane="sound" role="tabpanel" aria-labelledby="nightTabSound">
       <label class="night-vol"><span class="night-vico" data-svg="music"></span><span class="night-lab" data-i18n="night.musicVol">Music volume</span><span class="night-vol-in"><input id="nightMusicVol" type="range" min="0" max="1" step="0.01" value="0.6"></span></label>
       <label id="nightRoomSoundRow" class="night-vol" hidden><span class="night-vico" data-svg="forest"></span><span class="night-lab" data-i18n="night.roomSounds">Room sounds</span><span class="night-vol-in"><input id="nightRoomSound" type="range" min="0" max="1" step="0.01" value="0.6"></span></label>
       <button id="nightMusicAnswerTg" class="night-tg"><span class="night-vico" data-svg="note-stay"></span><span class="night-tg-lab"><span data-i18n="night.set.answer">Music answers my notes</span><span class="night-tg-note" data-i18n="night.set.answerNote">Its next chord leans toward what I played.</span></span><span class="night-tsw"><span></span></span></button>
     </section>
-    <!-- Picture: what is on screen (the value «forest» = the current room's picture), its detail, the Lightweight mode; More: the full note field -->
+    <!-- Picture: what is on screen (the value «forest» = the current room's picture), its detail, the Lightweight mode, the full note field -->
     <section id="nightPanePicture" class="night-sec night-pane" data-pane="picture" role="tabpanel" aria-labelledby="nightTabPicture" hidden>
       <div class="night-row"><span class="night-row-lab" data-i18n="night.set.screen">On screen</span>
         <div id="nightBgSeg" class="night-seg"><button data-bg="forest" data-i18n="night.bgRoom">Room</button><button data-bg="dark" data-i18n="prof.bgDark">Dark</button><button data-bg="camera" data-i18n="prof.bgCamera">Camera</button></div></div>
@@ -646,12 +648,9 @@
       <!-- NIGHT-11 part 5: on a small touch screen, a short note beside Detailed (it stays offered: a phone may drive a TV) -->
       <p id="nightQualNote" class="night-row-note" data-i18n="night.q.heavy" hidden>Detailed may be heavy on some phones.</p>
       <button id="nightLightTg" class="night-tg"><span class="night-vico" data-svg="lightweight"></span><span class="night-tg-lab"><span data-i18n="night.set.light">Lightweight mode</span><span class="night-tg-note" data-i18n="night.set.lightNote">For older computers and phones.</span></span><span class="night-tsw"><span></span></span></button>
-      <button id="nightMorePictureBtn" class="night-more" aria-expanded="false" aria-controls="nightMorePicture"><span class="night-more-lab"></span><span class="night-more-chev" aria-hidden="true"></span></button>
-      <div id="nightMorePicture" class="night-more-body" hidden>
-        <button id="nightFieldTg" class="night-tg"><span class="night-vico" data-svg="note-stay"></span><span class="night-tg-lab"><span data-i18n="night.field">Show the full note field</span></span><span class="night-tsw"><span></span></span></button>
-      </div>
+      <button id="nightFieldTg" class="night-tg"><span class="night-vico" data-svg="note-stay"></span><span class="night-tg-lab"><span data-i18n="night.field">Show the full note field</span></span><span class="night-tsw"><span></span></span></button>
     </section>
-    <!-- Hands: the hand's setup, which hand plays, the camera (NIGHT-10: shown with two or more), the two sliders; More: the hand points, the reset -->
+    <!-- Hands: the hand's setup, which hand plays, the camera (NIGHT-10: shown with two or more), the two sliders, the hand points, the reset -->
     <section id="nightPaneHands" class="night-sec night-pane" data-pane="hands" role="tabpanel" aria-labelledby="nightTabHands" hidden>
       <div class="night-calrow"><span id="nightCalState"></span><button id="nightCalGo" class="night-lnk"></button></div>
       <p id="nightCalStore" class="night-note" hidden></p>
@@ -668,15 +667,13 @@
         <input id="nightFxSens" type="range" min="-1" max="1" step="0.01" value="0">
         <div class="night-sl-ends"><span data-i18n="night.cal.softer">Softer</span><span data-i18n="night.cal.stronger">Stronger</span></div>
       </div>
-      <button id="nightMoreHandsBtn" class="night-more" aria-expanded="false" aria-controls="nightMoreHands"><span class="night-more-lab"></span><span class="night-more-chev" aria-hidden="true"></span></button>
-      <div id="nightMoreHands" class="night-more-body" hidden>
-        <div class="night-row"><span class="night-row-lab" data-i18n="night.set.dots">Hands on screen</span>
-          <div id="nightDotsSeg" class="night-seg night-seg-2"><button data-dots="tips" data-i18n="night.set.tips">Fingertips</button><button data-dots="all" data-i18n="night.set.all">All points</button></div></div>
-        <button id="nightCalReset" class="night-lnk" data-i18n="night.cal.reset">Reset hand settings</button>
-        <div id="nightCalResetQ" hidden><p data-i18n="night.cal.resetQ"></p>
-          <div class="night-btns"><button id="nightCalResetNo" class="night-btn" data-i18n="night.cal.cancel">Cancel</button><button id="nightCalResetYes" class="night-btn go" data-i18n="night.cal.resetDo">Reset</button></div></div>
-      </div>
+      <div class="night-row"><span class="night-row-lab" data-i18n="night.set.dots">Hands on screen</span>
+        <div id="nightDotsSeg" class="night-seg night-seg-2"><button data-dots="tips" data-i18n="night.set.tips">Fingertips</button><button data-dots="all" data-i18n="night.set.all">All points</button></div></div>
+      <button id="nightCalReset" class="night-lnk" data-i18n="night.cal.reset">Reset hand settings</button>
+      <div id="nightCalResetQ" hidden><p data-i18n="night.cal.resetQ"></p>
+        <div class="night-btns"><button id="nightCalResetNo" class="night-btn" data-i18n="night.cal.cancel">Cancel</button><button id="nightCalResetYes" class="night-btn go" data-i18n="night.cal.resetDo">Reset</button></div></div>
     </section>
+    </div>
     <div class="night-about">
       <span class="night-mark"><span data-svg="emblem"></span><span class="night-word">hand<span class="night-word-dot">·</span>song</span> <span class="night-sub">night</span></span>
       <!-- NIGHT-12 (the founder): no privacy or headphones lines here; the privacy line lives on the start screen only -->

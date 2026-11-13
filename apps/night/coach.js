@@ -11,13 +11,13 @@ const $=id=>document.getElementById(id), READ=BUS.reader();
 const load=k=>{ try{ return localStorage.getItem(k); }catch(e){ return null; } };
 const save=(k,v)=>{ try{ localStorage.setItem(k,v); }catch(e){} };
 const TEXT={ raise:'night.coach.raise', pinch:'night.coach.pinch', fingers:'night.coach.fingers', depth:'night.coach.depth', fx:'night.fxHint', calib:'night.coach.calib', home:'night.coach.home' };
-let st=null, seq=-1, last=0, shown=null, calYes=null, calNo=null, speed=1, vnow=0;
+let st=null, seq=-1, last=0, shown=null, calYes=null, calNo=null, speed=1, vnow=0, pin=null;   // pin: probe only — a line held on screen (coachShowDbg)
 const LOG=[];   // probe: { t, kind:'show'|'note', id }
 /* a session's coaching begins (a person's Begin or the app's start): the stored list read once, the notes counted from now */
 export function coachBegin(){ if(st) return; st=coachNew(coachSeen(load(COACH_KEY))); seq=READ.seq('notes'); last=0; }
 /* once per frame: x = { ready, paused, calDue, homeDue } from the shell; onCal(yes) when the calibration line is answered */
 export function coachTick(now, x, onCal){
-  if(!st) return;
+  if(!st || pin) return;
   const dt= last ? Math.min(250, now-last)*speed : 0; last=now; vnow+=dt;
   const hv=READ.get('handsView'), H=Array.isArray(hv) ? hv : [];
   const N=READ.since('notes', seq); seq=N.seq; const note=N.items.some(it=>it.kind==='on' && it.role==='ld');
@@ -44,4 +44,6 @@ export const coachShown=()=>shown;
 /* probe only: the log of this page, the state, a faster clock for the later hints (k × real time), a fresh start (nothing seen) */
 export const coachDbg=()=>({ shown, log:LOG.slice(), st:st ? { ...st, seen:st.seen.slice() } : null, speed });
 export const coachSpeedDbg=k=>{ speed= k>0 ? +k : 1; return speed; };
+/* probe only (NIGHT-13): hold one line on screen as render() shows it (its words, the calibration's buttons) — the layout row; null lets go */
+export function coachShowDbg(id){ pin= id && TEXT[id] ? id : null; shown=pin; render(); return shown; }
 export function coachResetDbg(o={}){ if(o.clear) save(COACH_KEY, '[]'); st=null; shown=null; LOG.length=0; vnow=0; render(); coachBegin(); }

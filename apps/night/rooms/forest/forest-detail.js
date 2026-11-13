@@ -12,10 +12,10 @@ import { seeded } from '../../../../core/pure/dsp.js';
 import { forestGround } from './pure/fireflies.js';
 import { streamNear, STREAM, bankGround } from './pure/forestlife.js';
 import { patchSway, patchSoftEdges } from './forest-life.js';
+import { FOREST_SIL, SIL_TALL } from './pure/sil.js';   // NIGHT-13: one list for the room and the start still's screen layer
 
 export const DETAIL=Object.freeze({ seed:0x44455441, leafH:5.3, beamLen:17, beams:Object.freeze([[-2.6,-7.5,2.2],[1.9,-10.5,2.6],[-0.7,-15,3.2],[3.7,-5.6,1.8]]),
-  sil:Object.freeze([ Object.freeze({ kind:'fern', nx:-0.86, ny:-0.82, d:1.7, h:0.5, flip:false }), Object.freeze({ kind:'fern', nx:0.9, ny:-0.86, d:2.0, h:0.42, flip:true }),
-    Object.freeze({ kind:'branch', nx:0.78, ny:0.9, d:2.4, h:0.34, flip:false }) ]) });
+  sil:FOREST_SIL });
 /* the leaves' shader: each leaf falls on its own loop (uNow · speed + phase), sways and turns; seen as a small rotated ellipse */
 const LV=`uniform float uNow,uWind,uScale,uSize,uH,uFog,uLightOn;uniform vec3 uLight;attribute vec4 aSeed;varying float vA,vRot,vLit;
 void main(){ float fall=mod(uNow*aSeed.w+aSeed.z*uH,uH); vec3 p=vec3(aSeed.x+sin(uNow*0.9+aSeed.z*6.0)*0.45+uWind*fall*0.35, uH+0.2-fall, aSeed.y+cos(uNow*0.7+aSeed.z*4.0)*0.35);
@@ -73,15 +73,15 @@ export function buildDetail(ctx){
   const branchT=tex(sc2,true); branchT.wrapS=branchT.wrapT=T.ClampToEdgeWrapping;
   const silC=new T.Color(C('forest-sil')), sils=DETAIL.sil.map(o=>{ const m=new T.MeshBasicMaterial({ map:o.kind==='fern' ? fernT : branchT, color:silC, alphaTest:0.45, side:T.DoubleSide, fog:false });
     if(ctx.soft) patchSoftEdges(m);   // NIGHT-6: soft edges at medium
-    const g=new T.PlaneGeometry(o.kind==='fern' ? 0.36 : 0.5, 1); own.push(m, g); const p=new T.Mesh(g, m); p.userData=o; p.renderOrder=10; s.add(p); return p; });
+    const g=new T.PlaneGeometry(o.gw, 1); own.push(m, g); const p=new T.Mesh(g, m); p.userData=o; p.renderOrder=10; s.add(p); return p; });
   const tv=new T.Vector3(), up=new T.Vector3(), zz=new T.Vector3(), xx=new T.Vector3(), mx=new T.Matrix4(), ray=new T.Raycaster(), ndc=new T.Vector2(), fwd=new T.Vector3();
   /* the silhouettes' places on the camera's frustum at rest (resize only): anchor (nx, ny) in device coordinates, d units away, h of the view's height */
   function resize(W, H, camera, scale){
     lm.uniforms.uScale.value=mm.uniforms.uScale.value=scale;
     camera.getWorldDirection(fwd);
     for(const p of sils){ const o=p.userData; ndc.set(o.nx, o.ny); ray.setFromCamera(ndc, camera); const t=o.d/ray.ray.direction.dot(fwd);
-      p.position.copy(ray.ray.origin).addScaledVector(ray.ray.direction, t); const vh=2*o.d*Math.tan(camera.fov*Math.PI/360), h=vh*o.h*(W/H<0.8 ? 0.8 : 1);
-      p.quaternion.copy(camera.quaternion); p.scale.set((o.flip?-1:1)*h, h, 1); p.rotateZ(o.kind==='branch' ? 2.4 : (o.flip ? 0.25 : -0.25)); }
+      p.position.copy(ray.ray.origin).addScaledVector(ray.ray.direction, t); const vh=2*o.d*Math.tan(camera.fov*Math.PI/360), h=vh*o.h*(W/H<SIL_TALL ? SIL_TALL : 1);
+      p.quaternion.copy(camera.quaternion); p.scale.set((o.flip?-1:1)*h, h, 1); p.rotateZ(o.rot); }
   }
   /* one frame. F: { light (V3), lightOn, moon [x,y,z], moonK (moon light × sleep), mist (0…1 mean), wind (sway), cam (camera position) } */
   function update(dt, t, F){

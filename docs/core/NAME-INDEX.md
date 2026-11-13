@@ -50,7 +50,7 @@ NIGHT-7 — THE FIRST CARDS: after the calibration offer on a first start (and f
 ## apps/night/coach.js
 NIGHT-11 part 4 — PLAY FIRST, TEACH INSIDE: the DOM side of the one coaching line (the law: pure/coach.js).
 - const (3): `coachShown`, `coachDbg`, `coachSpeedDbg`
-- fn (4): `coachBegin`, `coachTick`, `coachWire`, `coachResetDbg`
+- fn (5): `coachBegin`, `coachTick`, `coachWire`, `coachShowDbg`, `coachResetDbg`
 
 ## apps/night/early.js
 CORE-20 (audit P1) — MEDIAPIPE'S BINARY EARLY, NEVER AGAINST THE PAGE'S OWN FILES.
@@ -136,6 +136,11 @@ RUN 9 — THE NIGHT over the forest, as numbers.
 NIGHT-8b — THE FULL-SCREEN SIGN, pure data (apps/night/icons.js draws it filled): the plain standard sign, four separate corner brackets with square corners (thin round-joined strokes read as a pin…
 - const (2): `FS_ENTER`, `FS_EXIT`
 
+## apps/night/pure/handlight.js
+NIGHT-13 — THE HAND'S LIGHT: WHERE IT SITS AND HOW BRIGHT (pure, rule #36; data row «NIGHT hand light anchor (app)»).
+- const (4): `HANDLIGHT`, `handLightK`, `HANDLIGHT_GLOW_OLD`, `handLightNew`
+- fn (3): `handLightGlow`, `handLightRatios`, `handLightStep`
+
 ## apps/night/pure/heard.js
 NIGHT-6 slice 1 — WHEN A SOUND IS HEARD, on the page's clock.
 - const (1): `heardMs`
@@ -156,13 +161,13 @@ NIGHT-11 part 5 — THE SCENE'S PIXEL BUDGET (audit P4).
 
 ## apps/night/pure/room.js
 NIGHT-3: THE ROOM RECORD's shape and validator (pure, rule #36; data row «NIGHT room records» with controls).
-- const (9): `ROOM_FORMAT`, `ROOM_IDS`, `ROOM_LEVELS`, `ROOM_ACOUSTICS`, `TINT_INK`, `contrastOf`, `roomLook`, `roomModes`, `ROOM_DAMAGES`
+- const (10): `ROOM_FORMAT`, `ROOM_IDS`, `ROOM_LEVELS`, `ROOM_ACOUSTICS`, `TINT_INK`, `contrastOf`, `roomLook`, `roomModes`, `roomFov`, `ROOM_DAMAGES`
 - fn (1): `checkRoom`
 
 ## apps/night/pure/still.js
 DESIGN-1 part D: THE START SCREEN'S STILL AND THE REVEAL — the law (pure, rule #36; data row «NIGHT start still (app)»).
-- const (4): `STILL`, `STILL_PHASES`, `stillEase`, `stillFile`
-- fn (3): `stillPhase`, `stillLook`, `stillDot`
+- const (9): `STILL`, `STILL_PHASES`, `stillEase`, `stillDot`, `stillFile`, `stillTan`, `stillWidest`, `stillVeilMax`, `DOT`
+- fn (5): `stillPhase`, `stillLook`, `stillFit`, `stillVeil`, `dotFlight`
 
 ## apps/night/rooms/forest/forest-answers.js
 NIGHT-6 slice 1 — THE FOREST ANSWERS (parts of the night forest room; forest.js builds them; the numbers are ./pure/answers.js): - DEW: points on the low leaves in view, one draw; each twinkles on …
@@ -287,6 +292,11 @@ NIGHT-9 — THE GROUND'S ROOT BULGES AND OCCLUSION, as numbers (pure, rule #36; 
 NIGHT-3: THE FOREST ROOM'S RECORD — what the room is, as data (pure, rule #36; checked by apps/night/pure/room.js, data row «NIGHT room records»).
 - const (1): `FOREST_ROOM`
 
+## apps/night/rooms/forest/pure/sil.js
+NIGHT-13: THE FOREGROUND SILHOUETTES — dark fronds and a branch held in the corners of the view (pure, rule #36).
+- const (2): `SIL_TALL`, `FOREST_SIL`
+- fn (1): `silScreen`
+
 ## apps/night/rooms/forest/pure/stream.js
 NIGHT-6 slice 4 — THE STREAM'S LIFE, as numbers.
 - const (3): `STREAM_LIFE`, `streamLength`, `STREAM_SOUND`
@@ -321,11 +331,11 @@ CORE-20: Night fetches only the modes it plays — every room's moods and the pa
 
 ## apps/night/scene/host.js
 THE SCENE HOST and Night's BACKGROUNDS (VIS1b, RUN 6; Night's own since CORE-8 — the shared UI reaches it through hooks.scene).
-- const (26): `BACKGROUNDS`, `sceneRoomAdd`, `sceneRoomRemove`, `sceneRooms`, `sceneRoom`, `sceneRoomSet`, `SCENE_LEVEL_DEFAULT`, `SCENE_FADE`, `scenePausing`, `COMPILE_LOG`, `backgroundOf`, `sceneLevel`, `sceneShadowDbg`, `sceneOptDbg`, `sceneInfo`, `sceneRoomDbg`, `sceneLostDbg`, `sceneStartNote`, `sceneStartLevelDbg`, `sceneGuardDbg`, `sceneLevelDbg`, `sceneHeldDbg`, `sceneProgramsDbg`, `sceneClockDbg`, `sceneBedDbg`, `sceneOpenDbg`
-- fn (9): `loadThree`, `sceneOpen`, `sceneSwitch`, `sceneClose`, `setBackground`, `setSceneLevel`, `sceneSnapDbg`, `sceneShotDbg`, `sceneLoseDbg`
+- const (30): `BACKGROUNDS`, `sceneRoomAdd`, `sceneRoomRemove`, `sceneRooms`, `sceneRoom`, `sceneRoomSet`, `SCENE_LEVEL_DEFAULT`, `SCENE_FADE`, `scenePausing`, `COMPILE_LOG`, `sceneFlyPick`, `sceneFlyAt`, `sceneRestDbg`, `sceneLitDbg`, `backgroundOf`, `sceneLevel`, `sceneShadowDbg`, `sceneOptDbg`, `sceneInfo`, `sceneRoomDbg`, `sceneLostDbg`, `sceneStartNote`, `sceneStartLevelDbg`, `sceneGuardDbg`, `sceneLevelDbg`, `sceneHeldDbg`, `sceneProgramsDbg`, `sceneClockDbg`, `sceneBedDbg`, `sceneOpenDbg`
+- fn (10): `loadThree`, `sceneOpen`, `sceneSwitch`, `sceneClose`, `sceneRest`, `setBackground`, `setSceneLevel`, `sceneSnapDbg`, `sceneShotDbg`, `sceneLoseDbg`
 
 ## apps/night/settabs.js
-DESIGN-1 part C: THE SETTINGS IN THREE SHORT TABS — Sound · Picture · Hands (the markup in index.html: #nightSetTabs, the panes [data-pane]) and, in a tab, a «More» line that opens its rarely used …
+DESIGN-1 part C: THE SETTINGS IN THREE SHORT TABS — Sound · Picture · Hands (the markup in index.html: #nightSetTabs, the panes [data-pane]).
 - const (2): `SET_TABS`, `setTabOf`
 - fn (2): `setTab`, `setTabsWire`
 
@@ -549,7 +559,7 @@ DRAW1 (DAY run 2026-10-16): shared canvas helpers (FX bar layout, status and tra
 
 ## core/legacy-ui/views/play.js
 DRAW1 (DAY run 2026-10-16): the play screen: overlays per frame (drawOverlays), roles, grids, hands, palette, effect bars, status — moved from draw.js verbatim (draw.js is the facade).
-- const (1): `nightTipsDbg`
+- const (2): `nightTipsDbg`, `glowJointsDbg`
 - fn (2): `nightTipsDrawDbg`, `drawOverlays`
 
 ## core/legacy-ui/views/roll.js
@@ -1289,7 +1299,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 - const (5): `TEST_ROOM_ID`, `TEST_ROOM`, `testRoomMode`, `testRoomInfo`, `testRoomFreeLeaks`
 - fn (2): `testRoomInstall`, `testRoomRemove`
 
-_254 modules, 2705 exported names._
+_256 modules, 2730 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

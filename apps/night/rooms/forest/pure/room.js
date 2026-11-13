@@ -3,12 +3,18 @@
    night.css) and its fog / mist / firefly amounts, eased by the room (τ MOOD_TC); moods: a mode id → its look; nature: the ambience recipe
    (drone, wind, distant crickets, one soft echo — RUN 7's numbers; NIGHT-8 the stream), built by apps/night/sound/ambience.js. */
 import { streamVoices } from './stream.js';   // NIGHT-8: the stream's sound places, from its path
+import { FOREST_SIL, SIL_TALL } from './sil.js';   // NIGHT-13: the corner silhouettes (the still's screen layer draws them too)
+import { PAINT } from './paint.js';   // NIGHT-13: the film's vignette (the still's screen layer draws it too)
 const LOOK=(pre, fog, mist, flies)=>Object.freeze({ pre, fog, mist, flies,
   tokens:Object.freeze({ fog:pre+'fog', sky:pre+'sky', under:pre+'under', moon:pre+'moon', moonhalo:pre+'moonhalo', haze:pre+'haze', cloud:pre+'cloud',
     shroom:pre+'shroom', bloom:pre+'bloom' }) });
 const F=Object.freeze;
 export const FOREST_ROOM=F({
-  format:'handsong/room', version:1, id:'room.forest', name:F({ en:'Forest', ru:'Лес' }), icon:'forest', tint:'forest-tint', still:F({ full:'still/still-full.webp', reduced:'still/still-reduced.webp' }), tokens:'forest-',   // DESIGN-1 part D: still — the start screen's prepared still per level (tools/night-still.mjs)
+  format:'handsong/room', version:1, id:'room.forest', name:F({ en:'Forest', ru:'Лес' }), icon:'forest', tint:'forest-tint', still:F({ full:'still/still-full.webp', reduced:'still/still-reduced.webp', fov:68, aspect:1.85239,
+    over:F({ sprites:'still/still-sil.webp', rects:F({ fern:F([0,0,128,512]), branch:F([128,0,128,256]) }), sil:FOREST_SIL, vignette:PAINT.vignette }) }), tokens:'forest-',   // DESIGN-1 part D: still — the start screen's prepared still per level (tools/night-still.mjs)
+    // NIGHT-13: the still is the world only, seen by the room's camera at rest through a WIDER lens (fov, aspect: every screen up to 2.4 : 1 is a crop of it,
+    // placed by the room's own lens law `view`); `over` — what the room pins to the screen (the corner silhouettes, the vignette), drawn over it per screen
+  view:F({ fov:55, tallFov:68, tall:SIL_TALL }),   // NIGHT-13: the camera's vertical field of view — tallFov on a screen narrower than `tall` (w / h)
     // DESIGN-1: tint — the token of the interface's accents in this room (night.css: today's lime)
     // NIGHT-8: icon — its Room-sounds slider keeps the leaf
   /* full: real shadows (hand light 1024², 512² on small screens), 70 wild fireflies, 16-step trails, moving mist; reduced: no shadow, 35 fireflies,

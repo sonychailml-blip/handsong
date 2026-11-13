@@ -537,8 +537,17 @@ export async function checkNightBars(){
     if(!(B.forest.side==='left' && B.fx.side==='right')) miss('the bars did not follow the hands to the other sides: '+B.forest.side+' / '+B.fx.side);
     frame([],3); clk.t+=3000; frame([],1); await wait(150); await raf(); B=SH.nightShellDbg().bars; n++;   // past the hands' watchdog
     if(B.forest.on || B.fx.on) miss('the bars stay on with no hands');
-    ST.setNightView({ ...ST.nightView, tips:false }); frame(two(0.75,0.25,0.3),3); await raf(); await wait(60); n++;
-    if(PV.nightTipsDrawDbg().length) miss('CONTROL: «all joints» still drew fingertip fireflies — the tips check cannot fail');
+    /* CORE-21: «All points» is drawn in Night's look — the five fireflies of each hand plus its other sixteen points, each on its joint; CONTROL: Full's view
+       (no Night view) draws none of Night's fireflies or points (the old CONTROL «all joints draw no fireflies» is the old look) */
+    ST.setNightView({ ...ST.nightView, tips:false }); frame(two(0.75,0.25,0.3),3); await raf(); await wait(60); n+=2;
+    { const T=PV.nightTipsDrawDbg(), J=PV.glowJointsDbg(), R=J.filter(j=>j.i!=null && j.x!=null); let worst=0;
+      const lmOf=(x,y)=>{ let b=Infinity; for(const k of ['Right','Left']){ const L=G.HANDS[k] && G.HANDS[k].lm; if(L) for(const q of L) b=Math.min(b, Math.hypot(ST.sx(q.x,clk.W)-x, ST.sy(q.y,clk.H)-y)); } return b; };
+      for(const j of R) worst=Math.max(worst, lmOf(j.x, j.y));
+      if(T.length!==10 || J.length!==32) miss(`«All points»: ${T.length} fireflies and ${J.length} other points in Night's look (10 and 32 expected)`);
+      else if(J.some(j=>[4,8,12,16,20].includes(j.i)) || worst>1e-6) miss(`«All points»: the other points are off their joints by ${worst} px (or a fingertip drawn twice)`);
+      else notes.push(`«All points»: 10 fireflies + 32 points in Night's look, on their joints (off by ${worst.toExponential(1)} px)`); }
+    { const nv=ST.nightView; ST.setNightView(null); const T=PV.nightTipsDrawDbg(), J=PV.glowJointsDbg(); ST.setNightView(nv);
+      if(T.length || J.length) miss(`CONTROL: Full's view drew ${T.length} of Night's fireflies and ${J.length} of its points — the check cannot fail`); }
     ST.setNightView({ ...ST.nightView, tips:true });
     /* one message at a time */
     frame([],2); G.handsProbe(null);

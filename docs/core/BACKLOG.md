@@ -329,3 +329,6 @@ MediaPipe + model, a versioned precache written by the release tool, an update t
 6. ⛳ **Hosting before selling (user, Q14, 2026-10-14):** the Vercel deployment's visitor counter (Vercel Web Analytics) stays and is named in
    the privacy notice — but **Vercel's Hobby plan forbids commercial use**: before anything is sold, move to a paid Vercel plan or other
    hosting (GitHub Pages' terms to be checked then as well).
+
+## Found at NIGHT-13 (2026-11-13), not fixed (outside the slice)
+- `tools/smoke-paths.mjs:133`: the clipboard check waits with an `async` predicate (`waitForFunction(async t=>(await navigator.clipboard.readText())===t)`); Playwright does not await a predicate's promise, so it is truthy at once and the check can never fail. Fix as in `ui-snap.mjs` (NIGHT-13): read the clipboard in an `evaluate` loop with a time limit, or a synchronous predicate over a value set by the page.

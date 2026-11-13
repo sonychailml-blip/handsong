@@ -7,7 +7,7 @@ export const ROOM_FORMAT='handsong/room', ROOM_VERSION=1;
 export const ROOM_IDS=Object.freeze(['room.forest']);   // pinned: never renamed or reused
 export const ROOM_LEVELS=Object.freeze(['full','reduced']);   // the WebGL levels; «minimal» is the 2D stand-in
 export const ROOM_ACOUSTICS=Object.freeze(['fdepth']);
-const FIELDS=['format','version','id','name','icon','tint','still','tokens','levels','looks','moods','look','nature','acoustic','bed','bed2'];   // DESIGN-1: tint — the room's light on the interface   // NIGHT-8: icon — the room's own picture for its Room-sounds slider
+const FIELDS=['format','version','id','name','icon','tint','still','view','tokens','levels','looks','moods','look','nature','acoustic','bed','bed2'];   // DESIGN-1: tint — the room's light on the interface   // NIGHT-8: icon — the room's own picture for its Room-sounds slider
 const NATURE=['id','drone','wind','crickets','echo','stream','level','master','ahead'];   // NIGHT-8: stream (optional: a room without water has none)
 const plain=o=> o!==null && typeof o==='object' && !Array.isArray(o);
 /* DESIGN-1: a room's TINT (a token of the room, its colour in night.css) colours the interface's small accents (--night-tint) with dark ink on it (a
@@ -23,6 +23,8 @@ export const roomLook=(room, mood)=> room.looks[room.moods[mood]||mood] || room.
 export const roomModes=records=>[...new Set(records.flatMap(r=>Object.keys((r && r.moods) || {})))];
 /* null = valid; otherwise ONE line naming the field. known (optional): modes — the app's mode ids (each mood must be one); ids — the room ids
    allowed (default ROOM_IDS; a development room passes its own, never pinned and never remembered) */
+/* NIGHT-13: the camera's vertical field of view (degrees) for a view w × h by the room's lens law (its record's `view`) — the room and its start still read it */
+export const roomFov=(view, w, h)=> w/h<view.tall ? view.tallFov : view.fov;
 export function checkRoom(r, known={}){
   if(!plain(r)) return 'not an object';
   for(const k of Object.keys(r)) if(!FIELDS.includes(k)) return `unknown field «${k}»`;
@@ -33,8 +35,17 @@ export function checkRoom(r, known={}){
   if(typeof r.icon!=='string' || !/^[a-z][a-z0-9-]*$/.test(r.icon)) return 'icon: the name of a drawn icon (the Room-sounds slider shows it)';
   if(typeof r.tokens!=='string' || !/^[a-z][a-z0-9-]*-$/.test(r.tokens)) return 'tokens: a token prefix like «forest-»';
   if(typeof r.tint!=='string' || !/^[a-z][a-z0-9-]*$/.test(r.tint) || !r.tint.startsWith(r.tokens)) return `tint: the token of the room's light on the interface («${r.tokens}…»; its colour in night.css, checked by the data row «NIGHT room tint»)`;
-  if(!plain(r.still) || Object.keys(r.still).join()!==ROOM_LEVELS.join() || Object.values(r.still).some(f=>typeof f!=='string' || !/^[a-z0-9_-]+(\/[a-z0-9_-]+)*\.webp$/.test(f)))
+  const webp=f=>typeof f==='string' && /^[a-z0-9_-]+(\/[a-z0-9_-]+)*\.webp$/.test(f);
+  if(!plain(r.still) || Object.keys(r.still).some(k=>![...ROOM_LEVELS, 'fov', 'aspect', 'over'].includes(k)) || ROOM_LEVELS.some(l=>!webp(r.still[l])))
     return 'still: {'+ROOM_LEVELS.join(', ')+'} — a «….webp» in the room folder for each level (the start screen’s prepared still)';   // DESIGN-1 part D
+  if(!num(r.still.fov) || r.still.fov<20 || r.still.fov>120 || !num(r.still.aspect) || r.still.aspect<0.5 || r.still.aspect>4)
+    return 'still: fov (the vertical field of view of the still, 20…120°) and aspect (its width over height, 0.5…4)';   // NIGHT-13
+  if(r.still.over!=null){ const O=r.still.over, V=O.vignette, rect=q=>Array.isArray(q) && q.length===4 && q.every(v=>num(v) && v>=0);
+    if(!plain(O) || !webp(O.sprites) || !plain(O.rects) || !Object.values(O.rects).every(rect) || !Array.isArray(O.sil) || !plain(V) || !['cx','cy','rx','ry','from','k'].every(k=>num(V[k]))
+      || O.sil.some(o=>!plain(o) || !O.rects[o.kind] || !['nx','ny','h','rot','gw'].every(k=>num(o[k])) || typeof o.flip!=='boolean'))
+      return 'still.over: { sprites (a «….webp»), rects {kind: [x, y, w, h]}, sil [{ kind, nx, ny, h, rot, gw, flip }], vignette { cx, cy, rx, ry, from, k } }'; }   // NIGHT-13
+  if(!plain(r.view) || !num(r.view.fov) || !num(r.view.tallFov) || !num(r.view.tall) || r.view.fov<20 || r.view.fov>120 || r.view.tallFov<20 || r.view.tallFov>120 || r.view.tall<=0)
+    return 'view: { fov, tallFov (vertical, 20…120°), tall (w / h below which tallFov) } — the lens law of the camera';   // NIGHT-13
   if(!plain(r.levels) || Object.keys(r.levels).join()!==ROOM_LEVELS.join()) return 'levels: {'+ROOM_LEVELS.join(', ')+'}';
   for(const [lv,L] of Object.entries(r.levels)){ if(!plain(L) || !Object.keys(L).length) return `levels.${lv}: a table of counts`;
     for(const [k,v] of Object.entries(L)) if(!(typeof v==='boolean' || (num(v) && v>=0))) return `levels.${lv}.${k}: a count ≥ 0 or a switch`; }
@@ -139,6 +150,9 @@ export const ROOM_DAMAGES=Object.freeze([
   ['tint', r=>{ r.tint='lake-tint'; }],   // another room's token
   ['still', r=>{ r.still={ full:'../still.png', reduced:'still/r.webp' }; }],   // DESIGN-1 part D
   ['still', r=>{ delete r.still.reduced; }],
+  ['still', r=>{ r.still.fov=0; }],   // NIGHT-13
+  ['still.over', r=>{ r.still.over={ ...r.still.over, sil:[{ kind:'leaf', nx:0, ny:0, h:0.1, rot:0, gw:1, flip:false }] }; }],
+  ['view', r=>{ delete r.view; }],
   ['nature.stream', r=>{ r.nature.stream.gain=3; }],
   ['nature.stream.voices[0].lp', r=>{ r.nature.stream.voices[0].lp=50; }],
   ['nature.stream.rec', r=>{ r.nature.stream.rec={ file:'../x.wav', norm:1 }; }],   // NIGHT-8b

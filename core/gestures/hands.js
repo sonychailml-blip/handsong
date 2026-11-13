@@ -774,7 +774,7 @@ function handsView(){
     const tip=FINGER_TIPS[S.pinch && S.oct>=0 ? S.oct : 0]||8, fn=handFnOf(k, S.role||phoneInstr);
     out.push({ key:k, x:sx((lm[4].x+lm[tip].x)/2, W), y:sy((lm[4].y+lm[tip].y)/2, H),
       d:calOn() ? calDepthView(S,lm) : clamp01((REV_NEAR-(S.hsF!=null ? S.hsF : Math.hypot(lm[0].x-lm[9].x, lm[0].y-lm[9].y)))/REV_RANGE), pinch:!!S.pinch, play:fn!=='fx' && fn!=='loop' && fn!=='expr',
-      ...(nightView ? { finger: S.pinch && S.oct>=0 ? S.oct : -1, tips:TIPS5.map(i=>[sx(lm[i].x, W), sy(lm[i].y, H)]) } : {}) }); }   // RUN 8: the finger in use and the five fingertips (remapped as the hit-tests — Night only; Full's view is RUN 7's — Night's bars and fireflies)
+      ...(nightView ? { finger: S.pinch && S.oct>=0 ? S.oct : -1, tips:TIPS5.map(i=>[sx(lm[i].x, W), sy(lm[i].y, H)]), palm:Math.hypot(sx(lm[0].x, W)-sx(lm[5].x, W), sy(lm[0].y, H)-sy(lm[5].y, H)) } : {}) }); }   // RUN 8: the finger in use and the five fingertips (remapped as the hit-tests — Night only; Full's view is RUN 7's — Night's bars and fireflies); CORE-21: palm — wrist to the index base in canvas px (the pinch's own scale), read-only
   return out;
 }
 export { HANDS, processHands, voiceModeReset, handsProbe, processHandsProbe, handsView };

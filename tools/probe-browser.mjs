@@ -819,12 +819,19 @@ async function uiNightHowTo(page, label){
 
 /* DESIGN-1 part C — «NIGHT settings tabs»: the settings card in three tabs, real taps on a fresh profile (Dark), at a laptop size (1280 × 800) and a phone
    size (390 × 844), in English then in Russian. Per tab: exactly its pane shows; its controls are visible and the other tabs' are not; «How to play» stays
-   visible; «More» opens the rarely used (Hands on screen and the reset in Hands, the full note field in Picture). The layout, judged on every visible line of
-   the pane with its «More» open: no two lines overlap, none sticks out of the card, the card does not scroll sideways, a note sits under its label. Behaviour
-   (English, laptop): the Lightweight switch and the note-field switch still do what they did (their state and the stored value), switched back. CONTROLS:
-   every pane forced visible must fail «one pane»; a note pulled up over its row must fail the layout. */
-const SET_TABS_WANT={ sound:{ show:['nightMusicVol','nightMusicAnswerTg'], more:[] }, picture:{ show:['nightBgSeg','nightQualSeg','nightLightTg','nightMorePictureBtn'], more:['nightFieldTg'] },
-  hands:{ show:['nightHandSeg','nightTravel','nightFxSens','nightMoreHandsBtn'], more:['nightDotsSeg','nightCalReset'] } };
+   visible; NIGHT-13: no «More» anywhere — every control of a tab shows at once (Hands on screen and the reset in Hands, the full note field in Picture).
+   The layout, judged on every visible line of the pane: no two lines overlap, none sticks out of the card, the card does not scroll sideways, a note sits under
+   its label. NIGHT-13: THE CARD STANDS STILL — its box (top, left, width, height) is the same under all three tabs. Behaviour (English, laptop): the Lightweight
+   switch and the note-field switch still do what they did (their state and the stored value), switched back. CONTROLS: every pane forced visible must fail
+   «one pane»; a note pulled up over its row must fail the layout; the panes without their shared cell (a hidden pane taking no room) must fail «stands still». */
+const SET_TABS_WANT={ sound:{ show:['nightMusicVol','nightMusicAnswerTg'] }, picture:{ show:['nightBgSeg','nightQualSeg','nightLightTg','nightFieldTg'] },
+  hands:{ show:['nightHandSeg','nightTravel','nightFxSens','nightDotsSeg','nightCalReset'] } };
+/* the card's box under each tab (real taps) → the differences from the first tab's box, px */
+async function setCardStill(p){ const box=[];
+  for(const tab of ['sound','picture','hands']){ await p.click(`#nightSetTabs [data-tab="${tab}"]`); await p.waitForTimeout(120);
+    box.push(await p.evaluate(()=>{ const r=document.getElementById('nightInfo').getBoundingClientRect(); return [r.top, r.left, r.width, r.height]; })); }
+  const moved=[]; box.forEach((b,i)=>{ if(i && b.some((v,k)=>Math.abs(v-box[0][k])>0.5)) moved.push(`${['sound','picture','hands'][i]} ${b.map(Math.round).join('/')} vs ${box[0].map(Math.round).join('/')}`); });
+  return { moved, box:box[0].map(Math.round) }; }
 function setJudge(W){
   const $=id=>document.getElementById(id), card=$('nightInfo'), vis=e=>{ if(!e) return false; for(let q=e;q && q!==document.body;q=q.parentElement){ const s=getComputedStyle(q); if(s.display==='none' || s.visibility==='hidden') return false; } const r=e.getBoundingClientRect(); return r.width>0 && r.height>0; };
   const panes=[...card.querySelectorAll('[data-pane]')].filter(vis).map(p=>p.dataset.pane), tab=(card.querySelector('[role=tab][aria-selected=true]')||{}).dataset||{};
@@ -833,7 +840,7 @@ function setJudge(W){
   const p=card.querySelector(`[data-pane="${panes[0]}"]`), want=W[panes[0]];
   for(const id of want.show) if(!vis($(id))) out.missing.push(id);
   for(const [k,w] of Object.entries(W)) if(k!==panes[0]) for(const id of w.show) if(vis($(id))) out.extra.push(id);
-  const items=[]; for(const e of p.children){ if(!vis(e)) continue; if(e.classList.contains('night-more-body')) items.push(...[...e.children].filter(vis)); else items.push(e); }
+  const items=[...p.children].filter(vis); out.mores=card.querySelectorAll('.night-more, .night-more-body').length;
   const C=card.getBoundingClientRect(); out.lines=items.length;
   const R=items.map(e=>[e.id || e.className.split(' ')[0], e.getBoundingClientRect()]);
   for(const [n,r] of R) if(r.left<C.left-0.5 || r.right>C.right+0.5) out.layout.push(`${n} sticks out of the card (${Math.round(r.left)}…${Math.round(r.right)} in ${Math.round(C.left)}…${Math.round(C.right)})`);
@@ -852,29 +859,25 @@ async function setStart(page, lang, vp){
 }
 const dropStyle=(p, tag)=>p.evaluate(t=>{ for(const s of document.querySelectorAll('style')) if(s.textContent.includes(t)) s.remove(); }, tag);
 async function uiNightSettings(page, label){
-  const lines=[], bad=[], CYR=/[а-яё]/i;
+  const lines=[], bad=[];
   for(const lang of ['en','ru']){ const c=await setStart(page, lang, { width:1280, height:800 });
     try{
       for(const vp of [{ width:1280, height:800 }, { width:390, height:844 }]){ await c.p.setViewportSize(vp); await c.p.waitForTimeout(300); const at=`${lang}, ${vp.width}×${vp.height}`, seen=[];
         for(const tab of ['sound','picture','hands']){ await c.p.click(`#nightSetTabs [data-tab="${tab}"]`); await c.p.waitForTimeout(150);
-          const more=tab==='sound' ? null : (tab==='picture' ? '#nightMorePictureBtn' : '#nightMoreHandsBtn');
-          let j=await c.p.evaluate(setJudge, SET_TABS_WANT);
+          const j=await c.p.evaluate(setJudge, SET_TABS_WANT);
           if(j.panes.length!==1 || j.panes[0]!==tab || j.tab!==tab) bad.push(`${at}: the tab «${tab}» shows the panes ${j.panes.join(', ')||'none'} (selected «${j.tab}»)`);
           if(j.missing.length) bad.push(`${at}, ${tab}: not visible ${j.missing.join(', ')}`); if(j.extra.length) bad.push(`${at}, ${tab}: another tab's controls visible ${j.extra.join(', ')}`);
           if(!j.howTo) bad.push(`${at}, ${tab}: «How to play» is not visible`);
-          if(more){ const want=SET_TABS_WANT[tab].more, hid=await c.p.evaluate(ids=>ids.filter(id=>{ const e=document.getElementById(id); return !e || !e.offsetParent; }), want);
-            if(hid.length!==want.length) bad.push(`${at}, ${tab}: the rarely used show before «More» (${want.filter(x=>!hid.includes(x)).join(', ')})`);
-            await c.p.click(more); await c.p.waitForTimeout(150);
-            const shown=await c.p.evaluate(ids=>ids.filter(id=>{ const e=document.getElementById(id); return !!e && !!e.offsetParent; }), want), word=await c.p.evaluate(s=>document.querySelector(s).textContent.trim(), more);
-            if(shown.length!==want.length) bad.push(`${at}, ${tab}: «More» did not open ${want.filter(x=>!shown.includes(x)).join(', ')}`);
-            if(!word || (lang==='ru' ? !CYR.test(word) : CYR.test(word))) bad.push(`${at}, ${tab}: the «More» line reads «${word}»`);
-            j=await c.p.evaluate(setJudge, SET_TABS_WANT); }
+          if(j.mores) bad.push(`${at}, ${tab}: a «More» line is still in the card (${j.mores})`);
           if(j.layout.length) bad.push(`${at}, ${tab}: ${j.layout.slice(0,4).join('; ')}`);
-          seen.push(`${tab} ${j.lines} lines`);
-          if(more){ await c.p.click(more); await c.p.waitForTimeout(100); } }
-        lines.push(`${at}: one pane per tab, its controls only, «How to play» under each, «More» opens the rarely used; layout clean (${seen.join(', ')})`);
+          seen.push(`${tab} ${j.lines} lines`); }
+        const still=await setCardStill(c.p);
+        if(still.moved.length) bad.push(`${at}: the card moves when the tab changes — ${still.moved.join('; ')}`);
+        else lines.push(`${at}: one pane per tab, all its controls shown (no «More»), «How to play» under each; layout clean (${seen.join(', ')}); the card stands still (${still.box.join('/')} under every tab)`);
+        { await c.p.addStyleTag({ content:'#nightShell .night-panes > .night-pane[hidden]{ display:none !important; } /*ctl-c*/' }); const m=await setCardStill(c.p); await dropStyle(c.p, 'ctl-c');
+          if(!m.moved.length) bad.push(`${at}: CONTROL the panes without their shared cell did not move the card — the check cannot fail`); else lines.push(`${at}: CONTROL the panes without their shared cell move the card (${m.moved[0]})`); }
         if(vp.width===390){   // the CONTROLS, once per language at the phone size
-          await c.p.addStyleTag({ content:'#nightShell .night-pane[hidden]{ display:block !important; } /*ctl-a*/' }); const a=await c.p.evaluate(setJudge, SET_TABS_WANT); await dropStyle(c.p, 'ctl-a');
+          await c.p.addStyleTag({ content:'#nightShell .night-pane[hidden]{ visibility:visible !important; } /*ctl-a*/' }); const a=await c.p.evaluate(setJudge, SET_TABS_WANT); await dropStyle(c.p, 'ctl-a');
           if(a.panes.length===1) bad.push(`${at}: CONTROL every pane forced visible still read as one pane — the check cannot fail`); else lines.push(`${at}: CONTROL every pane forced visible is caught (${a.panes.length} panes)`);
           await c.p.click('#nightSetTabs [data-tab="picture"]'); await c.p.waitForTimeout(100);
           await c.p.addStyleTag({ content:'.night-card p.night-row-note{ margin-top:-2.4em !important; } /*ctl-b*/' }); const b=await c.p.evaluate(setJudge, SET_TABS_WANT); await dropStyle(c.p, 'ctl-b');
@@ -883,7 +886,7 @@ async function uiNightSettings(page, label){
       if(lang==='en'){ await c.p.setViewportSize({ width:1280, height:800 }); await c.p.click('#nightSetTabs [data-tab="picture"]'); await c.p.waitForTimeout(100);
         const st=()=>c.p.evaluate(async ()=>{ const S=await import('/core/state.js'); return { light:document.getElementById('nightLightTg').classList.contains('on'), stored:localStorage.getItem('handsong.nightLight'), field:!!(S.nightView && S.nightView.fieldAll) }; });
         const s0=await st(); await c.p.click('#nightLightTg'); await c.p.waitForTimeout(200); const s1=await st(); await c.p.click('#nightLightTg'); await c.p.waitForTimeout(200); const s2=await st();
-        await c.p.click('#nightMorePictureBtn'); await c.p.click('#nightFieldTg'); await c.p.waitForTimeout(100); const f1=await st(); await c.p.click('#nightFieldTg'); await c.p.waitForTimeout(100); const f2=await st();
+        await c.p.click('#nightFieldTg'); await c.p.waitForTimeout(100); const f1=await st(); await c.p.click('#nightFieldTg'); await c.p.waitForTimeout(100); const f2=await st();
         if(s1.light===s0.light || s1.stored!==(s1.light ? '1' : '0') || s2.light!==s0.light) bad.push('the Lightweight switch: '+JSON.stringify([s0, s1, s2]));
         else if(f1.field===s0.field || f2.field!==s0.field) bad.push('the note-field switch: '+JSON.stringify([s0, f1, f2]));
         else lines.push(`the Lightweight switch (on, stored «${s1.stored}», back off) and the note-field switch work from their tab as before`); }
@@ -902,7 +905,8 @@ const REVEAL_REC=()=>{ window.__rv=[]; window.__rvStop=false; const t0=performan
   (async ()=>{ const S=await import('/apps/night/still.js'), H=await import('/apps/night/scene/host.js');
     const step=()=>{ const st=S.stillDbg(), c=document.getElementById('scene'), I=H.sceneInfo();
       window.__rv.push({ t:Math.round(performance.now()-t0), start:document.getElementById('start').classList.contains('on'), phase:st.phase, look:st.look, shown:st.shown,
-        breathe:document.getElementById('nightStill').classList.contains('breathe'), dot:st.dot, sop:c ? +getComputedStyle(c).opacity : 0, veil:c ? c.classList.contains('veil') : true, rendered:I.rendered||0 });
+        breathe:document.getElementById('nightStill').classList.contains('breathe'), dot:st.dot, sop:c ? +getComputedStyle(c).opacity : 0, veil:c ? c.classList.contains('veil') : true, rendered:I.rendered||0,
+        pulse:st.pulse, rest:(H.sceneRestDbg().room||{}).rest, motionK:(H.sceneRestDbg().room||{}).motionK });   // NIGHT-13: the tap's pulse, the room's camera at rest
       if(!window.__rvStop) requestAnimationFrame(step); };
     requestAnimationFrame(step); })(); };
 async function revealRun(page, o={}){
@@ -928,7 +932,12 @@ function revealJudge(R){
   const after=R.F.filter(f=>!f.start), black=after.filter(f=>!((f.phase==='start' || f.phase==='wait') && f.shown && f.look && f.look.opacity>=0.99 && f.look.clear<=0) && !(f.sop>=0.99 && !f.veil && f.rendered>0));
   const order=[]; for(const f of after) if(order[order.length-1]!==f.phase) order.push(f.phase);
   const dots=after.filter(f=>f.dot && f.dot.a>0), moved=dots.length>1 && Math.hypot(dots[dots.length-1].dot.x-dots[0].dot.x, dots[dots.length-1].dot.y-dots[0].dot.y)>40;
-  return { frames:after.length, black, order, breathe:after.some(f=>f.breathe), dots:dots.length, moved, mask:after.some(f=>f.phase==='reveal' && f.look && f.look.clear>0), waitMs:(after.filter(f=>f.phase==='wait').length ? after.filter(f=>f.phase==='wait').slice(-1)[0].t-after[0].t : 0) };
+  /* NIGHT-13: the flight ends on a firefly of the room (its target followed; the last frames of the flight within its radius + 2 px of it), the room's camera at rest
+     from the first room frame until the still is gone, then let go */
+  const fl=after.filter(f=>f.dot && f.dot.to && f.dot.q>=0.9), end=fl[fl.length-1], landed=!!end && Math.hypot(end.dot.x-end.dot.to.x, end.dot.y-end.dot.to.y)<=end.dot.to.r+2;
+  const roomF=after.filter(f=>f.rest!=null && f.phase!=='done'), rested=roomF.length>0 && roomF.every(f=>f.rest===true), freed=after.some(f=>f.phase==='done' && f.rest===false);
+  return { frames:after.length, black, order, breathe:after.some(f=>f.breathe), dots:dots.length, moved, mask:after.some(f=>f.phase==='reveal' && f.look && f.look.clear>0), waitMs:(after.filter(f=>f.phase==='wait').length ? after.filter(f=>f.phase==='wait').slice(-1)[0].t-after[0].t : 0),
+    pulse:R.F.some(f=>f.pulse), fly:fl.length, landed, flyTo:end ? end.dot.to : null, rested, freed, roomFrames:roomF.length };
 }
 async function uiNightReveal(page, label){
   const lines=[], bad=[];
@@ -939,13 +948,80 @@ async function uiNightReveal(page, label){
   if(!A.breathe) bad.push('the still did not breathe while the late room was not ready');
   if(!A.mask) bad.push('the reveal never cleared the still from the far point (no mask)');
   if(!A.moved) bad.push(`the emblem's dot did not drift into the picture (${A.dots} frames with it)`);
+  if(!A.pulse) bad.push('the emblem\'s dot did not pulse at the Begin tap');   // NIGHT-13
+  if(!A.landed) bad.push(`the dot did not become a firefly (${A.fly} frames flying to one, the last ${JSON.stringify(A.flyTo)})`);
+  if(!A.rested || !A.freed) bad.push(`the room's camera was not at rest through the hand-over (${A.roomFrames} room frames, all at rest ${A.rested}) or not let go after (${A.freed})`);
   if(!(a.lights>=10)) bad.push(`the start screen's lights did not move (${a.lights} redraws in 1.5 s)`);
+  if(!bad.length) lines.push(`NIGHT-13: the dot pulsed at the tap, flew ${A.fly} frames onto firefly ${A.flyTo && A.flyTo.i} and faded there; the room's camera at rest for ${A.roomFrames} frames of the hand-over, then let go`);
   if(!bad.length) lines.push(`a late forest (held until 2.5 s after the start): ${A.frames} frames after the start card, none black; ${A.order.join(' → ')}; the still breathed ${(A.waitMs/1000).toFixed(1)} s while it waited; the dot drifted in (${A.dots} frames); the lights moved (${a.lights} redraws in 1.5 s)`);
   const n=await revealRun(page, { late:true, q:'&nostill' }), N=revealJudge(n);
   if(!N.black.length) bad.push('CONTROL: the old way (no still after the start) showed no black frame under the late forest — the check cannot fail'); else lines.push(`CONTROL: the old way under the same late forest shows ${N.black.length} black frames of ${N.frames}`);
   const r=await revealRun(page, { reduced:true }), M=revealJudge(r);
-  if(!r.plain || M.mask || M.dots || M.breathe || r.lights>1 || M.black.length || !r.done) bad.push(`reduced motion: plain ${r.plain}, mask ${M.mask}, dot frames ${M.dots}, breathing ${M.breathe}, lights redrawn ${r.lights}× in 1.5 s, black frames ${M.black.length}, forest shown ${r.done}`);
+  if(!r.plain || M.mask || M.dots || M.pulse || M.breathe || r.lights>1 || M.black.length || !r.done) bad.push(`reduced motion: plain ${r.plain}, mask ${M.mask}, pulse ${M.pulse}, dot frames ${M.dots}, breathing ${M.breathe}, lights redrawn ${r.lights}× in 1.5 s, black frames ${M.black.length}, forest shown ${r.done}`);
   else lines.push(`reduced motion: a plain fade (no mask, no dot, no breathing), the lights still (${r.lights} redraws in 1.5 s), no black frame; CONTROL the normal run above had the mask and the dot`);
+  return { pass:!bad.length, lines:[...lines.map(l=>`${label}: ${l}`), ...bad.map(b=>`${label}: NOT A PASS — ${b}`)] };
+}
+
+/* NIGHT-13 — «NIGHT still matches the live room»: the start still against the first live frame, by their EDGES, on real screens: a laptop window
+   (1536 × 730), full HD full screen (1920 × 1080), the still's old shape (1280 × 800), a phone upright (390 × 844) and on its side (844 × 390), and a window
+   resized before Begin (1280 × 800 → 1700 × 860). Per screen, a fresh profile with the forest chosen: (A) the start screen photographed with only the
+   still showing (its screen layer included, the lights and the start card hidden); Begin; at the reveal's end, with the room's camera still at rest (as at
+   the hand-over), (B) the live room photographed with nothing over it. In the page: both to 320 px wide, edges = the gradient of log brightness (the
+   still's dimming cancels), the scale about the centre and the shift that best line up A's edges with B's (coarse, then fine: 0.002, 0.25 px). Judged:
+   scale within 0.6 % of 1 and shift within 1 px of 320, the match clearly better there than at a 3 % scale (the measure can tell). CONTROL: DESIGN-1's fit
+   (?probe&oldstill: the old 55° 1.6 : 1 frame covering at 42 %, the camera not held) on the laptop window must fail. */
+const MATCH_FN=async ([a, b])=>{
+  const load=u=>new Promise((r,j)=>{ const i=new Image(); i.onload=()=>r(i); i.onerror=j; i.src='data:image/png;base64,'+u; });
+  const [ia, ib]=await Promise.all([load(a), load(b)]), W=320, H=Math.round(W*ia.height/ia.width);
+  const edges=img=>{ const c=document.createElement('canvas'); c.width=W; c.height=H; const g=c.getContext('2d'); g.drawImage(img, 0, 0, W, H); const d=g.getImageData(0,0,W,H).data, L=new Float32Array(W*H), E=new Float32Array(W*H);
+    for(let i=0;i<W*H;i++) L[i]=Math.log(1+d[i*4]*0.3+d[i*4+1]*0.59+d[i*4+2]*0.11);
+    for(let y=1;y<H-1;y++) for(let x=1;x<W-1;x++){ const k=y*W+x, gx=L[k+1-W]+2*L[k+1]+L[k+1+W]-L[k-1-W]-2*L[k-1]-L[k-1+W], gy=L[k-1+W]+2*L[k+W]+L[k+1+W]-L[k-1-W]-2*L[k-W]-L[k+1-W]; E[k]=Math.hypot(gx, gy); }
+    return E; };
+  const A=edges(ia), B=edges(ib), cx=W/2, cy=H/2, x0=Math.round(W*0.08), x1=Math.round(W*0.92), y0=Math.round(H*0.08), y1=Math.round(H*0.92);
+  const at=(E,x,y)=>{ const i=Math.floor(x), j=Math.floor(y); if(i<0||j<0||i>=W-1||j>=H-1) return 0; const fx=x-i, fy=y-j, k=j*W+i; return E[k]*(1-fx)*(1-fy)+E[k+1]*fx*(1-fy)+E[k+W]*(1-fx)*fy+E[k+W+1]*fx*fy; };
+  const ncc=(s, dx, dy, step)=>{ let sa=0, sb=0, saa=0, sbb=0, sab=0, n=0;
+    for(let y=y0;y<y1;y+=step) for(let x=x0;x<x1;x+=step){ const va=at(A, cx+(x-cx)*s+dx, cy+(y-cy)*s+dy), vb=B[y*W+x]; sa+=va; sb+=vb; saa+=va*va; sbb+=vb*vb; sab+=va*vb; n++; }
+    const cov=sab/n-(sa/n)*(sb/n), da=saa/n-(sa/n)**2, db=sbb/n-(sb/n)**2; return cov/Math.sqrt(Math.max(1e-12, da*db)); };
+  let best={ v:-2 };
+  for(let s=0.7;s<=1.45;s+=0.01) for(let dx=-16;dx<=16;dx+=2) for(let dy=-16;dy<=16;dy+=2){ const v=ncc(s, dx, dy, 3); if(v>best.v) best={ v, s, dx, dy }; }
+  let fine={ ...best };
+  for(let s=best.s-0.012;s<=best.s+0.012;s+=0.002) for(let dx=best.dx-2.5;dx<=best.dx+2.5;dx+=0.25) for(let dy=best.dy-2.5;dy<=best.dy+2.5;dy+=0.25){ const v=ncc(s, dx, dy, 2); if(v>fine.v) fine={ v, s, dx, dy }; }
+  /* the scale A shows the world at, against B (A × s lines up with B): s > 1 — the still is closer */
+  return { scale:1/fine.s, s:fine.s, dx:fine.dx, dy:fine.dy, peak:fine.v, at1:ncc(1, 0, 0, 2), off3:Math.max(ncc(1.03, fine.dx, fine.dy, 2), ncc(0.97, fine.dx, fine.dy, 2)), w:W, h:H };
+};
+const MATCH_HIDE_A='#start, #canvas, #video, #nightShell, #nightStillLights, #nightStillDot, #nightStillMist{ visibility:hidden !important; } /*match-a*/';
+const MATCH_HIDE_B='#start, #canvas, #video, #nightShell, #nightStill, #nightStillMist, #nightStillDot{ visibility:hidden !important; } /*match-b*/';
+async function stillMatchRun(page, vp, o={}){
+  const c=await freshPage(page, { q:o.q||'', init:[()=>{ try{ localStorage.setItem('handsong.nightBg','forest'); localStorage.setItem('handsong.sceneLevel','reduced'); }catch(e){} }, null] });
+  try{
+    await c.p.setViewportSize(vp); await c.p.goto(c.url); await c.p.waitForFunction(()=>window.__nightBoot && window.__nightBoot.state().done, null, { timeout:60e3 });
+    await c.p.evaluate(async ()=>{ window.__st=await import('/apps/night/still.js'); window.__host=await import('/apps/night/scene/host.js'); window.__st.stillDbg({ freeze:true }); });
+    if(o.resize){ await c.p.setViewportSize(o.resize); vp=o.resize; }
+    const fitOk=await c.p.waitForFunction(old=>{ const d=window.__st.stillDbg(); return !!d.fit && d.fit.bw===innerWidth && d.fit.bh===innerHeight && (old || d.sprites && d.overDrawn>0); }, !!o.old, { timeout:20e3, polling:100 }).then(()=>true, ()=>false);
+    if(!fitOk) return { err:'the still was not placed for this screen within 20 s' };
+    await c.p.addStyleTag({ content:MATCH_HIDE_A }); await c.p.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
+    const A=(await c.p.screenshot({ animations:'disabled' })).toString('base64'); const fit=await c.p.evaluate(()=>window.__st.stillDbg().fit);
+    await dropStyle(c.p, 'match-a');
+    await tapAt(c.p, '#nightBegin'); await c.p.waitForFunction(()=>!document.getElementById('start').classList.contains('on'), null, { timeout:LIMIT_START });
+    const done=await c.p.waitForFunction(()=>window.__st.stillDbg().phase==='done', null, { timeout:90e3, polling:50 }).then(()=>true, ()=>false);
+    if(!done) return { err:'the reveal did not end within 90 s' };
+    const rest=await c.p.evaluate(old=>{ if(!old) window.__host.sceneRest(true); return window.__host.sceneRestDbg().room; }, !!o.old);   // the camera as at the hand-over (the first live frame's pose); the old way: as it is
+    await c.p.addStyleTag({ content:MATCH_HIDE_B }); await c.p.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>requestAnimationFrame(r)))));
+    const B=(await c.p.screenshot({ animations:'disabled' })).toString('base64');
+    const m=await c.p.evaluate(MATCH_FN, [A, B]);
+    return { ...m, fit, rest, vp };
+  } finally { await c.ctx.close().catch(()=>{}); }
+}
+const matchOk=m=>!m.err && Math.abs(m.scale-1)<=0.006 && Math.abs(m.dx)<=1 && Math.abs(m.dy)<=1 && m.peak>m.off3+0.02;
+const matchTxt=m=>m.err ? m.err : `scale ${m.scale.toFixed(4)}, shift ${m.dx.toFixed(2)}, ${m.dy.toFixed(2)} px of ${m.w}, edge match ${m.peak.toFixed(3)} (at ±3 % ${m.off3.toFixed(3)})`;
+async function uiNightStillMatch(page, label){
+  const lines=[], bad=[];
+  for(const [vp, o, name] of [[{ width:1536, height:730 }, {}, 'laptop window'], [{ width:1920, height:1080 }, {}, 'full HD full screen'], [{ width:1280, height:800 }, {}, 'the old shape'],
+    [{ width:390, height:844 }, {}, 'phone upright'], [{ width:844, height:390 }, {}, 'phone on its side'], [{ width:1280, height:800 }, { resize:{ width:1700, height:860 } }, 'resized before Begin']]){
+    const m=await stillMatchRun(page, vp, o), at=`${name} ${(o.resize||vp).width}×${(o.resize||vp).height}`;
+    if(!matchOk(m)) bad.push(`${at}: the still and the first live frame do not line up — ${matchTxt(m)}`); else lines.push(`${at}: ${matchTxt(m)}`); }
+  const k=await stillMatchRun(page, { width:1536, height:730 }, { q:'&oldstill', old:true });
+  if(k.err || matchOk(k)) bad.push(`CONTROL: DESIGN-1's fit on the laptop window ${k.err ? 'did not run: '+k.err : 'lined up — the check cannot fail ('+matchTxt(k)+')'}`); else lines.push(`CONTROL: DESIGN-1's fit on the laptop window is caught — ${matchTxt(k)}`);
   return { pass:!bad.length, lines:[...lines.map(l=>`${label}: ${l}`), ...bad.map(b=>`${label}: NOT A PASS — ${b}`)] };
 }
 
@@ -1047,7 +1123,42 @@ async function uiNightOrder(page, label){
   if(!a.overlap || a.overlap.on) bad.push('the idle line and the coaching line show together: '+JSON.stringify(a.overlap)); else if(!a.overlap.ctl) bad.push('CONTROL: without the one-message rule the idle line and the coaching line do not overlap — the check cannot fail'); else lines.push('one message at a time: the idle line gives way to the coaching line (CONTROL: without the rule they overlap)');
   const o=await nightOrder(page, true);
   if(!o.bad.length) bad.push('CONTROL: the old order passed the judge — it cannot fail'); else lines.push('CONTROL: the old order fails the judge — '+o.bad[0]);
+  const cb=await nightCoachBars(page); lines.push(...cb.lines); bad.push(...cb.bad);
   return { pass:!bad.length, lines:[...lines.map(l=>`${label}: ${l}`), ...bad.map(b=>`${label}: NOT A PASS — ${b}`)] };
+}
+/* NIGHT-13 — the coaching line never touches the bars while playing: two synthetic hands play (the playing hand and the effects hand: both groups of bars
+   on, in both arrangements left / right), every coaching line held on screen as the app shows it (coachShowDbg; the calibration line with its buttons), in
+   English and Russian, at phone landscape sizes (844 × 390, 873 × 393, 740 × 360, 667 × 375) and a phone upright (390 × 844). Judged: the line's box crosses
+   neither group's box and stays on the screen. CONTROL: the line's old width and the bars' words kept (the NIGHT-13 rules undone) must overlap. */
+const COACH_SIZES=[[844,390],[873,393],[740,360],[667,375],[390,844]];
+async function nightCoachBars(page){
+  const lines=[], bad=[], c=await freshPage(page, {});
+  try{
+    await c.p.setViewportSize({ width:844, height:390 }); await c.p.goto(c.url); await c.p.waitForFunction(()=>window.__nightBoot && window.__nightBoot.state().done, null, { timeout:60e3 });
+    await c.p.click('#nightBegin'); await c.p.waitForFunction(()=>!document.getElementById('start').classList.contains('on'), null, { timeout:LIMIT_START });
+    await c.p.evaluate(async ()=>{ window.__cb={ C:await import('/apps/night/coach.js'), G:await import('/core/gestures.js'), PO:await import('/core/gestures/pose.js'), I:await import('/core/i18n.js') };
+      const { G, PO }=window.__cb, clk={ t:1e6 }; window.__cbX=[0.7, 0.25]; G.handsProbe(clk, ()=>true);
+      window.__cbT=setInterval(()=>{ clk.t+=1000/30; const [a,b]=window.__cbX; G.processHandsProbe({ landmarks:[PO.pose({ x:a, y:0.5, s:0.25, gaps:[1,1,1,1] }), PO.pose({ x:b, y:0.45, s:0.2, gaps:[1,1,1,1] })],
+        handednesses:[[{ categoryName:'Right' }], [{ categoryName:'Left' }]] }); }, 33); });
+    const measure=()=>c.p.evaluate(async ()=>{ const { C, I }=window.__cb, out=[], wait=ms=>new Promise(r=>setTimeout(r, ms)), box=e=>e.getBoundingClientRect(), $=id=>document.getElementById(id);
+      const cross=(a,b)=>Math.min(a.right,b.right)-Math.max(a.left,b.left)>0.5 && Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top)>0.5;
+      for(const lang of ['en','ru']){ I.setLang(lang);
+        for(const X of [[0.7, 0.25], [0.25, 0.7]]){ window.__cbX=X; await wait(700);
+          const F=$('nightForestBar'), Fx=$('nightFxBars'); if(!F.classList.contains('on') || !Fx.classList.contains('on')){ out.push({ lang, X, why:'the bars are not on (forest '+F.className+', effects '+Fx.className+')' }); continue; }
+          for(const id of ['raise','pinch','fingers','depth','fx','calib','home']){ C.coachShowDbg(id); await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+            const co=box($('nightCoach')), hit=[F, Fx].filter(g=>cross(co, box(g))).map(g=>g.id+' '+[box(g).left, box(g).top, box(g).right, box(g).bottom].map(Math.round).join(','));
+            if(hit.length || co.left<0 || co.right>innerWidth) out.push({ lang, X, id, coach:[co.left, co.top, co.right, co.bottom].map(Math.round), hit }); } } }
+      C.coachShowDbg(null); I.setLang('en'); return out; });
+    for(const [w,h] of COACH_SIZES){ await c.p.setViewportSize({ width:w, height:h }); await c.p.waitForTimeout(400);
+      const m=await measure();
+      if(m.length) bad.push(`${w}×${h}: the coaching line touches the bars — ${m.slice(0,3).map(x=>JSON.stringify(x)).join('; ')}${m.length>3 ? ` (+${m.length-3})` : ''}`);
+      else lines.push(`${w}×${h} while playing: no coaching line touches the bars (7 lines × English, Russian × both arrangements)`); }
+    await c.p.setViewportSize({ width:844, height:390 }); await c.p.waitForTimeout(400);
+    await c.p.addStyleTag({ content:'#nightShell .night-coach{ max-width:min(560px, calc(100vw - 4 * var(--night-edge))) !important; } body.night-coach-on .night-bar-lab{ display:block !important; } /*ctl-cb*/' });
+    const k=await measure(); await dropStyle(c.p, 'ctl-cb');
+    if(!k.some(x=>x.hit && x.hit.length)) bad.push('CONTROL: the old width and the bars\' words did not touch the bars at 844 × 390 — the check cannot fail'); else lines.push(`CONTROL: the old width and the bars' words touch the bars at 844 × 390 (${k.filter(x=>x.hit && x.hit.length).length} cases, e.g. «${k.find(x=>x.hit && x.hit.length).id}» ${k.find(x=>x.hit && x.hit.length).lang})`);
+  } finally { await c.p.evaluate(()=>{ clearInterval(window.__cbT); if(window.__cb) window.__cb.G.handsProbe(null); }).catch(()=>{}); await c.ctx.close().catch(()=>{}); }
+  return { lines, bad };
 }
 
 /* AUTOSAVE1 — the real thing at the END of a session: the seed song is autosaved by the app's own timer (the probe's hold released),
@@ -1259,6 +1370,7 @@ async function session(port, plan, label){
         ['NIGHT camera choice', uiNightCamera, 6*LIMIT_START, false], ['NIGHT honest start', uiNightStart, 8*LIMIT_START, true],   // NIGHT-10, NIGHT-11 part 2
         ['NIGHT how to play', uiNightHowTo, 4*LIMIT_START, true], ['NIGHT settings tabs', uiNightSettings, 4*LIMIT_START, true],   // DESIGN-1 part C
         ['NIGHT reveal', uiNightReveal, 4*LIMIT_START, true],   // DESIGN-1 part D
+        ['NIGHT still matches the live room', uiNightStillMatch, 9*LIMIT_START, true],   // NIGHT-13
         ['NIGHT start timeline', uiNightTimeline, (THROTTLE ? 25 : 8)*60e3, false],   // NIGHT-12, NIGHT-11 part 3
         ['NIGHT first contact order', uiNightOrder, 4*LIMIT_START, true]];   // NIGHT-11 part 4
       const all=[];

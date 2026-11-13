@@ -169,7 +169,7 @@
   },
   {
    "id": "night-stills",
-   "name": "The start screen's stills of the night forest: a dim picture of the room behind the start card, one per picture level (DESIGN-1)",
+   "name": "The start screen's stills of the night forest: a dim picture of the room behind the start card, one per picture level (DESIGN-1), and the shapes of its corner silhouettes (NIGHT-13)",
    "class": "image",
    "use": "shipped",
    "version": "—",
@@ -177,7 +177,8 @@
    "source": "our own render of our own forest scene, made by tools/night-still.mjs (headless Chrome draws the room at the level, the clear-moon moment, no hands; dimmed and encoded as WebP under 96 KB); the scene's floor uses the CC0 photo-scanned «Leaves Forest Ground» (register entry of the floor scan), which asks for no attribution",
    "files": [
     "apps/night/rooms/forest/still/still-full.webp",
-    "apps/night/rooms/forest/still/still-reduced.webp"
+    "apps/night/rooms/forest/still/still-reduced.webp",
+    "apps/night/rooms/forest/still/still-sil.webp"
    ],
    "replace": "kept — our own generated material (regenerate: node tools/night-still.mjs whenever the forest's look changes)"
   },

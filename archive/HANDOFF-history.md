@@ -8583,3 +8583,12 @@ not a control · run a "random" failure many times and print WHERE and HOW MUCH 
 - A room gives its own Room-sounds icon (`icon` in the record; the forest keeps the leaf; the test room shows another).
 - Laptop (HD 4000), Standard: detections = Dark (before −1.1 / +5.7 %, after −0.6 / −0.1 %), frame 3.3–3.4 ms (2.4–3.9), draws 62 (69–70), programs 28 (29), triangles 199 k (189 k), textures 24.9 MB (=). Detailed: −55.4 / −51.4 % (−59.1 / −50.7 %), draws 104–105 (117–120), programs 30 (32), triangles 622 k (533 k), textures 90.9 MB (86.9). Files 17.86 MB of 30.
 - Rows: data «NIGHT stream sound (app)», «FOREST ground (app)»; browser «NIGHT stream, water and ground». Waiting for step 146.
+
+## Moved from docs/night/HANDOFF.md at NIGHT-13 (2026-11-13)
+### NIGHT-9 (2026-11-11): real ground and real water. Log: `docs/night/WORK-LOG.md`
+- Relief in the ground law itself (mounds and hollows, the aisle's old step softened, deeper banks, the water 5 cm lower), root bulges at trunk feet and a finer mesh at Detailed; occlusion per vertex.
+- The green was blue night light on brown soil (measured on the screenshots): a night grade in the ground's own shading makes it dark brown-grey; the palette elsewhere unchanged.
+- The floor: the CC0 photo-scanned «Leaves Forest Ground» (Poly Haven) is the default; our baked floor stays switchable for the user's choice (`n9-compare.html`). Files 22.54 MB of 30.
+- Water: stronger Fresnel, clear and wobbling near the viewer, a mirror of the trunks, crowns and moon against a brighter sky (Detailed every frame, Standard every 1.5 s), a flow map (narrows faster, pools slower, eddies behind rocks), a dark wet edge.
+- Standard costs as before (detections −0.3 / −1.2 % vs Dark); Detailed about 2–3 points dearer (−57.5 %).
+- Rows: data «FOREST relief», «FOREST water flow» (app); browser «FOREST ground and water». Waiting for step 148 (the user picks the floor).

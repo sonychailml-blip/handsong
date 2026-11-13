@@ -14,6 +14,7 @@ import { ctx, canvas as cv2d, pumpStats } from '../../../core/vision.js';
 import { sceneRatio, stepsOf, guardNew, guardNext } from '../pure/pixels.js';   // NIGHT-11 part 5: the pixel budget and its guard
 import { BUS } from '../../../core/pure/bus.js';
 import { heardMs } from '../pure/heard.js';   // NIGHT-6 slice 1: the music bed's events shown when heard
+import { handLightNew, handLightStep } from '../pure/handlight.js';   // NIGHT-13: the hand's light between the thumb and the nearest finger
 const READ=BUS.reader();   // RUN 9: the mood at the room's opening, read-only (the frames read the bus they are given)
 
 export const BACKGROUNDS=Object.freeze(['forest','dark','camera']);
@@ -160,7 +161,7 @@ export async function sceneOpen(id=roomId, opt={}){
   if(level!=='minimal' && !renderer) renderer=makeRenderer();
   if(!renderer) level='minimal';
   if(renderer){ const tb=performance.now();
-    try{ room=build(THREE, { C:cv, level, w:innerWidth, h:innerHeight, reduce:REDUCE, mood:(READ.get('nightSky')||{}).mood, shadow:shadowOn(), lv:optOver && optOver.lv, gl2:renderer.capabilities.isWebGL2 }); resize(); }   // NIGHT-6: gl2 — soft edges need WebGL2
+    try{ room=build(THREE, { C:cv, level, w:innerWidth, h:innerHeight, reduce:REDUCE, mood:(READ.get('nightSky')||{}).mood, shadow:shadowOn(), lv:optOver && optOver.lv, gl2:renderer.capabilities.isWebGL2 }); if(room.rest) room.rest(restWant); resize(); }   // NIGHT-6: gl2 — soft edges need WebGL2
     catch(e){ openFail(op, e); return sceneInfo(); }   // a failed build: the renderer goes, the room's 2D stand-in shows (never black)
     last=0; info.t0=0; info.frames=0;
     /* RUN 9 (slice 5): compile every shader NOW (inside the opening, not inside a frame later: a 1–4-s frame) */
@@ -203,7 +204,7 @@ function sceneFrame(t, bus){
   /* NIGHT-6 slice 1: the music bed's new events, each at the room time it is heard */
   { const B=bus.since('bed', bedSeq), ck=bus.get('audioClock'); bedSeq=B.seq;
     if(room.bed && ck) for(const it of B.items) if(Number.isFinite(it.at)) room.bed(it, heardMs(ck, it.at, bedLate)/1000+clockOff); }
-  room.update(dt, t/1000+clockOff, bus.get('handsView')||[], bus.get('nightFx'), bus.get('nightSky'));   // RUN 7 (C5): the Night effects' values; RUN 9: the mood and the sleep
+  room.update(dt, t/1000+clockOff, litHands(bus.get('handsView')||[]), bus.get('nightFx'), bus.get('nightSky'));   // RUN 7 (C5): the Night effects' values; RUN 9: the mood and the sleep
   renderer.info.reset(); draw();
   info.calls=renderer.info.render.calls; info.tris=renderer.info.render.triangles;   // NIGHT-6 slice 0: this frame's draw calls and triangles (slice 8: every pass of it)
   if(opening && opening.id===room.id && ++opening.frames>=2) openEnd(opening);   // NIGHT-3 stage 5 part 2: two frames drawn — detection resumes, the picture fades in
@@ -213,6 +214,26 @@ function sceneFrame(t, bus){
   if(!opening) guardTick(t);
   info.frames++; info.total=(info.total||0)+1; if(!info.t0) info.t0=t; if(t-info.t0>=1000){ info.fps=Math.round(info.frames*1000/(t-info.t0)); info.frames=0; info.t0=t; }
 }
+/* NIGHT-13: THE CAMERA AT REST while the start still hands over (apps/night/still.js asks, through main.js): a room that can rest holds the pose its still
+   was drawn from; let go, it comes back to life gently. Kept for a room opened later in the hand-over too */
+let restWant=false;
+export function sceneRest(on){ restWant=!!on; if(room && room.rest) room.rest(restWant); return restWant; }
+/* NIGHT-13: the firefly the start's dot becomes — picked by the room (far, glowing, in the deep middle), then its place and size on the screen (view px) */
+export const sceneFlyPick=()=> room && room.flyPick && !opening ? room.flyPick() : null;
+export const sceneFlyAt=i=> room && room.flyAt && i!=null ? room.flyAt(i) : null;
+export const sceneRestDbg=()=>({ want:restWant, room: room && room.restDbg ? room.restDbg() : null });
+/* NIGHT-13: the hands as the rooms see them — each light between the thumb and its nearest finger (pure/handlight.js), with its glow; a view without
+   fingertips passes as it is. Visual only: the bus's handsView is never changed (the bars, the coaching line and the sound read it as before) */
+const LIT=new Map(); let litOff=false;
+function litHands(hv){
+  const now=performance.now(), keys=new Set(), out=[];
+  for(const h of hv){ if(litOff || !Array.isArray(h.tips) || h.tips.length<5 || !(h.palm>0)){ out.push(h); continue; } keys.add(h.key);
+    const L=LIT.get(h.key)||{ st:handLightNew(), t:now }, r=handLightStep(L.st, h.tips, h.palm, h.pinch ? h.finger : -1, Math.min(100, now-L.t));
+    LIT.set(h.key, { st:r.st, t:now }); out.push({ ...h, x:r.x, y:r.y, glow:r.glow, pair:r.f }); }
+  for(const k of [...LIT.keys()]) if(!keys.has(k)) LIT.delete(k);
+  return out; }
+/* probe only: the lights as last placed, and the old way (the light on the hand's play point) for a CONTROL */
+export const sceneLitDbg=(o={})=>{ if('off' in o){ litOff=!!o.off; LIT.clear(); } return { off:litOff, hands:[...LIT].map(([k,L])=>({ key:k, f:L.st.f, glow:L.st.glow })) }; };
 stackAdd({ kind:'visual', id:'scene', layer:'scene', cost:{ cls:'heavy', gpu:true }, frame:sceneFrame }); stackSet('scene', false);
 
 /* the BACKDROP (layer «background»): Dark = black; the room = the 2D canvas cleared so the room shows through (or, without WebGL, the room's
@@ -225,7 +246,7 @@ function backdrop(t, bus){
   if(opening && !opening.late && performance.now()-opening.t0>lateMs){ opening.late=true; OPENS.late++; }
   const late=opening && opening.late;
   if((renderer && !late) || (opening && !late)){ ctx.clearRect(0,0,W,H); return; }
-  const R=ROOMS.get(roomId); if(R && R.standIn) R.standIn(ctx, W, H, bus.get('handsView')||[], cv);
+  const R=ROOMS.get(roomId); if(R && R.standIn) R.standIn(ctx, W, H, litHands(bus.get('handsView')||[]), cv);
 }
 stackAdd({ kind:'visual', id:'backdrop', layer:'background', cost:{ cls:'light', gpu:false }, frame:backdrop });
 /* choose the background → a promise of sceneInfo() (the room opens asynchronously: three.js loads once) */

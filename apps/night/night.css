@@ -238,9 +238,11 @@ body.night-cal #darkHint{ display:none !important; }
   .night-ibtn{ right:auto; left:max(var(--night-edge), env(safe-area-inset-left)); }
   .night-ibtn.night-fsbtn{ left:auto; right:max(var(--night-edge), env(safe-area-inset-right)); }
   .night-idle{ top:8%; }   /* NIGHT-11 part 4: centred (it sat off-centre, across the moon) */
-  #nightShell .night-coach{ top:8%; }
+  /* NIGHT-13: the coaching line stays between the two groups of bars (the wider group — three effects — counted on both sides, as the line is centred) */
+  #nightShell .night-coach{ top:8%; max-width:min(560px, calc(100vw - 2 * (var(--night-side) + var(--night-fxw) + var(--night-gap)))); }
   .night-hint{ top:auto; bottom:max(var(--night-edge), env(safe-area-inset-bottom)); }   /* RUN 8: below the bars (a short screen) */
   .night-bars{ --night-bar-h:min(24vh, 200px); }
+  :root{ --night-side:max(var(--night-edge), env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px)); --night-fxw:calc(3 * 5.5 * var(--night-fs-small) + 2 * var(--night-bar-gap)); }
   .night-card{ width:min(760px, calc(100vw - 28px)); display:grid; grid-template-columns:1fr 1fr; column-gap:var(--night-pad-lg); align-content:start; }
   .night-card .night-ihead{ grid-column:1/-1; }
   .night-card p{ margin:var(--night-gap-sm) 0; }
@@ -316,7 +318,12 @@ body.night-cards-start #start .startCard{ visibility:hidden; }   /* DESIGN-1: th
 .np-ico{ color:var(--night-ink); }
 .np-wave{ fill:none; stroke:var(--night-tint); stroke-width:2; stroke-linecap:round; opacity:.7; } .np-faint{ opacity:.35; }
 /* DESIGN-1 part C: THE SETTINGS IN THREE SHORT TABS (apps/night/settabs.js) — the tab list, one line per control (a short label, the control beside it or under it
-   on a narrow card), a note small and dim under its control, the «More» line. Revert: docs/night/design/DESIGN-1-settings-before.html. */
+   on a narrow card), a note small and dim under its control. Revert: docs/night/design/DESIGN-1-settings-before.html.
+   NIGHT-13: no «More»; the three panes stacked in one grid cell — a hidden pane keeps its place (invisible, out of the tab order and the accessibility tree),
+   so the card is always the tallest tab's height and does not move when a tab changes. */
+.night-panes{ display:grid; }
+.night-panes > .night-pane{ grid-area:1 / 1; min-width:0; }
+#nightShell .night-panes > .night-pane[hidden]{ display:block !important; visibility:hidden; }   /* beats NIGHT-7b's «#nightShell [hidden]»: the pane keeps its place, still unseen and out of reach */
 .night-tabs{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); margin:var(--night-gap-sm) 0 var(--night-gap-sm); border-bottom:1px solid var(--night-hairline); }
 #nightShell .night-tab{ min-height:44px; padding:var(--night-gap-sm); text-align:center; font-size:var(--night-fs-value); color:var(--night-ink-dim); border-bottom:2px solid transparent; margin-bottom:-1px;
   transition:color var(--night-fade), border-color var(--night-fade); }
@@ -329,30 +336,48 @@ body.night-cards-start #start .startCard{ visibility:hidden; }   /* DESIGN-1: th
 .night-card p.night-row-note{ margin:0 0 var(--night-gap-sm); font-size:var(--night-fs-small); color:var(--night-ink-dim); line-height:var(--night-lh); }
 .night-tg-lab{ display:flex; flex-direction:column; gap:calc(var(--night-gap-sm) / 3); min-width:0; }
 .night-tg-note{ font-size:var(--night-fs-small); color:var(--night-ink-dim); line-height:var(--night-lh); }
-#nightShell .night-more{ display:flex; align-items:center; gap:var(--night-gap-sm); width:100%; min-height:44px; padding:var(--night-gap-sm) 0; border-top:1px solid var(--night-hairline);
-  font-size:var(--night-fs-value); color:var(--night-ink-dim); text-align:left; }
-.night-more-chev{ display:block; width:.45em; height:.45em; border-right:1.5px solid currentColor; border-bottom:1.5px solid currentColor; transform:translateY(-20%) rotate(45deg);
-  transition:transform var(--night-fade) var(--night-ease); }
-#nightShell .night-more.on .night-more-chev{ transform:translateY(20%) rotate(-135deg); }
-.night-more-body > .night-lnk{ margin-bottom:var(--night-gap-sm) !important; }
+#nightCalReset{ margin:var(--night-gap) 0 var(--night-gap-sm) !important; }
 .night-pane .night-sl{ display:grid; grid-template-columns:minmax(7em, max-content) minmax(0,1fr); column-gap:var(--night-gap); align-items:center; margin:var(--night-gap) 0 0; }
 .night-pane .night-sl > .night-sl-lab{ grid-column:1; grid-row:1 / span 2; align-self:start; flex-direction:column; align-items:flex-start; gap:calc(var(--night-gap-sm) / 3); margin:0; }
 .night-pane .night-sl > .night-sl-lab .night-lnk{ text-align:left; }
 .night-pane .night-sl > input{ grid-column:2; grid-row:1; margin:0; }
 .night-pane .night-sl > .night-sl-ends{ grid-column:2; grid-row:2; margin-top:calc(var(--night-gap-sm) / 3); }
+/* NIGHT-13: a phone on its side — while a coaching line shows, the bars' words give way (their icons stay), so the line between them keeps a readable width */
+@media (orientation:landscape) and (max-height:500px){
+  body.night-coach-on{ --night-fxw:calc(3 * var(--night-bar-ico) + 2 * var(--night-bar-gap)); }
+  body.night-coach-on .night-bar-lab{ display:none; }
+}
 @media (orientation:landscape){
   .night-card.night-set{ display:block; width:min(560px, calc(100vw - 28px)); }   /* one column: a tab is short */
 }
 /* DESIGN-1 part D: THE START SCREEN'S STILL (apps/night/still.js, the law pure/still.js) — a prepared, dim still of the room behind the start card from the first
    paint (the first room's file per level: html[data-still] from guard.js; another room's set by still.js; the data row «NIGHT start still» keeps these equal
    to the record), its drifting lights (a 2D canvas), the reveal's mask and its mist over the whole picture (set by still.js), the breathing while a late room is not ready, the emblem's dot */
-:root{ --z-night-still:calc(var(--z-night) - 1); --night-mist:#8fa4c4; --night-dot-glow:0 0 10px 3px color-mix(in srgb, var(--night-tint) 60%, transparent); --night-breathe:4.5s; }
-.night-still{ position:fixed; inset:0; z-index:var(--z-night-still); pointer-events:none; background:var(--night-base) url(rooms/forest/still/still-reduced.webp) center 42% / cover no-repeat; }
-html[data-still="full"] .night-still{ background-image:url(rooms/forest/still/still-full.webp); }
+:root{ --z-night-still:calc(var(--z-night) - 1); --night-mist:#8fa4c4; --night-breathe:4.5s;
+  /* NIGHT-13: the room's film vignette as a veil over the still (the paint pass's law: k · smoothstep(from, 1, e) over the ellipse 75 % × 70 % at 50 % 46 %; data row «NIGHT start still») */
+  --night-still-veil:radial-gradient(75% 70% at 50% 46%, rgba(0,0,0,0) 0%, rgba(0,0,0,0.0000) 55.00%, rgba(0,0,0,0.0108) 58.75%, rgba(0,0,0,0.0407) 62.50%, rgba(0,0,0,0.0859) 66.25%, rgba(0,0,0,0.1426) 70.00%, rgba(0,0,0,0.2069) 73.75%, rgba(0,0,0,0.2750) 77.50%, rgba(0,0,0,0.3431) 81.25%, rgba(0,0,0,0.4074) 85.00%, rgba(0,0,0,0.4641) 88.75%, rgba(0,0,0,0.5093) 92.50%, rgba(0,0,0,0.5392) 96.25%, rgba(0,0,0,0.5500) 100.00%); }
+/* NIGHT-13: the still is the room's world through a wider lens (68°, 1.85239 : 1 — the record's still.fov and aspect), so the live picture of any screen is a crop
+   of it. Its box is the live canvas's (100vw × 100vh, as #scene); its height = the box × tan(34°) / tan(the live half-angle): 27.5° (×1.29572), 34° below 4 : 5
+   (× 1); centred. Wider than 2.4 : 1 (more than it covers): the width filled. still.js places it to the pixel from the same law on every resize. */
+.night-still{ position:fixed; left:0; top:0; width:100vw; height:100vh; z-index:var(--z-night-still); pointer-events:none; background-color:var(--night-base);
+  background-image:var(--night-still-veil), url(rooms/forest/still/still-reduced.webp); background-repeat:no-repeat; background-position:0 0, 50% 50%; background-size:100% 100%, auto 129.5719%; }
+html[data-still="full"] .night-still{ background-image:var(--night-still-veil), url(rooms/forest/still/still-full.webp); }
+@media not all and (min-aspect-ratio: 4/5){ .night-still{ background-size:100% 100%, auto 100%; } }
+@media (min-aspect-ratio: 12/5){ .night-still{ background-size:100% 100%, 100% auto; } }
 .night-still-mist{ position:fixed; inset:0; z-index:var(--z-night-still); background:var(--night-mist); opacity:var(--still-mist, 0); pointer-events:none; }   /* over the still AND the live room: the room comes out through it */
 .night-still-lights{ position:absolute; inset:0; width:100%; height:100%; display:block; }
 .night-still.breathe{ animation:night-still-breathe var(--night-breathe) ease-in-out infinite alternate; }
 @keyframes night-still-breathe{ from{ filter:brightness(.88); } to{ filter:brightness(1.06); } }
 .night-still-dot{ position:fixed; left:0; top:0; z-index:var(--z-night-still); width:var(--night-gap-sm); height:var(--night-gap-sm); border-radius:var(--night-r-pill); background:var(--night-brand);
-  box-shadow:var(--night-dot-glow); pointer-events:none; will-change:transform, opacity; }
+  filter:brightness(var(--dot-glow)); pointer-events:none; will-change:transform, opacity; }
+.night-still-dot::before{ content:''; position:absolute; inset:calc(-180% * var(--dot-halo)); border-radius:var(--night-r-pill); background:var(--night-dot-halo); pointer-events:none; }   /* NIGHT-13: its halo — a soft glow filling its own box (no gap round the dot), grown by still.js (DOT) */
+/* NIGHT-13: the Begin tap — the emblem's dot brightens and grows a soft halo, then stays a little bright while the start card goes (the flying dot takes over
+   from that look: pure/still.js DOT.glowHeld, haloHeld); reduced motion: none */
+:root{ --night-dot-pulse:520ms; --dot-glow:1; --dot-halo:1;
+  --night-dot-halo:radial-gradient(circle closest-side, color-mix(in srgb, var(--night-tint) 55%, transparent), color-mix(in srgb, var(--night-tint) 16%, transparent) 50%, transparent); }   /* the flying dot's brightness and halo (still.js sets them on the dot) */
+.night-start-head .emblem-glow.night-dot-pulse{ transform-box:fill-box; transform-origin:center; animation:night-dot-pulse var(--night-dot-pulse) var(--night-ease) forwards; }
+@keyframes night-dot-pulse{ 0%{ filter:var(--night-brand-glow-f); transform:scale(1); }
+  45%{ filter:brightness(1.9) drop-shadow(0 0 14px var(--night-brand)) drop-shadow(0 0 4px var(--night-brand)); transform:scale(1.25); }
+  100%{ filter:brightness(1.45) drop-shadow(0 0 10px var(--night-brand)); transform:scale(1); } }
+@media (prefers-reduced-motion: reduce){ .night-start-head .emblem-glow.night-dot-pulse{ animation:none; } }
 @media (prefers-reduced-motion: reduce){ .night-still.breathe{ animation:none; } }

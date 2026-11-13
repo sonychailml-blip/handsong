@@ -1676,6 +1676,57 @@ async function nightRoomTint(){
     for(const [name, c, want] of ctl){ n++; const b=judge(c, rooms); if(!b.some(want)) miss(`CONTROL ${name}: not caught (${b.join('; ')||'no complaint'})`); else notes.push(`CONTROL ${name}: caught`); } }
   return { cases:n, total:d.length, differences:d, notes };
 }
+/* NIGHT-13 — «NIGHT hand light anchor (app)»: the hand's light (apps/night/pure/handlight.js). (1) NEAREST: the light sits between the thumb and the finger
+   nearest to it (the middle finger here), exactly at their midpoint once settled; (2) THE SOUNDING PAIR: while a note is held the light sits on the pair that
+   sounds, even when another finger is nearer; (3) NO FLICKER: two fingers about equally near, which is nearer swapping every frame by up to 0.12 of the palm,
+   300 frames → at most one move; (4) A GLIDE: a move to another pair passes smoothly (each frame at most 0.25 of the way at 60 fps, monotonic) and arrives
+   exactly within moveMs; (5) BRIGHTNESS BY DISTANCE: glow 1 at the pinch's threshold and below, 0 with the finger open, falling monotonically between, and the
+   light's strength at the old glow is today's (1); a finger closing frame by frame never dims the light; (6) VISUAL ONLY: the law imports nothing, no core or
+   sound module imports it, the host hands the rooms copies (the bus's handsView is never written). CONTROLS: the same law without hysteresis must flicker; the
+   old anchor (always thumb and index) must fail «nearest». */
+async function nightHandLight(){
+  const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); };
+  const L=await import(new URL('../apps/night/pure/handlight.js', import.meta.url).href), H=L.HANDLIGHT, PALM=100;
+  /* a hand: the thumb at (500, 400); finger j (1…4) at a ratio r[j-1] of the palm from it, each in its own direction */
+  const DIR=[[-0.2,-1],[0.15,-1],[0.5,-0.85],[0.85,-0.5]].map(([x,y])=>{ const m=Math.hypot(x,y); return [x/m, y/m]; });
+  const hand=r=>[[500,400], ...r.map((q,i)=>[500+DIR[i][0]*q*PALM, 400+DIR[i][1]*q*PALM])], mid=(T,j)=>[(T[0][0]+T[j][0])/2, (T[0][1]+T[j][1])/2];
+  const run=(frames, o={})=>{ let st=L.handLightNew(), out=[]; for(const [r, finger] of frames){ const T=hand(r), x=L.handLightStep(st, T, PALM, finger==null ? -1 : finger, 1000/60, o); st=x.st; out.push({ ...x, T }); } return out; };
+  /* (1) nearest */
+  { const R=run(Array.from({ length:30 }, ()=>[[0.9, 0.4, 1.2, 1.3]])), z=R[R.length-1], m=mid(z.T, 2);
+    ok(`the light is not on the nearest pair (thumb and middle): pair ${z.f}, at ${z.x.toFixed(2)},${z.y.toFixed(2)} vs ${m.map(v=>v.toFixed(2))}`, z.f===2 && Math.abs(z.x-m[0])<1e-9 && Math.abs(z.y-m[1])<1e-9);
+    const old=mid(z.T, 1); ok('CONTROL: the old anchor (thumb and index) passes «nearest» — the check cannot fail', !(Math.abs(old[0]-m[0])<1e-9 && Math.abs(old[1]-m[1])<1e-9)); }
+  /* (2) the sounding pair */
+  { const R=run(Array.from({ length:30 }, ()=>[[0.3, 0.9, 0.15, 1.1], 1])), z=R[R.length-1];
+    ok(`a held note on the middle finger: the light on pair ${z.f}, not the middle (the ring finger is nearer)`, z.f===2); }
+  /* (3) no flicker */
+  const noisy=o=>{ let s=0x9e3779b9; const rnd=()=>{ s=(s*1664525+1013904223)>>>0; return s/4294967296; };
+    const R=run(Array.from({ length:300 }, (_,i)=>{ const e=0.03*(rnd()*2-1), a=0.6+(i%2 ? 0.03 : -0.03)+e; return [[a, 0.6+(i%2 ? -0.03 : 0.03)-e, 1.2, 1.3]]; }), o);
+    let moves=0; for(let i=1;i<R.length;i++) if(R[i].f!==R[i-1].f) moves++; return moves; };
+  { const m=noisy({}), c=noisy({ hyst:0, margin:0 }); notes.push(`two fingers about equally near, 300 frames: ${m} moves (without hysteresis ${c})`);
+    ok(`the light flickers between two about equally near fingers: ${m} moves in 300 frames`, m<=1);
+    ok(`CONTROL: without hysteresis the light moved only ${c} times — the check cannot fail`, c>=20); }
+  /* (4) a glide: the index nearest, then the middle clearly nearer */
+  { const fr=[...Array.from({ length:20 }, ()=>[[0.8, 1.0, 1.2, 1.3]]), ...Array.from({ length:30 }, ()=>[[0.8, 0.3, 1.2, 1.3]])], R=run(fr);   // only the middle finger moves: the index pair stays put
+    const a=mid(R[20].T, 1), b=mid(R[20].T, 2), span=Math.hypot(b[0]-a[0], b[1]-a[1]); let worst=0, back=false, prev=0, at=-1;
+    for(let i=20;i<R.length;i++){ const p=[R[i].x, R[i].y], q=((p[0]-a[0])*(b[0]-a[0])+(p[1]-a[1])*(b[1]-a[1]))/(span*span), st=i>20 ? q-prev : q; worst=Math.max(worst, st); if(st< -1e-12) back=true; prev=q; if(at<0 && Math.abs(q-1)<1e-12) at=i-20; }
+    notes.push(`a move to the middle finger: ${at+1} frames (moveMs ${H.moveMs}), at most ${(worst*100).toFixed(1)} % of the way in one frame`);
+    ok(`the move is not smooth: ${(worst*100).toFixed(1)} % of the way in one frame (≤ 25 %), back ${back}`, worst<=0.25 && !back);
+    ok(`the move did not arrive within moveMs: frame ${at}`, at>=0 && at<=Math.ceil(H.moveMs/(1000/60))); }
+  /* (5) brightness by distance */
+  { ok(`glow at the pinch threshold ${L.handLightGlow(H.near)} and open ${L.handLightGlow(H.far)} (1 and 0)`, L.handLightGlow(H.near)===1 && L.handLightGlow(0.05)===1 && L.handLightGlow(H.far)===0 && L.handLightGlow(1.6)===0);
+    let mono=true; for(let r=H.near;r<H.far;r+=0.01) if(L.handLightGlow(r+0.01)>L.handLightGlow(r)+1e-12) mono=false; ok('the glow does not fall monotonically as the finger opens', mono);
+    ok(`the strength at the old glow is ${L.handLightK(L.HANDLIGHT_GLOW_OLD)}, not today's 1`, Math.abs(L.handLightK(L.HANDLIGHT_GLOW_OLD)-1)<1e-12);
+    const R=run(Array.from({ length:40 }, (_,i)=>[[1.1-0.95*i/39, 1.2, 1.3, 1.4]])); let dim=false; for(let i=1;i<R.length;i++) if(R[i].glow<R[i-1].glow-1e-12) dim=true;
+    ok(`a closing finger dimmed the light, or it did not reach full at the pinch (${R[R.length-1].glow})`, !dim && R[R.length-1].glow>=0.999); }
+  /* (6) visual only */
+  { const fs=await import('node:fs'), src=fs.readFileSync(new URL('../apps/night/pure/handlight.js', import.meta.url), 'utf8'), host=fs.readFileSync(new URL('../apps/night/scene/host.js', import.meta.url), 'utf8');
+    ok('the law imports something', !/^\s*import\s/m.test(src));
+    const users=[]; const walk=dir=>{ for(const e of fs.readdirSync(dir, { withFileTypes:true })){ const f=new URL(e.name+(e.isDirectory() ? '/' : ''), dir); if(e.isDirectory()) walk(f); else if(e.name.endsWith('.js') && fs.readFileSync(f,'utf8').includes('handlight.js')) users.push(f.pathname.replace(/^.*\/(core|apps)\//, '$1/')); } };
+    walk(new URL('../core/', import.meta.url)); walk(new URL('../apps/night/', import.meta.url));
+    ok(`the law is read by ${users.join(', ')} (only the host and the forest may read it)`, users.every(u=>/apps\/night\/(scene\/host|rooms\/forest\/forest)\.js$/.test(u)) && users.some(u=>/host\.js$/.test(u)));
+    ok('the host does not hand the rooms copies of the hands (out.push({ ...h, … }))', /out\.push\(\{ \.\.\.h, x:r\.x, y:r\.y/.test(host) && !/handsView'\)\s*\.\s*(forEach|map)\(\s*h\s*=>\s*\{?\s*h\.x\s*=/.test(host)); }
+  return { cases:n, total:d.length, differences:d, notes };
+}
 /* DESIGN-1 part D — «NIGHT start still (app)»: (1) THE FILES — every real room names a still per level, each a WebP in its folder of at most 100 KB
    (STILL_BUDGET); (2) THE FIRST PAINT — night.css shows the first room's two stills (the default and html[data-still="full"]) exactly as its record names
    them, and guard.js sets data-still to one of the levels from the stored picture level; (3) THE LAW (pure/still.js) — before the start ends: the still;
@@ -1726,7 +1777,50 @@ async function nightStartStill(){
     const P=SL.stillLook(0.5, true); if(P.clear>0 || Math.abs(P.opacity-0.5)>1e-9) miss('reduced motion: not a plain opacity fade'); }
   { n+=2; const a=SL.stillDot(0, 75, 40, 1280, 800), b=SL.stillDot(1, 75, 40, 1280, 800);
     if(Math.abs(a.x-75)>1e-9 || Math.abs(a.y-40)>1e-9 || a.a!==1) miss('the dot does not start at the emblem: '+JSON.stringify(a));
-    if(Math.abs(b.x-SL.STILL.dotTo[0]*1280)>1e-9 || Math.abs(b.y-SL.STILL.dotTo[1]*800)>1e-9 || b.a!==0) miss('the dot does not end in the picture, faded: '+JSON.stringify(b)); }
+    if(Math.abs(b.x-SL.STILL.dotTo[0]*1280)>1e-9 || Math.abs(b.y-SL.STILL.dotTo[1]*800)>1e-9 || b.a!==0) miss('the dot does not end in the picture, faded: '+JSON.stringify(b));
+    /* NIGHT-13: the flight to a firefly — from the emblem's place, radius and held glow to the firefly's place and size, faded there, inside the reveal */
+    n+=3; const A={ x:75, y:40, r:5 }, B={ x:700, y:380, r:1.2 }, f0=SL.dotFlight(0, A, B, 800), f1=SL.dotFlight(1, A, B, 800);
+    if(f0.x!==75 || f0.y!==40 || f0.r!==5 || f0.glow!==SL.DOT.glowHeld || f0.halo!==SL.DOT.haloHeld) miss('the flight does not start at the emblem in its held look: '+JSON.stringify(f0));
+    if(f1.x!==700 || f1.y!==380 || Math.abs(f1.r-1.2)>1e-12 || f1.a!==0 || f1.glow!==1) miss('the flight does not end on the firefly, at its size, faded: '+JSON.stringify(f1));
+    if(!(SL.DOT.flyMs<SL.STILL.revealMs && SL.DOT.flyMs>=1500 && SL.DOT.flyMs+SL.DOT.pulseMs<=2600)) miss(`the flight takes ${SL.DOT.flyMs} ms (inside the reveal's ${SL.STILL.revealMs} ms, about 1.5–2.5 s with the pulse wanted)`); }
+  /* NIGHT-13: THE GEOMETRY — the still as placed (stillFit) shows every world direction where the live camera shows it, on every screen shape (portrait and
+     landscape phones, laptops, full screens, a screen just under 4 : 5, the widest it covers); the corner silhouettes' 2D law = the 3D placement's projection;
+     the files' own aspect = the record's; night.css's first paint = the law (the heights, the two screen limits, the vignette veil). CONTROL: DESIGN-1's fit
+     (a 55° 1.6 : 1 frame covering at 42 %) misplaces them by more than 2 % on a 1920 × 1080 screen. */
+  const R0=first.record, ST=R0.still, RVf=RV.roomFov, T=SL.stillTan, SIL=await import(new URL('../apps/night/rooms/forest/pure/sil.js', import.meta.url).href);
+  const SCREENS=[[1280,800],[1536,730],[1920,1080],[390,844],[844,390],[873,393],[2400,1080],[800,800],[1000,1260],[1600,1000]];
+  const miss1=(bw, bh, F)=>{ const fov=RVf(R0.view, bw, bh), Tl=T(fov), Ts=T(ST.fov), Hs=1000, Ws=Hs*ST.aspect; let worst=0;
+    for(const tx of [-0.9,-0.4,0,0.3,0.85]) for(const ty of [-0.8,-0.2,0,0.5,0.9]){ const ax=tx*Tl*bw/bh, ay=ty*Tl;   // a direction inside the live view (tan units)
+      const X=bw/2+ax*(bh/2)/Tl, Y=bh/2-ay*(bh/2)/Tl, u=Ws/2+ax*(Hs/2)/Ts, v=Hs/2-ay*(Hs/2)/Ts, X2=F.x+u*F.w/Ws, Y2=F.y+v*F.h/Hs; worst=Math.max(worst, Math.hypot(X-X2, Y-Y2)/bh); }
+    return worst; };
+  for(const [bw,bh] of SCREENS){ n++; const F=SL.stillFit(ST, RVf(R0.view, bw, bh), bw, bh, bw, bh), m=miss1(bw, bh, F);
+    if(F.cover || m>1e-9) miss(`${bw}×${bh}: the still is off the live picture by ${(m*100).toExponential(2)} % of the height${F.cover ? ' (scaled to cover)' : ''}`); }
+  { const w=SL.stillWidest(ST, R0.view.fov); n++; notes.push(`the still covers every screen up to ${w.toFixed(4)} : 1 exactly (${SCREENS.length} shapes checked to 1e-9)`); if(w<2.4) miss(`the still covers screens only up to ${w.toFixed(3)} : 1 (2.4 wanted)`); }
+  { n++; const bw=1920, bh=1080, s=Math.max(bw/1280, bh/800), W0=1280*s, H0=800*s, h=H0*T(ST.fov)/T(R0.view.fov), w=h*ST.aspect, F={ w, h, x:(bw-W0)*0.5+W0/2-w/2, y:(bh-H0)*0.42+H0/2-h/2 }, m=miss1(bw, bh, F);
+    if(m<0.02) miss(`CONTROL: DESIGN-1's fit is off by only ${(m*100).toFixed(2)} % at 1920 × 1080 — the geometry check cannot fail`); else notes.push(`CONTROL: DESIGN-1's fit is off by ${(m*100).toFixed(1)} % of the height at 1920 × 1080`); }
+  /* the silhouettes: a pinhole camera of the live lens at the rest pose sees each plane (parallel to the picture at depth d, h of the view's height) where silScreen draws it */
+  for(const [bw,bh] of [[1280,800],[390,844]]){ const fov=RVf(R0.view, bw, bh), f=(bh/2)/T(fov);
+    for(const o of ST.over.sil){ n++; const P=SIL.silScreen(o, bw, bh, bw/bh), k=bw/bh<SIL.SIL_TALL ? SIL.SIL_TALL : 1, hw=2*o.d*T(fov)*o.h*k, wx=o.nx*T(fov)*bw/bh*o.d, wy=o.ny*T(fov)*o.d, X=bw/2+wx*f/o.d, Y=bh/2-wy*f/o.d;
+      if(Math.abs(P.h-hw*f/o.d)>1e-9 || Math.abs(P.x-X)>1e-9 || Math.abs(P.y-Y)>1e-9 || Math.abs(P.w-P.h*o.gw)>1e-9) miss(`${bw}×${bh}: the ${o.kind} silhouette's 2D place differs from its projection (${JSON.stringify(P)})`); } }
+  /* the files' own size (WebP: VP8 / VP8L / VP8X) */
+  const dims=f=>{ try{ const b=fs.readFileSync(f), t=b.slice(12,16).toString();
+    if(t==='VP8X') return [1+b.readUIntLE(24,3), 1+b.readUIntLE(27,3)]; if(t==='VP8 ') return [b.readUInt16LE(26)&0x3fff, b.readUInt16LE(28)&0x3fff];
+    if(t==='VP8L'){ const v=b.readUInt32LE(21); return [1+(v&0x3fff), 1+((v>>14)&0x3fff)]; } }catch(e){} return null; };
+  for(const lv of RV.ROOM_LEVELS){ n++; const D=dims(new URL(ST[lv], first.base)); if(!D || Math.abs(D[0]/D[1]-ST.aspect)/ST.aspect>2e-3) miss(`the ${lv} still is ${D ? D.join('×') : 'unreadable'}: its aspect is not the record's ${ST.aspect}`); else notes.push(`${lv} still ${D.join('×')}`); }
+  { n++; const D=dims(new URL(ST.over.sprites, first.base)), need=Object.values(ST.over.rects).reduce((m,q)=>[Math.max(m[0], q[0]+q[2]), Math.max(m[1], q[1]+q[3])], [0,0]);
+    if(!D || D[0]<need[0] || D[1]<need[1]) miss(`the silhouettes' shapes are ${D ? D.join('×') : 'unreadable'}, the rects need ${need.join('×')}`); }
+  /* night.css's first paint */
+  { const rule=(css.match(/\.night-still\{[^}]*\}/)||[''])[0], pct=(rule.match(/background-size:100% 100%, auto ([\d.]+)%/)||[])[1], tall=(css.match(/@media not all and \(min-aspect-ratio: 4\/5\)\{ \.night-still\{ background-size:100% 100%, auto ([\d.]+)%; \} \}/)||[])[1];
+    const wide=(css.match(/@media \(min-aspect-ratio: (\d+)\/(\d+)\)\{ \.night-still\{ background-size:100% 100%, 100% auto; \} \}/)||[]), want=100*T(ST.fov)/T(R0.view.fov), wantT=100*T(ST.fov)/T(R0.view.tallFov);
+    n+=4; if(!(Math.abs(+pct-want)<1e-3)) miss(`night.css shows the still at ${pct} % of the height, the law ${want.toFixed(4)} %`);
+    if(!(Math.abs(+tall-wantT)<1e-3)) miss(`night.css's tall screens: ${tall} %, the law ${wantT.toFixed(4)} %`);
+    if(!(wide.length===3 && Math.abs(wide[1]/wide[2]-SL.stillWidest(ST, R0.view.fov))<1e-3)) miss(`night.css fills the width from ${wide[1]}/${wide[2]}, the still covers up to ${SL.stillWidest(ST, R0.view.fov).toFixed(4)}`);
+    if(!/^\.night-still\{ position:fixed; left:0; top:0; width:100vw; height:100vh;/.test(rule)) miss('the box of the still is not that of the live canvas (100vw × 100vh at 0, 0)');
+    const veil=(css.match(/--night-still-veil:radial-gradient\(([\d.]+)% ([\d.]+)% at ([\d.]+)% ([\d.]+)%, ([^;]+)\);/)||[]), V=ST.over.vignette; n+=2;
+    if(veil.length!==6 || [V.rx, V.ry, V.cx, V.cy].some((v,i)=>Math.abs(+veil[i+1]-100*v)>1e-6)) miss('the vignette veil of night.css is not the ellipse of the paint pass');
+    else { let worst=0; const sm=x=>{ x=Math.max(0, Math.min(1, (x-V.from)/(1-V.from))); return x*x*(3-2*x); }, st=[...veil[5].matchAll(/rgba\(0,0,0,([\d.]+)\) ([\d.]+)%/g)].map(m=>[+m[2]/100, +m[1]]);
+      for(let e=0;e<=1.0000001;e+=0.005){ let a=st[st.length-1][1]; for(let i=1;i<st.length;i++) if(e<=st[i][0]){ const [e0,a0]=st[i-1], [e1,a1]=st[i]; a=a0+(a1-a0)*(e-e0)/((e1-e0)||1); break; } worst=Math.max(worst, Math.abs(a-V.k*sm(e))); }
+      notes.push(`the vignette veil: at most ${worst.toFixed(4)} off the paint pass's law (k ${V.k})`); if(worst>0.003) miss(`the vignette veil of night.css is ${worst.toFixed(4)} off the law`); } }
   /* the CONTROLS */
   { n++; const eager=(s, now)=> s.ended!=null && s.room && s.readyAt!=null && now>=Math.max(s.ended, s.readyAt) ? { phase:'reveal', p:0, t0:Math.max(s.ended, s.readyAt) } : SL.stillPhase(s, now);
     if(!law(eager).length) miss('CONTROL: a law revealing as soon as the room is ready passed — the fade-in wait cannot fail'); else notes.push('CONTROL: a law revealing without the fade-in wait is caught'); }
@@ -2087,6 +2181,7 @@ const ROWS=[
   ['NIGHT room records (app)',  ()=>nightRooms(),       r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // NIGHT-3
   ['NIGHT room tint (app)',     ()=>nightRoomTint(),    r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // DESIGN-1 part B
   ['NIGHT start still (app)',   ()=>nightStartStill(),  r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // DESIGN-1 part D
+  ['NIGHT hand light anchor (app)', ()=>nightHandLight(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-13
   ['NIGHT music bed law (app)', ()=>nightBedLaw(),     r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // NIGHT-3 stage 4
   ['NIGHT music bed v2 law (app)', ()=>nightBed2Law(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-4
   ['VIS1c fireflies (core)',    ()=>fliesCore(),    r=>({ cases:r.cases, diff:r.total, list:r.differences })],
