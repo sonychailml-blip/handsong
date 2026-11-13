@@ -31,7 +31,7 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
 - Scale data are JSON files in `core/data/`, fetched at start. MediaPipe model/WASM/library come from CDNs — internet required. ⚠️ The apps
   do not work offline at all (SW caches nothing on purpose). Needs a webcam + WebGL. Audio starts only on the "▶ Play" click.
 - `?probe` in the address loads the app's probes (`window.P`, guarded) and the render/ear tools (`window.R`) and user files (`window.U`). `P.all`/`P.quick` on Full, `P.night` on Night.
-- ⛳ **Build and deploy** (SPLIT-2): `HANDSONG_APP=full|night node tools/build.mjs` writes one app into `dist/` (no other app, no tools). Previews (`VERCEL_ENV=preview` or `--probes`) keep `?probe`; production has no probes. `HANDSONG_EDITION=release` hides the development items. `vercel.json` is shared by two Vercel projects (`HANDSONG_APP=full`, `=night`); previews from `dev`. ⛳ Production branches differ (user, 2026-11-02): Full's project builds `main` (handsong.vercel.app); `handsong-night` builds `night-release`, which carries Night's test build for the first testers (the user pushes it; NIGHT-7). ⛳ Night's test build lives at https://night.handsong.app (user, NIGHT-12, 2026-11-12; `handsong-night.vercel.app` still works). So merging `dev` into `main` updates only Full's production; `main` stays the old public version until the new Full is ready. Whenever a page, path or build changes: `node tools/smoke-paths.mjs` (`--build`: also the built trees).
+- ⛳ **Build and deploy** (SPLIT-2): `HANDSONG_APP=full|night node tools/build.mjs` writes one app into `dist/` (no other app, no tools). Previews (`VERCEL_ENV=preview` or `--probes`) keep `?probe`; production has no probes. `HANDSONG_EDITION=release` hides the development items. `vercel.json` is shared by two Vercel projects (`HANDSONG_APP=full`, `=night`); previews from `dev`. ⛳ Production branches differ (user, 2026-11-02): Full's project builds `main` (handsong.vercel.app); `handsong-night` builds `night-release`, which carries Night's test build for the first testers (the user pushes it; NIGHT-7). ⛳ Night's test build lives at https://night.handsong.app (user, NIGHT-12, 2026-11-12; `handsong-night.vercel.app` still works). So merging `dev` into `main` updates only Full's production; `main` stays the old public version until the new Full is ready. Whenever a page, path or build changes: `node tools/smoke-paths.mjs` (`--build`: also the built trees). ⛳ **The brand site handsong.app** (SITE-1, 2026-11-13): `apps/site/` — plain static pages (EN at `/`, RU at `/ru/`), no build; its own Vercel project (Root Directory `apps/site`, framework Other, no build command, production branch `dev`; `apps/site/vercel.json` holds its headers, clean URLs and the Ignored Build Step, so it deploys only when `apps/site/` changes). Pages are generated from `tools/site/texts.mjs` by `node tools/site-pages.mjs --write`; pictures by `node tools/site-images.mjs`. It imports nothing from `core/` or the apps; Full and Night never reference it.
 
 ## Standing working rules (apply to every slice; prompts don't repeat them)
 - **What a new session reads:** this file, the index `HANDOFF.md` and the track's `docs/<track>/HANDOFF.md`. Open the archives, `docs/<track>/BACKLOG.md`, `docs/core/NAME-INDEX.md` (every code name by
@@ -62,7 +62,8 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   for Levels 1–2, and a core change is always Level 3 or 4.
   - **Level 1 — texts, styles, docs, small interface changes in one app:** `node tools/check-static.mjs` (+ `node --check` on changed files),
     `node tools/probe-data.mjs`, that app's UI checks (Full: `node tools/probe-browser.mjs --quick`; Night: `--app night --ui-only` — the start, cards,
-    settings, coaching and texts checks with real input, no `P.night` renders; DESIGN-1). A docs-only change: the static check, the data runner and its proofs.
+    settings, coaching and texts checks with real input, no `P.night` renders; DESIGN-1; the site `apps/site/`: `node tools/site-check.mjs` — every page,
+    both languages, phone and laptop; SITE-1). A docs-only change: the static check, the data runner and its proofs.
   - **Level 2 — a room or the picture** (`apps/night/rooms/`, the scene, shaders): Level 1 + the full Night suite (`--app night`).
   - **Level 3 — core or the engine** (`core/`, worklets, hand tracking, audio, loading): Level 2 + Full `--quick`; Full `--all` when core's sound,
     tuning or recording paths change.
@@ -364,7 +365,7 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
 39. ⛳ **Two apps, one core** (user, SPLIT-1): the section below binds every run. Its rules are numbered there; quote them as «core rule N».
 
 ## Two apps, one core (user, SPLIT-1, 2026-11-01)
-⛳ Handsong (`apps/full/`) and Handsong Night (`apps/night/`, code id `night`) share `core/`. Every run belongs to ONE track: CORE-n, FULL-n or NIGHT-n.
+⛳ Handsong (`apps/full/`) and Handsong Night (`apps/night/`, code id `night`) share `core/`. Every run belongs to ONE track: CORE-n, FULL-n, NIGHT-n or SITE-n (SITE-1, 2026-11-13: the brand site handsong.app — `apps/site/`, `docs/site/HANDOFF.md`; it imports nothing from `core/` or the apps).
 
 1. **Only code used by both apps goes in `core/`.**
 2. **No UI in `core/`.** Exception: `core/legacy-ui/`, inherited from the split. It only shrinks; no new file, no new feature there beyond what
@@ -388,7 +389,7 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
 11. **Rules #32 (licences) and #33 (privacy) apply to both apps,** one register, the same CSP line in both pages (static check 16).
 12. **Never run git, not even read-only** (unchanged). Each pure file move is committed by the user before the moved files are edited.
 
-Run names and logs: `CORE-n`, `FULL-n`, `NIGHT-n`, counted separately (`NIGHT-0` is history; Night starts at `NIGHT-1`). If a NIGHT or FULL run needs a core change, that part is a small `CORE-n` with its own record and both apps' checks. Each log entry in `docs/<track>/WORK-LOG.md` starts: track, number, date, tree hashes before and after.
+Run names and logs: `CORE-n`, `FULL-n`, `NIGHT-n`, `SITE-n`, counted separately (`NIGHT-0` is history; Night starts at `NIGHT-1`). If a NIGHT or FULL run needs a core change, that part is a small `CORE-n` with its own record and both apps' checks. Each log entry in `docs/<track>/WORK-LOG.md` starts: track, number, date, tree hashes before and after.
 
 ## Module map
 One line per module: `docs/core/MODULE-MAP.md` (DOC2; open it when the slice touches a module you don't know). Every name per module:

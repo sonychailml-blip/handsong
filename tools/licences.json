@@ -320,6 +320,117 @@
     "http://www.w3.org/2000/svg"
    ],
    "notes": "RUN 7 (C11): core/icons.js builds the Night face's drawn icons and the emblem as SVG elements with this namespace name."
+  },
+  {
+   "id": "site-font-inter",
+   "name": "Inter (text font of the brand site handsong.app) — The Inter Project Authors",
+   "class": "font",
+   "use": "shipped",
+   "version": "Google Fonts v20, variable weight axis (400–600 used), latin + cyrillic subsets (woff2), unmodified",
+   "licence": "OFL-1.1",
+   "source": "https://fonts.google.com/specimen/Inter (https://github.com/rsms/inter) — no Reserved Font Name",
+   "files": [
+    "apps/site/fonts/inter-latin.woff2",
+    "apps/site/fonts/inter-cyrillic.woff2",
+    "apps/site/fonts/OFL-Inter.txt"
+   ],
+   "notes": "SITE-1: the founder's approved site design (variant B) names Inter; self-hosted from the site's own origin instead of Google Fonts (no third-party request).",
+   "replace": "kept — the font of the founder's approved site design (SITE-1)"
+  },
+  {
+   "id": "site-font-literata",
+   "name": "Literata (titles and wordmark of the brand site handsong.app) — The Literata Project Authors",
+   "class": "font",
+   "use": "shipped",
+   "version": "Google Fonts v40, variable optical-size and weight axes (300–400 roman, 300 italic), latin + cyrillic subsets (woff2), unmodified",
+   "licence": "OFL-1.1",
+   "source": "https://fonts.google.com/specimen/Literata (https://github.com/googlefonts/literata) — no Reserved Font Name",
+   "files": [
+    "apps/site/fonts/literata-latin.woff2",
+    "apps/site/fonts/literata-cyrillic.woff2",
+    "apps/site/fonts/literata-italic-latin.woff2",
+    "apps/site/fonts/literata-italic-cyrillic.woff2",
+    "apps/site/fonts/OFL-Literata.txt"
+   ],
+   "notes": "SITE-1: the same family as Night's wordmark (entry font-literata), here with the optical-size axis the approved design uses; self-hosted from the site's own origin.",
+   "replace": "kept — the font of the founder's approved site design (SITE-1)"
+  },
+  {
+   "id": "site-pictures",
+   "name": "The brand site's pictures: the Night card (portrait), the forest on the Install wall, the sharing picture (1200 × 630 with the wordmark), and the tech demo card (its start screen)",
+   "class": "image",
+   "use": "shipped",
+   "version": "—",
+   "licence": "own-work",
+   "source": "our own renders and captures, made by tools/site-images.mjs: the night forest drawn by our own scene through the still's camera (as tools/night-still.mjs; the floor uses the CC0 photo-scanned «Leaves Forest Ground», which asks for no attribution), and a capture of our own live tech demo's start screen",
+   "files": [
+    "apps/site/img/night-card.webp",
+    "apps/site/img/night-card.jpg",
+    "apps/site/img/forest-wall.webp",
+    "apps/site/img/forest-wall.jpg",
+    "apps/site/img/og.jpg",
+    "apps/site/img/demo-card.webp",
+    "apps/site/img/demo-card.jpg"
+   ],
+   "replace": "kept — our own generated material (regenerate: node tools/site-images.mjs when the forest or the demo changes)"
+  },
+  {
+   "id": "site-icons",
+   "name": "The brand site's favicons — the Handsong emblem: five notes in an arc, the centre one glowing",
+   "class": "image",
+   "use": "shipped",
+   "version": "—",
+   "licence": "AI-generated",
+   "source": "drawn by code by Claude Code in this project (an SVG of five circles; PNG and ICO rendered from it by tools/site-images.mjs; no font, no traced artwork)",
+   "tool": "Claude Code (Anthropic); output owned by the user under Anthropic's commercial terms",
+   "files": [
+    "apps/site/favicon.svg",
+    "apps/site/favicon.ico",
+    "apps/site/img/icon-32.png",
+    "apps/site/img/apple-touch-icon.png"
+   ],
+   "replace": "kept — the emblem of the founder's approved site design (SITE-1)"
+  },
+  {
+   "id": "site-own-origin",
+   "name": "handsong.app — the brand site's own address (canonical, language alternates, the sharing picture's address); nothing is fetched from elsewhere",
+   "class": "link",
+   "use": "link",
+   "version": "—",
+   "licence": "n/a",
+   "source": "tools/site/texts.mjs ORIGIN",
+   "urls": [
+    "https://handsong.app/"
+   ]
+  },
+  {
+   "id": "link-site-apps",
+   "name": "The apps the brand site links to — Handsong Night and the tech demo (our own deployments) — links the person opens",
+   "class": "link",
+   "use": "link",
+   "version": "—",
+   "licence": "n/a",
+   "source": "tools/site/texts.mjs LINKS",
+   "urls": [
+    "https://night.handsong.app",
+    "https://handsong.vercel.app"
+   ],
+   "notes": "SITE-1: opened only by a tap; the site sends nothing."
+  },
+  {
+   "id": "link-site-socials",
+   "name": "Handsong's social pages (YouTube, Instagram, TikTok @handsongapp) — links the person opens",
+   "class": "link",
+   "use": "link",
+   "version": "—",
+   "licence": "n/a",
+   "source": "tools/site/texts.mjs LINKS",
+   "urls": [
+    "https://www.youtube.com/@handsongapp",
+    "https://www.instagram.com/handsongapp",
+    "https://www.tiktok.com/@handsongapp"
+   ],
+   "notes": "SITE-1: plain links in the site's footer; no embed, no widget, nothing loaded from these hosts."
   }
  ],
  "glyphs": [

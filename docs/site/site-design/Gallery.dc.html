@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>handsong.app — вариант «Галерея»</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Literata:ital,opsz,wght@0,7..72,300;0,7..72,400;1,7..72,300&amp;display=swap">
+<style>
+body{margin:0;background:#0f1012}
+a{color:#ecedef}a:hover{color:#ffffff}
+</style>
+</helmet>
+<div style="background: #0f1012; color: #ecedef; font-family: Inter, 'Segoe UI', system-ui, sans-serif; font-size: 16px; line-height: 1.6; min-height: 100vh">
+
+<header style="max-width: 1200px; margin: 0 auto; padding: 24px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px">
+<a href="#top" style="display: flex; align-items: center; gap: 12px; text-decoration: none; color: #ecedef">
+<span aria-hidden="true" style="display: flex; gap: 5px; align-items: flex-end">
+<span style="width: 5px; height: 5px; border-radius: 50%; background: #5d6169"></span>
+<span style="width: 5px; height: 5px; border-radius: 50%; background: #5d6169; margin-bottom: 4px"></span>
+<span style="width: 7px; height: 7px; border-radius: 50%; background: #ffffff; box-shadow: 0 0 10px rgba(255,255,255,0.7); margin-bottom: 7px"></span>
+<span style="width: 5px; height: 5px; border-radius: 50%; background: #5d6169; margin-bottom: 4px"></span>
+<span style="width: 5px; height: 5px; border-radius: 50%; background: #5d6169"></span>
+</span>
+<span style="font-family: Literata, Georgia, serif; font-weight: 300; font-size: 23px; letter-spacing: 0.04em">hand·song</span>
+</a>
+<nav aria-label="Разделы" style="display: flex; flex-wrap: wrap; gap: 8px 24px; align-items: center; font-size: 15px">
+<a href="#apps" style="color: #9a9ea6; text-decoration: none">Приложения</a>
+<a href="#about" style="color: #9a9ea6; text-decoration: none">О Handsong</a>
+<a href="#contact" style="color: #9a9ea6; text-decoration: none">Контакты</a>
+<span style="display: flex; gap: 2px; border: 1px solid #2a2c31; border-radius: 999px; padding: 3px">
+<button type="button" style="background: #ecedef; color: #0f1012; border: 0; border-radius: 999px; padding: 3px 12px; font: inherit; font-size: 13px">RU</button>
+<button type="button" style="background: transparent; color: #9a9ea6; border: 0; border-radius: 999px; padding: 3px 12px; font: inherit; font-size: 13px">EN</button>
+</span>
+</nav>
+</header>
+
+<section id="apps" style="max-width: 1200px; margin: 0 auto; padding: 40px 24px 88px; display: flex; flex-direction: column; gap: 40px; align-items: center">
+<div style="display: flex; flex-direction: column; gap: 8px; align-items: center; text-align: center">
+<h1 style="margin: 0; font-family: Literata, Georgia, serif; font-weight: 300; font-size: clamp(34px, 4.6vw, 56px); line-height: 1.12">Музыка руками <i style="font-style: italic">в воздухе</i></h1>
+<p style="margin: 0; color: #9a9ea6; font-size: 18px">Три мира. Нужны только браузер и камера.</p>
+</div>
+
+<div style="width: 100%; display: flex; flex-wrap: wrap; gap: 28px; justify-content: center; align-items: stretch">
+
+<article style="flex: 1 1 300px; max-width: 370px; min-width: 0; display: flex; flex-direction: column; gap: 18px">
+<a href="Night.dc.html" aria-label="Handsong Night — подробнее" style="display: block; aspect-ratio: 9 / 14; max-width: 100%; position: relative; border-radius: 30px; overflow: hidden; text-decoration: none; background: radial-gradient(110% 80% at 50% 100%, #1a3d29 0%, #0c1a15 42%, #070a0e 80%); box-shadow: 0 30px 80px -30px rgba(160,230,110,0.35), inset 0 0 0 1px rgba(255,255,255,0.06)">
+<span style="position: absolute; left: 14%; top: 0; width: 7%; height: 100%; background: linear-gradient(#05070a, #0b1210)"></span>
+<span style="position: absolute; left: 36%; top: 0; width: 4%; height: 100%; background: #08100d; opacity: 0.85"></span>
+<span style="position: absolute; right: 16%; top: 0; width: 9%; height: 100%; background: linear-gradient(#05070a, #0a110f)"></span>
+<span style="position: absolute; left: 50%; top: 58%; width: 130px; height: 130px; margin: -65px 0 0 -65px; border-radius: 50%; background: radial-gradient(circle, rgba(200,245,106,0.6) 0%, rgba(200,245,106,0.12) 38%, transparent 70%)"></span>
+<span style="position: absolute; left: 50%; top: 58%; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; background: #f4ffd6; box-shadow: 0 0 16px 5px rgba(200,245,106,0.7)"></span>
+<span style="position: absolute; left: 26%; top: 74%; width: 5px; height: 5px; border-radius: 50%; background: #d8ff9a; box-shadow: 0 0 10px 3px rgba(200,245,106,0.5)"></span>
+<span style="position: absolute; left: 70%; top: 34%; width: 4px; height: 4px; border-radius: 50%; background: #d8ff9a; box-shadow: 0 0 8px 3px rgba(200,245,106,0.45)"></span>
+<span style="position: absolute; left: 0; right: 0; bottom: 0; padding: 22px; background: linear-gradient(transparent, rgba(5,7,10,0.85)); display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: #c8f56a">Доступно</span>
+<span style="font-family: Literata, Georgia, serif; font-weight: 400; font-size: 28px; color: #ffffff">Night</span>
+</span>
+</a>
+<p style="margin: 0; color: #9a9ea6; padding: 0 6px">Тихая живая музыка в ночном лесу, который отвечает на вашу игру.</p>
+<div style="display: flex; gap: 10px; flex-wrap: wrap; padding: 0 6px">
+<a href="https://night.handsong.app" style="display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 22px; border-radius: 999px; background: #ecedef; color: #0f1012; text-decoration: none; font-weight: 500">Играть</a>
+<a href="Night.dc.html" style="display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 18px; border-radius: 999px; border: 1px solid #2f3238; text-decoration: none">Подробнее</a>
+</div>
+</article>
+
+<article style="flex: 1 1 300px; max-width: 370px; min-width: 0; display: flex; flex-direction: column; gap: 18px">
+<a href="Demo.dc.html" aria-label="Handsong технодемо — подробнее" style="display: flex; align-items: center; justify-content: center; gap: 10px; aspect-ratio: 9 / 14; max-width: 100%; position: relative; border-radius: 30px; overflow: hidden; text-decoration: none; background: linear-gradient(165deg, #1e2840 0%, #0d111a 100%); box-shadow: 0 30px 80px -30px rgba(120,150,230,0.35), inset 0 0 0 1px rgba(255,255,255,0.06)">
+<span style="width: 12px; height: 60px; border-radius: 7px; background: #3b4a66"></span>
+<span style="width: 12px; height: 104px; border-radius: 7px; background: #5a70a0"></span>
+<span style="width: 12px; height: 42px; border-radius: 7px; background: #3b4a66"></span>
+<span style="width: 12px; height: 140px; border-radius: 7px; background: #8ea4d8"></span>
+<span style="width: 12px; height: 78px; border-radius: 7px; background: #5a70a0"></span>
+<span style="width: 12px; height: 34px; border-radius: 7px; background: #3b4a66"></span>
+<span style="position: absolute; left: 0; right: 0; bottom: 0; padding: 22px; background: linear-gradient(transparent, rgba(8,10,16,0.85)); display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: #a9bbe8">Ранняя версия</span>
+<span style="font-family: Literata, Georgia, serif; font-weight: 400; font-size: 28px; color: #ffffff">Технодемо</span>
+</span>
+</a>
+<p style="margin: 0; color: #9a9ea6; padding: 0 6px">Первая открытая версия инструмента: лады, звуки и эффекты, игра двумя руками.</p>
+<div style="display: flex; gap: 10px; flex-wrap: wrap; padding: 0 6px">
+<a href="https://handsong.vercel.app" style="display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 22px; border-radius: 999px; background: #ecedef; color: #0f1012; text-decoration: none; font-weight: 500">Открыть</a>
+<a href="Demo.dc.html" style="display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 18px; border-radius: 999px; border: 1px solid #2f3238; text-decoration: none">Подробнее</a>
+</div>
+</article>
+
+<article style="flex: 1 1 300px; max-width: 370px; min-width: 0; display: flex; flex-direction: column; gap: 18px">
+<a href="Install.dc.html" aria-label="Handsong Install — подробнее" style="display: block; aspect-ratio: 9 / 14; max-width: 100%; position: relative; border-radius: 30px; overflow: hidden; text-decoration: none; background: linear-gradient(180deg, #131113 0%, #1f180e 100%); box-shadow: 0 30px 80px -30px rgba(244,201,138,0.3), inset 0 0 0 1px rgba(255,255,255,0.06)">
+<span style="position: absolute; left: 12%; right: 12%; top: 16%; height: 40%; border-radius: 8px; background: radial-gradient(80% 90% at 50% 100%, #4a3415 0%, #1d160c 60%, #100d09 100%); box-shadow: 0 0 50px rgba(244,201,138,0.18)"></span>
+<span style="position: absolute; left: 50%; bottom: 22%; width: 26px; height: 54px; margin-left: -13px; border-radius: 13px 13px 4px 4px; background: #2b2318"></span>
+<span style="position: absolute; left: 0; right: 0; bottom: 0; padding: 22px; background: linear-gradient(transparent, rgba(10,8,6,0.85)); display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: #f0d2a2">Скоро</span>
+<span style="font-family: Literata, Georgia, serif; font-weight: 400; font-size: 28px; color: #ffffff">Install</span>
+</span>
+</a>
+<p style="margin: 0; color: #9a9ea6; padding: 0 6px">Музыкальная инсталляция для музеев, галерей и событий: ваша камера и проектор.</p>
+<div style="display: flex; gap: 10px; flex-wrap: wrap; padding: 0 6px">
+<a href="Install.dc.html" style="display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 22px; border-radius: 999px; background: #ecedef; color: #0f1012; text-decoration: none; font-weight: 500">Подробнее</a>
+<a href="Install.dc.html" style="display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 18px; border-radius: 999px; border: 1px solid #2f3238; text-decoration: none">Подробнее</a>
+</div>
+</article>
+
+</div>
+</section>
+
+<section id="about" style="border-top: 1px solid #1f2125">
+<div style="max-width: 1200px; margin: 0 auto; padding: 80px 24px; display: flex; flex-wrap: wrap; gap: 48px">
+<div style="flex: 1 1 380px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+<h2 style="margin: 0; font-family: Literata, Georgia, serif; font-weight: 300; font-size: clamp(28px, 3vw, 38px); line-height: 1.2">Что такое Handsong</h2>
+<p style="margin: 0; color: #c4c7cd; max-width: 56ch">Музыкальный инструмент, на котором играют руками в воздухе перед обычной камерой. Его не нужно покупать, устанавливать или учиться на нём годами: откройте ссылку, поднимите руку — и звучит музыка.</p>
+<div role="img" aria-label="Место для видео о Handsong" style="aspect-ratio: 16 / 9; max-width: 100%; border-radius: 18px; background: #17181b; border: 1px solid #24262b; display: flex; align-items: center; justify-content: center; color: #7d828a; font-size: 15px; margin-top: 8px">[Здесь будет видео: люди играют руками]</div>
+</div>
+<ul style="flex: 1 1 420px; min-width: 0; margin: 0; padding: 0; list-style: none">
+<li style="padding: 16px 0; border-top: 1px solid #24262b"><b style="font-weight: 600">Руки вместо инструмента.</b> <span style="color: #a7abb3">Сведите большой палец с другим — звучит нота. Выше рука — выше нота.</span></li>
+<li style="padding: 16px 0; border-top: 1px solid #24262b"><b style="font-weight: 600">Всегда в ладу.</b> <span style="color: #a7abb3">Ноты подобраны так, что фальшивить невозможно — играть может каждый.</span></li>
+<li style="padding: 16px 0; border-top: 1px solid #24262b"><b style="font-weight: 600">Живая музыка, а не трек.</b> <span style="color: #a7abb3">Звук рождается из ваших движений и ни разу не повторяется.</span></li>
+<li style="padding: 16px 0; border-top: 1px solid #24262b"><b style="font-weight: 600">Миры, которые отвечают.</b> <span style="color: #a7abb3">Свет, частицы и пространство откликаются на каждую ноту.</span></li>
+<li style="padding: 16px 0; border-top: 1px solid #24262b"><b style="font-weight: 600">Ничего не нужно устанавливать.</b> <span style="color: #a7abb3">Работает в Chrome и Safari на ноутбуке и телефоне.</span></li>
+<li style="padding: 16px 0; border-top: 1px solid #24262b; border-bottom: 1px solid #24262b"><b style="font-weight: 600">Приватно.</b> <span style="color: #a7abb3">Изображение с камеры обрабатывается только на вашем устройстве.</span></li>
+</ul>
+</div>
+</section>
+
+<footer id="contact" style="border-top: 1px solid #1f2125">
+<div style="max-width: 1200px; margin: 0 auto; padding: 56px 24px 64px; display: flex; flex-wrap: wrap; gap: 32px; justify-content: space-between">
+<div style="display: flex; flex-direction: column; gap: 8px; min-width: 0">
+<span style="font-family: Literata, Georgia, serif; font-weight: 300; font-size: 21px; letter-spacing: 0.04em">hand·song</span>
+<span style="color: #7d828a; font-size: 14px">Музыка руками в воздухе. Тбилиси, 2026.</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px; min-width: 0">
+<span style="color: #7d828a; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase">Связаться</span>
+<span style="user-select: all; font-weight: 500">hello@handsong.app</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px; min-width: 0">
+<span style="color: #7d828a; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase">Соцсети · @handsongapp</span>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<a href="https://www.youtube.com/@handsongapp" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 999px; border: 1px solid #2f3238; text-decoration: none">YouTube</a>
+<a href="https://www.instagram.com/handsongapp" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 999px; border: 1px solid #2f3238; text-decoration: none">Instagram</a>
+<a href="https://www.tiktok.com/@handsongapp" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 999px; border: 1px solid #2f3238; text-decoration: none">TikTok</a>
+</div>
+</div>
+</div>
+</footer>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":2400}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

@@ -12,3 +12,5 @@ tools/design/reference/
 commitmsg-*.txt
 tools/.design-lab/
 tools/design/compare/
+tools/.site-src/
+tools/.site-shots/

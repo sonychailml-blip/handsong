@@ -385,6 +385,10 @@ NIGHT-4: THE MUSIC BED v2 — one AudioWorklet processor «night-bed» holding e
 NIGHT-8: THE NATURE WORKLET «night-nature» — the stream's murmur (the law and the synthesis: apps/night/pure/brook.js, imported unchanged, so the listening render tools/brook-render.mjs hears exact…
 - exports: none
 
+## apps/site/site.js
+handsong.app (SITE-1): the language.
+- exports: none
+
 ## core/arrange.js
 Размер такта (metre) приходит через ctx.metre из loop.metre — модуль остаётся чистым (без импорта состояния).
 - const (8): `PROGRESSIONS`, `HARMONIES`, `RHYTHMS`, `subOf`, `gridOk`, `rhythmFits`, `rhythmsForMetre`, `BASS_MODES`
@@ -1299,7 +1303,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 - const (5): `TEST_ROOM_ID`, `TEST_ROOM`, `testRoomMode`, `testRoomInfo`, `testRoomFreeLeaks`
 - fn (2): `testRoomInstall`, `testRoomRemove`
 
-_256 modules, 2734 exported names._
+_257 modules, 2734 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

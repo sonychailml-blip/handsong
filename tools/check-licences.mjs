@@ -19,7 +19,7 @@ import { lex } from './lex.mjs';
 const ROOT=resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const REG_FILE='tools/licences.json', LOCK_FILE='tools/package-lock.json', MD_FILE='THIRD-PARTY-LICENSES.md';
 const SKIP_DIRS=new Set(['.git','tools','archive','node_modules','dist']);
-const OWN_EXT=new Set(['.js','.mjs','.json','.html','.css','.md','.txt','']);   // our code, data and docs
+const OWN_EXT=new Set(['.js','.mjs','.json','.html','.css','.md','.txt','.xml','']);   // our code, data and docs (SITE-1: + the site's sitemap.xml)
 const CLASSES=new Set(['code','model','service','link','image','font','glyph','sound','ir']);
 const USES=new Set(['shipped','CDN','service','link','device','dev-only','reference']);   // reference (RUN 5): used only by a reference prototype under docs/night/prototypes/ — never shipped
 const MATERIAL=new Set(['image','font','glyph','sound','ir']);
@@ -37,8 +37,9 @@ function walk(dir, out=[]){
     if(statSync(join(ROOT,rel)).isDirectory()){ if(!SKIP_DIRS.has(n)) walk(rel,out); } else out.push(rel); }
   return out;
 }
-const PAGE=/(^|\/)index\.html$/, MANIFEST=/(^|\/)manifest\.json$/;
-const isShippedText=f=>/^(index\.html|apps\/(full|night)\/(index\.html|sw\.js|manifest\.json|night\.css)|core\/legacy-ui\/style\.css|core\/tokens\.css)$/.test(f)||/^(core|apps\/(full|night))\/.+\.js$/.test(f)&&!/\/vendor\//.test(f)||/^(core|apps\/(full|night))\/data\/.+\.json$/.test(f);
+const PAGE=/(^|\/)index\.html$|^apps\/site\/.+\.html$/, MANIFEST=/(^|\/)manifest\.json$/;   // SITE-1: every page of the brand site (its 404 too)
+const SITE_DIR='apps/site/';   // SITE-1: served at the root of its own domain — a root-absolute address there means a file of apps/site/
+const isShippedText=f=>/^apps\/site\/.+\.(html|css|js)$/.test(f)||/^(index\.html|apps\/(full|night)\/(index\.html|sw\.js|manifest\.json|night\.css)|core\/legacy-ui\/style\.css|core\/tokens\.css)$/.test(f)||/^(core|apps\/(full|night))\/.+\.js$/.test(f)&&!/\/vendor\//.test(f)||/^(core|apps\/(full|night))\/data\/.+\.json$/.test(f);
 const isRefText=f=>/^docs\/night\/prototypes\/.+\.html$/.test(f);   // RUN 5: reference prototypes — their addresses must be «reference» entries
 export function gather(){
   const files=walk('').sort(), texts={};
@@ -91,6 +92,8 @@ export function check(inp){
     for(const m of v.matchAll(/https?:\/\/[^\s'"`<>)\\]+/g)) refs.push([f,m[0]]);
     if(PAGE.test(f)) for(const m of v.matchAll(/\b(?:src|href)\s*=\s*["']([^"']+)["']/g)){ const u=m[1];
       if(/^(https?:)?\/\//.test(u)) continue;   // absolute — taken above
+      if(u.startsWith('/') && f.startsWith(SITE_DIR)){ const p=posix.normalize(SITE_DIR+u.slice(1).split(/[?#]/)[0]), q=p.endsWith('/')||p===SITE_DIR.slice(0,-1) ? posix.join(p,'index.html') : p;   // SITE-1
+        if(!fileSet.has(q) && !fileSet.has(q+'/index.html')) refs.push([f,u+' (missing site file)']); continue; }
       if(u.startsWith('/')) refs.push([f,u]);   // root-absolute: not ours under a sub-folder → must be an entry
       else if(!/^(#|mailto:|data:|blob:|javascript:)/.test(u)){ const p=posix.normalize(posix.join(posix.dirname(f),u.split(/[?#]/)[0])), isDir=p.endsWith('/');   // relative to its page
         if(!isDir && !fileSet.has(p) && !(p.startsWith('tools/') && existsSync(join(ROOT,p)))) refs.push([f,u+' (missing local file)']); } }
@@ -181,6 +184,8 @@ export function controls(inp, base){
     ['an unlisted image file', i=>{ i.files.push('apps/full/icons/extra.svg'); }, /icons\/extra\.svg/],
     ['a reference-only address in a shipped file', i=>{ const it=i.reg.items.find(x=>x.use==='reference'&&(x.urls||[]).length); if(it) i.texts['core/legacy-ui/ui.js']+=`
 const probeRef='${it.urls[0]}';`; }, /reference-only address/],
+    ['an unlisted address in a site page (SITE-1)', i=>{ i.texts['apps/site/index.html']+='\n<a href="https://tracker.example.org/x">x</a>'; }, /apps\/site\/index\.html: https:\/\/tracker\.example\.org/],
+    ['a missing file in a site page (SITE-1)', i=>{ i.texts['apps/site/index.html']+='\n<a href="/no-such-page/">x</a>'; }, /\/no-such-page\/ \(missing site file\)/],
     ['a package version bump', i=>{ const k=Object.keys(i.lock.packages||{}).find(Boolean); if(k) i.lock.packages[k].version='999.0.0'; }, /999\.0\.0/],
   ];
   const out=[];

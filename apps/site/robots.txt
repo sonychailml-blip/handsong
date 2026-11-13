@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://handsong.app/sitemap.xml
