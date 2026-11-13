@@ -52,6 +52,12 @@
   --cv-forest-warm:#ffb45a; --cv-forest-cold:#e6fff2;   /* RUN 7 (C5): Warmth / Brightness — the light's two ends (the lime between) */
   --cv-forest-tint:#c8f56a;   /* DESIGN-1: the forest's light on the interface (its record's tint; --night-tint's default above must equal it) */
   --cv-forest-core:#f6ffd0; --cv-forest-halo:#9be04a; --cv-forest-trail:#c8ff70; --cv-forest-fx:#9fd0ff;
+  /* RAIN-0: the room «Rain» (a development room; docs/night/design/RAIN/CONCEPT.md §8, the style bible): its amber on the interface, its windows,
+     lamps and playing light; then each mood's sky, cloud underside, cloud body, hills' haze, stone, plaster, wet asphalt and the pane's mist */
+  --cv-rain-tint:#f4c98a; --cv-rain-honey:#ffb95e; --cv-rain-amber:#f29a3a; --cv-rain-lamp:#ffc27a; --cv-rain-light:#ffd9a0; --cv-rain-fx:#e86a92; --cv-rain-pane:#0d0f16;
+  --cv-rain-sky:#1b1a2b; --cv-rain-glow:#8a5a44; --cv-rain-cloud:#5a3a4a; --cv-rain-haze:#2b2536; --cv-rain-stone:#2a2220; --cv-rain-plaster:#6b5440; --cv-rain-asphalt:#121621; --cv-rain-mist:#b9a48e;
+  --cv-rain-eve-sky:#23203a; --cv-rain-eve-glow:#a06a48; --cv-rain-eve-cloud:#6a4456; --cv-rain-eve-haze:#352c40; --cv-rain-eve-stone:#2e2523; --cv-rain-eve-plaster:#76593f; --cv-rain-eve-asphalt:#141826; --cv-rain-eve-mist:#c2aa90;
+  --cv-rain-after-sky:#171a2c; --cv-rain-after-glow:#6f5560; --cv-rain-after-cloud:#453848; --cv-rain-after-haze:#272838; --cv-rain-after-stone:#262224; --cv-rain-after-plaster:#5e4c42; --cv-rain-after-asphalt:#0f1420; --cv-rain-after-mist:#a8a8b4;
   --z-night:18;
 }
 /* DESIGN-1: the tint is a registered colour, so a room switch EASES it (the root's transition) instead of snapping */

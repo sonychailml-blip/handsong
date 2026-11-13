@@ -1727,6 +1727,119 @@ async function nightHandLight(){
     ok('the host does not hand the rooms copies of the hands (out.push({ ...h, … }))', /out\.push\(\{ \.\.\.h, x:r\.x, y:r\.y/.test(host) && !/handsView'\)\s*\.\s*(forEach|map)\(\s*h\s*=>\s*\{?\s*h\.x\s*=/.test(host)); }
   return { cases:n, total:d.length, differences:d, notes };
 }
+/* RAIN-0 — the rain room's laws (apps/night/rooms/rain/pure/; docs/night/design/RAIN/PLAN.md §7). «RAIN focus law (app)»: the focus from the playing
+   hand's depth — exactly 0 near and 1 far (dead zones), monotone; the glide never overshoots, never moves faster than its limit (a target flipping
+   every frame cannot make it jump), is the same at 30 and 60 frames a second; without a hand it drifts slowly to the rest focus; the two blurs are
+   opposite. CONTROL: an un-eased law (the focus = its target) breaks the speed limit. */
+async function rainFocus(){
+  const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); };
+  const F=await import(new URL('../apps/night/rooms/rain/pure/focus.js', import.meta.url).href), C=F.FOCUS;
+  ok('the target is not exactly 0 near and 1 far', F.focusTarget(0)===0 && F.focusTarget(C.near)===0 && F.focusTarget(C.far)===1 && F.focusTarget(1)===1);
+  { let mono=true; for(let x=0;x<1;x+=0.01) if(F.focusTarget(x+0.01)<F.focusTarget(x)-1e-12) mono=false; ok('the target is not monotone in the depth', mono); }
+  const judge=step=>{ const bad=[];
+    for(const fps of [30, 60]){ const dt=1/fps; let f=0, prev=0, at95=null; for(let i=1;i<=fps*3;i++){ f=step(f, 1, dt, true); if(f<prev-1e-12) bad.push(`back at ${fps} fps`); if(f>1+1e-12) bad.push(`overshoot at ${fps} fps`);
+        if(f-prev>C.maxRate*dt+1e-9){ bad.push(`a step of ${(f-prev).toFixed(3)} in one frame at ${fps} fps (limit ${(C.maxRate*dt).toFixed(3)})`); break; } if(at95==null && f>=0.95) at95=i*dt; prev=f; }
+      if(!(at95!=null && at95<=1.5)) bad.push(`95 % reached after ${at95} s at ${fps} fps (≤ 1.5)`); }
+    { let f=0.5, worst=0; for(let i=0;i<120;i++){ const p=f; f=step(f, i%2, 1/60, true); worst=Math.max(worst, Math.abs(f-p)); } if(worst>C.maxRate/60+1e-9) bad.push(`a flipping target moves the focus ${worst.toFixed(3)} in a frame`); }
+    return bad; };
+  n+=6; for(const b of judge(F.focusStep)) d.push(b);
+  { const run=fps=>{ let f=0; for(let i=0;i<fps;i++) f=F.focusStep(f, 1, 1/fps, true); return f; }, a=run(30), b=run(60); notes.push(`one second towards the city: ${a.toFixed(4)} at 30 fps, ${b.toFixed(4)} at 60 fps`);
+    ok(`the glide depends on the frame rate: ${a} vs ${b}`, Math.abs(a-b)<=0.01); }
+  { let f=1; for(let i=0;i<60;i++) f=F.focusStep(f, C.rest, 1/60, false); const one=f; for(let i=0;i<60*15;i++) f=F.focusStep(f, C.rest, 1/60, false);
+    ok(`without a hand the focus does not drift slowly to rest: ${one.toFixed(3)} after 1 s, ${f.toFixed(3)} after 16 s (rest ${C.rest})`, one>0.5 && Math.abs(f-C.rest)<0.01); }
+  { const a=F.focusBlur(0), b=F.focusBlur(1); let mono=true; for(let x=0;x<1;x+=0.02){ const p=F.focusBlur(x), q=F.focusBlur(x+0.02); if(q.city>p.city+1e-12 || q.glass<p.glass-1e-12) mono=false; }
+    ok('the blurs are not opposite: '+JSON.stringify([a, b]), a.city===1 && a.glass===0 && b.city===0 && b.glass===1 && mono); }
+  { const c=judge((f, t)=>t); n++; if(!c.length) d.push('CONTROL: an un-eased law passed the speed limit — the check cannot fail'); else notes.push('CONTROL: an un-eased focus is caught ('+c[0]+')'); }
+  return { cases:n, total:d.length, differences:d, notes };
+}
+/* «RAIN window pick (app)»: which window a note lights — the light at a window's centre picks that window (every one); just beside a window, that window;
+   between two, the nearer; in the sky, none. The layout: seeded (two calls equal), no two windows overlap, each inside its house. CONTROL: a mirrored law. */
+async function rainPick(){
+  const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); };
+  const Wn=await import(new URL('../apps/night/rooms/rain/pure/windows.js', import.meta.url).href), W=Wn.windowsLayout();
+  ok('the layout is not seeded (two calls differ)', JSON.stringify(W)===JSON.stringify(Wn.windowsLayout()));
+  { let over=0, out=0; for(let i=0;i<W.length;i++){ const a=W[i], H=Wn.HOUSES[a.house]; if(a.x-a.hw<H.x0 || a.x+a.hw>H.x1 || a.y+a.hh>H.y1 || a.y-a.hh<H.y0) out++;
+      for(let j=i+1;j<W.length;j++){ const b=W[j]; if(Math.abs(a.x-b.x)<a.hw+b.hw && Math.abs(a.y-b.y)<a.hh+b.hh) over++; } }
+    ok(`${over} pairs of windows overlap, ${out} leave their house`, !over && !out); notes.push(`${W.length} windows on ${Wn.HOUSES.length} houses`); }
+  const self=pick=>W.filter((w, i)=>pick(W, w.x, w.y)!==i).length;
+  ok(`${self(Wn.windowPick)} windows are not picked at their own centre`, self(Wn.windowPick)===0);
+  { const w=W[7], i=Wn.windowPick(W, w.x+w.hw+0.01, w.y); ok(`a point 0.01 beside window 7 picks ${i}`, i===7); }
+  { const a=W[3], b=W[4], mid=(a.x+b.x)/2; ok('between two windows the nearer is not picked', Wn.windowPick(W, mid-0.004, a.y)===3 && Wn.windowPick(W, mid+0.004, a.y)===4); }
+  ok('the sky picks a window', Wn.windowPick(W, 0, 0.6)===-1 && Wn.windowPick(W, 0.55, 0.3)===-1);
+  { const c=self((L, x, y)=>Wn.windowPick(L, -x, y)); n++; if(!c) d.push('CONTROL: a mirrored pick passed — the check cannot fail'); else notes.push(`CONTROL: a mirrored pick misses ${c} windows`); }
+  return { cases:n, total:d.length, differences:d, notes };
+}
+/* «RAIN window fade (app)»: the trace — nothing before the note, on within a third of a second, full while held, then down slowly: never up, never a jump
+   (≤ 0.01 in half a second), still visible after ten minutes, gone within the hour; a window's light is the brighter of the city's own and the trace.
+   CONTROL: a law that switches off at the hold's end jumps. */
+async function rainFade(){
+  const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); };
+  const Wn=await import(new URL('../apps/night/rooms/rain/pure/windows.js', import.meta.url).href), T=Wn.TRACE;
+  const judge=L=>{ const bad=[]; if(L(-1)!==0 || L(0)!==0) bad.push('lit before its note'); if(!(L(0.3)>=0.95)) bad.push(`only ${L(0.3).toFixed(2)} after 0.3 s`);
+    for(let a=1;a<=T.hold;a+=0.5) if(!(L(a)>=0.99 && L(a)<=1)){ bad.push(`not full while held (${L(a)} at ${a} s)`); break; }
+    let prev=L(T.hold), jump=0, up=false; for(let a=T.hold+0.5;a<=3600;a+=0.5){ const v=L(a); if(v>prev+1e-12) up=true; jump=Math.max(jump, prev-v); prev=v; }
+    if(up) bad.push('the light rises again after its hold'); if(jump>0.01) bad.push(`a jump of ${jump.toFixed(3)} in half a second`);
+    if(!(L(600)>=0.1)) bad.push(`after ten minutes only ${L(600).toFixed(3)} is left (≥ 0.1)`); if(!(L(3600)<=0.02)) bad.push(`after an hour ${L(3600).toFixed(3)} is still lit (≤ 0.02)`); return bad; };
+  n+=7; for(const b of judge(Wn.traceLevel)) d.push(b);
+  notes.push('the trace at 1 s, 30 s, 1 min, 2 min, 10 min, 30 min: '+[1, 30, 60, 120, 600, 1800].map(a=>Wn.traceLevel(a).toFixed(2)).join(', '));
+  { const w={ amb:0.05, warm:1 }, dark={ amb:0.9, warm:0 };
+    ok('the city\'s own light, or the brighter of it and a note, is wrong', Wn.windowLight(w, 0.1, -1)===Wn.AMB_LEVEL && Wn.windowLight(w, 0.1, 1)===Wn.traceLevel(1) && Wn.windowLight(dark, 0.1, -1)===0 && Wn.windowLight(dark, 0, 5)===Wn.traceLevel(5)); }
+  { const c=judge(a=> a>T.hold ? 0 : Wn.traceLevel(a)); n++; if(!c.some(x=>/jump/.test(x))) d.push('CONTROL: an instant switch-off passed — the check cannot fail'); else notes.push('CONTROL: an instant switch-off is caught'); }
+  return { cases:n, total:d.length, differences:d, notes };
+}
+/* «RAIN glass law (app)»: the wipe map — a stamp clears its place and nothing beyond its radius; a weaker stamp never brings mist back; the mist returns
+   by one time constant, the same in one long step as in many short ones; in the end nothing is cleared; a place off the pane changes nothing.
+   CONTROL: a pane whose mist never returns. */
+async function rainGlass(){
+  const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); };
+  const G=await import(new URL('../apps/night/rooms/rain/pure/glass.js', import.meta.url).href), K=G.GLASS;
+  { const g=G.wipeNew(); ok('a new pane is not all mist', !g.live && g.a.every(v=>v===0));
+    const k=G.wipeStamp(g, 0.1, -0.05, 1); ok(`a stamp cleared ${k} cells, its place reads ${G.wipeAt(g, 0.1, -0.05)}`, k>0 && g.live && G.wipeAt(g, 0.1, -0.05)>0.5);
+    { const e=G.wipeNew(), cx=((40+0.5)/K.cols*2-1)*K.ext[0], cy=((20+0.5)/K.rows*2-1)*K.ext[1]; G.wipeStamp(e, cx, cy, 0.7); ok(`a stamp on a cell's centre reads ${G.wipeAt(e, cx, cy)} there, not exactly its amount 0.7`, Math.abs(G.wipeAt(e, cx, cy)-Math.fround(0.7))<1e-12); }
+    const cell=Math.max(2*K.ext[0]/K.cols, 2*K.ext[1]/K.rows); let far=0; for(let a=0;a<6.28;a+=0.3) far=Math.max(far, G.wipeAt(g, 0.1+(K.radius+2*cell)*Math.cos(a), -0.05+(K.radius+2*cell)*Math.sin(a)));
+    ok(`the stamp reaches beyond its radius (${far})`, far===0);
+    const before=G.wipeAt(g, 0.1, -0.05); G.wipeStamp(g, 0.1, -0.05, 0.3); ok('a weaker stamp brought mist back', G.wipeAt(g, 0.1, -0.05)===before);
+    ok('a place off the pane changed it or threw', G.wipeStamp(g, 9, 9, 1)===0); }
+  const refog=step=>{ const a=G.wipeNew(), b=G.wipeNew(); G.wipeStamp(a, 0, 0, 1); G.wipeStamp(b, 0, 0, 1); const v0=G.wipeAt(a, 0, 0), T=K.refog*Math.LN2;
+    step(a, T); for(let i=0;i<600;i++) step(b, T/600); const va=G.wipeAt(a, 0, 0), vb=G.wipeAt(b, 0, 0); for(let i=0;i<60;i++) step(a, 10);
+    return { half:va/v0, same:Math.abs(va-vb), gone:!a.live && a.a.every(v=>v===0) }; };
+  { const r=refog(G.wipeStep); notes.push(`the mist is half back after ${(K.refog*Math.LN2).toFixed(1)} s (${r.half.toFixed(4)}); one step vs 600: ${r.same.toExponential(1)} apart`);
+    ok(`the mist does not return by its time constant (${r.half})`, Math.abs(r.half-0.5)<1e-3); ok(`the return depends on the frame length (${r.same})`, r.same<1e-5); ok('ten minutes later something is still cleared', r.gone);
+    const c=refog(()=>true); n++; if(Math.abs(c.half-0.5)<1e-3 || c.gone) d.push('CONTROL: a pane whose mist never returns passed — the check cannot fail'); else notes.push('CONTROL: a pane whose mist never returns is caught'); }
+  return { cases:n, total:d.length, differences:d, notes };
+}
+/* «RAIN stays out of the players' edition (app)»: the rain room is a DEVELOPMENT room until the founder approves it. (1) Its record is valid as a
+   development room and refused as a real one (its id is not pinned, so it is never remembered); it is not in ROOMS. (2) The door (rooms/dev.js): closed in
+   the release edition whatever the address says, closed without the word, open only for «room=rain» in the development edition. (3) No module outside the
+   room's folder imports it except the door, and the door only by import() (never in a build's preloaded closure); the page does not name it; main.js opens
+   the door. (4) Its tint is readable and every token its looks name is defined. CONTROLS: a static import of the room, a dark tint. */
+async function rainGate(){
+  const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); }, fs=await import('node:fs');
+  const RV=await import(new URL('../apps/night/pure/room.js', import.meta.url).href), RR=(await import(new URL('../apps/night/rooms/rain/pure/room.js', import.meta.url).href)).RAIN_ROOM;
+  const RI=await import(new URL('../apps/night/rooms/index.js', import.meta.url).href), DV=await import(new URL('../apps/night/rooms/dev.js', import.meta.url).href);
+  const prof=JSON.parse(await readFile(new URL('../apps/night/data/night.json', import.meta.url), 'utf8'));
+  { const why=RV.checkRoom(RR, { ids:[RR.id], modes:prof.moods }); ok('the record is refused as a development room: '+why, why===null);
+    ok('the record passes as a real room (its id must not be pinned yet)', /not a pinned room id/.test(RV.checkRoom(RR)||'') && !RV.ROOM_IDS.includes(RR.id));
+    ok('the room is in ROOMS', !RI.ROOMS.some(R=>R.record.id===RR.id) && RI.roomById(RR.id)===null); }
+  { const W=DV.devRoomWord; ok('the door is open in the release edition', W('release', '?room=rain')===null && W('release', '?probe&room=rain')===null);
+    ok('the door opens without the word, or for another word', W('dev', '')===null && W('dev', '?probe')===null && W('dev', '?room=forest')===null && W('dev', '?room=')===null);
+    ok('the door does not open for «room=rain» in the development edition (the room cannot be reached)', W('dev', '?room=rain')==='rain' && W('dev', '?probe&room=rain')==='rain' && DV.DEV_ROOMS.rain===RR.id); }
+  { const strip=t=>t.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/[^\n]*$/gm, ' '), users=[];
+    const scan=t=>{ const c=strip(t), st=/(?:\bfrom|\bimport)\s*['"][^'"\n]*\/rain\/[^'"\n]*['"]/.test(c), dy=/\bimport\s*\(\s*['"][^'"\n]*\/rain\/[^'"\n]*['"]\s*\)/.test(c); return st ? 'static' : dy ? 'dynamic' : null; };
+    const walk=dir=>{ for(const e of fs.readdirSync(dir, { withFileTypes:true })){ const f=new URL(e.name+(e.isDirectory() ? '/' : ''), dir); if(e.isDirectory()){ if(!/\/(vendor|rooms\/rain)\/$/.test(f.pathname)) walk(f); }
+      else if(e.name.endsWith('.js')){ const k=scan(fs.readFileSync(f, 'utf8')); if(k) users.push([f.pathname.replace(/^.*\/(core|apps)\//, '$1/'), k]); } } };
+    walk(new URL('../core/', import.meta.url)); walk(new URL('../apps/night/', import.meta.url)); walk(new URL('../apps/full/', import.meta.url));
+    ok('the room is imported by '+JSON.stringify(users)+' (only rooms/dev.js, by import())', users.length===1 && users[0][0]==='apps/night/rooms/dev.js' && users[0][1]==='dynamic');
+    const page=await readFile(new URL('../apps/night/index.html', import.meta.url), 'utf8'), main=await readFile(new URL('../apps/night/main.js', import.meta.url), 'utf8');
+    ok('the page names the room, or main.js does not open the door', !/rooms\/rain|room\.rain/.test(page) && /devRoomInstall\(\)/.test(strip(main)));
+    n++; if(scan("import { RAIN_ROOM } from './rooms/rain/pure/room.js';")!=='static') d.push('CONTROL: a static import of the room is not seen — the check cannot fail'); else notes.push('CONTROL: a static import of the room is caught'); }
+  { const css=(await readFile(new URL('../apps/night/night.css', import.meta.url), 'utf8')).replace(/\/\*[\s\S]*?\*\//g, ''), tok=name=>{ const m=css.match(new RegExp('(?<![\\w-])--cv-'+name+'\\s*:\\s*(#[0-9a-fA-F]{6})\\b')); return m ? m[1].toLowerCase() : null; };
+    const light=v=>!!v && RV.contrastOf(v, RV.TINT_INK)>=RV.TINT_CONTRAST && RV.contrastOf(v, RV.TINT_BASE)>=RV.TINT_CONTRAST, t=tok(RR.tint);
+    ok(`the room's tint ${t} is missing or too dark for the interface`, light(t)); notes.push(`tint ${t}: ${t ? RV.contrastOf(t, RV.TINT_INK).toFixed(1) : '—'} : 1 against the ink`);
+    const miss=[...new Set(Object.values(RR.looks).flatMap(L=>Object.values(L.tokens)))].filter(x=>!tok(x)); ok('tokens the looks name are not defined in night.css: '+miss.join(', '), !miss.length);
+    n++; if(light('#3a4a6a')) d.push('CONTROL: a dark tint passed — the check cannot fail'); else notes.push('CONTROL: a dark tint is caught'); }
+  return { cases:n, total:d.length, differences:d, notes };
+}
 /* DESIGN-1 part D — «NIGHT start still (app)»: (1) THE FILES — every real room names a still per level, each a WebP in its folder of at most 100 KB
    (STILL_BUDGET); (2) THE FIRST PAINT — night.css shows the first room's two stills (the default and html[data-still="full"]) exactly as its record names
    them, and guard.js sets data-still to one of the levels from the stored picture level; (3) THE LAW (pure/still.js) — before the start ends: the still;
@@ -2193,6 +2306,11 @@ const ROWS=[
   ['NIGHT room tint (app)',     ()=>nightRoomTint(),    r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // DESIGN-1 part B
   ['NIGHT start still (app)',   ()=>nightStartStill(),  r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // DESIGN-1 part D
   ['NIGHT hand light anchor (app)', ()=>nightHandLight(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-13
+  ["RAIN focus law (app)", ()=>rainFocus(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-0
+  ["RAIN window pick (app)", ()=>rainPick(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-0
+  ["RAIN window fade (app)", ()=>rainFade(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-0
+  ["RAIN glass law (app)", ()=>rainGlass(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-0
+  ["RAIN stays out of the players' edition (app)", ()=>rainGate(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-0
   ['NIGHT music bed law (app)', ()=>nightBedLaw(),     r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // NIGHT-3 stage 4
   ['NIGHT music bed v2 law (app)', ()=>nightBed2Law(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-4
   ['VIS1c fireflies (core)',    ()=>fliesCore(),    r=>({ cases:r.cases, diff:r.total, list:r.differences })],

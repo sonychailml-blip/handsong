@@ -59,6 +59,7 @@ THERE in full and here as one index entry):
   153 Colour roles with the room's tint, settings in three tabs, the start screen's still and the reveal after Begin (DESIGN-1)
   154 Polish after DESIGN-1: the dot becomes a firefly, the still lines up with the live forest, settings without «More», the coaching line clear of the bars, the hand's light on the nearest finger, all points in Night's look (NIGHT-13, CORE-21)
   155 The dot's flight, stronger and steady: the flare, a 3.4-s flight onto a firefly, no jump when full screen is entered at Begin (NIGHT-13b)
+  156 The room «Rain», its foundation (development only, «?room=rain»): the rain on the glass, depth is focus, a note lights a window, on a placeholder city (RAIN-0)
 
 ## Moved to `archive/CLAUDE-history.md` at DOC1 (grep by title; read only what the slice needs)
 - «Module map (full, moved at DOC1)» — every module's detailed paragraph (AUD1a … IDS1, SONG1, AUTOSAVE1, PACK1 …).

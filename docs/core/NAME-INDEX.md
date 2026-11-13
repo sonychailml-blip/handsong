@@ -169,6 +169,11 @@ DESIGN-1 part D: THE START SCREEN'S STILL AND THE REVEAL — the law (pure, rule
 - const (9): `STILL`, `STILL_PHASES`, `stillEase`, `stillDot`, `stillFile`, `stillTan`, `stillWidest`, `stillVeilMax`, `DOT`
 - fn (7): `stillPhase`, `stillLook`, `stillFit`, `stillVeil`, `dotFlare`, `dotGate`, `dotFlight`
 
+## apps/night/rooms/dev.js
+RAIN-0: THE DEVELOPMENT ROOMS' DOOR — a room the founder has not approved yet stays out of the players' edition: it is not in ROOMS, its id is not pinned, and its code is loaded only here, only in …
+- const (1): `DEV_ROOMS`
+- fn (2): `devRoomWord`, `devRoomInstall`
+
 ## apps/night/rooms/forest/forest-answers.js
 NIGHT-6 slice 1 — THE FOREST ANSWERS (parts of the night forest room; forest.js builds them; the numbers are ./pure/answers.js): - DEW: points on the low leaves in view, one draw; each twinkles on …
 - fn (1): `buildAnswers`
@@ -319,6 +324,43 @@ NIGHT-3: the forest's 2D STAND-IN — the «low» level and the fallback without
 ## apps/night/rooms/index.js
 NIGHT-3: THE ROOMS — the order a player meets them (ids, rule #37) and each room's parts: its record (data), its 2D stand-in, and its scene code, loaded only when the room is first opened.
 - const (5): `ROOMS`, `roomsAll`, `roomById`, `roomAdd`, `roomRemove`
+
+## apps/night/rooms/rain/install.js
+RAIN-0: THE RAIN ROOM JOINS THE APP — loaded only by the development rooms' door (apps/night/rooms/dev.js: the development edition and «?room=rain» in the address).
+- const (1): `RAIN`
+- fn (1): `rainInstall`
+
+## apps/night/rooms/rain/pure/focus.js
+RAIN-0: DEPTH IS FOCUS — the law (pure, rule #36; data row «RAIN focus law (app)»).
+- const (2): `FOCUS`, `focusBlur`
+- fn (2): `focusTarget`, `focusStep`
+
+## apps/night/rooms/rain/pure/glass.js
+RAIN-0: THE GLASS's law (pure, rule #36; data row «RAIN glass law (app)») — THE WIPE MAP: a small grid over the pane (view-angle units, as the windows) holding how much of the mist is cleared at ea…
+- const (2): `GLASS`, `wipeNew`
+- fn (3): `wipeStamp`, `wipeStep`, `wipeAt`
+
+## apps/night/rooms/rain/pure/room.js
+RAIN-0: THE RAIN ROOM'S RECORD (docs/night/design/RAIN/CONCEPT.md, PLAN.md) — what the room is, as data (pure, rule #36; checked by apps/night/pure/room.js).
+- const (1): `RAIN_ROOM`
+
+## apps/night/rooms/rain/pure/windows.js
+RAIN-0: THE WINDOWS — their places on the placeholder city, which one a note lights, and how a lit window fades (pure, rule #36; data rows «RAIN window pick (app)», «RAIN window fade (app)»).
+- const (8): `RAIN_SEED`, `HOUSES`, `HILL`, `hillAt`, `PICK_REACH`, `TRACE`, `AMB_LEVEL`, `windowLight`
+- fn (4): `windowsLayout`, `farLights`, `windowPick`, `traceLevel`
+
+## apps/night/rooms/rain/rain-glass.js
+RAIN-0: THE RAIN ROOM'S SHADERS (our own, written from the physics: a drop is a small strong lens that shows the view upside down and wide, darker at its rim; a running drop leaves a wet lane and b…
+- const (8): `QUAD_V`, `BLUR_F`, `VIEW_F`, `WIN_V`, `WIN_F`, `PT_V`, `PT_F`, `glassShader`
+
+## apps/night/rooms/rain/rain.js
+RAIN-0 — THE RAIN ROOM's picture (docs/night/design/RAIN/CONCEPT.md; the plan and what is still a placeholder: PLAN.md).
+- const (3): `RAIN_LEVELS`, `BOKEH`, `rainAssets`
+- fn (1): `buildRain`
+
+## apps/night/rooms/rain/standin.js
+RAIN-0: the rain room's 2D STAND-IN — the «low» level and the fallback without WebGL (or after a lost context): the night sky over the city's warm glow, and a soft glow at each hand (the playing ha…
+- fn (1): `standInRain`
 
 ## apps/night/roomswitch.js
 NIGHT-3 stage 5 part 2: THE ROOM SWITCH — one door for everything a room change touches, in this order: the music bed fades out and holds (it takes the new room's recipes while silent); the picture…
@@ -1213,6 +1255,7 @@ SPLIT-2: the probe entry of the Night page: its own rows and the core rows flagg
 - → ./night/nightmigrate.js (1): `checkNightMigrate`
 - → ./night/nightprofile.js (1): `checkNightProfile`
 - → ./night/pixels.js (2): `checkNightPixels`, `checkNightDetailedGuard`
+- → ./night/rainroom.js (1): `checkRainRoom`
 - → ./night/roomswitch.js (1): `checkNightRoomSwitch`
 - → ./night/scales.js (1): `checkNightScales`
 - → ./night/stream.js (1): `checkNightStream`
@@ -1281,6 +1324,10 @@ SPLIT-2: row «NIGHT profile round trip» on Night's page: the checks of C0 that
 NIGHT-11 part 5 — rows «NIGHT pixel budget» and «NIGHT Detailed guard», on the running app with the forest open.
 - fn (2): `checkNightPixels`, `checkNightDetailedGuard`
 
+## tools/probes/night/rainroom.js
+RAIN-0: row «RAIN room» (P.night, drawn) — the rain room (apps/night/rooms/rain/, a development room: the row adds it and takes it out again).
+- fn (1): `checkRainRoom`
+
 ## tools/probes/night/roomswitch.js
 NIGHT-3 stage 5 part 2: row «NIGHT room switch» (P.night, drawn) — the switching machinery, on the test room (./testroom.js), judged on EXACT controls (the user, 2026-11-09): (1) hand detection tak…
 - fn (1): `checkNightRoomSwitch`
@@ -1303,7 +1350,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 - const (5): `TEST_ROOM_ID`, `TEST_ROOM`, `testRoomMode`, `testRoomInfo`, `testRoomFreeLeaks`
 - fn (2): `testRoomInstall`, `testRoomRemove`
 
-_257 modules, 2734 exported names._
+_267 modules, 2776 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

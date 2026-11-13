@@ -10,6 +10,7 @@ import { hooks } from '../../core/hooks.js';
 import { nightShellWire, nightShellFace } from './shell.js';
 import { calTick } from './calib.js';
 import { ROOMS } from './rooms/index.js';
+import { devRoomInstall } from './rooms/dev.js';   // RAIN-0: a development room, only when the address asks and never in the players' edition
 import { soundModAdd } from '../../core/soundmods.js';
 import { natureModule, roomRestore } from './roomswitch.js';
 import { camRestore } from './camera.js';   // NIGHT-10: the camera kept on this device
@@ -19,6 +20,7 @@ import { fsCamera } from './fullscreen.js';   // NIGHT-11 part 3: full screen wh
 
 for(const R of ROOMS) sceneRoomAdd(R.record.id, { load:R.load, standIn:R.standIn, three:()=>import('./vendor/three-r128/three.min.js') });   // NIGHT-3: the rooms, by id
 roomRestore();   // NIGHT-3 stage 5 part 2: the room remembered on this device, before the first picture
+devRoomInstall().catch(e=>console.warn('[night] the development room was not added:', e));   // RAIN-0: «?room=rain», the development edition only (rooms/dev.js)   // eslint-disable-line no-console
 camRestore();   // NIGHT-10: before the start — the start opens the kept camera (the default when it is gone)
 /* NIGHT-6 (the user): the current room's code and the files of its level are fetched while the start card shows, so the first opening finds them ready */
 setTimeout(()=>{ const R=ROOMS.find(r=>r.record.id===sceneRoom()); if(R && R.prefetch && sceneLevel()!=='minimal') R.prefetch({ level:sceneLevel() }).catch(()=>{}); }, 0);
