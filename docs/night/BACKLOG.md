@@ -163,3 +163,11 @@ _Below: the old backlog's text as it stood, renamed._
   capsule, first-run card, ⓘ panel, portrait and landscape). Fonts: OFL, self-hosted woff2, WITH Cyrillic (Fraunces has none — an OFL title
   serif in its soft spirit; the sans checked for Cyrillic). Glass blur has a plain dark fallback (Dark level, weak devices, low power). Full
   keeps today's look. Applied in RUN 7 slice C11 (`docs/night/STAGE4-NIGHT-plan.md` «Review RUN 7»; quality bar `docs/night/QUALITY.md`).
+
+## DESIGN-1 findings (2026-11-13, English; outside that run)
+- Cached MediaPipe files and the Begin tap: in runner runs with `--cdn-cache` (the files arrive at once) the music was first audible 3.1–8.1 s after Begin (1.1–1.5 s without), and an instant camera refusal was timed past `QUICK_DENY_MS` (450 ms). Probably the runner's routing; still, measure a real second visit (HTTP cache) on the Poco: does the model's start-up delay the music?
+- Phone landscape while playing: the coaching line touches the effect bars (`ui-snap`: play 844×390, nightCoach × nightFxBars) — seen before DESIGN-1 too.
+- `tools/ui-snap.mjs`: two waits use an `async` predicate (night-cards, night-cal-fail) — Playwright does not await it, so they never wait.
+- core/i18n.js keeps Night's old long settings texts (`night.light`, `night.musicAnswer`, the section headings) that Night no longer shows: a CORE run may drop them (core debt).
+- Settings in tabs: the card is centred, so its height and place change from tab to tab (the founder's eye decides; a fixed top would hold it).
+

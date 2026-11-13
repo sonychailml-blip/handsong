@@ -61,8 +61,8 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   when unsure, go ONE LEVEL HIGHER. This picks the runner commands; where the probe budget's «Every slice» line or core rule 6 asks more, this wins
   for Levels 1–2, and a core change is always Level 3 or 4.
   - **Level 1 — texts, styles, docs, small interface changes in one app:** `node tools/check-static.mjs` (+ `node --check` on changed files),
-    `node tools/probe-data.mjs`, that app's UI checks (Full: `node tools/probe-browser.mjs --quick`; Night: `--app night` — no lighter Night mode
-    exists yet, so on Night Levels 1 and 2 run the same command). A docs-only change: the static check, the data runner and its proofs.
+    `node tools/probe-data.mjs`, that app's UI checks (Full: `node tools/probe-browser.mjs --quick`; Night: `--app night --ui-only` — the start, cards,
+    settings, coaching and texts checks with real input, no `P.night` renders; DESIGN-1). A docs-only change: the static check, the data runner and its proofs.
   - **Level 2 — a room or the picture** (`apps/night/rooms/`, the scene, shaders): Level 1 + the full Night suite (`--app night`).
   - **Level 3 — core or the engine** (`core/`, worklets, hand tracking, audio, loading): Level 2 + Full `--quick`; Full `--all` when core's sound,
     tuning or recording paths change.

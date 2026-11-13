@@ -1,0 +1,54 @@
+[ui-snap] night-start: 900 elements · style differences 0 · only in d1-base-laptop 0 · only in d1-base2-laptop 0 · pixels differing 0
+[ui-snap] night-offer: 901 elements · style differences 0 · only in d1-base-laptop 0 · only in d1-base2-laptop 0 · pixels differing 1023038
+[ui-snap] night-cards: 900 elements · style differences 1 · only in d1-base-laptop 0 · only in d1-base2-laptop 0 · pixels differing 0
+    #nightCoachText text: "" → "Raise a hand"
+[ui-snap] night-dark: 901 elements · style differences 1 · only in d1-base-laptop 0 · only in d1-base2-laptop 0 · pixels differing 21857
+    #nightCoachText text: "" → "Raise a hand"
+[ui-snap] night-info: 901 elements · style differences 41 · only in d1-base-laptop 0 · only in d1-base2-laptop 0 · pixels differing 0
+    #darkHint block-size: 38px → auto
+    #darkHint bottom: 698px → auto
+    #darkHint display: flex → none
+    #darkHint height: 38px → auto
+    #darkHint inline-size: 487.844px → max-content
+    #darkHint inset-block-end: 698px → auto
+    #darkHint margin-inline-end: 151.688px → auto
+    #darkHint margin-inline-start: 151.672px → auto
+    #darkHint margin-left: 151.672px → auto
+    #darkHint margin-right: 151.688px → auto
+    #darkHint perspective-origin: 243.922px 19px → 50% 50%
+    #darkHint transform-origin: 243.922px 19px → 50% 50%
+[ui-snap] night-info-mid: 901 elements · style differences 5 · only in d1-base-laptop 0 · only in d1-base2-laptop 0 · pixels differing 0
+    #scaleBtn display: inline-block → none
+    #soundBtn display: inline-block → none
+    #camBtn display: inline-block → none
+    #fsBtn display: inline-block → none
+    #nightCoachText text: "" → "Raise a hand"
+[ui-snap] night-info-end: 901 elements · style differences 1 · only in d1-base-laptop 0 · only in d1-base2-laptop 0 · pixels differing 0
+    #nightCoachText text: "" → "Raise a hand"
+[ui-snap] night-land: 901 elements · style differences 0 · only in d1-base-laptop 0 · only in d1-base2-laptop 0 · pixels differing 0
+[ui-snap] night-land-info: 901 elements · style differences 0 · only in d1-base-laptop 0 · only in d1-base2-laptop 0 · pixels differing 0
+[ui-snap] night-land-info-mid: 901 elements · style differences 4 · only in d1-base-laptop 0 · only in d1-base2-laptop 0 · pixels differing 0
+    #scaleBtn display: inline-block → none
+    #soundBtn display: inline-block → none
+    #camBtn display: inline-block → none
+    #fsBtn display: inline-block → none
+[ui-snap] night-land-info-end: 901 elements · style differences 0 · only in d1-base-laptop 0 · only in d1-base2-laptop 0 · pixels differing 0
+[ui-snap] night-camera: 901 elements · style differences 0 · only in d1-base-laptop 0 · only in d1-base2-laptop 0 · pixels differing 0
+[ui-snap] night-ru: 905 elements · style differences 0 · only in d1-base-laptop 0 · only in d1-base2-laptop 0 · pixels differing 0
+[ui-snap] night-ru-info: 905 elements · style differences 0 · only in d1-base-laptop 0 · only in d1-base2-laptop 0 · pixels differing 0
+[ui-snap] night-ru-info-mid: 905 elements · style differences 0 · only in d1-base-laptop 0 · only in d1-base2-laptop 0 · pixels differing 0
+[ui-snap] night-ru-info-end: 905 elements · style differences 0 · only in d1-base-laptop 0 · only in d1-base2-laptop 0 · pixels differing 0
+[ui-snap] night-ru-land-info: 905 elements · style differences 0 · only in d1-base-laptop 0 · only in d1-base2-laptop 0 · pixels differing 0
+[ui-snap] night-ru-land-info-mid: 905 elements · style differences 0 · only in d1-base-laptop 0 · only in d1-base2-laptop 0 · pixels differing 0
+[ui-snap] night-ru-land-info-end: 905 elements · style differences 0 · only in d1-base-laptop 0 · only in d1-base2-laptop 0 · pixels differing 0
+[ui-snap] night-msg-ru: 905 elements · style differences 0 · only in d1-base-laptop 0 · only in d1-base2-laptop 0 · pixels differing 0
+[ui-snap] night-msg-land: 905 elements · style differences 0 · only in d1-base-laptop 0 · only in d1-base2-laptop 0 · pixels differing 0
+[ui-snap] night-play-land: 905 elements · style differences 0 · only in d1-base-laptop 0 · only in d1-base2-laptop 0 · pixels differing 0
+[ui-snap] night-play: 905 elements · style differences 0 · only in d1-base-laptop 0 · only in d1-base2-laptop 0 · pixels differing 0
+[ui-snap] night-forest: 906 elements · style differences 0 · only in d1-base-laptop 0 · only in d1-base2-laptop 0 · pixels differing 610489
+[ui-snap] night-forest-land: 906 elements · style differences 0 · only in d1-base-laptop 0 · only in d1-base2-laptop 0 · pixels differing 366847
+[ui-snap] night-cal-land: 906 elements · style differences 0 · only in d1-base-laptop 0 · only in d1-base2-laptop 0 · pixels differing 0
+[ui-snap] night-cal: 906 elements · style differences 0 · only in d1-base-laptop 0 · only in d1-base2-laptop 0 · pixels differing 0
+[ui-snap] night-cal-fail: 906 elements · style differences 0 · only in d1-base-laptop 0 · only in d1-base2-laptop 0 · pixels differing 0
+[ui-snap] night-cal-fail-land: 906 elements · style differences 0 · only in d1-base-laptop 0 · only in d1-base2-laptop 0 · pixels differing 0
+[ui-snap] DIFFERENCES — 57 (d1-base-laptop → d1-base2-laptop)

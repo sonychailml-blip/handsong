@@ -1,0 +1,85 @@
+[ui-snap] night-start: 900 elements · style differences 0 · only in d1-base-phone 0 · only in d1-base2-phone 0 · pixels differing 35
+[ui-snap] night-offer: 901 elements · style differences 0 · only in d1-base-phone 0 · only in d1-base2-phone 0 · pixels differing 64098
+[ui-snap] night-cards: 900 elements · style differences 42 · only in d1-base-phone 0 · only in d1-base2-phone 0 · pixels differing 62104
+    #darkHint block-size: 80px → auto
+    #darkHint bottom: 700px → auto
+    #darkHint display: flex → none
+    #darkHint height: 80px → auto
+    #darkHint inline-size: 195px → auto
+    #darkHint inset-block-end: 700px → auto
+    #darkHint inset-inline-end: 0px → auto
+    #darkHint inset-inline-start: 195px → 50%
+    #darkHint left: 195px → 50%
+    #darkHint perspective-origin: 97.5px 40px → 50% 50%
+    #darkHint right: 0px → auto
+    #darkHint transform: matrix(1, 0, 0, 1, -97.5, 0) → none
+[ui-snap] night-dark: 901 elements · style differences 64 · only in d1-base-phone 0 · only in d1-base2-phone 0 · pixels differing 0
+    #darkHint block-size: 80px → auto
+    #darkHint bottom: 700px → auto
+    #darkHint display: flex → none
+    #darkHint height: 80px → auto
+    #darkHint inline-size: 195px → auto
+    #darkHint inset-block-end: 700px → auto
+    #darkHint inset-inline-end: 0px → auto
+    #darkHint inset-inline-start: 195px → 50%
+    #darkHint left: 195px → 50%
+    #darkHint perspective-origin: 97.5px 40px → 50% 50%
+    #darkHint right: 0px → auto
+    #darkHint transform: matrix(1, 0, 0, 1, -97.5, 0) → none
+[ui-snap] night-info: 901 elements · style differences 1 · only in d1-base-phone 0 · only in d1-base2-phone 0 · pixels differing 0
+    #darkHintTx text: "Too dark: the camera slowed to 6 fps, so sound answers later" → ""
+[ui-snap] night-info-mid: 901 elements · style differences 1 · only in d1-base-phone 0 · only in d1-base2-phone 0 · pixels differing 0
+    #darkHintTx text: "Too dark: the camera slowed to 6 fps, so sound answers later" → ""
+[ui-snap] night-info-end: 901 elements · style differences 1 · only in d1-base-phone 0 · only in d1-base2-phone 0 · pixels differing 0
+    #darkHintTx text: "Too dark: the camera slowed to 6 fps, so sound answers later" → ""
+[ui-snap] night-land: 901 elements · style differences 1 · only in d1-base-phone 0 · only in d1-base2-phone 0 · pixels differing 0
+    #darkHintTx text: "Too dark: the camera slowed to 6 fps, so sound answers later" → ""
+[ui-snap] night-land-info: 901 elements · style differences 1 · only in d1-base-phone 0 · only in d1-base2-phone 0 · pixels differing 0
+    #darkHintTx text: "Too dark: the camera slowed to 6 fps, so sound answers later" → ""
+[ui-snap] night-land-info-mid: 901 elements · style differences 1 · only in d1-base-phone 0 · only in d1-base2-phone 0 · pixels differing 0
+    #darkHintTx text: "Too dark: the camera slowed to 6 fps, so sound answers later" → ""
+[ui-snap] night-land-info-end: 901 elements · style differences 1 · only in d1-base-phone 0 · only in d1-base2-phone 0 · pixels differing 0
+    #darkHintTx text: "Too dark: the camera slowed to 6 fps, so sound answers later" → ""
+[ui-snap] night-camera: 901 elements · style differences 1 · only in d1-base-phone 0 · only in d1-base2-phone 0 · pixels differing 0
+    #darkHintTx text: "Too dark: the camera slowed to 6 fps, so sound answers later" → ""
+[ui-snap] night-ru: 905 elements · style differences 1 · only in d1-base-phone 0 · only in d1-base2-phone 0 · pixels differing 0
+    #darkHintTx text: "Too dark: the camera slowed to 6 fps, so sound answers later" → ""
+[ui-snap] night-ru-info: 905 elements · style differences 1 · only in d1-base-phone 0 · only in d1-base2-phone 0 · pixels differing 0
+    #darkHintTx text: "Too dark: the camera slowed to 6 fps, so sound answers later" → ""
+[ui-snap] night-ru-info-mid: 905 elements · style differences 5 · only in d1-base-phone 0 · only in d1-base2-phone 0 · pixels differing 0
+    #scaleBtn display: inline-block → none
+    #soundBtn display: inline-block → none
+    #camBtn display: inline-block → none
+    #fsBtn display: inline-block → none
+    #darkHintTx text: "Too dark: the camera slowed to 6 fps, so sound answers later" → ""
+[ui-snap] night-ru-info-end: 905 elements · style differences 1 · only in d1-base-phone 0 · only in d1-base2-phone 0 · pixels differing 0
+    #darkHintTx text: "Too dark: the camera slowed to 6 fps, so sound answers later" → ""
+[ui-snap] night-ru-land-info: 905 elements · style differences 1 · only in d1-base-phone 0 · only in d1-base2-phone 0 · pixels differing 0
+    #darkHintTx text: "Too dark: the camera slowed to 6 fps, so sound answers later" → ""
+[ui-snap] night-ru-land-info-mid: 905 elements · style differences 1 · only in d1-base-phone 0 · only in d1-base2-phone 0 · pixels differing 0
+    #darkHintTx text: "Too dark: the camera slowed to 6 fps, so sound answers later" → ""
+[ui-snap] night-ru-land-info-end: 905 elements · style differences 1 · only in d1-base-phone 0 · only in d1-base2-phone 0 · pixels differing 0
+    #darkHintTx text: "Too dark: the camera slowed to 6 fps, so sound answers later" → ""
+[ui-snap] night-msg-ru: 905 elements · style differences 0 · only in d1-base-phone 0 · only in d1-base2-phone 0 · pixels differing 0
+[ui-snap] night-msg-land: 905 elements · style differences 0 · only in d1-base-phone 0 · only in d1-base2-phone 0 · pixels differing 0
+[ui-snap] night-play-land: 905 elements · style differences 0 · only in d1-base-phone 0 · only in d1-base2-phone 0 · pixels differing 0
+[ui-snap] night-play: 905 elements · style differences 0 · only in d1-base-phone 0 · only in d1-base2-phone 0 · pixels differing 0
+[ui-snap] night-forest: 906 elements · style differences 0 · only in d1-base-phone 0 · only in d1-base2-phone 0 · pixels differing 888341
+[ui-snap] night-forest-land: 906 elements · style differences 0 · only in d1-base-phone 0 · only in d1-base2-phone 0 · pixels differing 769332
+[ui-snap] night-cal-land: 906 elements · style differences 0 · only in d1-base-phone 0 · only in d1-base2-phone 0 · pixels differing 0
+[ui-snap] night-cal: 906 elements · style differences 0 · only in d1-base-phone 0 · only in d1-base2-phone 0 · pixels differing 0
+[ui-snap] night-cal-fail: 906 elements · style differences 108 · only in d1-base-phone 0 · only in d1-base2-phone 0 · pixels differing 0
+    #nightCalFrame block-size: 725.844px → auto
+    #nightCalFrame bottom: 59.0781px → 7%
+    #nightCalFrame display: block → none
+    #nightCalFrame height: 725.844px → auto
+    #nightCalFrame inline-size: 335.406px → auto
+    #nightCalFrame inset-block-end: 59.0781px → 7%
+    #nightCalFrame inset-block-start: 59.0781px → 7%
+    #nightCalFrame inset-inline-end: 27.2969px → 7%
+    #nightCalFrame inset-inline-start: 27.2969px → 7%
+    #nightCalFrame left: 27.2969px → 7%
+    #nightCalFrame perspective-origin: 167.703px 362.922px → 50% 50%
+    #nightCalFrame right: 27.2969px → 7%
+[ui-snap] night-cal-fail-land: 906 elements · style differences 0 · only in d1-base-phone 0 · only in d1-base2-phone 0 · pixels differing 0
+[ui-snap] DIFFERENCES — 238 (d1-base-phone → d1-base2-phone)

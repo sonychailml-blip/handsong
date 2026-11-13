@@ -23,7 +23,8 @@ import { fsBegin, fsStarted, fsToggle, fsOn, fsOnChange, fsCanToggle } from './f
 import { devItems } from './edition.js';   // NIGHT-7b: the release edition (a players' build, or ?release) hides the development items
 import { calWire, calOfferIfNew, calActive, calSideApply, calSideSet, calSettingsRender, calAbort, calDueNow, calOffered, calStep } from './calib.js';   // NIGHT-2: the hand's calibration (its picture is drawn by the loop: main.js afterDraw)
 import { setSceneLevel, sceneLevel, setBackground, backgroundOf, sceneInfo, sceneRoom, sceneRooms, sceneOptDbg, sceneStartNote } from './scene/host.js';   // RUN 8 (slice 4): the scene's quality (development switch); C8 the measurement
-import { roomSwitch, roomNext, natureLight } from './roomswitch.js';   // NIGHT-3 stage 5 part 2: the Room button
+import { roomSwitch, roomNext, natureLight } from './roomswitch.js';
+import { setTabsWire } from './settabs.js';   // DESIGN-1 part C: the settings in three tabs (revert: docs/night/design/DESIGN-1-settings-before.html)   // NIGHT-3 stage 5 part 2: the Room button
 import { latReport } from '../../core/legacy-ui/latmeter.js';   // C8: the device measurement reads the latency meter
 import { cardsWire, cardsShow, cardsOpen, cardsDue, cardsDone, cardsEnvNow } from './cards.js';   // NIGHT-7: the first cards
 import { camWire, camRender } from './camera.js';   // NIGHT-10: Settings → Camera
@@ -150,7 +151,7 @@ function wire(){
   /* NIGHT-7: the picture's quality (Detailed ends the Lightweight mode, which keeps the picture standard); the first cards again */
   for(const b of $('nightQualSeg').children) b.onclick=()=>{ const q=b.dataset.q; if(q==='full' && load(KEY.light)==='1'){ save(KEY.light, '0'); lightApply(false, false); } setSceneLevel(q).then(()=>render()); render(); };
   $('nightHowTo').onclick=()=>{ infoShow(false); cardsShow(); };
-  cardsWire(); noticeWire(); coachWire();
+  cardsWire(); noticeWire(); coachWire(); setTabsWire();
   /* NIGHT-2: the background and the hand's points in settings (fingertips only, the default, or all points) */
   for(const b of $('nightBgSeg').children) b.onclick=()=>{ if(!D) return; D.setBg(b.dataset.bg); render(); };
   for(const b of $('nightHandSeg').children) b.onclick=()=>{ if(!D) return; calSideSet(b.dataset.hand); render(); };   // saved: the last choice wins

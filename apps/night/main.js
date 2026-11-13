@@ -14,6 +14,7 @@ import { soundModAdd } from '../../core/soundmods.js';
 import { natureModule, roomRestore } from './roomswitch.js';
 import { camRestore } from './camera.js';   // NIGHT-10: the camera kept on this device
 import { startWire, startFailText, startSay, START_OLD } from './start.js';
+import { stillWire } from './still.js';   // DESIGN-1 part D: the start still waits for the live room
 import { fsCamera } from './fullscreen.js';   // NIGHT-11 part 3: full screen when the camera runs, while the Begin tap still counts   // NIGHT-11 part 2: the start's own words
 
 for(const R of ROOMS) sceneRoomAdd(R.record.id, { load:R.load, standIn:R.standIn, three:()=>import('./vendor/three-r128/three.min.js') });   // NIGHT-3: the rooms, by id
@@ -28,6 +29,10 @@ hooks.scene={ set:setBackground, of:backgroundOf, info:sceneInfo };   // CORE-8:
   const why=soundModAdd('ambience', N.id, natureModule(N));   // NIGHT-3 stage 4: the live drone steps aside while the music bed plays (a render copy keeps it)
   if(why) console.warn('[night] the ambience was not registered:', why); }   // eslint-disable-line no-console
 nightShellWire(shellDoors()); setFaceHook(nightShellFace);
+/* DESIGN-1 part D: how the live room stands for the start still — drawn and its veil lifted (ready), the 2D stand-in (no WebGL: there at once),
+   still opening (wait), or another background (other: a plain fade) */
+stillWire(()=>{ if(backgroundOf()!=='forest') return 'other'; const I=sceneInfo(); if(!I.webgl || I.level==='minimal') return I.opening ? 'wait' : 'stand-in';
+  const c=document.getElementById('scene'); return !I.opening && I.rendered>0 && c && !c.classList.contains('veil') ? 'ready' : 'wait'; });
 /* afterDraw: the calibration's picture is drawn in the loop, while the camera snapshot is still open (NIGHT-2 stage 3) */
 const Q=new URLSearchParams(location.search), probeQ=Q.has('probe');
 boot({ profile:'profile.night', afterDraw:()=>calTick(),

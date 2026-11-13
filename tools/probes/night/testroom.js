@@ -9,9 +9,10 @@ import { checkRoom } from '../../../apps/night/pure/room.js';
 import { roomAdd, roomRemove } from '../../../apps/night/rooms/index.js';
 import { sceneRoomAdd, sceneRoomRemove } from '../../../apps/night/scene/host.js';
 
-export const TEST_ROOM_ID='room.dev-test';
+export const TEST_ROOM_ID='room.dev-test', TEST_TINT='#f4b860';   // DESIGN-1: its tint, a warm amber (its token defined on the page while it is in)
 const F=Object.freeze;
-export const TEST_ROOM=F({ ...FOREST_ROOM, id:TEST_ROOM_ID, name:F({ en:'Test room', ru:'Тестовая комната' }), icon:'depth',   // NIGHT-8: its own Room-sounds icon (the row checks the slider shows it)
+export const TEST_ROOM=F({ ...FOREST_ROOM, id:TEST_ROOM_ID, name:F({ en:'Test room', ru:'Тестовая комната' }), icon:'depth', tint:'forest-devtest-tint',   // DESIGN-1: a warm amber (TEST_TINT, defined on the page while the room is in) — the interface's accents must follow it here
+    // NIGHT-8: its own Room-sounds icon (the row checks the slider shows it)
   nature:F({ id:'ambience.dev-test',   // silent: no drone, no wind, no crickets, no stream (every gain 0; the shape the validator asks for)
     drone:F({ root:0, fifth:0, tc:1.2, send:0 }),
     wind:F({ hz:300, q:0.8, sweep:120, rate:0.11, gain:0, send:0, sec:2, seed:0x54455354 }),
@@ -42,7 +43,8 @@ const load=()=>new Promise(r=>setTimeout(()=>r(build), S.mode==='slow' ? S.ms : 
 /* in: → null, or the validator's refusal; out again → true */
 export function testRoomInstall(){
   const why=checkRoom(TEST_ROOM, { ids:[TEST_ROOM_ID] }); if(why) return why;
+  document.documentElement.style.setProperty('--cv-'+TEST_ROOM.tint, TEST_TINT);   // DESIGN-1: its tint's token, on the page while the room is in
   if(roomAdd({ record:TEST_ROOM, standIn, load })) sceneRoomAdd(TEST_ROOM_ID, { load, standIn, three:()=>import('../../../apps/night/vendor/three-r128/three.min.js') });
   return null;
 }
-export function testRoomRemove(){ const a=roomRemove(TEST_ROOM_ID), b=sceneRoomRemove(TEST_ROOM_ID); return a || b; }
+export function testRoomRemove(){ const a=roomRemove(TEST_ROOM_ID), b=sceneRoomRemove(TEST_ROOM_ID); document.documentElement.style.removeProperty('--cv-'+TEST_ROOM.tint); return a || b; }

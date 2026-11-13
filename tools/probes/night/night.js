@@ -165,9 +165,9 @@ export async function checkNightShell(){
        NIGHT-5: REACH is the whole range (1): the hand's far end fills the «Глубина» bar to 100 %, the bar has no mark and reads «night.depth»;
        CONTROL: the old reach 0.6 stops the same far end at 60 % */
     n++; if($('nightLanternTg') || $('nightLantern')) miss('the Lantern is still in the settings or on the screen');
-    { const sec=id=>{ const s=$(id) && $(id).closest('section'), h=s && s.querySelector('.night-sec-h'); return h ? h.dataset.i18n : null; }; n+=2;
-      if(sec('nightDotsSeg')!=='night.set.hand') miss(`«Hands on screen» is in the section ${sec('nightDotsSeg')}, not Hand`);
-      if(sec('nightRoomSound')!=='night.set.music' || $('nightRoomSoundRow').hidden) miss(`«Room sounds» is in ${sec('nightRoomSound')} (hidden ${$('nightRoomSoundRow').hidden}), not shown under Music`); }
+    { const sec=id=>{ const s=$(id) && $(id).closest('[data-pane]'); return s ? s.dataset.pane : null; }; n+=2;   // DESIGN-1 part C: the settings' tabs (the panes) replace the section headings
+      if(sec('nightDotsSeg')!=='hands') miss(`«Hands on screen» is in the tab ${sec('nightDotsSeg')}, not Hands`);
+      if(sec('nightRoomSound')!=='sound' || $('nightRoomSoundRow').hidden) miss(`«Room sounds» is in the tab ${sec('nightRoomSound')} (hidden ${$('nightRoomSoundRow').hidden}), not shown under Sound`); }
     n++; { const b=$('nightBgSeg').firstElementChild; if(b.dataset.bg!=='forest' || b.textContent!==I.t('night.bgRoom')) miss(`the first picture choice reads «${b.textContent}» (${b.dataset.bg})`); }
     { const I0=A.fxInstance(ST.chainKeyOf('ld'),'fdepth'), reach=()=>I0 && I0.params[3] ? I0.params[3].cur : NaN, sl=$('nightRoomSound'), v0=sl.value; n+=2;
       if(Math.abs(reach()-CS.REACH)>1e-9) miss(`the hand's reach is ${reach()}, not ${CS.REACH} (the reach is no longer set with the face)`);

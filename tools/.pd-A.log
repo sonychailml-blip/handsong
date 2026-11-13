@@ -1,0 +1,201 @@
+[scales] 74 modes, 18 tunings from 106 files in 42 ms
+[probe-data] running 66 checks (40 s to 2 min, depending on the machine; T2 is the longest) — one line per check as it finishes
+[probe-data] pass · T0 data · 1924 cases · 0 differences · 6 ms
+[probe-data] pass · T1 pitch · 16637076 cases · 0 differences · 23440 ms
+[probe-data] pass · T2 view · 21682204 cases · 0 differences · 18762 ms
+[probe-data] pass · T6b untyped chords (sweep) · 438336 cases · 0 differences · 1578 ms
+[probe-data] pass · stacked chords · 2236 cases · 0 differences · 25 ms
+[probe-data] pass · ED4 degrees (sweep) · 216480 cases · 0 differences · 591 ms
+[probe-data] pass · OWN1 modes by degrees (sweep) · 50016 cases · 0 differences · 128 ms
+[probe-data] pass · F4 behaviour as data · 3556 cases · 0 differences · 63 ms
+[probe-data] pass · LIC1 licence register · 236 cases · 0 differences · 1296 ms
+[probe-data] pass · NAME-INDEX current · 2 cases · 0 differences · 1828 ms
+[probe-data] pass · LAT1 latency stats (core) · 25 cases · 0 differences · 2 ms
+[probe-data] pass · SND-F1 Night forest IR (core) · 32 cases · 0 differences · 609 ms
+[probe-data] pass · LAT2 search schedule (core) · 15 cases · 0 differences · 2 ms
+[probe-data] pass · LAT3 low light (core) · 45 cases · 0 differences · 16 ms
+[probe-data] pass · FMT1 format + registry (core) · 24 cases · 0 differences · 17 ms
+[probe-data] pass · GES1 gesture features (core) · 15 cases · 0 differences · 2 ms
+[probe-data] pass · UI1b icons (core) · 1966 cases · 0 differences · 25 ms
+[probe-data] pass · SAVE1 song file (core) · 45 cases · 0 differences · 10 ms
+[probe-data] pass · CMD1 canonical values (core) · 10 cases · 0 differences · 4 ms
+[probe-data] pass · AUD1c/AUD2a engine data pure (core) · 33 cases · 0 differences · 69 ms
+[probe-data] pass · PACK1 packs and licence keys (core) · 27 cases · 0 differences · 66 ms
+[probe-data] pass · ENG2 power class (core) · 17 cases · 0 differences · 3 ms
+[probe-data] pass · TIM3 timbre records (core) · 169 cases · 0 differences · 101 ms
+[probe-data] pass · C0 profile records (core) · 28 cases · 0 differences · 37 ms
+[probe-data] pass · VIS1 bus (core) · 12 cases · 0 differences · 4 ms
+[probe-data] pass · NIGHT shell (core) · 16 cases · 0 differences · 6 ms
+[probe-data] pass · NIGHT depth curve (core) · 25 cases · 0 differences · 1 ms
+[probe-data] pass · NIGHT cricket schedule (app) · 17 cases · 0 differences · 13 ms
+[probe-data] pass · NIGHT room records (app) · 59 cases · 0 differences · 28 ms
+[probe-data] pass · NIGHT music bed law (app) · 68 cases · 0 differences · 379 ms
+[probe-data] pass · NIGHT music bed v2 law (app) · 174 cases · 0 differences · 1306 ms
+[probe-data]     work census (laptop µs per quantum, 5 degrees, an hour): still 38.9 (95 % 46.0, peak 52.8; Lighter 36.4, 95 % 43.6, peak 51.4) · drift 50.8 (95 % 62.6, peak 70.5; Lighter 43.7, 95 % 51.4, peak 61.3) · glimmer 58.6 (95 % 72.1, peak 85.4; Lighter 44.8, 95 % 51.5, peak 57.4); the gate 133 µs = 5 %
+[probe-data] pass · VIS1c fireflies (core) · 8 cases · 0 differences · 134 ms
+[probe-data] pass · NIGHT cycle (core) · 24 cases · 0 differences · 49 ms
+[probe-data] pass · FOREST life (core) · 55 cases · 0 differences · 900 ms
+[probe-data] pass · FOREST answers (app) · 32 cases · 0 differences · 79 ms
+[probe-data]     webs beside 11 test trunks: 7 of 9 asked
+[probe-data]     the bed's clusters: 4 at z -11.3, 2 at z -9.2, 5 at z -8.6, 4 at z -4.9
+[probe-data] pass · FOREST melody (app) · 21 cases · 0 differences · 1338 ms
+[probe-data]     near flies, mean distance / speed / glow spread: plain 2.18 / 2.227 / 0.244 · a long note 1.02 / 0.997 / 0.048 · fast playing 3.87 / 4.115
+[probe-data] pass · FOREST floor (app) · 30 cases · 0 differences · 559 ms
+[probe-data]     full: sorrel 1500, forb 600, bilberry 260, anemone 500, nettle 140, sedge 580, fern2 110 — 3690 plants
+[probe-data]     damp: sorrel 0.57 vs anemone 0.42; light: anemone 0.70 vs sorrel 0.56 (shuffled: -0.013 / -0.005)
+[probe-data]     reduced: sorrel 600, forb 240, bilberry 100, anemone 200, nettle 50, sedge 230, fern2 45 — 1465 plants
+[probe-data] pass · FOREST stream (app) · 27 cases · 0 differences · 190 ms
+[probe-data]     the moon's reflection at -0.90, 1.59, 0.28 m from the centre line; a mirrored moon's 2.03 m
+[probe-data]     the carve (bed − floor) changes at most 8.5 mm per 2 cm
+[probe-data]     high: 30 rocks (11 in the water), 260 pebbles, 5 mist strips
+[probe-data]     28 leaves over 2 minutes: 28 starts again upstream
+[probe-data] pass · FOREST ground (app) · 19 cases · 0 differences · 795 ms
+[probe-data]     moss at the feet 0.80 vs 3 m away 0.21; drift lee 115.0 vs windward 22.1
+[probe-data]     against the 6-m shift: damp 0.31, moss -0.02, drift 0.05, sel -0.04 (CONTROL periodic 1.00)
+[probe-data]     high: 900 leaves (mean drift 0.38 vs uniform 0.21 / 0.22), 220 pebbles, 160 twigs (1.36 m from a trunk vs 1.40)
+[probe-data] pass · NIGHT stream sound (app) · 18 cases · 0 differences · 715 ms
+[probe-data]     40 s: RMS -33.6 dBFS, peak -13.3 dBFS, 7018 bubbles (175/s), 0 dropped; rendered in 0.82 % of real time on this machine (not judged)
+[probe-data]     no loop: the longest self-similarity 0.124 at 2.80 s; CONTROL a 6-s loop 1.000 at 6.00 s
+[probe-data]     stereo: correlation near 0.663 (CONTROL no spread 1.000), far 0.994; voices pan 0.1 / 0.013 / -0.377 / -0.369 / 0.328 / 0.649, gain 0.14 / 0.211 / 0.325 / 0.538 / 1 / 0.824
+[probe-data] pass · FOREST wood (app) · 25 cases · 0 differences · 273 ms
+[probe-data]     the flare: ×1.67 at the foot, ×1.23 at 0.5 m, ×1.011 at 3 m
+[probe-data]     high: 65 roots, 2 logs, 5 stumps, 3 dead trees, 56 branches, 400 moss cushions, ivy 204 cards on 12 trees, 30 mushrooms, 35 bracket fungi
+[probe-data]     the bridge spans 0.84 m of water, its underside 13.2 cm above it
+[probe-data]     1518 contact-shadow blobs, the same at both levels
+[probe-data] pass · FOREST bark moss (app) · 6 cases · 0 differences · 7 ms
+[probe-data]     the two big trunks on the right (2.5,-4.6, 4.6,-9): reach 0.80 / 2.71 m, side -1.36 / -0.70 rad, cover 0.21 / 0.43, patchiness 0.05 / 0.93, tint -0.56 / 0.53 (5 of 5 apart)
+[probe-data]     95 trunks, the smallest gap 0.222 (trunks 72,93; 0.2 wanted); CONTROL one moss for all: gap 0
+[probe-data] pass · FOREST bark layouts (app) · 15 cases · 0 differences · 275 ms
+[probe-data]     bark mappings: 95 trunks, the smallest gap 0.153 (trunks 2,92; 0.07 wanted); trunks 0 / 1 (the two in the light) turn 0.33 / 0.08, lift 0.05 / 0.39, scale 1.23 / 0.87, spiral -0.14 / 0.01; CONTROL one for all: gap 0
+[probe-data]     moss and lichen layouts: the trunks' regions at least 7.31 cells apart (trunks 37,38), the two in the light 7.31; the hash at every shift between two trunks and its octaves (22325 shifts) correlates at most 0.12; CONTROL a weak hash at 97 cells 1.00, the same numbers 0 cells apart
+[probe-data]     the merged wood at Detailed: 132 pieces (roots 65, logs 2, stumps 5, dead trees 3, branches 56, fungi 1), each its own moss and bark mapping (smallest mapping gap 0.151), none a trunk's; the limbs their own list
+[probe-data]     the look: moss and lichen from each piece's own numbers on the bark and the merged wood alike, no world-angle coordinate, the lichen from vp8; CONTROL the old lichen line is caught (a world-angle coordinate, not the piece's own numbers, the lichen not from vp8)
+[probe-data] pass · FOREST fireflies visit the light (app) · 7 cases · 0 differences · 2675 ms
+[probe-data]     flies seen round the light: depth 0: 7.1 playing, 2.1 idle; depth 0.15: 11.5 playing, 4.6 idle; depth 0.5: 27.3 playing, 11.0 idle; CONTROL the old law at depth 0: 0.00
+[probe-data] pass · NIGHT stream recording (app) · 13 cases · 0 differences · 1029 ms
+[probe-data]     joins: peak 1.4142 × the plain level on a constant recording (√2 wanted); CONTROL hard cut 1.0000
+[probe-data]     13.2 joins per stream a minute, 12 streams (6 voices × 2)
+[probe-data]     the shipped file: sound/stream.mp3, 664 KB, level ×1.244
+[probe-data] pass · NIGHT full-screen icons (app) · 11 cases · 0 differences · 4 ms
+[probe-data]     CONTROL: a pinwheel (one uneven L turned four times) fails the mirror test
+[probe-data]     in: four corner brackets pointing out; out: four pointing in; both mirror-symmetric on both axes, filled, pieces ≥ 4 units apart
+[probe-data] pass · NIGHT scales loaded (app) · 14 cases · 0 differences · 75 ms
+[probe-data]     Night: 3 modes (major-penta, minor-penta, egyptian) from 7 files (index.json, menu.json, modes/major-penta.json, modes/minor-penta.json, modes/egyptian.json, tunings/edo12.json, chordmodes/stackPower.json) instead of every built-in
+[probe-data]     CONTROLS: an unloaded room mode caught; a room mode loaded once named; a missing mode caught; a profile mood loaded
+[probe-data] pass · NIGHT early model files (app) · 7 cases · 0 differences · 2 ms
+[probe-data]     early files: https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm/vision_wasm_internal.{js,wasm}, after the load event and Begin working
+[probe-data] pass · FOREST relief (app) · 13 cases · 0 differences · 25 ms
+[probe-data]     relief: 0.30 m span, 71 tops, 73 hollows over 20 × 40 m (1-m grid); half as high in the aisle
+[probe-data]     the aisle's edge: the largest 1-cm step 2.8 mm (CONTROL the old law 21.0 cm)
+[probe-data]     occlusion: a hollow's bottom 0.90 against its rim 1.00; a trunk's foot 0.58; flat open ground 1
+[probe-data] pass · FOREST water flow (app) · 6 cases · 0 differences · 6 ms
+[probe-data]     width 0.79…1.25 × the half-width, speed 0.80…1.27 on level ground (narrows fast, pools slow); the largest step 0.0069
+[probe-data] pass · NIGHT camera names (app) · 9 cases · 0 differences · 2 ms
+[probe-data]     phone: Front, Back, Back 2, «USB2.0 HD UVC WebCam»; computer names cleaned of hardware numbers; «Camera 1/2» before the permission; CONTROL a computer list is not Front / Back
+[probe-data] pass · NIGHT in-app browsers (app) · 22 cases · 0 differences · 4 ms
+[probe-data]     16 made-up devices: 11 in-app browsers recognised, 5 browsers left alone; «without asking» below 450 ms
+[probe-data] pass · NIGHT coaching line (app) · 8 cases · 0 differences · 19 ms
+[probe-data]     first session: raise@0 · pinch@3500 · fingers@36000 · fx@50000 · depth@66000 · calib@77500 · home@96000 (ms); fingers after 30 s of playing, depth after 60 s
+[probe-data] pass · NIGHT pixel budget law (app) · 29 cases · 0 differences · 3 ms
+[probe-data]     phone 390×844 at 2.75: Standard 429×930 (before 234×506), Detailed 588×1274 (before 331×717); laptop 819×460 / 1161×652
+[probe-data]     guard steps on the phone at Standard: 4
+[probe-data] pass · FOREST gust (app) · 19 cases · 0 differences · 10 ms
+[probe-data]     a 3 m/s sweep: strength 0.81, direction 1.00, 0.00, centre 0.43 m behind the hand
+[probe-data]     the bend at the centre: 28.2 cm at 1 m up, 3.7 cm at 0.2 m; 3.5 m away exactly 0
+[probe-data] pass · FOREST canopy (app) · 18 cases · 0 differences · 323 ms
+[probe-data]     the moon's window: 0 of 64 rays blocked (without the gap 59); seen from the eye the path spans azimuth -17.4…-8.5°, elevation 17.4…20.5°
+[probe-data]     the light's reach hidden by the understorey: 1.37 % of 1456 places (two saplings in the view: 14.63 %)
+[probe-data]     high: 2415 crown sprays, 10 young trees (222), 16 shrubs (314), 10 saplings (47), 2597 limbs, 500 stars; medium 1892 sprays
+[probe-data]     light: young trees 0.59 vs 0.36, saplings 0.67 vs 0.54; damp: shrubs 0.18 vs 0.16 (free floor where each may grow)
+[probe-data] pass · FOREST paint (app) · 18 cases · 0 differences · 6 ms
+[probe-data]     R 3: 29 taps, 92 sector feeds (the sketch's loop: 81 × 8)
+[probe-data]     R 2.5: 21 taps, 68 sector feeds (the sketch's loop: 81 × 8)
+[probe-data]     the vignette: 1 in the middle, 0.65 near the lower right, 0.45 in the corner
+[probe-data]     the breath: at most 5.0 cm sideways, mean 0.19 mm over ten minutes
+[probe-data] pass · FOREST hidden (app) · 16 cases · 0 differences · 112 ms
+[probe-data]     a 4-m pass in 4 s leaves 9 points 0.45 m apart
+[probe-data]     the glow: 1 at the point, 0.37 1.2 m away; at 10 s 0.20 (hold 8 s) vs 1.00 (12 s); gone by 14.5 s
+[probe-data]     14 flowers (sorrel, anemone); a flower found opens in 0.63 s, stays 20 s, closes in 2.9 s
+[probe-data] pass · NIGHT texts both languages (app) · 9 cases · 0 differences · 24 ms
+[probe-data]     264 keys used by the Night page and its code, 161 «night.*» keys: all in English and Russian, none names a room
+[probe-data] pass · NIGHT home screen (app) · 22 cases · 0 differences · 4 ms
+[probe-data]     10 made-up devices: the card on iPhone Safari and iPad Safari (reports a Mac with touch) only; manifest fullscreen, landscape, 3 icons; iOS tags in place
+[probe-data] pass · NIGHT forest files (app) · 57 cases · 0 differences · 60935 ms
+[probe-data]     the forest's files: 22.55 MB of 30.00 MB — code 279.5 KB, prepared files 22808.5 KB (litter-arm-1024.jpg 174.2 KB, litter-arm-512.jpg 50.2 KB, litter-col-1024.jpg 308.2 KB, litter-col-2048.jpg 1058.5 KB, litter-nor-1024.jpg 527.4 KB, litter-nor-2048.jpg 1975.9 KB, stream.mp3 663.8 KB, crown-1024.png 189.0 KB, crown-256.png 37.9 KB, crown-512.png 89.5 KB, dapple-1024.png 169.6 KB, dapple-256.png 23.3 KB, dapple-512.png 65.8 KB, floor-1024.png 509.0 KB, floor-2048.png 1250.2 KB, floor-512.png 198.6 KB, ground-1024.png 1252.4 KB, ground-2048.png 3210.0 KB, ground-512.png 404.4 KB, groundm-1024.png 1832.0 KB, groundm-256.png 164.4 KB, groundm-512.png 564.6 KB, groundn-1024.png 2025.9 KB, groundn-2048.png 4784.8 KB, groundn-512.png 646.2 KB, moon-128.png 3.8 KB, moon-256.png 10.5 KB, moon-512.png 26.5 KB, shade-1024.png 84.3 KB, shade-2048.png 213.4 KB, shade-512.png 32.3 KB, web-1024.png 166.2 KB, web-256.png 24.9 KB, web-512.png 70.6 KB)
+[probe-data]     per level (code + that level's files): high 11.84 MB, medium 4.84 MB, low 1.77 MB
+[probe-data] pass · OLD NAME gone · 513 cases · 0 differences · 171 ms
+[probe-data] pass · NIGHT rare events (core) · 11 cases · 0 differences · 23 ms
+[probe-data] pass · NIGHT-1 headroom sums (tool) · 21 cases · 0 differences · 16 ms
+[probe-data] pass · CAL0 hand measuring (tool) · 22 cases · 0 differences · 22 ms
+[probe-data] pass · CAL1-3 hand calibration (core) · 153 cases · 0 differences · 734 ms
+┌─────────┬──────────────────────────────────────────┬──────────┬─────────────┬───────┬────────┐
+│ (index) │ check                                    │ cases    │ differences │ ms    │ status │
+├─────────┼──────────────────────────────────────────┼──────────┼─────────────┼───────┼────────┤
+│ 0       │ 'T0 data'                                │ 1924     │ 0           │ 6     │ 'pass' │
+│ 1       │ 'T1 pitch'                               │ 16637076 │ 0           │ 23440 │ 'pass' │
+│ 2       │ 'T2 view'                                │ 21682204 │ 0           │ 18762 │ 'pass' │
+│ 3       │ 'T6b untyped chords (sweep)'             │ 438336   │ 0           │ 1578  │ 'pass' │
+│ 4       │ 'stacked chords'                         │ 2236     │ 0           │ 25    │ 'pass' │
+│ 5       │ 'ED4 degrees (sweep)'                    │ 216480   │ 0           │ 591   │ 'pass' │
+│ 6       │ 'OWN1 modes by degrees (sweep)'          │ 50016    │ 0           │ 128   │ 'pass' │
+│ 7       │ 'F4 behaviour as data'                   │ 3556     │ 0           │ 63    │ 'pass' │
+│ 8       │ 'LIC1 licence register'                  │ 236      │ 0           │ 1296  │ 'pass' │
+│ 9       │ 'NAME-INDEX current'                     │ 2        │ 0           │ 1828  │ 'pass' │
+│ 10      │ 'LAT1 latency stats (core)'              │ 25       │ 0           │ 2     │ 'pass' │
+│ 11      │ 'SND-F1 Night forest IR (core)'          │ 32       │ 0           │ 609   │ 'pass' │
+│ 12      │ 'LAT2 search schedule (core)'            │ 15       │ 0           │ 2     │ 'pass' │
+│ 13      │ 'LAT3 low light (core)'                  │ 45       │ 0           │ 16    │ 'pass' │
+│ 14      │ 'FMT1 format + registry (core)'          │ 24       │ 0           │ 17    │ 'pass' │
+│ 15      │ 'GES1 gesture features (core)'           │ 15       │ 0           │ 2     │ 'pass' │
+│ 16      │ 'UI1b icons (core)'                      │ 1966     │ 0           │ 25    │ 'pass' │
+│ 17      │ 'SAVE1 song file (core)'                 │ 45       │ 0           │ 10    │ 'pass' │
+│ 18      │ 'CMD1 canonical values (core)'           │ 10       │ 0           │ 4     │ 'pass' │
+│ 19      │ 'AUD1c/AUD2a engine data pure (core)'    │ 33       │ 0           │ 69    │ 'pass' │
+│ 20      │ 'PACK1 packs and licence keys (core)'    │ 27       │ 0           │ 66    │ 'pass' │
+│ 21      │ 'ENG2 power class (core)'                │ 17       │ 0           │ 3     │ 'pass' │
+│ 22      │ 'TIM3 timbre records (core)'             │ 169      │ 0           │ 101   │ 'pass' │
+│ 23      │ 'C0 profile records (core)'              │ 28       │ 0           │ 37    │ 'pass' │
+│ 24      │ 'VIS1 bus (core)'                        │ 12       │ 0           │ 4     │ 'pass' │
+│ 25      │ 'NIGHT shell (core)'                     │ 16       │ 0           │ 6     │ 'pass' │
+│ 26      │ 'NIGHT depth curve (core)'               │ 25       │ 0           │ 1     │ 'pass' │
+│ 27      │ 'NIGHT cricket schedule (app)'           │ 17       │ 0           │ 13    │ 'pass' │
+│ 28      │ 'NIGHT room records (app)'               │ 59       │ 0           │ 28    │ 'pass' │
+│ 29      │ 'NIGHT music bed law (app)'              │ 68       │ 0           │ 379   │ 'pass' │
+│ 30      │ 'NIGHT music bed v2 law (app)'           │ 174      │ 0           │ 1306  │ 'pass' │
+│ 31      │ 'VIS1c fireflies (core)'                 │ 8        │ 0           │ 134   │ 'pass' │
+│ 32      │ 'NIGHT cycle (core)'                     │ 24       │ 0           │ 49    │ 'pass' │
+│ 33      │ 'FOREST life (core)'                     │ 55       │ 0           │ 900   │ 'pass' │
+│ 34      │ 'FOREST answers (app)'                   │ 32       │ 0           │ 79    │ 'pass' │
+│ 35      │ 'FOREST melody (app)'                    │ 21       │ 0           │ 1338  │ 'pass' │
+│ 36      │ 'FOREST floor (app)'                     │ 30       │ 0           │ 559   │ 'pass' │
+│ 37      │ 'FOREST stream (app)'                    │ 27       │ 0           │ 190   │ 'pass' │
+│ 38      │ 'FOREST ground (app)'                    │ 19       │ 0           │ 795   │ 'pass' │
+│ 39      │ 'NIGHT stream sound (app)'               │ 18       │ 0           │ 715   │ 'pass' │
+│ 40      │ 'FOREST wood (app)'                      │ 25       │ 0           │ 273   │ 'pass' │
+│ 41      │ 'FOREST bark moss (app)'                 │ 6        │ 0           │ 7     │ 'pass' │
+│ 42      │ 'FOREST bark layouts (app)'              │ 15       │ 0           │ 275   │ 'pass' │
+│ 43      │ 'FOREST fireflies visit the light (app)' │ 7        │ 0           │ 2675  │ 'pass' │
+│ 44      │ 'NIGHT stream recording (app)'           │ 13       │ 0           │ 1029  │ 'pass' │
+│ 45      │ 'NIGHT full-screen icons (app)'          │ 11       │ 0           │ 4     │ 'pass' │
+│ 46      │ 'NIGHT scales loaded (app)'              │ 14       │ 0           │ 75    │ 'pass' │
+│ 47      │ 'NIGHT early model files (app)'          │ 7        │ 0           │ 2     │ 'pass' │
+│ 48      │ 'FOREST relief (app)'                    │ 13       │ 0           │ 25    │ 'pass' │
+│ 49      │ 'FOREST water flow (app)'                │ 6        │ 0           │ 6     │ 'pass' │
+│ 50      │ 'NIGHT camera names (app)'               │ 9        │ 0           │ 2     │ 'pass' │
+│ 51      │ 'NIGHT in-app browsers (app)'            │ 22       │ 0           │ 4     │ 'pass' │
+│ 52      │ 'NIGHT coaching line (app)'              │ 8        │ 0           │ 19    │ 'pass' │
+│ 53      │ 'NIGHT pixel budget law (app)'           │ 29       │ 0           │ 3     │ 'pass' │
+│ 54      │ 'FOREST gust (app)'                      │ 19       │ 0           │ 10    │ 'pass' │
+│ 55      │ 'FOREST canopy (app)'                    │ 18       │ 0           │ 323   │ 'pass' │
+│ 56      │ 'FOREST paint (app)'                     │ 18       │ 0           │ 6     │ 'pass' │
+│ 57      │ 'FOREST hidden (app)'                    │ 16       │ 0           │ 112   │ 'pass' │
+│ 58      │ 'NIGHT texts both languages (app)'       │ 9        │ 0           │ 24    │ 'pass' │
+│ 59      │ 'NIGHT home screen (app)'                │ 22       │ 0           │ 4     │ 'pass' │
+│ 60      │ 'NIGHT forest files (app)'               │ 57       │ 0           │ 60935 │ 'pass' │
+│ 61      │ 'OLD NAME gone'                          │ 513      │ 0           │ 171   │ 'pass' │
+│ 62      │ 'NIGHT rare events (core)'               │ 11       │ 0           │ 23    │ 'pass' │
+│ 63      │ 'NIGHT-1 headroom sums (tool)'           │ 21       │ 0           │ 16    │ 'pass' │
+│ 64      │ 'CAL0 hand measuring (tool)'             │ 22       │ 0           │ 22    │ 'pass' │
+│ 65      │ 'CAL1-3 hand calibration (core)'         │ 153      │ 0           │ 734   │ 'pass' │
+└─────────┴──────────────────────────────────────────┴──────────┴─────────────┴───────┴────────┘
+[probe-data] PASS — 66 checks, 0 differences, data files 106 (0 problems) · load 124 ms · total 122.1 s

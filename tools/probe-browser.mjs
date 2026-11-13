@@ -72,6 +72,10 @@ const SERVE_ROOT=val('--root',null) ? path.resolve(val('--root',null)) : ROOT, E
 if(NIGHT_PAGE && !has('--quick') && !has('--all')) QUICK=false;
 if(DUMP && !has('--quick') && !has('--all') && !has('--night')) QUICK=false;
 const EVAL=val('--eval',null);
+/* DESIGN-1: --ui-only (Night page only) — no P.night (its offline renders), no engine benchmark: only the start, cards, settings, coaching and texts
+   checks with real input, plus the CSP, network and storage checks every session ends with (Level 1 changes on Night, CLAUDE.md «Check levels») */
+const UI_ONLY=has('--ui-only');
+if(UI_ONLY && APP!=='night'){ console.log('[probe-browser] --ui-only is for the Night page: add --app night'); process.exit(2); }
 const LEAK=has('--leak');
 if((EVAL||LEAK) && !has('--quick') && !has('--all')) QUICK=false;
 const HEADED=has('--headed'), VERBOSE=has('--verbose'), BROWSER=val('--browser','chrome');
@@ -379,10 +383,16 @@ async function nightBeginHear(page, stub=false){
 }
 /* CORE-20: the live view is judged once the START has ended (the start card gone, bounded by LIMIT_START) and the face has had 3 s to take over — not
    at a fixed 10 s after the tap (a lottery: a start on this machine takes 8–14 s, the old way too; measured by --measure-start) */
+/* DESIGN-1: the take-over is a verdict, not a pause — true once the bed ticks in the profile's own view (the face's override gone) within 3 s of the
+   start's end; false when the start never ended or the 3 s ran out (the judge then fails; it used to read on as if it had come). Its predicate is
+   SYNCHRONOUS: Playwright does not await a predicate's promise (an async one is a promise, truthy at once — the CORE-20 wait never waited) */
+async function nightTakeover(page, ended){ if(!ended) return false;
+  await page.evaluate(async ()=>{ window.__bed2=await import('/apps/night/bed2.js'); });
+  return page.waitForFunction(()=>{ const v=window.__bed2.bed2ViewDbg(); return v.ticked && !v.over; }, null, { timeout:3000, polling:100 }).then(()=>true, ()=>false); }
 async function nightHeard(page){
   const h=await within(page.evaluate(()=>window.__hearP), 30e3, 'the music measure');
   const ended=await page.waitForFunction(()=>!document.getElementById('start').classList.contains('on'), null, { timeout:LIMIT_START }).then(()=>true, ()=>false);
-  if(ended) await page.waitForFunction(async ()=>{ const v=(await import('/apps/night/bed2.js')).bed2ViewDbg(); return v.ticked && !v.over; }, null, { timeout:3000, polling:100 }).catch(()=>{});
+  h.takeover=await nightTakeover(page, ended);
   h.view=await page.evaluate(async ()=>(await import('/apps/night/bed2.js')).bed2ViewDbg()); h.startEnded=ended;
   return h;
 }
@@ -433,8 +443,8 @@ async function uiNightStale(page, label){
 }
 /* the music measure judged: on = audible within 6 s of the tap, playing in the live view, started once (no restart when the face came) */
 function musicJudge(h, on, what, lines, bad){
-  if(on){ if(h.first!=null && h.first<=6000 && h.view.same && h.view.starts===1) lines.push(`music ${what}: audible ${h.first} ms after Begin, ${h.at4} dBFS at 4 s, ${h.last} at 10 s; in the live view, started once`);
-    else bad.push(`music ${what}: first audible ${h.first==null ? 'never' : h.first+' ms'} (6000 at most), live view ${h.view.same} ${JSON.stringify(h.view)}, started ${h.view.starts} times (once wanted), audio ${h.ac}, the start ${h.startEnded ? 'ended' : 'did not end'}, the profile took over ${h.faceAt==null ? 'after the first 10 s' : 'at '+h.faceAt+' ms'}`); }
+  if(on){ if(h.first!=null && h.first<=6000 && h.view.same && h.view.starts===1 && h.takeover) lines.push(`music ${what}: audible ${h.first} ms after Begin, ${h.at4} dBFS at 4 s, ${h.last} at 10 s; in the live view, started once; the profile took over within 3 s of the start's end`);
+    else bad.push(`music ${what}: first audible ${h.first==null ? 'never' : h.first+' ms'} (6000 at most), live view ${h.view.same} ${JSON.stringify(h.view)}, started ${h.view.starts} times (once wanted), audio ${h.ac}, the start ${h.startEnded ? 'ended' : 'did not end'}, the profile ${h.takeover ? 'took over' : 'did NOT take over within 3 s of the start’s end'}${h.faceAt==null ? '' : ' (first seen at '+h.faceAt+' ms)'}`); }
   else { if(h.first==null && h.ac==='running') lines.push(`music ${what}: silent for 10 s with the audio running`); else bad.push(`music ${what}: audible ${h.first} ms after Begin (audio ${h.ac})`); }
 }
 /* NIGHT-7c — the music on a FRESH profile (everything cleared), and the CONTROLS: a stored «off» (the person's own choice) must fail the
@@ -450,7 +460,15 @@ async function uiNightMusic(page, label){
   /* fresh */
   await reloadWith([['handsong.nightBg','dark']]); await nightBeginHear(page); await started();
   if(await skipFlow()) await page.click('#nightCardSkip');
-  musicJudge(await nightHeard(page), true, 'on a fresh profile', lines, bad);
+  const hFresh=await nightHeard(page); musicJudge(hFresh, true, 'on a fresh profile', lines, bad);
+  /* DESIGN-1 CONTROL: the take-over held back (the face's view override put back in place, the very view it holds: nothing glides) — the wait must
+     run out and the same judge must fail; then the override is released */
+  { const held=await page.evaluate(async ()=>{ const B=await import('/apps/night/bed.js'), S=await import('/core/scales.js'); B.bedViewOver(S.CUR()); return true; });
+    const t=await nightTakeover(page, true), v=await page.evaluate(async ()=>(await import('/apps/night/bed2.js')).bed2ViewDbg());
+    await page.evaluate(async ()=>{ (await import('/apps/night/bed.js')).bedViewOver(null); });
+    const l=[], b=[]; musicJudge({ ...hFresh, takeover:t, view:v }, true, 'with the take-over held back', l, b);
+    if(held && !t && b.length) lines.push('CONTROL: with the take-over held back the 3-s wait runs out and the music judgement fails');
+    else bad.push(`CONTROL: the take-over held back was not caught (wait ${t ? 'came' : 'ran out'}, judge ${b.length ? 'failed' : 'passed'}) — the take-over check cannot fail`); }
   /* the controls */
   await reloadWith([['handsong.nightBg','dark'], ['handsong.nightMusicMode','off']]); await nightBeginHear(page, true); await started();
   const cards=await skipFlow(), h=await nightHeard(page);
@@ -472,18 +490,24 @@ async function uiNightMusic(page, label){
 const FP_REC=()=>{ const fr=[]; window.__fp=fr; const t0=performance.now();
   const vis=sel=>{ const e=document.querySelector(sel); if(!e) return false; const s=getComputedStyle(e), r=e.getBoundingClientRect(); return s.display!=='none' && s.visibility!=='hidden' && +s.opacity>0 && r.width>0 && r.height>0; };
   const FULL=['#start .startCard > h1', '#start .startTag', '#startBtn', '#learnBtn', '#fsBtnStart', '#startSupport'], NIGHT=['.night-start-head', '#nightBegin'];
-  const tick=()=>{ if(document.body && document.getElementById('start')) fr.push({ t:Math.round(performance.now()-t0), full:FULL.filter(vis), night:NIGHT.filter(vis), js:!!document.querySelector('.night-start-head svg') });
+  try{ new PerformanceObserver(l=>{ for(const e of l.getEntries()) if(/\/still\/still-[a-z]+\.webp/.test(e.name) && fr.stillAt==null) fr.stillAt=Math.round(e.responseEnd-t0); }).observe({ type:'resource', buffered:true }); }catch(e){}   // DESIGN-1 part D
+  /* a page in the same context finds the picture in its memory cache (no resource-timing entry): its arrival is also timed by loading it (the same address) */
+  const stillLoad=()=>{ const e=document.getElementById('nightStill'); if(!e || fr.loadAsked) return; const m=getComputedStyle(e).backgroundImage.match(/url\("?([^")]+)"?\)/); if(!m) return;
+    fr.loadAsked=true; const i=new Image(); i.onload=()=>{ if(fr.stillAt==null) fr.stillAt=Math.round(performance.now()-t0); }; i.src=m[1]; };
+  const still=()=>{ const e=document.getElementById('nightStill'); stillLoad(); if(!vis('#nightStill')) return null; const bg=getComputedStyle(e).backgroundImage; return /still-[a-z]+\.webp/.test(bg) ? bg.replace(/^.*\/(still-[a-z]+\.webp).*$/, '$1') : null; };
+  const tick=()=>{ if(document.body && document.getElementById('start')) fr.push({ t:Math.round(performance.now()-t0), full:FULL.filter(vis), night:NIGHT.filter(vis), js:!!document.querySelector('.night-start-head svg'), still:still(), startBg:getComputedStyle(document.getElementById('start')).backgroundColor });
     if(performance.now()-t0<4000) requestAnimationFrame(tick); else fr.done=true; };
   requestAnimationFrame(tick); };
-async function nightFirstFrames(page, control){
+async function nightFirstFrames(page, control, noStill=false){
   const ctx=page.context(), p=await ctx.newPage(), url=page.url();
   try{
     await p.addInitScript(FP_REC);
     await p.route(u=>/\/apps\/night\/main\.js$/.test(u.pathname), async r=>{ await new Promise(z=>setTimeout(z, 1200)); await r.continue(); });
     if(control) await p.route(u=>/\/apps\/night\/(index\.html)?$/.test(u.pathname), async r=>{ const resp=await r.fetch(); const body=(await resp.text()).replace(/<body class="night-boot[^"]*">/, '<body>'); await r.fulfill({ response:resp, body }); });
+    if(noStill) await p.route(u=>/\/apps\/night\/(index\.html)?$/.test(u.pathname), async r=>{ const resp=await r.fetch(); const body=(await resp.text()).replace(/<div id="nightStill"[^>]*>[\s\S]*?<\/div>/, ''); await r.fulfill({ response:resp, body }); });   // DESIGN-1 CONTROL: the page before the still
     await p.goto(url, { waitUntil:'commit' });
     await within(p.waitForFunction(()=>window.__fp && window.__fp.done, null, { timeout:0, polling:200 }), 30e3, 'the first frames');
-    return await p.evaluate(()=>window.__fp.slice());
+    const r=await p.evaluate(()=>({ f:window.__fp.slice(), at:window.__fp.stillAt==null ? null : window.__fp.stillAt })); r.f.stillAt=r.at; return r.f;   // an array's own properties do not cross page.evaluate: the time comes beside it
   } finally { await p.close().catch(()=>{}); }
 }
 async function uiNightFirstFrames(page, label){
@@ -495,6 +519,16 @@ async function uiNightFirstFrames(page, label){
   else lines.push(`the first frames: ${ok.n} frames in 4 s (${ok.early} before the page's scripts, the first at ${ok.first.t} ms) — every one shows Night's title and Begin, none of Full's start card`);
   if(!(ctl.early && ctl.wrong.some(f=>!f.js && f.full.length))) bad.push(`CONTROL: the page without Night's body class showed no Full item in its early frames (${ctl.n} frames, ${ctl.early} early) — the check cannot fail`);
   else lines.push(`CONTROL: the NIGHT-8 page (no body class) shows Full's start items in ${ctl.wrong.filter(f=>!f.js).length} of its ${ctl.early} early frames`);
+  /* DESIGN-1 part D: the room's still behind the start card from the first frame (the layer shown with its picture's address in every frame, the start card's own
+     background clear), its picture arrived within 2 s on this local server; CONTROL the page without the still layer must fail */
+  { const F=await nightFirstFrames(page, false), N=await nightFirstFrames(page, false, true);
+    const judge=X=>{ const no=X.filter(f=>!f.still), opaque=X.filter(f=>!/rgba\(0, 0, 0, 0\)|transparent/.test(f.startBg)); return { n:X.length, early:X.filter(f=>!f.js).length, no, opaque, at:X.stillAt, file:(X.find(f=>f.still)||{}).still }; };
+    const a=judge(F), b=judge(N);
+    if(!a.n || !a.early) bad.push('the still: no early frame captured');
+    else if(a.no.length || a.opaque.length) bad.push(`the still: ${a.no.length} of ${a.n} frames without it (first at ${(a.no[0]||{}).t} ms), ${a.opaque.length} with the start card's own background over it`);
+    else if(!(a.at!=null && a.at<=2000)) bad.push(`the still's picture arrived at ${a.at} ms (2000 at most on this local server)`);
+    else lines.push(`the start still: in all ${a.n} frames from the first (${a.early} before the page's scripts), «${a.file}», its picture arrived ${a.at} ms after the page began`);
+    if(!b.no.length) bad.push('CONTROL: the page without the still layer still showed a still — the check cannot fail'); else lines.push(`CONTROL: the page without the still layer fails (${b.no.length} of ${b.n} frames without a still)`); }
   return { pass:!bad.length, lines:[...lines.map(l=>`${label}: ${l}`), ...bad.map(b=>`${label}: NOT A PASS — ${b}`)] };
 }
 /* NIGHT-8b — FULL SCREEN WITH THE CAMERA UNDECIDED (the user's Poco: full screen ended at the camera prompt and never came back). The camera
@@ -586,7 +620,7 @@ async function uiNightCamera(page, label){
     const a=await camStart(page, null);
     if(!a.ok || a.facing!=='user' || !a.mirrored) bad.push(`the default start: ${JSON.stringify(a)}`);
     await page.evaluate(async ()=>{ const C=await import('/apps/night/camera.js'); C.camEnvDbg({ ua:'Mozilla/5.0 (Linux; Android 13) Mobile', platform:'Linux armv8l', touch:5 }); document.getElementById('nightInfoBtn').click(); });
-    await page.waitForTimeout(700);
+    await page.waitForTimeout(400); await page.click('#nightTabHands'); await page.waitForTimeout(300);   // DESIGN-1 part C: the camera sits in the Hands tab (a real tap)
     const list=await page.evaluate(async ()=>{ const I=await import('/core/i18n.js'), sec=document.getElementById('nightCamSec'), b=[...document.querySelectorAll('#nightCamSeg button')];
       return { shown:!sec.hidden && getComputedStyle(sec).display!=='none', names:b.map(x=>x.textContent), want:[I.t('night.cam.front'), I.t('night.cam.back')], on:b.map(x=>x.classList.contains('on')) }; });   // the page's own language
     if(!list.shown || list.names.join()!==list.want.join() || list.on.join()!=='true,false' || list.names.some(x=>/cam-/.test(x))) bad.push('Settings → Camera: '+JSON.stringify(list));
@@ -632,7 +666,7 @@ async function uiNightCamera(page, label){
 const AWV_IG='Mozilla/5.0 (Linux; Android 14; 22111317PG; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/126.0.0.0 Mobile Safari/537.36 Instagram 300.0.0.0 Android';
 const MODEL_RE=/storage\.googleapis\.com\/mediapipe-models\//;
 async function freshPage(page, o={}){
-  const ctx=await page.context().browser().newContext({ viewport:{ width:1280, height:800 }, ...(o.ua ? { userAgent:o.ua } : {}), ...(o.locale ? { locale:o.locale } : {}) }), origin=new URL(page.url()).origin;
+  const ctx=await page.context().browser().newContext({ viewport:{ width:1280, height:800 }, ...(o.ua ? { userAgent:o.ua } : {}), ...(o.locale ? { locale:o.locale } : {}), ...(o.ctxOpt||{}) }), origin=new URL(page.url()).origin;   // DESIGN-1: ctxOpt (reduced motion)
   await ctx.grantPermissions(['camera','microphone','clipboard-read','clipboard-write'], { origin }); if(CDN_CACHE) await cdnCache(ctx);
   await ctx.addInitScript(()=>{ try{ if(!localStorage.getItem('handsong.nightBg')) localStorage.setItem('handsong.nightBg','dark'); }catch(e){} });
   if(o.init) await ctx.addInitScript(o.init[0], o.init[1]);
@@ -734,6 +768,26 @@ async function uiNightStart(page, label){
 async function howToState(p){ return p.evaluate(()=>{ const c=document.getElementById('nightCards'), n=document.getElementById('nightCardNext'), r=n.getBoundingClientRect(), top=document.elementFromPoint(r.x+r.width/2, r.y+r.height/2);
   return { open:!c.hidden, onTop:!!top && !!top.closest('#nightCards') && getComputedStyle(c).display!=='none', start:document.getElementById('start').classList.contains('on'), lift:document.body.classList.contains('night-cards-start'),
     title:document.getElementById('nightCardTitle').textContent, link:document.getElementById('nightStartHowTo').textContent, focus:document.activeElement && document.activeElement.id, begin:getComputedStyle(document.getElementById('nightBegin')).pointerEvents }; }); }
+/* DESIGN-1 — nothing of Begin shows through the cards: Begin's area photographed with the cards open, then again with Begin itself hidden — the two
+   must be the same pixels (Begin adds nothing). strip: the start card put back under the cards (today's page before the fix) — must differ. */
+async function pngDiff(p, a, b){ if(a.equals(b)) return 0; return p.evaluate(async ([x,y])=>{ const load=s=>new Promise(r=>{ const i=new Image(); i.onload=()=>r(i); i.src='data:image/png;base64,'+s; });
+  const [ia,ib]=await Promise.all([load(x),load(y)]); if(ia.width!==ib.width||ia.height!==ib.height) return -1;
+  const c=document.createElement('canvas'); c.width=ia.width; c.height=ia.height; const g=c.getContext('2d');
+  g.drawImage(ia,0,0); const da=g.getImageData(0,0,c.width,c.height).data; g.clearRect(0,0,c.width,c.height); g.drawImage(ib,0,0); const db=g.getImageData(0,0,c.width,c.height).data;
+  let n=0; for(let i=0;i<da.length;i+=4) if(da[i]!==db[i]||da[i+1]!==db[i+1]||da[i+2]!==db[i+2]) n++; return n; }, [a.toString('base64'), b.toString('base64')]); }
+async function beginThrough(p, strip){
+  const css=k=>p.evaluate(([id,t])=>{ let e=document.getElementById(id); if(t==null){ if(e) e.remove(); return; } if(!e){ e=document.createElement('style'); e.id=id; document.head.appendChild(e); } e.textContent=t; }, k);
+  if(strip) await css(['__beginStrip', 'body.night-cards-start #start .startCard{ visibility:visible !important; }']);
+  await p.evaluate(async ()=>{ try{ (await import('/apps/night/still.js')).stillDbg({ freeze:true }); }catch(e){} });   // the start screen's drifting lights held still (DESIGN-1 part D)
+  await p.waitForTimeout(250);
+  const r=await p.evaluate(()=>{ const b=document.getElementById('nightBegin').getBoundingClientRect(); return { x:Math.floor(b.x), y:Math.floor(b.y), width:Math.ceil(b.width), height:Math.ceil(b.height) }; });
+  const a=await p.screenshot({ clip:r, animations:'disabled', caret:'hide' });
+  await css(['__beginHide', '#nightBegin{ visibility:hidden !important; }']); await p.waitForTimeout(120);
+  const b=await p.screenshot({ clip:r, animations:'disabled', caret:'hide' });
+  await css(['__beginHide', null]); if(strip) await css(['__beginStrip', null]);
+  await p.evaluate(async ()=>{ try{ (await import('/apps/night/still.js')).stillDbg({ freeze:false }); }catch(e){} });
+  return { px:await pngDiff(p, a, b), area:r.width*r.height };
+}
 async function uiNightHowTo(page, label){
   const lines=[], bad=[];
   for(const control of [false, true]){ const c=await freshPage(page, control ? { init:[()=>{ document.addEventListener('DOMContentLoaded', ()=>{ new MutationObserver(()=>{ if(document.body.classList.contains('night-cards-start')) document.body.classList.remove('night-cards-start'); }).observe(document.body, { attributes:true, attributeFilter:['class'] }); }); }, null] } : {});
@@ -745,6 +799,9 @@ async function uiNightHowTo(page, label){
       if(a.link!==T.how) bad.push(`the link reads «${a.link}», wanted «${T.how}»`);
       if(!(a.open && a.onTop && a.start && a.lift && a.title)) bad.push('the link did not open the cards over the start card: '+JSON.stringify(a));
       else lines.push(`«${a.link}» under Begin opens the cards over the start card («${a.title}»)`);
+      { const k=await beginThrough(c.p, false), x=await beginThrough(c.p, true);   // DESIGN-1 part A: the cards fully cover Begin
+        if(k.px!==0) bad.push(`Begin shows through the cards: ${k.px} of ${k.area} pixels of its area change when Begin is hidden`); else lines.push(`nothing of Begin shows through the cards (its area identical with Begin hidden, ${k.area} pixels)`);
+        if(!(x.px>0)) bad.push('CONTROL: with the start card back under the cards Begin did not show through — the check cannot fail'); else lines.push(`CONTROL: with the start card back under the cards (the page before the fix) ${x.px} pixels of Begin show through`); }
       let k=0; for(;k<8;k++){ const s=await howToState(c.p); if(!s.open) break; await tapAt(c.p, '#nightCardNext'); await c.p.waitForTimeout(80); }
       const b=await howToState(c.p);
       if(b.open || !b.start || b.lift || b.focus!=='nightStartHowTo' || b.begin==='none') bad.push('after the last card the start card did not come back as it was: '+JSON.stringify(b)); else lines.push(`Next through ${k} cards closes them; the start card is back (focus on the link, Begin live)`);
@@ -757,6 +814,138 @@ async function uiNightHowTo(page, label){
       await tapAt(c.p, '#nightBegin'); const go=await c.p.waitForFunction(()=>{ const s=document.getElementById('start'); return s.classList.contains('busy') || !s.classList.contains('on'); }, null, { timeout:5000 }).then(()=>true, ()=>false);
       if(!go) bad.push('after the cards a tap on Begin did not start the app'); else lines.push('then Begin starts the app');
     } finally { await c.ctx.close().catch(()=>{}); } }
+  return { pass:!bad.length, lines:[...lines.map(l=>`${label}: ${l}`), ...bad.map(b=>`${label}: NOT A PASS — ${b}`)] };
+}
+
+/* DESIGN-1 part C — «NIGHT settings tabs»: the settings card in three tabs, real taps on a fresh profile (Dark), at a laptop size (1280 × 800) and a phone
+   size (390 × 844), in English then in Russian. Per tab: exactly its pane shows; its controls are visible and the other tabs' are not; «How to play» stays
+   visible; «More» opens the rarely used (Hands on screen and the reset in Hands, the full note field in Picture). The layout, judged on every visible line of
+   the pane with its «More» open: no two lines overlap, none sticks out of the card, the card does not scroll sideways, a note sits under its label. Behaviour
+   (English, laptop): the Lightweight switch and the note-field switch still do what they did (their state and the stored value), switched back. CONTROLS:
+   every pane forced visible must fail «one pane»; a note pulled up over its row must fail the layout. */
+const SET_TABS_WANT={ sound:{ show:['nightMusicVol','nightMusicAnswerTg'], more:[] }, picture:{ show:['nightBgSeg','nightQualSeg','nightLightTg','nightMorePictureBtn'], more:['nightFieldTg'] },
+  hands:{ show:['nightHandSeg','nightTravel','nightFxSens','nightMoreHandsBtn'], more:['nightDotsSeg','nightCalReset'] } };
+function setJudge(W){
+  const $=id=>document.getElementById(id), card=$('nightInfo'), vis=e=>{ if(!e) return false; for(let q=e;q && q!==document.body;q=q.parentElement){ const s=getComputedStyle(q); if(s.display==='none' || s.visibility==='hidden') return false; } const r=e.getBoundingClientRect(); return r.width>0 && r.height>0; };
+  const panes=[...card.querySelectorAll('[data-pane]')].filter(vis).map(p=>p.dataset.pane), tab=(card.querySelector('[role=tab][aria-selected=true]')||{}).dataset||{};
+  const out={ panes, tab:tab.tab||null, missing:[], extra:[], layout:[], howTo:vis($('nightHowTo')), lines:0 };
+  if(panes.length!==1) return out;
+  const p=card.querySelector(`[data-pane="${panes[0]}"]`), want=W[panes[0]];
+  for(const id of want.show) if(!vis($(id))) out.missing.push(id);
+  for(const [k,w] of Object.entries(W)) if(k!==panes[0]) for(const id of w.show) if(vis($(id))) out.extra.push(id);
+  const items=[]; for(const e of p.children){ if(!vis(e)) continue; if(e.classList.contains('night-more-body')) items.push(...[...e.children].filter(vis)); else items.push(e); }
+  const C=card.getBoundingClientRect(); out.lines=items.length;
+  const R=items.map(e=>[e.id || e.className.split(' ')[0], e.getBoundingClientRect()]);
+  for(const [n,r] of R) if(r.left<C.left-0.5 || r.right>C.right+0.5) out.layout.push(`${n} sticks out of the card (${Math.round(r.left)}…${Math.round(r.right)} in ${Math.round(C.left)}…${Math.round(C.right)})`);
+  for(let i=0;i<R.length;i++) for(let j=i+1;j<R.length;j++){ const a=R[i][1], b=R[j][1]; if(Math.min(a.right,b.right)-Math.max(a.left,b.left)>1 && Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top)>1) out.layout.push(`${R[i][0]} × ${R[j][0]} overlap`); }
+  if(card.scrollWidth>card.clientWidth+1) out.layout.push(`the card scrolls sideways (${card.scrollWidth} > ${card.clientWidth})`);
+  for(const nt of p.querySelectorAll('.night-tg-note')){ if(!vis(nt)) continue; const lab=nt.previousElementSibling; if(lab && nt.getBoundingClientRect().top<lab.getBoundingClientRect().bottom-1) out.layout.push(`a note is not under its label (${nt.closest('button').id})`); }
+  for(const ctl of p.querySelectorAll('.night-row > .night-seg, .night-tg, .night-vol, .night-sl')){ if(!vis(ctl)) continue; const r=ctl.getBoundingClientRect(); if(r.right>C.right+0.5) out.layout.push(`${ctl.id||ctl.className} runs past the card's edge`); }
+  return out;
+}
+async function setStart(page, lang, vp){
+  const c=await freshPage(page, { init:[L=>{ try{ localStorage.setItem('handsong.night.lang', L); }catch(e){} }, lang] });
+  await c.p.setViewportSize(vp); await c.p.goto(c.url); await c.p.waitForFunction(()=>window.__nightBoot && window.__nightBoot.state().done, null, { timeout:60e3 });
+  await tapAt(c.p, '#nightBegin'); await c.p.waitForFunction(()=>!document.getElementById('start').classList.contains('on'), null, { timeout:LIMIT_START });
+  await c.p.waitForFunction(()=>document.getElementById('nightShell').classList.contains('show'), null, { timeout:30e3 });
+  await c.p.click('#nightInfoBtn'); await c.p.waitForTimeout(300); return c;
+}
+const dropStyle=(p, tag)=>p.evaluate(t=>{ for(const s of document.querySelectorAll('style')) if(s.textContent.includes(t)) s.remove(); }, tag);
+async function uiNightSettings(page, label){
+  const lines=[], bad=[], CYR=/[а-яё]/i;
+  for(const lang of ['en','ru']){ const c=await setStart(page, lang, { width:1280, height:800 });
+    try{
+      for(const vp of [{ width:1280, height:800 }, { width:390, height:844 }]){ await c.p.setViewportSize(vp); await c.p.waitForTimeout(300); const at=`${lang}, ${vp.width}×${vp.height}`, seen=[];
+        for(const tab of ['sound','picture','hands']){ await c.p.click(`#nightSetTabs [data-tab="${tab}"]`); await c.p.waitForTimeout(150);
+          const more=tab==='sound' ? null : (tab==='picture' ? '#nightMorePictureBtn' : '#nightMoreHandsBtn');
+          let j=await c.p.evaluate(setJudge, SET_TABS_WANT);
+          if(j.panes.length!==1 || j.panes[0]!==tab || j.tab!==tab) bad.push(`${at}: the tab «${tab}» shows the panes ${j.panes.join(', ')||'none'} (selected «${j.tab}»)`);
+          if(j.missing.length) bad.push(`${at}, ${tab}: not visible ${j.missing.join(', ')}`); if(j.extra.length) bad.push(`${at}, ${tab}: another tab's controls visible ${j.extra.join(', ')}`);
+          if(!j.howTo) bad.push(`${at}, ${tab}: «How to play» is not visible`);
+          if(more){ const want=SET_TABS_WANT[tab].more, hid=await c.p.evaluate(ids=>ids.filter(id=>{ const e=document.getElementById(id); return !e || !e.offsetParent; }), want);
+            if(hid.length!==want.length) bad.push(`${at}, ${tab}: the rarely used show before «More» (${want.filter(x=>!hid.includes(x)).join(', ')})`);
+            await c.p.click(more); await c.p.waitForTimeout(150);
+            const shown=await c.p.evaluate(ids=>ids.filter(id=>{ const e=document.getElementById(id); return !!e && !!e.offsetParent; }), want), word=await c.p.evaluate(s=>document.querySelector(s).textContent.trim(), more);
+            if(shown.length!==want.length) bad.push(`${at}, ${tab}: «More» did not open ${want.filter(x=>!shown.includes(x)).join(', ')}`);
+            if(!word || (lang==='ru' ? !CYR.test(word) : CYR.test(word))) bad.push(`${at}, ${tab}: the «More» line reads «${word}»`);
+            j=await c.p.evaluate(setJudge, SET_TABS_WANT); }
+          if(j.layout.length) bad.push(`${at}, ${tab}: ${j.layout.slice(0,4).join('; ')}`);
+          seen.push(`${tab} ${j.lines} lines`);
+          if(more){ await c.p.click(more); await c.p.waitForTimeout(100); } }
+        lines.push(`${at}: one pane per tab, its controls only, «How to play» under each, «More» opens the rarely used; layout clean (${seen.join(', ')})`);
+        if(vp.width===390){   // the CONTROLS, once per language at the phone size
+          await c.p.addStyleTag({ content:'#nightShell .night-pane[hidden]{ display:block !important; } /*ctl-a*/' }); const a=await c.p.evaluate(setJudge, SET_TABS_WANT); await dropStyle(c.p, 'ctl-a');
+          if(a.panes.length===1) bad.push(`${at}: CONTROL every pane forced visible still read as one pane — the check cannot fail`); else lines.push(`${at}: CONTROL every pane forced visible is caught (${a.panes.length} panes)`);
+          await c.p.click('#nightSetTabs [data-tab="picture"]'); await c.p.waitForTimeout(100);
+          await c.p.addStyleTag({ content:'.night-card p.night-row-note{ margin-top:-2.4em !important; } /*ctl-b*/' }); const b=await c.p.evaluate(setJudge, SET_TABS_WANT); await dropStyle(c.p, 'ctl-b');
+          if(!b.layout.some(x=>/overlap/.test(x))) bad.push(`${at}: CONTROL a note pulled over its row was not caught — the layout check cannot fail`); else lines.push(`${at}: CONTROL a note pulled over its row is caught`); }
+      }
+      if(lang==='en'){ await c.p.setViewportSize({ width:1280, height:800 }); await c.p.click('#nightSetTabs [data-tab="picture"]'); await c.p.waitForTimeout(100);
+        const st=()=>c.p.evaluate(async ()=>{ const S=await import('/core/state.js'); return { light:document.getElementById('nightLightTg').classList.contains('on'), stored:localStorage.getItem('handsong.nightLight'), field:!!(S.nightView && S.nightView.fieldAll) }; });
+        const s0=await st(); await c.p.click('#nightLightTg'); await c.p.waitForTimeout(200); const s1=await st(); await c.p.click('#nightLightTg'); await c.p.waitForTimeout(200); const s2=await st();
+        await c.p.click('#nightMorePictureBtn'); await c.p.click('#nightFieldTg'); await c.p.waitForTimeout(100); const f1=await st(); await c.p.click('#nightFieldTg'); await c.p.waitForTimeout(100); const f2=await st();
+        if(s1.light===s0.light || s1.stored!==(s1.light ? '1' : '0') || s2.light!==s0.light) bad.push('the Lightweight switch: '+JSON.stringify([s0, s1, s2]));
+        else if(f1.field===s0.field || f2.field!==s0.field) bad.push('the note-field switch: '+JSON.stringify([s0, f1, f2]));
+        else lines.push(`the Lightweight switch (on, stored «${s1.stored}», back off) and the note-field switch work from their tab as before`); }
+    } finally { await c.ctx.close().catch(()=>{}); } }
+  return { pass:!bad.length, lines:[...lines.map(l=>`${label}: ${l}`), ...bad.map(b=>`${label}: NOT A PASS — ${b}`)] };
+}
+
+/* DESIGN-1 part D — «NIGHT reveal»: from the Begin tap to the live forest, frame by frame, on a fresh profile with the forest chosen. The room is made LATE on
+   purpose (its three.js held back until 2.5 s after the start ends; the stand-in's deadline pushed out of the way in every case alike), so the gap between
+   the start card and the live forest really exists. Judged per frame after the start ends: COVERED = the still whole (waiting: opaque, no mask) or the live
+   forest fully shown (drawn, veil lifted, opacity 1); a frame that is neither is a black frame — none allowed. Also: the phases came in order (wait →
+   reveal → done), the still breathed while it waited, the emblem's dot was shown and moved into the picture, the drifting lights moved on the start screen.
+   CONTROL: the old way (?probe&nostill: no still after the start) under the same late room must show black frames. REDUCED MOTION (a context that asks for
+   it): a plain fade — no mask, no dot, no breathing, the lights drawn once and still. */
+const REVEAL_REC=()=>{ window.__rv=[]; window.__rvStop=false; const t0=performance.now();
+  (async ()=>{ const S=await import('/apps/night/still.js'), H=await import('/apps/night/scene/host.js');
+    const step=()=>{ const st=S.stillDbg(), c=document.getElementById('scene'), I=H.sceneInfo();
+      window.__rv.push({ t:Math.round(performance.now()-t0), start:document.getElementById('start').classList.contains('on'), phase:st.phase, look:st.look, shown:st.shown,
+        breathe:document.getElementById('nightStill').classList.contains('breathe'), dot:st.dot, sop:c ? +getComputedStyle(c).opacity : 0, veil:c ? c.classList.contains('veil') : true, rendered:I.rendered||0 });
+      if(!window.__rvStop) requestAnimationFrame(step); };
+    requestAnimationFrame(step); })(); };
+async function revealRun(page, o={}){
+  const c=await freshPage(page, { q:o.q||'', ...(o.reduced ? { ctxOpt:{ reducedMotion:'reduce' } } : {}), init:[()=>{ try{ localStorage.setItem('handsong.nightBg','forest'); }catch(e){} }, null] });
+  let open=null; const gate=new Promise(r=>{ open=r; });
+  try{
+    if(o.late) await c.p.route(u=>/\/apps\/night\/vendor\/three-r128\/three\.min\.js$/.test(u.pathname), async r=>{ await gate; await r.continue(); });
+    else open();
+    await c.p.goto(c.url); await c.p.waitForFunction(()=>window.__nightBoot && window.__nightBoot.state().done, null, { timeout:60e3 });
+    await c.p.evaluate(async ()=>{ (await import('/apps/night/scene/host.js')).sceneOpenDbg({ lateMs:120000 }); });   // no stand-in in the way (alike in every case)
+    const d0=await c.p.evaluate(async ()=>(await import('/apps/night/still.js')).stillDbg().draws); await c.p.waitForTimeout(1500);
+    const pre=await c.p.evaluate(async ()=>(await import('/apps/night/still.js')).stillDbg());
+    await c.p.evaluate(REVEAL_REC); await tapAt(c.p, '#nightBegin');
+    await c.p.waitForFunction(()=>!document.getElementById('start').classList.contains('on'), null, { timeout:LIMIT_START });
+    if(o.late){ await c.p.waitForTimeout(2500); open(); }
+    const done=await c.p.waitForFunction(()=>{ const f=window.__rv[window.__rv.length-1]; return !!f && f.phase==='done' && f.sop>=0.99 && !f.veil && f.rendered>0; }, null, { timeout:90e3, polling:200 }).then(()=>true, ()=>false);
+    await c.p.waitForTimeout(400); await c.p.evaluate(()=>{ window.__rvStop=true; });
+    const F=await c.p.evaluate(()=>window.__rv.slice());
+    return { F, done, lights:pre.draws-d0, plain:pre.plain, image:pre.image };
+  } finally { open(); await c.ctx.close().catch(()=>{}); }
+}
+function revealJudge(R){
+  const after=R.F.filter(f=>!f.start), black=after.filter(f=>!((f.phase==='start' || f.phase==='wait') && f.shown && f.look && f.look.opacity>=0.99 && f.look.clear<=0) && !(f.sop>=0.99 && !f.veil && f.rendered>0));
+  const order=[]; for(const f of after) if(order[order.length-1]!==f.phase) order.push(f.phase);
+  const dots=after.filter(f=>f.dot && f.dot.a>0), moved=dots.length>1 && Math.hypot(dots[dots.length-1].dot.x-dots[0].dot.x, dots[dots.length-1].dot.y-dots[0].dot.y)>40;
+  return { frames:after.length, black, order, breathe:after.some(f=>f.breathe), dots:dots.length, moved, mask:after.some(f=>f.phase==='reveal' && f.look && f.look.clear>0), waitMs:(after.filter(f=>f.phase==='wait').length ? after.filter(f=>f.phase==='wait').slice(-1)[0].t-after[0].t : 0) };
+}
+async function uiNightReveal(page, label){
+  const lines=[], bad=[];
+  const a=await revealRun(page, { late:true }), A=revealJudge(a);
+  if(!a.done) bad.push('the live forest never came fully into view (90 s)');
+  if(A.black.length) bad.push(`${A.black.length} black frame(s) of ${A.frames} between the start card and the live forest (first at ${A.black[0].t} ms: ${JSON.stringify(A.black[0])})`);
+  if(A.order.join()!=='wait,reveal,done') bad.push('the phases came as '+A.order.join(' → ')+' (wait → reveal → done wanted)');
+  if(!A.breathe) bad.push('the still did not breathe while the late room was not ready');
+  if(!A.mask) bad.push('the reveal never cleared the still from the far point (no mask)');
+  if(!A.moved) bad.push(`the emblem's dot did not drift into the picture (${A.dots} frames with it)`);
+  if(!(a.lights>=10)) bad.push(`the start screen's lights did not move (${a.lights} redraws in 1.5 s)`);
+  if(!bad.length) lines.push(`a late forest (held until 2.5 s after the start): ${A.frames} frames after the start card, none black; ${A.order.join(' → ')}; the still breathed ${(A.waitMs/1000).toFixed(1)} s while it waited; the dot drifted in (${A.dots} frames); the lights moved (${a.lights} redraws in 1.5 s)`);
+  const n=await revealRun(page, { late:true, q:'&nostill' }), N=revealJudge(n);
+  if(!N.black.length) bad.push('CONTROL: the old way (no still after the start) showed no black frame under the late forest — the check cannot fail'); else lines.push(`CONTROL: the old way under the same late forest shows ${N.black.length} black frames of ${N.frames}`);
+  const r=await revealRun(page, { reduced:true }), M=revealJudge(r);
+  if(!r.plain || M.mask || M.dots || M.breathe || r.lights>1 || M.black.length || !r.done) bad.push(`reduced motion: plain ${r.plain}, mask ${M.mask}, dot frames ${M.dots}, breathing ${M.breathe}, lights redrawn ${r.lights}× in 1.5 s, black frames ${M.black.length}, forest shown ${r.done}`);
+  else lines.push(`reduced motion: a plain fade (no mask, no dot, no breathing), the lights still (${r.lights} redraws in 1.5 s), no black frame; CONTROL the normal run above had the mask and the dot`);
   return { pass:!bad.length, lines:[...lines.map(l=>`${label}: ${l}`), ...bad.map(b=>`${label}: NOT A PASS — ${b}`)] };
 }
 
@@ -956,7 +1145,7 @@ async function session(port, plan, label){
        the pause above can come too late for it: it was still rendering on the engine copy when Night's first row (GOLD) took its state-guard
        snapshot. The runner runs it ONCE here and waits: one already in flight finishes first (the render queue is serial), and the stored result
        stops the timer's later one. settled() is checked, and its CONTROL (nothing stored) must read unsettled. */
-    { const b=await page.evaluate(async ()=>{ const R=await import('/core/render.js'), E=await import('/core/pure/engclass.js'), t0=performance.now();
+    if(!UI_ONLY){ const b=await page.evaluate(async ()=>{ const R=await import('/core/render.js'), E=await import('/core/pure/engclass.js'), t0=performance.now();
         const r=await R.engBench(); await new Promise(q=>setTimeout(q, 50));
         const settled=(stored, queued)=>!!E.benchOf(stored, navigator.userAgent) && queued===0;
         let stored=null; try{ stored=localStorage.getItem(E.ENG_BENCH_KEY); }catch(e){}
@@ -1062,27 +1251,22 @@ async function session(port, plan, label){
       out(`[${label}] network (PRIV1, LAT2): ${N.n} request(s) of the page and its workers (${N.workers} worker(s) started${N.workerUrls.length?': '+[...new Set(N.workerUrls)].join(', '):''}) — ${N.bad.length?N.bad.length+' OUTSIDE the own origin and the MediaPipe paths: '+N.bad.slice(0,5).join(', '):'all to the own origin or the MediaPipe paths'} · control (a worker asking an unlisted host) ${N.ctl?'caught':'NOT CAUGHT'} → ${N.pass?'PASS':'NOT A PASS'}`); }
     { const C=res.csp; C.pass=C.meta && !C.list.length && C.blocked && C.ctl;
       out(`[${label}] CSP (PRIV1): policy ${C.meta?'present':'MISSING'} · ${C.list.length} violation(s) during the run${C.list.length?' — '+C.list.slice(0,5).map(x=>`${x.dir} ${x.uri} (${x.src}:${x.line})`).join('; '):''} · control fetch to https://example.com ${C.blocked&&C.ctl?'refused by connect-src':'NOT REFUSED ('+(C.err||'it went out')+')'} → ${C.pass?'PASS':'NOT A PASS'}`); }
-    if(NIGHT_PAGE && !DUMP && !(EVAL && THROTTLE)){   // CORE-20: not after a throttled --eval (its page runs 4× slower); NIGHT-7b: stale saved values → the start card still fully labelled (last: it reloads the page)
-      res.stale=await within(uiNightStale(page, `[${label}] NIGHT stale saved values`), LIMIT_START+120e3, 'the stale-values check').catch(e=>({ pass:false, lines:[`[${label}] NIGHT stale saved values: ERROR — ${e&&e.message||e}`] }));
-      for(const l of res.stale.lines) out(l);
-      const mu=await within(uiNightMusic(page, `[${label}] NIGHT music and full screen`), 3*LIMIT_START, 'the music check').catch(e=>({ pass:false, lines:[`[${label}] NIGHT music and full screen: ERROR — ${e&&e.message||e}`] }));
-      for(const l of mu.lines) out(l);
-      /* NIGHT-8b: full screen with the camera undecided (the Poco), and the first frames of the page */
-      const fu=await within(uiNightFsUndecided(page, `[${label}] NIGHT full screen, camera undecided`), 3*LIMIT_START, 'the undecided-camera check').catch(e=>({ pass:false, lines:[`[${label}] NIGHT full screen, camera undecided: ERROR — ${e&&e.message||e}`] }));
-      for(const l of fu.lines) out(l);
-      const ff=await within(uiNightFirstFrames(page, `[${label}] NIGHT first frames`), 90e3, 'the first-frames check').catch(e=>({ pass:false, lines:[`[${label}] NIGHT first frames: ERROR — ${e&&e.message||e}`] }));
-      for(const l of ff.lines) out(l);
-      const cm=await within(uiNightCamera(page, `[${label}] NIGHT camera choice`), 6*LIMIT_START, 'the camera check').catch(e=>({ pass:false, lines:[`[${label}] NIGHT camera choice: ERROR — ${e&&e.message||e}`] }));   // NIGHT-10
-      for(const l of cm.lines) out(l);
-      const hs=await within(uiNightStart(page, `[${label}] NIGHT honest start`), 8*LIMIT_START, 'the honest-start check').catch(e=>({ pass:false, lines:[`[${label}] NIGHT honest start: ERROR — ${e&&e.message||e}`] }));   // NIGHT-11 part 2
-      for(const l of hs.lines) out(l);
-      const ht=await within(uiNightHowTo(page, `[${label}] NIGHT how to play`), 4*LIMIT_START, 'the how-to-play check').catch(e=>({ pass:false, lines:[`[${label}] NIGHT how to play: ERROR — ${e&&e.message||e}`] }));   // NIGHT-12
-      for(const l of ht.lines) out(l);
-      const tl=await within(uiNightTimeline(page, `[${label}] NIGHT start timeline`), (THROTTLE ? 25 : 8)*60e3, 'the start timeline').catch(e=>({ pass:false, lines:[`[${label}] NIGHT start timeline: ERROR — ${e&&e.message||e}`] }));   // NIGHT-11 part 3
-      for(const l of tl.lines) out(l);
-      const od=await within(uiNightOrder(page, `[${label}] NIGHT first contact order`), 4*LIMIT_START, 'the order check').catch(e=>({ pass:false, lines:[`[${label}] NIGHT first contact order: ERROR — ${e&&e.message||e}`] }));   // NIGHT-11 part 4
-      for(const l of od.lines) out(l);
-      res.stale={ pass:res.stale.pass && mu.pass && fu.pass && ff.pass && cm.pass && hs.pass && ht.pass && tl.pass && od.pass, lines:[...res.stale.lines, ...mu.lines, ...fu.lines, ...ff.lines, ...cm.lines, ...hs.lines, ...ht.lines, ...tl.lines, ...od.lines] };
+    if(NIGHT_PAGE && !DUMP && !(EVAL && THROTTLE)){   // CORE-20: not after a throttled --eval (its page runs 4× slower); NIGHT-7b: stale saved values → the start card still fully labelled (it reloads the page)
+      /* each: [name, check, time limit, in --ui-only]; DESIGN-1: --ui-only keeps the start, cards, settings, coaching and texts checks — not the music, full
+         screen, camera choice or the start timeline (timing: CLAUDE.md «Check levels») */
+      const ROWS=[['NIGHT stale saved values', uiNightStale, LIMIT_START+120e3, true], ['NIGHT music and full screen', uiNightMusic, 3*LIMIT_START, false],
+        ['NIGHT full screen, camera undecided', uiNightFsUndecided, 3*LIMIT_START, false], ['NIGHT first frames', uiNightFirstFrames, 90e3, true],   // NIGHT-8b
+        ['NIGHT camera choice', uiNightCamera, 6*LIMIT_START, false], ['NIGHT honest start', uiNightStart, 8*LIMIT_START, true],   // NIGHT-10, NIGHT-11 part 2
+        ['NIGHT how to play', uiNightHowTo, 4*LIMIT_START, true], ['NIGHT settings tabs', uiNightSettings, 4*LIMIT_START, true],   // DESIGN-1 part C
+        ['NIGHT reveal', uiNightReveal, 4*LIMIT_START, true],   // DESIGN-1 part D
+        ['NIGHT start timeline', uiNightTimeline, (THROTTLE ? 25 : 8)*60e3, false],   // NIGHT-12, NIGHT-11 part 3
+        ['NIGHT first contact order', uiNightOrder, 4*LIMIT_START, true]];   // NIGHT-11 part 4
+      const all=[];
+      for(const [name, fn, lim, ui] of ROWS){ if(UI_ONLY && !ui) continue;
+        const r=await within(fn(page, `[${label}] ${name}`), lim, `the check «${name}»`).catch(e=>({ pass:false, lines:[`[${label}] ${name}: ERROR — ${e&&e.message||e}`] }));
+        for(const l of r.lines) out(l); all.push(r); }
+      if(UI_ONLY) out(`[${label}] --ui-only: ${all.length} UI checks (P.night, the music, full screen, the camera choice and the start timeline not run)`);
+      res.stale={ pass:all.every(r=>r.pass), lines:all.flatMap(r=>r.lines) };
     }
     if(!has('--no-ui') && res.ui){   // AUTOSAVE1: reload → «Continue?» → the same song (last: it reloads the page)
       const ua=await within(uiAutosave(page, `[${label}] UI autosave`), LIMIT_START+120e3, 'the autosave UI check').catch(e=>({ pass:false, lines:[`[${label}] UI autosave: ERROR — ${e&&e.message||e}`] }));
@@ -1127,7 +1311,7 @@ function repeatTable(sessions){
 await staleScan();
 if(CLEAN_ONLY) process.exit(0);
 await mkdir(LOGDIR,{ recursive:true });
-const mode=REPEAT?`repeat${REPEAT}`:[QUICK&&'quick',ALL&&'all',has('--night')&&'night',LEAK&&'leak'].filter(Boolean).join('+');
+const mode=REPEAT?`repeat${REPEAT}`:[QUICK&&'quick',ALL&&'all',has('--night')&&'night',LEAK&&'leak',UI_ONLY&&'ui-only'].filter(Boolean).join('+');
 LOG=path.join(LOGDIR, `${stamp()}-${mode}.log`);
 await writeFile(LOG, `probe-browser ${argv.join(' ')}\n`);
 /* CORE-20 — --measure-start [--throttle] [--root DIR]: THE START, MEASURED (no probe rows). Night's page (the repo's, or a built tree's root page with
@@ -1213,7 +1397,7 @@ try{
   if(REPEAT){
     for(let i=1;i<=REPEAT;i++){ out(`\n[probe-browser] run ${i} of ${REPEAT} — fresh browser, fresh profile`); await log(`===== run ${i} of ${REPEAT} =====`);
       sessions.push(await session(port, QUICK?['quick','all']:['all'], `run ${i}/${REPEAT}`)); }
-  } else sessions.push(await session(port, [QUICK&&'quick', ALL&&'all', (has('--night')||(NIGHT_PAGE&&!QUICK&&!ALL&&!EVAL&&!LEAK&&!DUMP))&&'night'].filter(Boolean), mode||'eval'));   // RUN 7: --night runs P.night; SPLIT-2: the second page's default
+  } else sessions.push(await session(port, [QUICK&&'quick', ALL&&'all', (has('--night')||(NIGHT_PAGE&&!QUICK&&!ALL&&!EVAL&&!LEAK&&!DUMP&&!UI_ONLY))&&'night'].filter(Boolean), mode||'eval'));   // RUN 7: --night runs P.night; SPLIT-2: the second page's default
 } finally { await closeAll(); }
 if(EXITING) await new Promise(()=>{});   // a signal/error path is closing — it prints and exits itself
 const stillMine=(runnerBrowsers()||[]).filter(g=>g.mine);
@@ -1228,9 +1412,10 @@ for(const s of sessions){
     for(const l of r.lines) if(/frozen seed bass|state guard|P\.(all|quick|night):/.test(l)) out('  '+l);
     if(!r.pass) pass=false;
   }
-  if(!s.runs.length && !s.error && !EVAL && !LEAK && !s.dumped) pass=false;
+  if(!s.runs.length && !s.error && !EVAL && !LEAK && !s.dumped && !UI_ONLY) pass=false;
+  if(UI_ONLY && !s.stale && !s.error) pass=false;   // DESIGN-1: a --ui-only run that ran no UI check is no pass
   if(s.ui){ out(`[${s.label}] UI checks (section rename, bend drag, song file, autosave): ${s.ui.pass?'PASS':'NOT A PASS'}`); if(!s.ui.pass) pass=false; }
-  if(s.stale){ out(`[${s.label}] NIGHT stale saved values, music from Begin, full screen, first frames, camera choice, honest start, how to play, start timeline, first contact order (NIGHT-7b, 7c, 8b, 10, 11, 12): ${s.stale.pass?'PASS':'NOT A PASS'}`); if(!s.stale.pass) pass=false; }
+  if(s.stale){ out(`[${s.label}] NIGHT stale saved values, music from Begin, full screen, first frames, camera choice, honest start, how to play, settings tabs, reveal, start timeline, first contact order (NIGHT-7b, 7c, 8b, 10, 11, 12, DESIGN-1): ${s.stale.pass?'PASS':'NOT A PASS'}`); if(!s.stale.pass) pass=false; }
   if(!s.error){ out(`[${s.label}] CSP (PRIV1): ${s.csp&&s.csp.pass?'PASS — no violation, the control fetch refused':'NOT A PASS'}`); if(!(s.csp&&s.csp.pass)) pass=false;
     out(`[${s.label}] network (PRIV1, LAT2): ${s.net&&s.net.pass?`PASS — ${s.net.n} requests, all to the own origin or the MediaPipe paths`:'NOT A PASS'}`); if(!(s.net&&s.net.pass)) pass=false;
     out(`[${s.label}] storage (CORE-11): ${s.store&&s.store.pass?`PASS — ${s.store.list.length} names, ${NIGHT_PAGE?'all of this app or device facts':'the Full names as before'}, the control seen`:'NOT A PASS'}`); if(!(s.store&&s.store.pass)) pass=false; }

@@ -22,17 +22,22 @@ const SAVE=val('--save'), CMP=val('--compare'), CMP2=argv[argv.indexOf('--compar
 const NOISY=new Set((val('--noisy')||'').split(',').filter(Boolean));   // SPLIT-2: screens that differ between two captures of identical code (animation, WebGL): compared by structure only
 const ONLY=val('--only');   // comma list of screens
 const FOREST=argv.includes('--forest');   // RUN 9: the forest's own screens (GPU capture, the Night face)
-const NIGHT=argv.includes('--night') || FOREST;   // RUN 7 (C6/C11): the Night face's screens instead (a phone viewport, the page apps/night/)
+const TINT_DEMO=argv.includes('--tint-demo');   // DESIGN-1: the interface's tint in the forest and in the dev test room (warm amber), the same screens
+const REVEAL=argv.includes('--reveal');   // DESIGN-1 part D: the start still and the reveal held at fixed moments (apps/night/still.js stillDbg pin)
+const NIGHT=argv.includes('--night') || FOREST || TINT_DEMO || REVEAL;   // RUN 7 (C6/C11): the Night face's screens instead (a phone viewport, the page apps/night/)
 const DPR=+val('--dpr')||0;   // NIGHT-11: the device pixel ratio of the capture (a mid phone is about 2.75; default 2 on the Night screens, 1 elsewhere)
 const LEVEL=val('--level');   // NIGHT-8: the forest's picture level for the capture (full = Detailed, reduced = Standard; stored before the page loads)
 const TINT=val('--tint');   // NIGHT-8c: diagnosis — canvas tokens replaced before the page reads them ('forest-lichen=#ff00ff,forest-moss=#00ffff')
+const LAPTOP=argv.includes('--laptop');   // DESIGN-1: the Night screens at laptop sizes — the phone portrait 390×844 becomes 1280×800, the phone landscape 844×390 becomes 1024×600 (DPR 1)
+const VP_LAPTOP={ '390x844':{ width:1280, height:800 }, '844x390':{ width:1024, height:600 } };
 const GROUND=val('--ground');   // NIGHT-9: 'baked' | 'scan' — which bare floor the forest draws (the user's comparison; forest.js forestGroundDbg, set before the room opens)
 const out=s=>console.log(s);
 const MIME={ '.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.json':'application/json; charset=utf-8', '.css':'text/css; charset=utf-8',
   '.png':'image/png', '.svg':'image/svg+xml', '.webmanifest':'application/manifest+json', '.mp3':'audio/mpeg' };
+const SERVE=val('--root') ? path.resolve(val('--root')) : ROOT;   // DESIGN-1: serve a frozen copy of the tree (a second capture of unchanged code while the tree is edited)
 function serve(){
   const srv=http.createServer(async (q,r)=>{ try{ const u=new URL(q.url,'http://x'); let p=decodeURIComponent(u.pathname); if(p.endsWith('/')) p+='index.html';
-    const f=path.join(ROOT,p); if(!f.startsWith(ROOT)){ r.writeHead(403); r.end(); return; }
+    const f=path.join(SERVE,p); if(!f.startsWith(SERVE)){ r.writeHead(403); r.end(); return; }
     const b=await readFile(f); r.writeHead(200,{ 'content-type':MIME[path.extname(f).toLowerCase()]||'application/octet-stream', 'cache-control':'no-store' }); r.end(b); }
     catch(e){ r.writeHead(404); r.end(); } });
   return new Promise(res=>srv.listen(0,'127.0.0.1',()=>res(srv)));
@@ -92,6 +97,10 @@ const SCREENS=[
 const nightWait=async p=>{ await p.waitForTimeout(2200); };
 /* NIGHT-3 stage 5: the settings card scrolled to a share of its height (0 top, 1 end), so every section is seen */
 const cardTo=async (p, f)=>{ await p.evaluate(f=>{ const c=document.getElementById('nightInfo'); c.scrollTop=Math.round(f*(c.scrollHeight-c.clientHeight)); }, f); await p.waitForTimeout(150); };
+/* DESIGN-1 part C: the settings' tabs — a tab shown (its «More» opened); a page without tabs (an older capture) does nothing here */
+const tabTo=async (p, name, more=true)=>{ await p.evaluate(([n,m])=>{ const b=document.querySelector(`#nightSetTabs [data-tab="${n}"]`); if(!b) return; b.click();
+  for(const x of document.querySelectorAll('#nightInfo .night-more')){ const open=x.getAttribute('aria-expanded')==='true', want=m && !!x.closest(`[data-pane="${n}"]`); if(open!==want) x.click(); }
+  const c=document.getElementById('nightInfo'); c.scrollTop=0; }, [name, more]); await p.waitForTimeout(250); };
 const SCREENS_NIGHT=[
   ['night-start',     async p=>{}],
   ['night-offer',     async p=>{ await p.click('#nightBegin'); await p.waitForFunction(()=>{ const s=document.getElementById('start'); return s && !s.classList.contains('on'); }, null, { timeout:180e3 }); await p.waitForTimeout(1500); }],   // NIGHT-11: Begin → the coaching line «Raise a hand» (no offer, no card first)
@@ -102,19 +111,30 @@ const SCREENS_NIGHT=[
   ['night-info',      async p=>{ await p.click('#nightInfoBtn'); await p.waitForTimeout(500); }],
   ['night-info-mid',  async p=>{ await cardTo(p, 0.5); }],
   ['night-info-end',  async p=>{ await cardTo(p, 1); }],
+  ['night-info-picture', async p=>{ await tabTo(p, 'picture'); }],
+  ['night-info-hands', async p=>{ await tabTo(p, 'hands'); }],
+  ['night-info-hands-end', async p=>{ await cardTo(p, 1); await tabTo(p, 'sound', false); }],
   ['night-land',      async p=>{ await p.click('#nightInfoClose'); await p.setViewportSize({ width:844, height:390 }); await nightWait(p); }],
   ['night-land-info', async p=>{ await p.click('#nightInfoBtn'); await p.waitForTimeout(500); await cardTo(p, 0); }],
   ['night-land-info-mid', async p=>{ await cardTo(p, 0.5); }],
   ['night-land-info-end', async p=>{ await cardTo(p, 1); }],
+  ['night-land-info-picture', async p=>{ await tabTo(p, 'picture'); }],
+  ['night-land-info-hands', async p=>{ await tabTo(p, 'hands'); }],
+  ['night-land-info-hands-end', async p=>{ await cardTo(p, 1); await tabTo(p, 'sound', false); }],
   ['night-camera',    async p=>{ await p.click('#nightInfoClose'); await p.setViewportSize({ width:390, height:844 });   // the glass over a picture (headless screenshots do not show the WebGL forest)
                        await p.evaluate(()=>{ document.querySelector('#nightBgSeg [data-bg="camera"]').click(); }); await nightWait(p); }],
   ['night-ru',        async p=>{ await p.evaluate(async ()=>{ const I=await import('/core/i18n.js'); I.setLang('ru'); document.querySelector('#nightBgSeg [data-bg="dark"]').click(); }); await nightWait(p); }],
   ['night-ru-info',   async p=>{ await p.click('#nightInfoBtn'); await p.waitForTimeout(500); await cardTo(p, 0); }],
   ['night-ru-info-mid', async p=>{ await cardTo(p, 0.5); }],
   ['night-ru-info-end', async p=>{ await cardTo(p, 1); }],
+  ['night-ru-info-picture', async p=>{ await tabTo(p, 'picture'); }],
+  ['night-ru-info-hands', async p=>{ await tabTo(p, 'hands'); await tabTo(p, 'sound', false); await tabTo(p, 'hands'); }],
   ['night-ru-land-info', async p=>{ await p.setViewportSize({ width:844, height:390 }); await p.waitForTimeout(600); await cardTo(p, 0); }],
   ['night-ru-land-info-mid', async p=>{ await cardTo(p, 0.5); }],
   ['night-ru-land-info-end', async p=>{ await cardTo(p, 1); }],
+  ['night-ru-land-info-picture', async p=>{ await tabTo(p, 'picture'); }],
+  ['night-ru-land-info-hands', async p=>{ await tabTo(p, 'hands'); }],
+  ['night-ru-land-info-hands-end', async p=>{ await cardTo(p, 1); await tabTo(p, 'sound', false); }],
   /* RUN 8 (addendum 3): the low-light message with «Raise a hand» (Russian: the longer lines) — portrait and landscape; every visible message
      at the top must stand clear of the others (printed; a touch counts in the run's result) */
   ['night-msg-ru',    async p=>{ await p.click('#nightInfoClose'); await p.setViewportSize({ width:390, height:844 }); await p.waitForTimeout(400); await p.evaluate(async ()=>{ const M=await import('/core/legacy-ui/latmeter.js'); M.darkDbg(Array.from({ length:80 }, (_,i)=>i*100), 30); }); await nightWait(p); await msgCheck(p,'night-msg-ru'); }],
@@ -122,7 +142,7 @@ const SCREENS_NIGHT=[
   /* RUN 8 (slice 3, addendum 1 and 5): playing — two synthetic hands through the probe's door (the playing right hand pinching its index, the
      effects hand its middle finger): the fingertip fireflies, the quiet glow on the row, the depth bar and the three effect bars */
   ['night-play-land', async p=>{ await p.evaluate(async ()=>{ const M=await import('/core/legacy-ui/latmeter.js'); M.darkHideDbg(); }); await playHands(p); }],
-  ['night-play',      async p=>{ await p.setViewportSize({ width:390, height:844 }); await p.waitForFunction(()=>innerWidth===390 && document.querySelector('canvas').width===390); await p.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))); await playHands(p); }],  /* SPLIT-2: the hands read the canvas size and the per-frame cover rect: wait for the resize */
+  ['night-play',      async p=>{ await p.setViewportSize({ width:390, height:844 }); await p.waitForFunction(w=>innerWidth===w && (document.getElementById('canvas')||document.querySelector('canvas')).width===w, p.viewportSize().width, { timeout:30e3 });   /* DESIGN-1: the 2D canvas by id (the forest's #scene canvas comes first in the page once a room opened) */ await p.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))); await playHands(p); }],  /* SPLIT-2: the hands read the canvas size and the per-frame cover rect: wait for the resize */
   /* RUN 8 (slice 4): the forest picture behind the playing hands (WebGL with screen-blended lights; the room renders at its own rate) */
   ['night-forest',    async p=>{ await p.evaluate(()=>{ document.querySelector('#nightBgSeg [data-bg="forest"]').click(); }); await p.waitForTimeout(2500); await playHands(p); await p.waitForTimeout(800); }],
   ['night-forest-land', async p=>{ await p.setViewportSize({ width:844, height:390 }); await p.waitForTimeout(1500); await playHands(p); await p.waitForTimeout(800); }],
@@ -130,6 +150,33 @@ const SCREENS_NIGHT=[
   ['night-cal',       async p=>{ await p.setViewportSize({ width:390, height:844 }); await p.waitForTimeout(1200); }],
   ['night-cal-fail',  async p=>{ await p.waitForFunction(async ()=>{ const C=await import('/apps/night/calib.js'); return C.calDbg.state().mode==='fail'; }, null, { timeout:30e3, polling:250 }); await p.waitForTimeout(400); }],
   ['night-cal-fail-land', async p=>{ await p.setViewportSize({ width:844, height:390 }); await p.waitForTimeout(800); }],
+];
+/* DESIGN-1: --tint-demo — the same interface in two rooms: the forest (lime) and the dev test room (?probe&testroom, its record's warm amber);
+   Dark background (the interface alone), settings top and middle, the cards' first picture, the playing bars */
+const tintRoom=async (p, id)=>{ await p.evaluate(async id=>{ const RS=await import('/apps/night/roomswitch.js'); await RS.roomSwitch(id, { fast:true }); }, id); await p.waitForTimeout(300); };
+const tintSet=(tag)=>[
+  [tag+'-settings',  async p=>{ await p.evaluate(()=>document.getElementById('nightInfoBtn').click()); await p.waitForTimeout(400); await cardTo(p, 0); }],
+  [tag+'-settings-mid', async p=>{ await cardTo(p, 0.6); }],
+  [tag+'-card',      async p=>{ await p.evaluate(async ()=>{ document.getElementById('nightInfoClose').click(); const C=await import('/apps/night/cards.js'); C.cardsShow(); }); await p.waitForTimeout(400); }],
+  [tag+'-play',      async p=>{ await p.evaluate(()=>document.getElementById('nightCardSkip').click()); await p.waitForTimeout(300); await playHands(p, false); }],
+];
+const SCREENS_TINT=[
+  ['tint-begin',     async p=>{ await p.click('#nightBegin'); await p.waitForFunction(()=>{ const s=document.getElementById('start'); return s && !s.classList.contains('on'); }, null, { timeout:180e3 });
+                       await p.evaluate(async ()=>{ const Q=await import('/core/frzqueue.js'); Q.afPause('runner', true); document.querySelector('#nightBgSeg [data-bg="dark"]').click(); }); await p.waitForTimeout(1500); }],
+  ...tintSet('tint-forest'),
+  ['tint-to-test',   async p=>{ await p.evaluate(async ()=>{ const G=await import('/core/gestures.js'); G.handsProbe(null); }); await tintRoom(p, 'room.dev-test'); await p.waitForTimeout(1600); }],
+  ...tintSet('tint-amber'),
+];
+/* DESIGN-1 part D: --reveal — the start screen with the room's still and its lights, then after Begin the reveal held at fixed points of its progress (the still
+   pinned: the dot and the mask follow; the live forest keeps moving behind), then the live forest. The forest chosen (stored before the page loads). */
+const revealPin=async (p, v)=>{ await p.evaluate(async v=>{ const S=await import('/apps/night/still.js'); S.stillDbg({ pin:v }); }, v); await p.waitForTimeout(350); };
+const SCREENS_REVEAL=[
+  ['rv-start',  async p=>{ await p.waitForTimeout(2500); }],
+  ['rv-00',     async p=>{ await p.click('#nightBegin'); await p.waitForFunction(()=>{ const s=document.getElementById('start'); return s && !s.classList.contains('on'); }, null, { timeout:180e3 });
+                  await p.evaluate(async ()=>{ const S=await import('/apps/night/still.js'); S.stillDbg({ pin:0 }); const G=await import('/core/gestures.js'); G.handsProbe(null); });
+                  await p.evaluate(async ()=>{ window.__still=await import('/apps/night/still.js'); }); await p.waitForFunction(()=>window.__still.stillDbg().readyAt!=null, null, { timeout:120e3, polling:200 }); await p.waitForTimeout(1200); await revealPin(p, 0); }],   // a synchronous wait: Playwright does not await a predicate's promise
+  ...[20, 40, 60, 80, 95].map(k=>['rv-'+k, async p=>{ await revealPin(p, k/100); }]),
+  ['rv-live',   async p=>{ await p.evaluate(async ()=>{ const S=await import('/apps/night/still.js'); S.stillDbg({ pin:null }); }); await p.waitForTimeout(3500); }],
 ];
 /* RUN 9: THE FOREST'S SCREENS (--forest; headless Chrome renders the WebGL room) — Begin, the Forest background, the two hands playing; then
    moments of the night through the probe clock (host sceneClockDbg): the clear moon, a cloud over it, the moods, the deep-sleep night;
@@ -223,25 +270,28 @@ async function capture(tag){
     `--use-file-for-fake-video-capture=${y4m}`,'--autoplay-policy=no-user-gesture-required','--disable-background-timer-throttling','--disable-renderer-backgrounding','--hide-scrollbars'] });
   const res={ tag, screens:{} };
   try{
-    const ctx=await browser.newContext({ viewport: NIGHT ? { width:390, height:844 } : { width:1280, height:800 }, deviceScaleFactor: DPR || (NIGHT ? 2 : 1), locale:'en-US' });
+    const ctx=await browser.newContext({ viewport: NIGHT ? (LAPTOP ? VP_LAPTOP['390x844'] : { width:390, height:844 }) : { width:1280, height:800 }, deviceScaleFactor: DPR || (NIGHT && !LAPTOP ? 2 : 1), locale:'en-US' });
     await ctx.grantPermissions(['camera','microphone'],{ origin:`http://127.0.0.1:${port}` }); await cdnCache(ctx);
     await ctx.addInitScript(()=>{ try{ localStorage.setItem('handsong.lang','en'); }catch(e){} });
     if(LEVEL) await ctx.addInitScript(lv=>{ try{ localStorage.setItem('handsong.sceneLevel', lv); }catch(e){} }, LEVEL);
+    if(REVEAL) await ctx.addInitScript(()=>{ try{ localStorage.setItem('handsong.nightBg', 'forest'); }catch(e){} });
     if(GROUND) await ctx.addInitScript(g=>{ window.__groundSet=g; }, GROUND);
     if(TINT) await ctx.addInitScript(t=>{ const set=()=>{ for(const kv of t.split(',')){ const [k,v]=kv.split('='); document.documentElement.style.setProperty('--cv-'+k, v); } };
       if(document.documentElement) set(); else new MutationObserver((_,o)=>{ if(document.documentElement){ set(); o.disconnect(); } }).observe(document, { childList:true }); }, TINT);
     /* SPLIT-2: the effects hint's own 7-s timer races the capture (it hid between the style walk and the shot): it stays up through night-play; night-forest takes it down, as the timer would have */
     if(NIGHT) await ctx.addInitScript(()=>{ const st=window.setTimeout; window.setTimeout=(f,ms,...a)=>st(f, ms===7000 ? 3600e3 : ms, ...a); });
-    const page=await ctx.newPage(); const errs=[]; page.on('pageerror',e=>errs.push(String(e&&e.message||e))); page.on('console',m=>{ if(m.type()==='error') errs.push('console: '+m.text().slice(0,600)); });   // NIGHT-8c: a shader that fails to compile shows here
-    await page.goto(`http://127.0.0.1:${port}/apps/${NIGHT?'night':'full'}/index.html?probe`);
+    const page=await ctx.newPage();
+    if(LAPTOP){ const real=page.setViewportSize.bind(page); page.setViewportSize=v=>real(VP_LAPTOP[v.width+'x'+v.height]||v); }   // DESIGN-1: every screen's own size mapped
+    const errs=[]; page.on('pageerror',e=>errs.push(String(e&&e.message||e))); page.on('console',m=>{ if(m.type()==='error') errs.push('console: '+m.text().slice(0,600)); });   // NIGHT-8c: a shader that fails to compile shows here
+    await page.goto(`http://127.0.0.1:${port}/apps/${NIGHT?'night':'full'}/index.html?probe${TINT_DEMO ? '&testroom' : ''}`);
     await page.waitForFunction(()=>window.P && window.R, null, { timeout:60e3 }); await page.waitForTimeout(800);
     const FAST=argv.includes('--fast') ? new Set(['f-start','f-wide-still','f-wide-notes','f-close-water','f-close-rocks','f-close-ground','f-close-ground-off','f-close-far','f-close-bank','f-close-foot','f-close-trunks','f-close-trunk-l','f-close-trunk-r','f-close-end']) : null;   // NIGHT-8: look iterations — the start and the laptop-sized views only
-    for(const [name,act] of (FOREST ? SCREENS_FOREST.filter(([n])=>!FAST || FAST.has(n)) : NIGHT ? SCREENS_NIGHT : SCREENS)){
+    for(const [name,act] of (REVEAL ? SCREENS_REVEAL : TINT_DEMO ? SCREENS_TINT : FOREST ? SCREENS_FOREST.filter(([n])=>!FAST || FAST.has(n)) : NIGHT ? SCREENS_NIGHT : SCREENS)){
       await act(page);
       if(ONLY && !ONLY.split(',').includes(name)) continue;
       await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
       if(BAR_KEEP.has(name)) await barOpen(page);   // RUN 8: the capture waits for an open top bar (the app is untouched)
-      const st= FOREST ? { els:{}, table:[], props:[] } : await page.evaluate(STYLES_FN);   // RUN 9: the forest screens are pictures only (the style walk takes seconds — a falling star is over by then)
+      const st= FOREST || REVEAL ? { els:{}, table:[], props:[] } : await page.evaluate(STYLES_FN);   // RUN 9: the forest screens are pictures only (the style walk takes seconds — a falling star is over by then)
       if(BAR_KEEP.has(name) && await page.evaluate(()=>document.getElementById('bar').classList.contains('min'))) await barOpen(page);   // the style walk outlasted the bar's timer
       const png=await page.screenshot({ animations:'disabled', caret:'hide' });
       await writeFile(path.join(dir,name+'.png'), png); res.screens[name]=st;

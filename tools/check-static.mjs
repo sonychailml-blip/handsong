@@ -188,6 +188,7 @@ const RESERVED=new Set(('break case catch class const continue debugger default 
   'instanceof let new return super switch this throw try typeof var void while with yield async await of get set static from as '+
   'true false null undefined NaN Infinity arguments').split(' '));
 const GLOBALS=new Set((
+  /* DESIGN-1: the start still watches the start card */ 'MutationObserver '+
   /* JavaScript */ 'Math JSON Object Array Number String Boolean Symbol BigInt Map Set WeakMap WeakSet WeakRef Promise Proxy Reflect Intl Date RegExp '+
   'Error TypeError RangeError SyntaxError ReferenceError AggregateError ArrayBuffer SharedArrayBuffer DataView Float32Array Float64Array Int8Array '+
   'Int16Array Int32Array Uint8Array Uint8ClampedArray Uint16Array Uint32Array parseInt parseFloat isNaN isFinite encodeURIComponent '+
@@ -381,7 +382,8 @@ for(const f of files) fails.push(...importWrites(mods[f]));
    tokens.css (custom properties on :root). style.css carries no such literal (only var(--…), 0, auto, inherit…); every var(--name) used
    in style.css, index.html and core/ is defined in tokens.css or is a RUNTIME variable set by JS (RUNTIME_VARS, with the reason); a JS
    inline style writes no colour or px spacing literal. CONTROL: a colour literal and an undefined token must both be caught. */
-const RUNTIME_VARS={ '--role':'the role colour of a button / track chip, set by ui.js from palette.ROLE_COL (tokens --cv-role-*)' };
+const RUNTIME_VARS={ '--role':'the role colour of a button / track chip, set by ui.js from palette.ROLE_COL (tokens --cv-role-*)',
+  '--still-mist':'DESIGN-1: the reveal’s mist over the whole picture (0 at rest; apps/night/still.js, the law pure/still.js stillLook)' };
 function tokenCheck(css, tok, others){
   const bad=[], strip=t=>t.replace(/\/\*[\s\S]*?\*\//g,m=>m.replace(/[^\n]/g,' '));
   const defs=new Set([...strip(tok).matchAll(/(--[\w-]+)\s*:/g)].map(m=>m[1])), c=strip(css);

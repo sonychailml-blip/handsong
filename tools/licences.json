@@ -168,6 +168,20 @@
    "replace": "kept — our own generated material (NIGHT-6: the user's rule that what never changes is prepared ahead as files)"
   },
   {
+   "id": "night-stills",
+   "name": "The start screen's stills of the night forest: a dim picture of the room behind the start card, one per picture level (DESIGN-1)",
+   "class": "image",
+   "use": "shipped",
+   "version": "—",
+   "licence": "own-work",
+   "source": "our own render of our own forest scene, made by tools/night-still.mjs (headless Chrome draws the room at the level, the clear-moon moment, no hands; dimmed and encoded as WebP under 96 KB); the scene's floor uses the CC0 photo-scanned «Leaves Forest Ground» (register entry of the floor scan), which asks for no attribution",
+   "files": [
+    "apps/night/rooms/forest/still/still-full.webp",
+    "apps/night/rooms/forest/still/still-reduced.webp"
+   ],
+   "replace": "kept — our own generated material (regenerate: node tools/night-still.mjs whenever the forest's look changes)"
+  },
+  {
    "id": "stream-recording",
    "name": "The night forest's stream: a field recording of soft flowing water («stream-river-water-up-close»), played in grains by the nature sound (NIGHT-8b)",
    "class": "sound",

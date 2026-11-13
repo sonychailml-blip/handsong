@@ -8,7 +8,9 @@ const LOOK=(pre, fog, mist, flies)=>Object.freeze({ pre, fog, mist, flies,
     shroom:pre+'shroom', bloom:pre+'bloom' }) });
 const F=Object.freeze;
 export const FOREST_ROOM=F({
-  format:'handsong/room', version:1, id:'room.forest', name:F({ en:'Forest', ru:'Лес' }), icon:'forest', tokens:'forest-',   // NIGHT-8: icon — its Room-sounds slider keeps the leaf
+  format:'handsong/room', version:1, id:'room.forest', name:F({ en:'Forest', ru:'Лес' }), icon:'forest', tint:'forest-tint', still:F({ full:'still/still-full.webp', reduced:'still/still-reduced.webp' }), tokens:'forest-',   // DESIGN-1 part D: still — the start screen's prepared still per level (tools/night-still.mjs)
+    // DESIGN-1: tint — the token of the interface's accents in this room (night.css: today's lime)
+    // NIGHT-8: icon — its Room-sounds slider keeps the leaf
   /* full: real shadows (hand light 1024², 512² on small screens), 70 wild fireflies, 16-step trails, moving mist; reduced: no shadow, 35 fireflies,
      8-step trails, still mist; «minimal» has no WebGL (the room's 2D stand-in) */
   levels:F({ full:F({ flies:70, trail:16, shadow:1024, shadowSmall:512, mist:true, shrooms:28, blooms:10, grass:3500, leaves:60, moths:6, beams:4, dew:1100, webs:9,

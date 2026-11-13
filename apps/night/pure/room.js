@@ -7,9 +7,15 @@ export const ROOM_FORMAT='handsong/room', ROOM_VERSION=1;
 export const ROOM_IDS=Object.freeze(['room.forest']);   // pinned: never renamed or reused
 export const ROOM_LEVELS=Object.freeze(['full','reduced']);   // the WebGL levels; «minimal» is the 2D stand-in
 export const ROOM_ACOUSTICS=Object.freeze(['fdepth']);
-const FIELDS=['format','version','id','name','icon','tokens','levels','looks','moods','look','nature','acoustic','bed','bed2'];   // NIGHT-8: icon — the room's own picture for its Room-sounds slider
+const FIELDS=['format','version','id','name','icon','tint','still','tokens','levels','looks','moods','look','nature','acoustic','bed','bed2'];   // DESIGN-1: tint — the room's light on the interface   // NIGHT-8: icon — the room's own picture for its Room-sounds slider
 const NATURE=['id','drone','wind','crickets','echo','stream','level','master','ahead'];   // NIGHT-8: stream (optional: a room without water has none)
 const plain=o=> o!==null && typeof o==='object' && !Array.isArray(o);
+/* DESIGN-1: a room's TINT (a token of the room, its colour in night.css) colours the interface's small accents (--night-tint) with dark ink on it (a
+   chosen segment): a light colour — at least 7 : 1 against that ink and against the night base (WCAG's relative luminance; the data row «NIGHT room
+   tint» reads the token's value and judges it with these) */
+export const TINT_INK='#0b1205', TINT_BASE='#060a12', TINT_CONTRAST=7;
+const lum=h=>{ const c=[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)/255).map(v=> v<=0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055, 2.4)); return 0.2126*c[0]+0.7152*c[1]+0.0722*c[2]; };
+export const contrastOf=(a, b)=>{ const x=lum(a), y=lum(b); return (Math.max(x,y)+0.05)/(Math.min(x,y)+0.05); };
 const num=v=> typeof v==='number' && Number.isFinite(v);
 /* a room's look for a mood (a mode id, or a look's own key) → the look; unknown → the room's default look */
 export const roomLook=(room, mood)=> room.looks[room.moods[mood]||mood] || room.looks[room.look];
@@ -26,6 +32,9 @@ export function checkRoom(r, known={}){
   if(!plain(r.name) || typeof r.name.en!=='string' || typeof r.name.ru!=='string' || !r.name.en || !r.name.ru) return 'name: {en, ru}';
   if(typeof r.icon!=='string' || !/^[a-z][a-z0-9-]*$/.test(r.icon)) return 'icon: the name of a drawn icon (the Room-sounds slider shows it)';
   if(typeof r.tokens!=='string' || !/^[a-z][a-z0-9-]*-$/.test(r.tokens)) return 'tokens: a token prefix like «forest-»';
+  if(typeof r.tint!=='string' || !/^[a-z][a-z0-9-]*$/.test(r.tint) || !r.tint.startsWith(r.tokens)) return `tint: the token of the room's light on the interface («${r.tokens}…»; its colour in night.css, checked by the data row «NIGHT room tint»)`;
+  if(!plain(r.still) || Object.keys(r.still).join()!==ROOM_LEVELS.join() || Object.values(r.still).some(f=>typeof f!=='string' || !/^[a-z0-9_-]+(\/[a-z0-9_-]+)*\.webp$/.test(f)))
+    return 'still: {'+ROOM_LEVELS.join(', ')+'} — a «….webp» in the room folder for each level (the start screen’s prepared still)';   // DESIGN-1 part D
   if(!plain(r.levels) || Object.keys(r.levels).join()!==ROOM_LEVELS.join()) return 'levels: {'+ROOM_LEVELS.join(', ')+'}';
   for(const [lv,L] of Object.entries(r.levels)){ if(!plain(L) || !Object.keys(L).length) return `levels.${lv}: a table of counts`;
     for(const [k,v] of Object.entries(L)) if(!(typeof v==='boolean' || (num(v) && v>=0))) return `levels.${lv}.${k}: a count ≥ 0 or a switch`; }
@@ -126,6 +135,10 @@ export const ROOM_DAMAGES=Object.freeze([
   ['nature.crickets.n', r=>{ r.nature.crickets.n=5; }],   // NIGHT-3 stage 5 part 2: more than a nature slot holds
   ['acoustic', r=>{ r.acoustic='cathedral'; }],
   ['icon', r=>{ r.icon='Leaf Icon'; }],   // NIGHT-8
+  ['tint', r=>{ r.tint='#c8f56a'; }],   // DESIGN-1: a colour, not a token
+  ['tint', r=>{ r.tint='lake-tint'; }],   // another room's token
+  ['still', r=>{ r.still={ full:'../still.png', reduced:'still/r.webp' }; }],   // DESIGN-1 part D
+  ['still', r=>{ delete r.still.reduced; }],
   ['nature.stream', r=>{ r.nature.stream.gain=3; }],
   ['nature.stream.voices[0].lp', r=>{ r.nature.stream.voices[0].lp=50; }],
   ['nature.stream.rec', r=>{ r.nature.stream.rec={ file:'../x.wav', norm:1 }; }],   // NIGHT-8b

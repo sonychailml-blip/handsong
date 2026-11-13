@@ -90,8 +90,14 @@ async function run(app, dir, prefix, breakWorklet=false, measureOn=true, query='
       const hid=await page.evaluate(()=>document.getElementById('nightMeasure').hidden); if(hid===measureOn) miss(`«Measure this device» is ${hid?'hidden':'shown'}, expected ${measureOn?'shown':'hidden'}`);
       /* NIGHT-7: a players' build shows no development item anywhere in settings (each .night-dev hidden; no visible text that says so) and keeps the picture choice */
       if(!measureOn){ const r=await page.evaluate(()=>{ const card=document.getElementById('nightInfo'), shown=el=>{ for(let e=el;e && e!==card.parentElement;e=e.parentElement){ if(e.hidden && e!==card) return false; } return true; };
-          const dev=[...card.querySelectorAll('.night-dev')].filter(shown).map(e=>e.id), words=[...card.querySelectorAll('*')].filter(e=>!e.children.length && /development|разработк/i.test(e.textContent) && shown(e)).map(e=>e.id||e.textContent.slice(0,40));
-          return { dev, words, qual:!!document.getElementById('nightQualSeg') && shown(document.getElementById('nightQualSeg')) }; });
+          /* DESIGN-1: the settings in tabs — every tab looked at in turn (a development item in any of them is caught), the picture choice shown in one */
+          const tabs=[...card.querySelectorAll('#nightSetTabs [role=tab]')], dev=new Set(), words=new Set(); let qual=false;
+          for(const t of tabs.length ? tabs : [null]){ if(t) t.click();
+            for(const e of card.querySelectorAll('.night-dev')) if(shown(e)) dev.add(e.id);
+            for(const e of card.querySelectorAll('*')) if(!e.children.length && /development|разработк/i.test(e.textContent) && shown(e)) words.add(e.id||e.textContent.slice(0,40));
+            if(document.getElementById('nightQualSeg') && shown(document.getElementById('nightQualSeg'))) qual=true; }
+          if(tabs.length) tabs[0].click();
+          return { dev:[...dev], words:[...words], qual }; });
         if(r.dev.length) miss('development items shown to players: '+r.dev.join(', ')); if(r.words.length) miss('development words shown to players: '+r.words.join(' | ')); if(!r.qual) miss('the picture choice is missing'); } }
   }catch(e){ miss('error: '+(e&&e.message||e)); const card=pageRef ? await pageRef.evaluate(()=>{ const s=document.getElementById('start'); return s ? (s.className+' · '+(s.innerText||'').replace(/\s+/g,' ').slice(0,160)) : 'no #start'; }).catch(x=>'unreadable: '+x.message) : '';
     out(`    [stalled] last served: ${served.slice(-6).map(([u,st])=>u+' '+st).join(' · ')}

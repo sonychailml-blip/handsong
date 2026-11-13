@@ -9,6 +9,7 @@ import { sceneSwitch, sceneRoom, sceneRoomSet, sceneRooms, backgroundOf } from '
 import { ROOMS, roomById } from './rooms/index.js';
 import { ROOM_IDS } from './pure/room.js';
 import { bedHold, bedResume, bedTakesDrone } from './bed.js';
+import { tintApply } from './tint.js';   // DESIGN-1: the interface takes the room's tint
 import { buildAmbience, ambienceSchedule, ambienceTune, ambienceSet, ambienceRoom, ambienceBrook, ambienceBrookLight, ambienceBrookRec, NATURE_WORKLET } from './sound/ambience.js';
 
 export const ROOM_KEY='handsong.nightRoom';
@@ -54,7 +55,7 @@ function natureRec(E, a){ const R=natureRecOf(); if(!R || !a.brook) return; a.br
 /* the Lighter mode (the shell): fewer bubbles, the nearest voices only */
 export function natureLight(v){ brookLight=!!v; if(liveAmb && liveAmb.brook) ambienceBrookLight(null, liveAmb, brookLight); }
 /* at the start, before the first picture: the remembered room, if it is a real one this app has */
-export function roomRestore(){ const id=load(ROOM_KEY); if(id && ROOM_IDS.includes(id) && roomById(id)) sceneRoomSet(id); return sceneRoom(); }
+export function roomRestore(){ const id=load(ROOM_KEY); if(id && ROOM_IDS.includes(id) && roomById(id)) sceneRoomSet(id); tintApply(roomCurrent(), { now:true }); return sceneRoom(); }   // DESIGN-1: its tint at once
 /* the next room in order (the Room button) */
 export const roomNext=()=>{ const ids=sceneRooms(); return ids.length ? ids[(ids.indexOf(sceneRoom())+1)%ids.length] : null; };
 function nameShow(rec){ const el=document.getElementById('nightRoomName'); if(!el) return;
@@ -67,6 +68,7 @@ export async function roomSwitch(id, o={}){
   if(ROOM_IDS.includes(id)) save(ROOM_KEY, id);
   bedHold(rec.bed, rec.bed2);
   const pic=sceneSwitch(id, { fast:o.fast });   // sets the host's current room at once (its synchronous part)
+  tintApply(rec, { now:o.fast });   // DESIGN-1: the interface's accents ease to the new room's tint over the picture's fades
   const I=ambienceInfo(); if(I && I.on) ambienceOn(true, I.level);   // the nature crossfade: the module now finds the new room's recipe
   if(!o.fast) nameShow(rec);
   await pic;

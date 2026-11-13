@@ -1648,6 +1648,92 @@ async function nightEarlyModel(){
   notes.push(`early files: ${wasm}/vision_wasm_internal.{js,wasm}, after the load event and Begin working`);
   return { cases:n, total:d.length, differences:d, notes };
 }
+/* DESIGN-1 part B — «NIGHT room tint (app)»: every real room names a tint token whose colour (night.css --cv-<token>) is light enough for the
+   interface (≥ 7 : 1 against the dark ink on it and against the night base: pure/room.js contrastOf, TINT_CONTRAST); night.css's default tint
+   (--night-tint, and the registered property's initial value) is the FIRST room's, so the first paint already wears it. CONTROLS: a dark colour,
+   a token missing from night.css and a default one character off must each be caught. */
+async function nightRoomTint(){
+  const d=[], notes=[]; let n=0; const miss=s=>d.push(s);
+  const RV=await import(new URL('../apps/night/pure/room.js', import.meta.url).href), F=(await import(new URL('../apps/night/rooms/forest/pure/room.js', import.meta.url).href)).FOREST_ROOM;
+  const css=(await readFile(new URL('../apps/night/night.css', import.meta.url),'utf8')).replace(/\/\*[\s\S]*?\*\//g,'');
+  const tokOf=(c, name)=>{ const m=c.match(new RegExp('(?<![\\w-])--'+name+'\\s*:\\s*(#[0-9a-fA-F]{6})\\b')); return m ? m[1].toLowerCase() : null; };
+  const judge=(c, rooms)=>{ const bad=[];
+    for(const r of rooms){ const v=tokOf(c, 'cv-'+r.tint); if(!v){ bad.push(`${r.id}: no colour for its tint token --cv-${r.tint} in night.css`); continue; }
+      const ci=RV.contrastOf(v, RV.TINT_INK), cb=RV.contrastOf(v, RV.TINT_BASE); if(ci<RV.TINT_CONTRAST || cb<RV.TINT_CONTRAST) bad.push(`${r.id}: its tint ${v} is too dark (${ci.toFixed(1)} : 1 against the ink, ${cb.toFixed(1)} : 1 against the base; at least ${RV.TINT_CONTRAST})`);
+      else notes.push(`${r.id}: tint ${v} — ${ci.toFixed(1)} : 1 against the ink ${RV.TINT_INK}, ${cb.toFixed(1)} : 1 against the base ${RV.TINT_BASE}`); }
+    const first=tokOf(c, 'cv-'+rooms[0].tint), def=tokOf(c, 'night-tint'), init=(c.match(/@property\s+--night-tint\s*\{[^}]*initial-value\s*:\s*(#[0-9a-fA-F]{6})/)||[])[1];
+    if(!def || def!==first) bad.push(`night.css's default --night-tint ${def} is not the first room's tint ${first}`);
+    if(!init || init.toLowerCase()!==first) bad.push(`the registered --night-tint's initial value ${init} is not the first room's tint ${first}`);
+    if(tokOf(c, 'night-on-tint')!==RV.TINT_INK) bad.push(`night.css's --night-on-tint ${tokOf(c, 'night-on-tint')} is not the ink the contrast is judged against (${RV.TINT_INK})`);
+    if(tokOf(c, 'night-base')!==RV.TINT_BASE) bad.push(`night.css's --night-base ${tokOf(c, 'night-base')} is not the base the contrast is judged against (${RV.TINT_BASE})`);
+    return bad; };
+  const rooms=RV.ROOM_IDS.map(id=>[F].find(r=>r.id===id)); n+=rooms.length;
+  if(rooms.some(r=>!r)) miss('a pinned room has no record here: '+RV.ROOM_IDS.join(', '));
+  else { n+=4; for(const b of judge(css, rooms)) miss(b);
+    const ctl=[['a dark tint', css.replace(/--cv-forest-tint\s*:\s*#[0-9a-fA-F]{6}/, '--cv-forest-tint:#3a4a6a'), r=>/too dark/.test(r)],
+      ['a missing token', css.replace(/--cv-forest-tint\s*:\s*#[0-9a-fA-F]{6};?/, ''), r=>/no colour/.test(r)],
+      ['a default one character off', css.replace(/--night-tint\s*:\s*#c8f56a/, '--night-tint:#c8f56b'), r=>/default --night-tint/.test(r)]];
+    for(const [name, c, want] of ctl){ n++; const b=judge(c, rooms); if(!b.some(want)) miss(`CONTROL ${name}: not caught (${b.join('; ')||'no complaint'})`); else notes.push(`CONTROL ${name}: caught`); } }
+  return { cases:n, total:d.length, differences:d, notes };
+}
+/* DESIGN-1 part D — «NIGHT start still (app)»: (1) THE FILES — every real room names a still per level, each a WebP in its folder of at most 100 KB
+   (STILL_BUDGET); (2) THE FIRST PAINT — night.css shows the first room's two stills (the default and html[data-still="full"]) exactly as its record names
+   them, and guard.js sets data-still to one of the levels from the stored picture level; (3) THE LAW (pure/still.js) — before the start ends: the still;
+   with the room's picture: no reveal before the room is ready AND its fade-in (= the host's SCENE_FADE.in) is over, «wait» while it is not ready (a late
+   room keeps the still), then the reveal over revealMs; reduced motion or another background: a plain fade; the old way (none): gone at the start's end;
+   the look covers everything at 0 and nothing at 1, clearing monotonically; the dot starts at the emblem, ends in the picture, faded. CONTROLS: a law that
+   reveals as soon as the room is ready (no fade-in wait), a file over the budget and a CSS default one character off must each be caught. */
+const STILL_BUDGET=100*1024;
+async function nightStartStill(){
+  const d=[], notes=[]; let n=0; const miss=s=>d.push(s), fs=await import('node:fs');
+  const RV=await import(new URL('../apps/night/pure/room.js', import.meta.url).href), SL=await import(new URL('../apps/night/pure/still.js', import.meta.url).href);
+  const RI=await import(new URL('../apps/night/rooms/index.js', import.meta.url).href);
+  const rooms=RV.ROOM_IDS.map(id=>RI.roomById(id)); if(rooms.some(r=>!r)) return { cases:1, total:1, differences:['a pinned room is not in the registry'], notes };
+  const sizeOf=f=>{ try{ const b=fs.readFileSync(f); return { n:b.length, webp:b.slice(0,4).toString()==='RIFF' && b.slice(8,12).toString()==='WEBP' }; }catch(e){ return null; } };
+  const files=(sz)=>{ const bad=[];
+    for(const R of rooms) for(const lv of RV.ROOM_LEVELS){ const rel=SL.stillFile(R.record, lv); if(!rel){ bad.push(`${R.record.id}: no still for «${lv}»`); continue; }
+      const f=new URL(rel, R.base), s=sz ? sz(f) : sizeOf(f); if(!s){ bad.push(`${R.record.id} ${lv}: ${rel} is missing`); continue; }
+      if(!s.webp) bad.push(`${R.record.id} ${lv}: ${rel} is not a WebP`); if(s.n>STILL_BUDGET) bad.push(`${R.record.id} ${lv}: ${rel} is ${s.n} bytes (at most ${STILL_BUDGET})`);
+      if(!sz) notes.push(`${R.record.id} ${lv}: ${rel}, ${(s.n/1024).toFixed(1)} KB`); }
+    return bad; };
+  n+=rooms.length*RV.ROOM_LEVELS.length; for(const b of files()) miss(b);
+  /* the first paint */
+  const css=(await readFile(new URL('../apps/night/night.css', import.meta.url),'utf8')).replace(/\/\*[\s\S]*?\*\//g,''), guard=await readFile(new URL('../apps/night/guard.js', import.meta.url),'utf8');
+  const first=rooms[0], folder=new URL(first.base).pathname.replace(/^.*\/apps\/night\//, '');
+  const paint=c=>{ const bad=[], def=(c.match(/\.night-still\{[^}]*url\(([^)]+)\)/)||[])[1], full=(c.match(/html\[data-still="full"\]\s*\.night-still\{[^}]*url\(([^)]+)\)/)||[])[1];
+    if(def!==folder+first.record.still.reduced) bad.push(`night.css's default still is «${def}», the first room's reduced one is «${folder+first.record.still.reduced}»`);
+    if(full!==folder+first.record.still.full) bad.push(`night.css's still at Detailed is «${full}», the first room's full one is «${folder+first.record.still.full}»`);
+    return bad; };
+  n+=3; for(const b of paint(css)) miss(b);
+  if(!/setAttribute\('data-still', localStorage\.getItem\('handsong\.sceneLevel'\)==='full' \? 'full' : 'reduced'\)/.test(guard) || !RV.ROOM_LEVELS.every(l=>guard.includes(`'${l}'`))) miss('guard.js does not set data-still to a level from the stored picture level');
+  /* the law */
+  const host=await readFile(new URL('../apps/night/scene/host.js', import.meta.url),'utf8'), fadeIn=+((host.match(/SCENE_FADE=Object\.freeze\(\{\s*out:\s*\d+,\s*in:\s*(\d+)/)||[])[1]);
+  n++; if(SL.STILL.sceneInMs!==fadeIn) miss(`the still waits ${SL.STILL.sceneInMs} ms for the room's fade-in, the host fades in over ${fadeIn} ms`);
+  const law=phase=>{ const bad=[], E=1000;
+    if(phase({ ended:null, readyAt:null, room:true }, 5e3).phase!=='start') bad.push('before the start ends it is not the start');
+    for(const ready of [null, 400, 3000, 9000]) for(let t=E;t<E+16e3;t+=50){ const P=phase({ ended:E, readyAt:ready, room:true }, t);
+      if(ready==null || t<ready+SL.STILL.sceneInMs){ if(P.phase!=='wait'){ bad.push(`room ready at ${ready}: «${P.phase}» at ${t} — the still went before the room was drawn and faded in`); break; } } }
+    { const P=phase({ ended:E, readyAt:200, room:true }, E+SL.STILL.revealMs/2); if(P.phase!=='reveal' || Math.abs(P.p-0.5)>1e-9) bad.push('a room ready long before: the reveal does not start at the start\'s end ('+JSON.stringify(P)+')'); }
+    { const P=phase({ ended:E, readyAt:200, room:true, plain:true }, E+SL.STILL.fadeMs/2); if(P.phase!=='reveal' || Math.abs(P.p-0.5)>1e-9) bad.push('reduced motion: not a plain fade over fadeMs'); }
+    { const P=phase({ ended:E, readyAt:null, room:false }, E+SL.STILL.fadeMs+1); if(P.phase!=='done') bad.push('another background: not gone after the plain fade'); }
+    { const P=phase({ ended:E, readyAt:null, room:true, none:true }, E); if(P.phase!=='done') bad.push('the old way (none) keeps the still'); }
+    return bad; };
+  n+=6; for(const b of law(SL.stillPhase)) miss(b);
+  { n+=4; const L0=SL.stillLook(0, false), L1=SL.stillLook(1, false); let prev=-Infinity, mono=true; for(let p=0;p<=1;p+=0.01){ const c=SL.stillLook(p, false).clear; if(c<prev-1e-12) mono=false; prev=c; }
+    if(!(L0.clear<=0 && L0.opacity===1)) miss('at the reveal\'s start the still does not cover everything: '+JSON.stringify(L0));
+    if(!(L1.clear-SL.STILL.soft>=1 && L1.mist<1e-9)) miss('at the reveal\'s end something of the still is left: '+JSON.stringify(L1));
+    if(!mono) miss('the clearing goes back');
+    const P=SL.stillLook(0.5, true); if(P.clear>0 || Math.abs(P.opacity-0.5)>1e-9) miss('reduced motion: not a plain opacity fade'); }
+  { n+=2; const a=SL.stillDot(0, 75, 40, 1280, 800), b=SL.stillDot(1, 75, 40, 1280, 800);
+    if(Math.abs(a.x-75)>1e-9 || Math.abs(a.y-40)>1e-9 || a.a!==1) miss('the dot does not start at the emblem: '+JSON.stringify(a));
+    if(Math.abs(b.x-SL.STILL.dotTo[0]*1280)>1e-9 || Math.abs(b.y-SL.STILL.dotTo[1]*800)>1e-9 || b.a!==0) miss('the dot does not end in the picture, faded: '+JSON.stringify(b)); }
+  /* the CONTROLS */
+  { n++; const eager=(s, now)=> s.ended!=null && s.room && s.readyAt!=null && now>=Math.max(s.ended, s.readyAt) ? { phase:'reveal', p:0, t0:Math.max(s.ended, s.readyAt) } : SL.stillPhase(s, now);
+    if(!law(eager).length) miss('CONTROL: a law revealing as soon as the room is ready passed — the fade-in wait cannot fail'); else notes.push('CONTROL: a law revealing without the fade-in wait is caught'); }
+  { n++; const b=files(()=>({ n:STILL_BUDGET+1, webp:true })); if(!b.some(x=>/at most/.test(x))) miss('CONTROL: a file over the budget was not caught'); else notes.push('CONTROL: a file over the budget is caught'); }
+  { n++; const b=paint(css.replace('still-reduced.webp', 'still-reduced.webq')); if(!b.length) miss('CONTROL: a CSS default one character off was not caught'); else notes.push('CONTROL: a CSS default one character off is caught'); }
+  return { cases:n, total:d.length, differences:d, notes };
+}
 async function nightFsIcons(){
   const d=[], notes=[]; let n=0; const miss=s=>d.push(s), I=await import(new URL('../apps/night/pure/fsicons.js', import.meta.url).href).catch(e=>({ err:e }));
   if(I.err){ return { cases:1, total:1, differences:['apps/night/pure/fsicons.js does not load in node: '+I.err.message], notes }; }
@@ -1999,6 +2085,8 @@ const ROWS=[
   ['NIGHT depth curve (core)',   ()=>nightDepthCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['NIGHT cricket schedule (app)', ()=>nightCricketsCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['NIGHT room records (app)',  ()=>nightRooms(),       r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // NIGHT-3
+  ['NIGHT room tint (app)',     ()=>nightRoomTint(),    r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // DESIGN-1 part B
+  ['NIGHT start still (app)',   ()=>nightStartStill(),  r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // DESIGN-1 part D
   ['NIGHT music bed law (app)', ()=>nightBedLaw(),     r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // NIGHT-3 stage 4
   ['NIGHT music bed v2 law (app)', ()=>nightBed2Law(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-4
   ['VIS1c fireflies (core)',    ()=>fliesCore(),    r=>({ cases:r.cases, diff:r.total, list:r.differences })],

@@ -23,3 +23,7 @@ NIGHT-7b (2026-11-11), `docs/core/MODULE-MAP.md` (the ghost light deleted):
 
 NIGHT-12 (2026-11-12), `CLAUDE.md` «Build and deploy» (Night's test build at night.handsong.app):
 - ⛳ **Build and deploy** (SPLIT-2): `HANDSONG_APP=full|night node tools/build.mjs` writes one app into `dist/` (no other app, no tools). Previews (`VERCEL_ENV=preview` or `--probes`) keep `?probe`; production has no probes. `HANDSONG_EDITION=release` hides the development items. `vercel.json` is shared by two Vercel projects (`HANDSONG_APP=full`, `=night`); previews from `dev`. ⛳ Production branches differ (user, 2026-11-02): Full's project builds `main` (handsong.vercel.app); `handsong-night` builds `night-release`, a stopper branch that is a copy of the old `main`. So merging `dev` into `main` updates only Full's production. Neither new app goes public yet: `main` stays the old public version until the new Full is ready, and Night's public home (Vercel or another host) is not decided. Whenever a page, path or build changes: `node tools/smoke-paths.mjs` (`--build`: also the built trees).
+
+DESIGN-1 (2026-11-12), `CLAUDE.md` «Check levels», Level 1 (Night gained `--ui-only`):
+    `node tools/probe-data.mjs`, that app's UI checks (Full: `node tools/probe-browser.mjs --quick`; Night: `--app night` — no lighter Night mode
+    exists yet, so on Night Levels 1 and 2 run the same command). A docs-only change: the static check, the data runner and its proofs.

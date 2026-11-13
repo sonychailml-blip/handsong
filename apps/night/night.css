@@ -4,20 +4,28 @@
      capsule, cards, layouts) + the C · Hush emblem (five dots in an arc, the centre one glowing in Moonglass's firefly lime). Fonts: Literata
      Light (titles, wordmark) and Andika (text) — OFL, self-hosted (@font-face below), both with Cyrillic. Glass = a blur over the scene;
      its PLAIN fallback (--night-glass-plain, no blur) on the Dark background, the minimal scene level and the low-power choice. */
-  --night-bg:#060a12; --night-ink:#e6ecf5; --night-dim:#8f9bb0; --night-moon:#9cc3ff;
-  --night-accent:#c8f56a; --night-accent-ink:#0b1205; --night-accent-a16:rgba(200,245,106,.16); --night-accent-a35:rgba(200,245,106,.35);
-  --night-glass:rgba(20,28,44,.52); --night-glass-plain:rgba(12,17,28,.94); --night-hair:rgba(200,215,240,.20); --night-fill:rgba(255,255,255,.06);
-  --night-shade:rgba(0,0,0,.45); --night-emblem-dot:rgba(230,236,245,.85);
+  /* DESIGN-1: COLOUR ROLES — every interface colour of Night is one of these (the values are today's palette, unchanged). base: the night behind
+     everything; surface: the glass of cards and the capsule (its plain fallback without blur); raised: a control's own faint fill; hairline: the thin
+     lines; ink and ink-dim: text; brand: the product's own light (Begin, the main button of a card, the emblem's glowing dot, the wordmark's «night»)
+     and the ink on it; tint: THE CURRENT ROOM'S light (its record's `tint`, set by apps/night/tint.js; eased over a room switch's fades) — every
+     small accent of the interface (icon dots, switches, slider fills, links, a chosen segment, the bars, the card pictures' light) — and the ink on it. */
+  --night-base:#060a12; --night-ink:#e6ecf5; --night-ink-dim:#8f9bb0;
+  --night-brand:#c8f56a; --night-on-brand:#0b1205;
+  --night-tint:#c8f56a; --night-on-tint:#0b1205;   /* the forest's tint (its record); a room's own replaces it at run time */
+  --night-accent:var(--night-tint);   /* the accent parts of the drawn icons (core/icons.js reads this name): they follow the room */
+  --night-surface:rgba(20,28,44,.52); --night-surface-plain:rgba(12,17,28,.94); --night-hairline:rgba(200,215,240,.20); --night-raised:rgba(255,255,255,.06);
+  --night-emblem-dot:rgba(230,236,245,.85);
+  --night-tint-ms:calc(var(--night-scene-out) + var(--night-scene-in));   /* a room switch's two fades: the tint eases over both */
   --night-font-display:"Literata", "Iowan Old Style", Georgia, serif; --night-font-body:"Andika", system-ui, "Segoe UI", sans-serif;
   --night-fw-light:300; --night-fw-regular:400; --night-fw-bold:700; --night-lh:1.45; --night-lh-tight:1.1; --night-track-wide:.12em;
   --night-fs-title:28px; --night-fs-body:17px; --night-fs-value:15px; --night-fs-label:13px; --night-fs-small:12px; --night-fs-mark:30px;
   --night-btn:56px; --night-ibtn:46px; --night-gap:12px; --night-gap-sm:6px; --night-pad:18px; --night-pad-lg:24px; --night-edge:14px;
   --night-r-capsule:28px; --night-r-card:24px; --night-r-pill:999px;
   --night-blur:blur(16px) saturate(1.2); --night-blur-card:blur(18px) saturate(1.2);
-  --night-ring:0 0 0 3px rgba(200,245,106,.16); --night-glow:0 0 14px rgba(200,245,106,.55); --night-shadow:0 10px 40px rgba(0,0,0,.45);
+  --night-tint-ring:0 0 0 3px color-mix(in srgb, var(--night-tint) 16%, transparent); --night-tint-glow:0 0 14px color-mix(in srgb, var(--night-tint) 55%, transparent); --night-shadow:0 10px 40px rgba(0,0,0,.45);
   --night-fade:300ms; --night-slow:900ms; --night-ease:cubic-bezier(.2,.7,.2,1);
   --night-scene-out:500ms; --night-scene-in:800ms; --night-name-fade:600ms;   /* NIGHT-3 stage 5 part 2: a room switch (host.js SCENE_FADE) and the room's name */
-  --night-icon:24px; --night-glow-f:drop-shadow(0 0 6px #c8f56a);
+  --night-icon:24px; --night-brand-glow-f:drop-shadow(0 0 6px var(--night-brand)); --night-tint-glow-f:drop-shadow(0 0 6px var(--night-tint));
   /* RUN 8 (slice 3): the slim bars that show the forest's depth and the three effects while the hands play (Moonglass) */
   --night-bar-w:6px; --night-bar-h:min(30vh, 200px); --night-bar-gap:16px; --night-bar-ico:20px; --night-warm:#ffb45a; --night-cold:#e6fff2;
   /* VIS1c (RUN 6): the NIGHT FOREST room (apps/night/rooms/forest/; moved from core/tokens.css at NIGHT-3) — the «Rooms of light» prototype's colours, read by the 3D room as its base
@@ -42,9 +50,13 @@
   --cv-forest-misty-moonhalo:#b8c8dc; --cv-forest-misty-haze:#aebdcc; --cv-forest-misty-cloud:#202b36;
   --cv-forest-misty-shroom:#a8e8ff; --cv-forest-misty-bloom:#e8f2ff;
   --cv-forest-warm:#ffb45a; --cv-forest-cold:#e6fff2;   /* RUN 7 (C5): Warmth / Brightness — the light's two ends (the lime between) */
+  --cv-forest-tint:#c8f56a;   /* DESIGN-1: the forest's light on the interface (its record's tint; --night-tint's default above must equal it) */
   --cv-forest-core:#f6ffd0; --cv-forest-halo:#9be04a; --cv-forest-trail:#c8ff70; --cv-forest-fx:#9fd0ff;
   --z-night:18;
 }
+/* DESIGN-1: the tint is a registered colour, so a room switch EASES it (the root's transition) instead of snapping */
+@property --night-tint{ syntax:'<color>'; inherits:true; initial-value:#c8f56a; }
+:root{ transition:--night-tint var(--night-tint-ms) var(--night-ease); }
 /* RUN 7 (C11): the Night face's fonts, self-hosted from our own origin (CSP default-src 'self'), register entries font-andika / font-literata
    (LIC1). Andika ships UNMODIFIED (its licence reserves the name); Literata as its latin + cyrillic subsets (no reserved name). */
 @font-face{ font-family:"Andika"; font-style:normal; font-weight:400; font-display:swap; src:url(fonts/andika/Andika-Regular.woff2) format("woff2"); }
@@ -67,13 +79,13 @@
 #nightShell [hidden]{ display:none !important; }   /* NIGHT-7b: hidden always hides here (a class's display once kept the closed cards on screen) */
 #nightShell button{ font:inherit; color:inherit; background:none; border:0; padding:0; cursor:pointer; -webkit-tap-highlight-color:transparent; }
 .svgi{ display:block; width:100%; height:100%; overflow:visible; }
-.night-glass{ background:var(--night-glass); -webkit-backdrop-filter:var(--night-blur); backdrop-filter:var(--night-blur); border:1px solid var(--night-hair); }
-body.night-plain .night-glass{ background:var(--night-glass-plain); -webkit-backdrop-filter:none; backdrop-filter:none; }
-@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){ .night-glass{ background:var(--night-glass-plain); } }
+.night-glass{ background:var(--night-surface); -webkit-backdrop-filter:var(--night-blur); backdrop-filter:var(--night-blur); border:1px solid var(--night-hairline); }
+body.night-plain .night-glass{ background:var(--night-surface-plain); -webkit-backdrop-filter:none; backdrop-filter:none; }
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){ .night-glass{ background:var(--night-surface-plain); } }
 .night-fade{ position:absolute; inset:0; opacity:0; visibility:hidden; transition:opacity var(--night-fade) var(--night-ease), visibility 0s linear var(--night-fade); }
 #nightShell.show .night-fade{ opacity:1; visibility:visible; transition:opacity var(--night-fade) var(--night-ease), visibility 0s; }
 #nightShell.show .night-ctl, #nightShell.show .night-ibtn{ pointer-events:auto; }
-.night-idle{ position:absolute; top:12%; left:0; right:0; margin:0; text-align:center; color:var(--night-dim); font-size:var(--night-fs-body); letter-spacing:.04em; }
+.night-idle{ position:absolute; top:12%; left:0; right:0; margin:0; text-align:center; color:var(--night-ink-dim); font-size:var(--night-fs-body); letter-spacing:.04em; }
 .night-ibtn{ position:absolute; top:max(var(--night-edge), env(safe-area-inset-top)); right:max(var(--night-edge), env(safe-area-inset-right));
   width:var(--night-ibtn); height:var(--night-ibtn); border-radius:var(--night-r-pill); display:flex; align-items:center; justify-content:center; }
 .night-ibtn .svgi{ width:52%; height:52%; }
@@ -94,54 +106,54 @@ body.night-plain .night-glass{ background:var(--night-glass-plain); -webkit-back
 .night-roomname.on{ opacity:1; }
 /* NIGHT-11: the notice line (apps/night/notice.js) — in the middle, above everything else of the shell; while it shows, the other lines give way */
 #nightShell .night-notice{ position:absolute; left:50%; top:42%; transform:translate(-50%,-50%); width:min(520px, calc(100vw - 4 * var(--night-edge))); margin:0;
-  padding:var(--night-pad); border-radius:var(--night-r-card); border:1px solid var(--night-hair); text-align:center; color:var(--night-ink); font-size:var(--night-fs-body); line-height:var(--night-lh);
+  padding:var(--night-pad); border-radius:var(--night-r-card); border:1px solid var(--night-hairline); text-align:center; color:var(--night-ink); font-size:var(--night-fs-body); line-height:var(--night-lh);
   pointer-events:auto; cursor:pointer; box-shadow:var(--night-shadow); }
 #nightShell .night-notice[hidden]{ display:none; }
 body.night-notice-on .night-idle, body.night-notice-on .night-hint, body.night-notice-on .night-coach{ visibility:hidden; }
 .night-rb{ display:flex !important; flex-direction:column; align-items:center; gap:var(--night-gap-sm); min-width:0; }
 .night-circ{ width:var(--night-btn); height:var(--night-btn); border-radius:var(--night-r-pill); display:flex; align-items:center; justify-content:center;
-  background:var(--night-fill); border:1px solid var(--night-hair); transition:border-color var(--night-fade), box-shadow var(--night-fade), color var(--night-fade); }
+  background:var(--night-raised); border:1px solid var(--night-hairline); transition:border-color var(--night-fade), box-shadow var(--night-fade), color var(--night-fade); }
 .night-circ .svgi{ width:46%; height:46%; }
-.night-rb:focus-visible .night-circ, .night-rb.glint .night-circ{ border-color:var(--night-accent); box-shadow:var(--night-ring); color:var(--night-accent); }
-.night-lab{ font-size:var(--night-fs-label); color:var(--night-dim); line-height:var(--night-lh-tight); }
+.night-rb:focus-visible .night-circ, .night-rb.glint .night-circ{ border-color:var(--night-tint); box-shadow:var(--night-tint-ring); color:var(--night-tint); }
+.night-lab{ font-size:var(--night-fs-label); color:var(--night-ink-dim); line-height:var(--night-lh-tight); }
 .night-val{ font-size:var(--night-fs-value); line-height:var(--night-lh-tight); text-align:center; max-width:100%; overflow:hidden; display:-webkit-box;
   -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2; overflow-wrap:anywhere; }
 .night-vol{ grid-column:1/-1; display:flex; align-items:center; gap:var(--night-gap); padding:0 var(--night-gap-sm); }
 .night-vol[hidden]{ display:none; }
-.night-vol input{ flex:1; min-width:0; accent-color:var(--night-accent); }
+.night-vol input{ flex:1; min-width:0; accent-color:var(--night-tint); }
 .night-vol-in{ position:relative; flex:1; min-width:0; display:flex; align-items:center; }
-.night-vico{ display:flex; width:var(--night-icon); height:var(--night-icon); color:var(--night-dim); }
+.night-vico{ display:flex; width:var(--night-icon); height:var(--night-icon); color:var(--night-ink-dim); }
 .night-card{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:min(440px, calc(100vw - 28px)); max-height:calc(100vh - 28px);
   overflow:auto; border-radius:var(--night-r-card); padding:var(--night-pad-lg); pointer-events:auto; box-shadow:var(--night-shadow);
   -webkit-backdrop-filter:var(--night-blur-card); backdrop-filter:var(--night-blur-card); }
 body.night-plain .night-card{ -webkit-backdrop-filter:none; backdrop-filter:none; }
 .night-card[hidden]{ display:none; }
-.night-card p{ margin:var(--night-gap) 0; color:var(--night-dim); line-height:var(--night-lh); font-size:var(--night-fs-body); }
+.night-card p{ margin:var(--night-gap) 0; color:var(--night-ink-dim); line-height:var(--night-lh); font-size:var(--night-fs-body); }
 .night-ihead{ display:flex; justify-content:space-between; align-items:flex-start; gap:var(--night-gap); margin:0 0 var(--night-gap-sm); }
 .night-ibtn-in{ position:static; flex:none; }
 .night-mark{ display:flex; flex-direction:column; align-items:flex-start; gap:var(--night-gap-sm); }
 .emblem{ display:block; width:110px; height:22px; overflow:visible; }
 .emblem-dot{ fill:var(--night-emblem-dot); }
-.emblem-glow{ fill:var(--night-accent); filter:var(--night-glow-f); }
+.emblem-glow{ fill:var(--night-brand); filter:var(--night-brand-glow-f); }
 .night-word{ font-family:var(--night-font-display); font-weight:var(--night-fw-light); font-size:var(--night-fs-mark); letter-spacing:var(--night-track-wide);
   line-height:var(--night-lh-tight); color:var(--night-ink); }
-.night-word-dot{ color:var(--night-dim); }
-.night-sub{ font-size:var(--night-fs-small); letter-spacing:.5em; color:var(--night-accent); }
+.night-word-dot{ color:var(--night-ink-dim); }
+.night-sub{ font-size:var(--night-fs-small); letter-spacing:.5em; color:var(--night-brand); }
 .night-tg{ display:grid !important; grid-template-columns:var(--night-icon) 1fr auto; gap:var(--night-gap); align-items:center; width:100%; text-align:left;
-  padding:var(--night-gap) 0 !important; border-top:1px solid var(--night-hair) !important; font-size:var(--night-fs-value); }
-.night-tsw{ width:2.4em; height:1.3em; border-radius:var(--night-r-pill); border:1px solid var(--night-hair); position:relative; display:block; }
-.night-tsw span{ position:absolute; top:.17em; left:.17em; width:.9em; height:.9em; border-radius:var(--night-r-pill); background:var(--night-dim);
+  padding:var(--night-gap) 0 !important; border-top:1px solid var(--night-hairline) !important; font-size:var(--night-fs-value); }
+.night-tsw{ width:2.4em; height:1.3em; border-radius:var(--night-r-pill); border:1px solid var(--night-hairline); position:relative; display:block; }
+.night-tsw span{ position:absolute; top:.17em; left:.17em; width:.9em; height:.9em; border-radius:var(--night-r-pill); background:var(--night-ink-dim);
   transition:transform var(--night-fade) var(--night-ease), background var(--night-fade); }
-.night-tg.on .night-tsw{ border-color:var(--night-accent); }
-.night-tg.on .night-tsw span{ transform:translateX(1.1em); background:var(--night-accent); }
-.night-lnk{ display:block; margin:var(--night-gap) 0 0 !important; color:var(--night-accent) !important; font-size:var(--night-fs-value); text-align:left; }
+.night-tg.on .night-tsw{ border-color:var(--night-tint); }
+.night-tg.on .night-tsw span{ transform:translateX(1.1em); background:var(--night-tint); }
+.night-lnk{ display:block; margin:var(--night-gap) 0 0 !important; color:var(--night-tint) !important; font-size:var(--night-fs-value); text-align:left; }
 .night-lnk[hidden]{ display:none; }
-.night-dev{ color:var(--night-dim) !important; font-size:var(--night-fs-small); }
-.night-measure{ margin:var(--night-gap-sm) 0 0; white-space:pre-wrap; font-size:var(--night-fs-small); color:var(--night-dim); user-select:text; -webkit-user-select:text; }
+.night-dev{ color:var(--night-ink-dim) !important; font-size:var(--night-fs-small); }
+.night-measure{ margin:var(--night-gap-sm) 0 0; white-space:pre-wrap; font-size:var(--night-fs-small); color:var(--night-ink-dim); user-select:text; -webkit-user-select:text; }
 .night-measure[hidden]{ display:none; }
 .night-veil{ position:absolute; inset:0; background:var(--c-black); opacity:0; pointer-events:none; display:flex; align-items:center; justify-content:center; }
 #nightShell.asleep .night-veil{ pointer-events:auto; }
-.night-veil-msg{ color:var(--night-dim); font-size:var(--night-fs-body); }
+.night-veil-msg{ color:var(--night-ink-dim); font-size:var(--night-fs-body); }
 .night-veil-msg[hidden]{ display:none; }
 /* RUN 8 (slice 3): the bars while the hands play — slim Moonglass tracks: the forest's depth on the playing hand's side, the three effects on the
    effects hand's side (apps/night/shell.js: the value, .left / .right from where the hand is, .act on the finger in use, .on while that hand is seen) */
@@ -150,17 +162,17 @@ body.night-plain .night-card{ -webkit-backdrop-filter:none; backdrop-filter:none
 .night-bars.on{ opacity:1; transition:opacity var(--night-fade) var(--night-ease); }
 .night-bars.left{ left:max(var(--night-edge), env(safe-area-inset-left)); }
 .night-bars.right{ right:max(var(--night-edge), env(safe-area-inset-right)); }
-.night-bar{ display:flex; flex-direction:column; align-items:center; gap:var(--night-gap-sm); color:var(--night-dim); transition:color var(--night-fade); }
+.night-bar{ display:flex; flex-direction:column; align-items:center; gap:var(--night-gap-sm); color:var(--night-ink-dim); transition:color var(--night-fade); }
 .night-bar-ico{ display:flex; width:var(--night-bar-ico); height:var(--night-bar-ico); }
-.night-bar-track{ position:relative; display:block; width:var(--night-bar-w); height:var(--night-bar-h); border-radius:var(--night-r-pill); background:var(--night-fill);
-  border:1px solid var(--night-hair); transition:border-color var(--night-fade), box-shadow var(--night-fade); }
-.night-bar-fill{ position:absolute; left:0; right:0; bottom:0; height:0; border-radius:var(--night-r-pill); background:var(--night-accent); }
-.night-bar-mid{ position:absolute; left:calc(-1 * var(--night-gap-sm)); right:calc(-1 * var(--night-gap-sm)); top:50%; height:1px; background:var(--night-hair); }
+.night-bar-track{ position:relative; display:block; width:var(--night-bar-w); height:var(--night-bar-h); border-radius:var(--night-r-pill); background:var(--night-raised);
+  border:1px solid var(--night-hairline); transition:border-color var(--night-fade), box-shadow var(--night-fade); }
+.night-bar-fill{ position:absolute; left:0; right:0; bottom:0; height:0; border-radius:var(--night-r-pill); background:var(--night-tint); }
+.night-bar-mid{ position:absolute; left:calc(-1 * var(--night-gap-sm)); right:calc(-1 * var(--night-gap-sm)); top:50%; height:1px; background:var(--night-hairline); }
 .night-bar-two.warm .night-bar-fill{ background:var(--night-warm); }
 .night-bar-two.cold .night-bar-fill{ background:var(--night-cold); }
 .night-bar-lab{ font-size:var(--night-fs-small); line-height:var(--night-lh-tight); text-align:center; max-width:5.5em; }
-.night-bar.act{ color:var(--night-accent); }
-.night-bar.act .night-bar-track{ border-color:var(--night-accent); box-shadow:var(--night-glow); }
+.night-bar.act{ color:var(--night-tint); }
+.night-bar.act .night-bar-track{ border-color:var(--night-tint); box-shadow:var(--night-tint-glow); }
 .night-hint{ position:absolute; left:50%; top:12%; transform:translateX(-50%); width:min(560px, calc(100vw - 4 * var(--night-edge))); margin:0;
   padding:var(--night-gap) var(--night-pad); border-radius:var(--night-r-card); text-align:center; color:var(--night-ink); font-size:var(--night-fs-value); line-height:var(--night-lh); }
 .night-hint[hidden]{ display:none; }
@@ -168,7 +180,7 @@ body.night-plain .night-card{ -webkit-backdrop-filter:none; backdrop-filter:none
 body.dark-on .night-idle, body.dark-on .night-hint, body.dark-on .night-coach{ visibility:hidden; }
 /* NIGHT-11 part 4: the coaching line, where the idle line sits (centred); while it shows the idle line gives way — one message at a time */
 #nightShell .night-coach{ position:absolute; left:50%; top:12%; transform:translateX(-50%); width:max-content; max-width:min(560px, calc(100vw - 4 * var(--night-edge))); margin:0;
-  padding:var(--night-gap) var(--night-pad); border-radius:var(--night-r-card); border:1px solid var(--night-hair); text-align:center; color:var(--night-ink); font-size:var(--night-fs-value); line-height:var(--night-lh); pointer-events:none; }
+  padding:var(--night-gap) var(--night-pad); border-radius:var(--night-r-card); border:1px solid var(--night-hairline); text-align:center; color:var(--night-ink); font-size:var(--night-fs-value); line-height:var(--night-lh); pointer-events:none; }
 #nightShell .night-coach.night-coach-ask{ pointer-events:auto; }
 #nightShell .night-coach[hidden], #nightShell .night-coach [hidden]{ display:none; }
 .night-coach p{ margin:0; }
@@ -177,7 +189,7 @@ body.night-coach-on .night-idle{ visibility:hidden; }
 /* NIGHT-2: THE SETTINGS CARD — sections Hand and View, two named sliders without numbers, segments, and the about lines at the bottom */
 .night-set-title{ font-family:var(--night-font-display); font-weight:var(--night-fw-light); font-size:calc(var(--night-fs-body) * 1.5); line-height:var(--night-lh-tight); color:var(--night-ink); }
 .night-sec{ min-width:0; }
-.night-sec-h{ margin:var(--night-pad) 0 var(--night-gap-sm); font-size:var(--night-fs-small); font-weight:var(--night-fw-regular); letter-spacing:.08em; text-transform:uppercase; color:var(--night-dim); }
+.night-sec-h{ margin:var(--night-pad) 0 var(--night-gap-sm); font-size:var(--night-fs-small); font-weight:var(--night-fw-regular); letter-spacing:.08em; text-transform:uppercase; color:var(--night-ink-dim); }
 .night-calrow{ display:flex; justify-content:space-between; align-items:baseline; gap:var(--night-gap); font-size:var(--night-fs-value); }
 .night-calrow .night-lnk{ margin:0 !important; flex:none; }
 .night-card p.night-note{ font-size:var(--night-fs-small); margin:var(--night-gap-sm) 0; }
@@ -185,36 +197,36 @@ body.night-coach-on .night-idle{ visibility:hidden; }
 .night-sl{ margin:var(--night-gap) 0 var(--night-pad); }
 .night-sl-lab{ display:flex; justify-content:space-between; align-items:baseline; gap:var(--night-gap); font-size:var(--night-fs-value); margin-top:var(--night-gap); }
 .night-sl-lab .night-lnk{ margin:0 !important; font-size:var(--night-fs-small); text-align:right; }
-.night-sl input{ display:block; width:100%; margin:var(--night-gap-sm) 0 0; accent-color:var(--night-accent); }
-.night-sl-ends{ display:flex; justify-content:space-between; font-size:var(--night-fs-small); color:var(--night-dim); margin-top:var(--night-gap-sm); }
+.night-sl input{ display:block; width:100%; margin:var(--night-gap-sm) 0 0; accent-color:var(--night-tint); }
+.night-sl-ends{ display:flex; justify-content:space-between; font-size:var(--night-fs-small); color:var(--night-ink-dim); margin-top:var(--night-gap-sm); }
 .night-sl.off input, .night-sl.off .night-sl-ends{ opacity:.45; }
-.night-seg{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); margin:var(--night-gap-sm) 0 var(--night-gap); border:1px solid var(--night-hair); border-radius:var(--night-r-pill); overflow:hidden; }
+.night-seg{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); margin:var(--night-gap-sm) 0 var(--night-gap); border:1px solid var(--night-hairline); border-radius:var(--night-r-pill); overflow:hidden; }
 .night-seg-2{ grid-template-columns:repeat(2,minmax(0,1fr)); }
 #nightShell .night-seg button{ padding:var(--night-gap-sm); text-align:center; font-size:var(--night-fs-value); min-height:40px; }
-#nightShell .night-seg button.on{ background:var(--night-accent); color:var(--night-accent-ink); }
+#nightShell .night-seg button.on{ background:var(--night-tint); color:var(--night-on-tint); }
 #nightShell .night-seg button[hidden]{ display:none; }
 .night-set .night-vol{ padding:0; margin:0 0 var(--night-gap); }
 .night-set .night-vol .night-lab{ flex:none; min-width:9em; }   /* NIGHT-3 stage 5: the Music section's two sliders start at one line */
 .night-btns{ display:flex; flex-wrap:wrap; gap:var(--night-gap); margin-top:var(--night-pad); }
-#nightShell .night-btn{ flex:1 1 auto; white-space:nowrap; min-height:48px; padding:0 var(--night-gap); border-radius:var(--night-r-pill); border:1px solid var(--night-hair); background:var(--night-fill); font-size:var(--night-fs-body); }
-#nightShell .night-btn.go{ background:var(--night-accent); color:var(--night-accent-ink); border:0; font-weight:var(--night-fw-bold); }
-.night-about{ margin-top:var(--night-pad); padding-top:var(--night-gap); border-top:1px solid var(--night-hair); }
+#nightShell .night-btn{ flex:1 1 auto; white-space:nowrap; min-height:48px; padding:0 var(--night-gap); border-radius:var(--night-r-pill); border:1px solid var(--night-hairline); background:var(--night-raised); font-size:var(--night-fs-body); }
+#nightShell .night-btn.go{ background:var(--night-brand); color:var(--night-on-brand); border:0; font-weight:var(--night-fw-bold); }
+.night-about{ margin-top:var(--night-pad); padding-top:var(--night-gap); border-top:1px solid var(--night-hairline); }
 .night-about .night-mark{ margin-bottom:var(--night-gap-sm); }
 /* NIGHT-2: THE HAND'S CALIBRATION — the camera picture on its own canvas over the scene, a dashed frame, one line with the progress at the bottom, Cancel at the top;
    one card for the offer, the result and a failure. While it shows, the low-light message gives way (the step's own line and «low-rate» speak for it). */
 .night-cal{ position:absolute; inset:0; pointer-events:auto; }
 .night-cal[hidden]{ display:none; }
 .night-cal-pic{ position:absolute; inset:0; width:100%; height:100%; display:block; }
-.night-cal-frame{ position:absolute; inset:7%; border:1.5px dashed var(--night-hair); border-radius:var(--night-r-card); pointer-events:none; }
+.night-cal-frame{ position:absolute; inset:7%; border:1.5px dashed var(--night-hairline); border-radius:var(--night-r-card); pointer-events:none; }
 .night-cal-frame.warn{ border-color:var(--night-warm); }
 #nightShell .night-cal-cancel{ position:absolute; top:max(var(--night-edge), env(safe-area-inset-top)); right:max(var(--night-edge), env(safe-area-inset-right)); padding:var(--night-gap-sm) var(--night-pad);
-  border-radius:var(--night-r-pill); font-size:var(--night-fs-value); background:var(--night-glass); border:1px solid var(--night-hair); }
-body.night-plain #nightShell .night-cal-cancel{ background:var(--night-glass-plain); }
+  border-radius:var(--night-r-pill); font-size:var(--night-fs-value); background:var(--night-surface); border:1px solid var(--night-hairline); }
+body.night-plain #nightShell .night-cal-cancel{ background:var(--night-surface-plain); }
 .night-cal-strip{ position:absolute; left:var(--night-edge); right:var(--night-edge); bottom:max(var(--night-edge), env(safe-area-inset-bottom)); max-width:560px; margin:0 auto;
   padding:var(--night-pad); border-radius:var(--night-r-card); box-shadow:var(--night-shadow); }
 .night-cal-say{ margin:0; font-size:var(--night-fs-body); line-height:var(--night-lh); color:var(--night-ink); }
-.night-cal-bar{ height:6px; margin-top:var(--night-gap); border-radius:var(--night-r-pill); background:var(--night-fill); border:1px solid var(--night-hair); overflow:hidden; }
-.night-cal-bar i{ display:block; height:100%; width:0; background:var(--night-accent); transition:width 120ms linear; }
+.night-cal-bar{ height:6px; margin-top:var(--night-gap); border-radius:var(--night-r-pill); background:var(--night-raised); border:1px solid var(--night-hairline); overflow:hidden; }
+.night-cal-bar i{ display:block; height:100%; width:0; background:var(--night-tint); transition:width 120ms linear; }
 .night-cal [hidden]{ display:none !important; }
 .night-card p.night-cal-title{ margin:0 0 var(--night-gap); font-family:var(--night-font-display); font-weight:var(--night-fw-light); font-size:calc(var(--night-fs-body) * 1.5); color:var(--night-ink); }
 .night-card p.night-cal-text{ margin:0; color:var(--night-ink); }
@@ -245,8 +257,8 @@ body.night #bar, body.night #status{ display:none !important; }   /* the technic
 /* RUN 7 (C7): the Night start — the start card restyled in a Night boot (Moonglass glass card on the night); Full's start untouched. */
 .night-only{ display:none !important; }
 body.night-boot .night-only{ display:revert !important; }
-body.night-boot #start{ background:var(--night-bg); }
-body.night-boot #start .startCard{ background:var(--night-glass-plain); border:1px solid var(--night-hair); border-radius:var(--night-r-card); box-shadow:var(--night-shadow);
+body.night-boot #start{ background:transparent; }   /* DESIGN-1 part D: the room's still shows behind the start card (.night-still) */
+body.night-boot #start .startCard{ background:var(--night-surface-plain); border:1px solid var(--night-hairline); border-radius:var(--night-r-card); box-shadow:var(--night-shadow);
   color:var(--night-ink); font-family:var(--night-font-body); }
 body.night-boot #start .startCard > h1, body.night-boot #start .startTag, body.night-boot #start .startBtns, body.night-boot #fsBtnStart, body.night-boot #installBtn,
 body.night-boot #installHint, body.night-boot #learnMsg, body.night-boot #start .startFoot > p:not(.startLang){ display:none !important; }
@@ -255,14 +267,14 @@ body.night-boot .night-start-head{ display:flex !important; flex-direction:colum
 .night-start-head > [data-svg="emblem"]{ display:block; width:150px; height:30px; }   /* NIGHT-8b: its place kept before the drawing comes (no jump on the first paint) */
 .night-steps{ list-style:none; margin:var(--night-gap) 0; padding:0; text-align:left; }
 body.night-boot .night-steps{ display:flex !important; flex-direction:column; gap:var(--night-gap); }
-.night-steps li{ display:grid; grid-template-columns:var(--night-icon) 1fr; gap:var(--night-gap); align-items:start; color:var(--night-dim); font-size:var(--night-fs-value); line-height:var(--night-lh); }
-.night-steps .night-vico{ color:var(--night-accent); }
+.night-steps li{ display:grid; grid-template-columns:var(--night-icon) 1fr; gap:var(--night-gap); align-items:start; color:var(--night-ink-dim); font-size:var(--night-fs-value); line-height:var(--night-lh); }
+.night-steps .night-vico{ color:var(--night-tint); }
 .night-begin{ width:100%; padding:var(--night-gap) var(--night-pad) !important; margin:var(--night-gap) 0 !important; border:0 !important; border-radius:var(--night-r-pill) !important;
-  background:var(--night-accent) !important; color:var(--night-accent-ink) !important; font-family:var(--night-font-body); font-weight:var(--night-fw-bold); font-size:var(--night-fs-body); cursor:pointer; }
-body.night-boot #start .startFoot{ border-top-color:var(--night-hair); color:var(--night-dim); }
-body.night-boot #privacyNote summary{ color:var(--night-dim); }
+  background:var(--night-brand) !important; color:var(--night-on-brand) !important; font-family:var(--night-font-body); font-weight:var(--night-fw-bold); font-size:var(--night-fs-body); cursor:pointer; }
+body.night-boot #start .startFoot{ border-top-color:var(--night-hairline); color:var(--night-ink-dim); }
+body.night-boot #privacyNote summary{ color:var(--night-ink-dim); }
 body.night-boot #start .startLang [data-icon]{ display:none; }
-body.night-boot #langSel{ background:var(--night-fill); color:var(--night-ink); border:1px solid var(--night-hair); }
+body.night-boot #langSel{ background:var(--night-raised); color:var(--night-ink); border:1px solid var(--night-hairline); }
 
 /* NIGHT-7: the start screen's privacy line; the first cards (their pictures: our own line drawings, apps/night/cards.js) */
 /* NIGHT-11 part 2: Begin reads as loading until it really works (apps/night/guard.js removes the class); the start's messages; a hidden Night-only item stays hidden */
@@ -270,35 +282,77 @@ body.night-loading #nightBegin{ opacity:.5; pointer-events:none; cursor:progress
 body.night-boot .night-only[hidden]{ display:none !important; }
 .night-boot-msg{ margin:var(--night-gap) 0 0; color:var(--night-ink); font-size:var(--night-fs-value); line-height:var(--night-lh); text-align:center; }
 .night-boot-msg .night-lnk{ margin:0 0 0 var(--night-gap-sm); }
-.night-inapp{ margin:var(--night-gap) 0; padding:var(--night-gap); border:1px solid var(--night-hair); border-radius:var(--night-r-card); text-align:left; }
+.night-inapp{ margin:var(--night-gap) 0; padding:var(--night-gap); border:1px solid var(--night-hairline); border-radius:var(--night-r-card); text-align:left; }
 .night-inapp p{ margin:0 0 var(--night-gap-sm); color:var(--night-ink); font-size:var(--night-fs-value); line-height:var(--night-lh); }
-.night-inapp-url{ display:block; width:100%; box-sizing:border-box; margin:0 0 var(--night-gap-sm); padding:var(--night-gap-sm); border:1px solid var(--night-hair); border-radius:var(--night-r-pill); background:var(--night-fill); color:var(--night-ink); font-size:var(--night-fs-small); }
-.night-inapp-copy{ width:100%; min-height:44px; border:1px solid var(--night-hair); border-radius:var(--night-r-pill); background:var(--night-fill); color:var(--night-ink); font-size:var(--night-fs-value); }
-.night-privacy-line{ margin:var(--night-gap) 0 0; color:var(--night-dim); font-size:var(--night-fs-small); text-align:center; }
+.night-inapp-url{ display:block; width:100%; box-sizing:border-box; margin:0 0 var(--night-gap-sm); padding:var(--night-gap-sm); border:1px solid var(--night-hairline); border-radius:var(--night-r-pill); background:var(--night-raised); color:var(--night-ink); font-size:var(--night-fs-small); }
+.night-inapp-copy{ width:100%; min-height:44px; border:1px solid var(--night-hairline); border-radius:var(--night-r-pill); background:var(--night-raised); color:var(--night-ink); font-size:var(--night-fs-value); }
+.night-privacy-line{ margin:var(--night-gap) 0 0; color:var(--night-ink-dim); font-size:var(--night-fs-small); text-align:center; }
 /* NIGHT-12: «How to play» under Begin — a quiet link (Begin stays the main action), inactive while Begin loads; its cards show over the start
    screen: the shell is lifted above the start card with only the cards in it, its own state untouched */
-#nightStartHowTo{ display:block; margin:0 auto !important; min-height:44px; padding:0 var(--night-pad); border:0; background:none; color:var(--night-accent);
+#nightStartHowTo{ display:block; margin:0 auto !important; min-height:44px; padding:0 var(--night-pad); border:0; background:none; color:var(--night-tint);
   font-family:var(--night-font-body); font-size:var(--night-fs-value); cursor:pointer; }
 body.night-loading #nightStartHowTo{ opacity:.5; pointer-events:none; }
 body.night-cards-start #nightShell, body.night-cards-start #nightShell[hidden]{ display:block; z-index:calc(var(--z-menu) + 1); }   /* the start card is at --z-menu */
 body.night-cards-start #nightShell > :not(#nightCards){ display:none !important; }
+body.night-cards-start #start .startCard{ visibility:hidden; }   /* DESIGN-1: the start card steps out under the cards (its place kept): Begin's lime no longer glows through their glass */
 .night-card.night-cards{ display:block; width:min(460px, calc(100vw - 28px)); }
 .night-card-pic{ display:flex; justify-content:center; margin:0 0 var(--night-gap); color:var(--night-ink); }
 .night-pic{ width:100%; max-width:340px; height:auto; overflow:visible; }
 .night-cards-foot{ display:flex; align-items:center; justify-content:space-between; gap:var(--night-gap); margin-top:var(--night-gap); }
 .night-cards-dots{ display:flex; gap:var(--night-gap-sm); }
-.night-cards-dot{ width:var(--night-gap-sm); height:var(--night-gap-sm); border-radius:var(--night-r-pill); background:var(--night-hair); }
-.night-cards-dot.on{ background:var(--night-accent); }
-.night-cards-step{ color:var(--night-dim); font-size:var(--night-fs-small); }
+.night-cards-dot{ width:var(--night-gap-sm); height:var(--night-gap-sm); border-radius:var(--night-r-pill); background:var(--night-hairline); }
+.night-cards-dot.on{ background:var(--night-tint); }
+.night-cards-step{ color:var(--night-ink-dim); font-size:var(--night-fs-small); }
 .np-palm{ fill:currentColor; opacity:.88; }
 .np-limb{ fill:none; stroke:currentColor; stroke-linecap:round; opacity:.88; }
-.np-glow{ fill:var(--night-accent); filter:var(--night-glow-f); }
-.np-dot{ fill:var(--night-dim); }
-.np-line{ fill:none; stroke:var(--night-dim); stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
-.np-dash{ fill:none; stroke:var(--night-dim); stroke-width:2; stroke-dasharray:4 4; }
-.np-hold{ fill:none; stroke:var(--night-accent); stroke-width:5; stroke-linecap:round; opacity:.7; }
-.np-bar{ fill:var(--night-fill); stroke:var(--night-hair); }
-.np-t1{ fill:var(--night-accent); } .np-t2{ fill:var(--night-warm); } .np-t3{ fill:var(--night-cold); }
-.np-btn{ fill:var(--night-fill); stroke:var(--night-hair); stroke-width:1.5; }
+.np-glow{ fill:var(--night-tint); filter:var(--night-tint-glow-f); }
+.np-dot{ fill:var(--night-ink-dim); }
+.np-line{ fill:none; stroke:var(--night-ink-dim); stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+.np-dash{ fill:none; stroke:var(--night-ink-dim); stroke-width:2; stroke-dasharray:4 4; }
+.np-hold{ fill:none; stroke:var(--night-tint); stroke-width:5; stroke-linecap:round; opacity:.7; }
+.np-bar{ fill:var(--night-raised); stroke:var(--night-hairline); }
+.np-t1{ fill:var(--night-tint); } .np-t2{ fill:var(--night-warm); } .np-t3{ fill:var(--night-cold); }
+.np-btn{ fill:var(--night-raised); stroke:var(--night-hairline); stroke-width:1.5; }
 .np-ico{ color:var(--night-ink); }
-.np-wave{ fill:none; stroke:var(--night-accent); stroke-width:2; stroke-linecap:round; opacity:.7; } .np-faint{ opacity:.35; }
+.np-wave{ fill:none; stroke:var(--night-tint); stroke-width:2; stroke-linecap:round; opacity:.7; } .np-faint{ opacity:.35; }
+/* DESIGN-1 part C: THE SETTINGS IN THREE SHORT TABS (apps/night/settabs.js) — the tab list, one line per control (a short label, the control beside it or under it
+   on a narrow card), a note small and dim under its control, the «More» line. Revert: docs/night/design/DESIGN-1-settings-before.html. */
+.night-tabs{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); margin:var(--night-gap-sm) 0 var(--night-gap-sm); border-bottom:1px solid var(--night-hairline); }
+#nightShell .night-tab{ min-height:44px; padding:var(--night-gap-sm); text-align:center; font-size:var(--night-fs-value); color:var(--night-ink-dim); border-bottom:2px solid transparent; margin-bottom:-1px;
+  transition:color var(--night-fade), border-color var(--night-fade); }
+#nightShell .night-tab.on{ color:var(--night-ink); border-bottom-color:var(--night-tint); }
+#nightShell .night-tab:focus-visible{ outline:2px solid var(--night-tint); outline-offset:-2px; }
+.night-row{ display:flex; flex-wrap:wrap; align-items:center; column-gap:var(--night-gap); margin:var(--night-gap) 0 0; }
+.night-row-lab{ flex:1 0 7em; font-size:var(--night-fs-value); }
+.night-row > .night-seg{ flex:1 1 14em; margin:var(--night-gap-sm) 0; }
+.night-row[hidden]{ display:none; }
+.night-card p.night-row-note{ margin:0 0 var(--night-gap-sm); font-size:var(--night-fs-small); color:var(--night-ink-dim); line-height:var(--night-lh); }
+.night-tg-lab{ display:flex; flex-direction:column; gap:calc(var(--night-gap-sm) / 3); min-width:0; }
+.night-tg-note{ font-size:var(--night-fs-small); color:var(--night-ink-dim); line-height:var(--night-lh); }
+#nightShell .night-more{ display:flex; align-items:center; gap:var(--night-gap-sm); width:100%; min-height:44px; padding:var(--night-gap-sm) 0; border-top:1px solid var(--night-hairline);
+  font-size:var(--night-fs-value); color:var(--night-ink-dim); text-align:left; }
+.night-more-chev{ display:block; width:.45em; height:.45em; border-right:1.5px solid currentColor; border-bottom:1.5px solid currentColor; transform:translateY(-20%) rotate(45deg);
+  transition:transform var(--night-fade) var(--night-ease); }
+#nightShell .night-more.on .night-more-chev{ transform:translateY(20%) rotate(-135deg); }
+.night-more-body > .night-lnk{ margin-bottom:var(--night-gap-sm) !important; }
+.night-pane .night-sl{ display:grid; grid-template-columns:minmax(7em, max-content) minmax(0,1fr); column-gap:var(--night-gap); align-items:center; margin:var(--night-gap) 0 0; }
+.night-pane .night-sl > .night-sl-lab{ grid-column:1; grid-row:1 / span 2; align-self:start; flex-direction:column; align-items:flex-start; gap:calc(var(--night-gap-sm) / 3); margin:0; }
+.night-pane .night-sl > .night-sl-lab .night-lnk{ text-align:left; }
+.night-pane .night-sl > input{ grid-column:2; grid-row:1; margin:0; }
+.night-pane .night-sl > .night-sl-ends{ grid-column:2; grid-row:2; margin-top:calc(var(--night-gap-sm) / 3); }
+@media (orientation:landscape){
+  .night-card.night-set{ display:block; width:min(560px, calc(100vw - 28px)); }   /* one column: a tab is short */
+}
+/* DESIGN-1 part D: THE START SCREEN'S STILL (apps/night/still.js, the law pure/still.js) — a prepared, dim still of the room behind the start card from the first
+   paint (the first room's file per level: html[data-still] from guard.js; another room's set by still.js; the data row «NIGHT start still» keeps these equal
+   to the record), its drifting lights (a 2D canvas), the reveal's mask and its mist over the whole picture (set by still.js), the breathing while a late room is not ready, the emblem's dot */
+:root{ --z-night-still:calc(var(--z-night) - 1); --night-mist:#8fa4c4; --night-dot-glow:0 0 10px 3px color-mix(in srgb, var(--night-tint) 60%, transparent); --night-breathe:4.5s; }
+.night-still{ position:fixed; inset:0; z-index:var(--z-night-still); pointer-events:none; background:var(--night-base) url(rooms/forest/still/still-reduced.webp) center 42% / cover no-repeat; }
+html[data-still="full"] .night-still{ background-image:url(rooms/forest/still/still-full.webp); }
+.night-still-mist{ position:fixed; inset:0; z-index:var(--z-night-still); background:var(--night-mist); opacity:var(--still-mist, 0); pointer-events:none; }   /* over the still AND the live room: the room comes out through it */
+.night-still-lights{ position:absolute; inset:0; width:100%; height:100%; display:block; }
+.night-still.breathe{ animation:night-still-breathe var(--night-breathe) ease-in-out infinite alternate; }
+@keyframes night-still-breathe{ from{ filter:brightness(.88); } to{ filter:brightness(1.06); } }
+.night-still-dot{ position:fixed; left:0; top:0; z-index:var(--z-night-still); width:var(--night-gap-sm); height:var(--night-gap-sm); border-radius:var(--night-r-pill); background:var(--night-brand);
+  box-shadow:var(--night-dot-glow); pointer-events:none; will-change:transform, opacity; }
+@media (prefers-reduced-motion: reduce){ .night-still.breathe{ animation:none; } }

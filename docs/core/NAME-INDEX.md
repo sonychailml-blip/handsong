@@ -156,8 +156,13 @@ NIGHT-11 part 5 — THE SCENE'S PIXEL BUDGET (audit P4).
 
 ## apps/night/pure/room.js
 NIGHT-3: THE ROOM RECORD's shape and validator (pure, rule #36; data row «NIGHT room records» with controls).
-- const (7): `ROOM_FORMAT`, `ROOM_IDS`, `ROOM_LEVELS`, `ROOM_ACOUSTICS`, `roomLook`, `roomModes`, `ROOM_DAMAGES`
+- const (9): `ROOM_FORMAT`, `ROOM_IDS`, `ROOM_LEVELS`, `ROOM_ACOUSTICS`, `TINT_INK`, `contrastOf`, `roomLook`, `roomModes`, `ROOM_DAMAGES`
 - fn (1): `checkRoom`
+
+## apps/night/pure/still.js
+DESIGN-1 part D: THE START SCREEN'S STILL AND THE REVEAL — the law (pure, rule #36; data row «NIGHT start still (app)»).
+- const (4): `STILL`, `STILL_PHASES`, `stillEase`, `stillFile`
+- fn (3): `stillPhase`, `stillLook`, `stillDot`
 
 ## apps/night/rooms/forest/forest-answers.js
 NIGHT-6 slice 1 — THE FOREST ANSWERS (parts of the night forest room; forest.js builds them; the numbers are ./pure/answers.js): - DEW: points on the low leaves in view, one draw; each twinkles on …
@@ -319,6 +324,11 @@ THE SCENE HOST and Night's BACKGROUNDS (VIS1b, RUN 6; Night's own since CORE-8 �
 - const (26): `BACKGROUNDS`, `sceneRoomAdd`, `sceneRoomRemove`, `sceneRooms`, `sceneRoom`, `sceneRoomSet`, `SCENE_LEVEL_DEFAULT`, `SCENE_FADE`, `scenePausing`, `COMPILE_LOG`, `backgroundOf`, `sceneLevel`, `sceneShadowDbg`, `sceneOptDbg`, `sceneInfo`, `sceneRoomDbg`, `sceneLostDbg`, `sceneStartNote`, `sceneStartLevelDbg`, `sceneGuardDbg`, `sceneLevelDbg`, `sceneHeldDbg`, `sceneProgramsDbg`, `sceneClockDbg`, `sceneBedDbg`, `sceneOpenDbg`
 - fn (9): `loadThree`, `sceneOpen`, `sceneSwitch`, `sceneClose`, `setBackground`, `setSceneLevel`, `sceneSnapDbg`, `sceneShotDbg`, `sceneLoseDbg`
 
+## apps/night/settabs.js
+DESIGN-1 part C: THE SETTINGS IN THREE SHORT TABS — Sound · Picture · Hands (the markup in index.html: #nightSetTabs, the panes [data-pane]) and, in a tab, a «More» line that opens its rarely used …
+- const (2): `SET_TABS`, `setTabOf`
+- fn (2): `setTab`, `setTabsWire`
+
 ## apps/night/shell.js
 RUN 7 (C6 + C11, Night plan §5; docs/night/QUALITY.md points 4, 5, 6, 9, 10) — THE NIGHT SHELL (DOM side; the logic is core/nightui.js).
 - const (8): `LEAN_PATH`, `MUSIC_KEYS`, `musicModeOf`, `REACH`, `nightEarlyDbg`, `nightClockDbg`, `nightShellDbg`, `nightSleepDbg`
@@ -344,9 +354,18 @@ NIGHT-11 part 2 — THE START'S OWN WORDS (audit W4, W9).
 - const (5): `START_OLD`, `FLOW_OLD`, `startEnv`, `startEnvDbg`, `startDbg`
 - fn (4): `inAppShow`, `startWire`, `startFailText`, `startSay`
 
+## apps/night/still.js
+DESIGN-1 part D: THE START SCREEN'S STILL, ITS LIGHTS AND THE REVEAL (the law: pure/still.js).
+- fn (2): `stillWire`, `stillDbg`
+
 ## apps/night/texts.js
 NIGHT-7 — NIGHT'S OWN TEXTS, both languages.
 - const (1): `NIGHT_TEXTS`
+
+## apps/night/tint.js
+DESIGN-1 part B: THE ROOM'S TINT ON THE INTERFACE — the current room's record names its `tint` token (its light colour in night.css; the data row «NIGHT room tint» checks dark ink on it and it on t…
+- const (1): `tintNow`
+- fn (1): `tintApply`
 
 ## apps/night/worklets/bed-worklet.js
 NIGHT-4: THE MUSIC BED v2 — one AudioWorklet processor «night-bed» holding every voice of the bed and its own reverb (design: docs/night/design/NIGHT-3-rooms/PLAN.md §4b; the law apps/night/pure/be…
@@ -1270,7 +1289,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 - const (5): `TEST_ROOM_ID`, `TEST_ROOM`, `testRoomMode`, `testRoomInfo`, `testRoomFreeLeaks`
 - fn (2): `testRoomInstall`, `testRoomRemove`
 
-_250 modules, 2688 exported names._
+_254 modules, 2705 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

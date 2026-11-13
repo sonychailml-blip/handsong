@@ -45,6 +45,7 @@ export async function checkNightRoomSwitch(){
   const d=[], notes=[]; let n=0; const miss=s=>d.push(s);
   const H=await import('../../../apps/night/scene/host.js'), RS=await import('../../../apps/night/roomswitch.js'), TR=await import('./testroom.js');
   const V=await import('../../../core/vision.js'), A=await import('../../../core/audio.js'), BD=await import('../../../apps/night/bed.js'), I18=await import('../../../core/i18n.js');
+  const TN=await import('../../../apps/night/tint.js');   // DESIGN-1: the interface's tint follows the room
   const FR=(await import('../../../apps/night/rooms/forest/pure/room.js')).FOREST_ROOM, FOREST=FR.id, TEST=TR.TEST_ROOM_ID, $=id=>document.getElementById(id);
   const keep={ bg:H.backgroundOf(), room:H.sceneRoom(), key:(()=>{ try{ return localStorage.getItem(RS.ROOM_KEY); }catch(e){ return null; } })(), mode:BD.bedModeOf(), engine:BD.bedDbg().engine };
   const opened=async(ms=20000)=>{ const t=performance.now(); while(H.sceneInfo().opening && performance.now()-t<ms) await sleep(50); await frames(2); };
@@ -100,7 +101,19 @@ export async function checkNightRoomSwitch(){
       const p=H.setBackground('forest'), pz=H.scenePausing(); await p; await opened(); H.sceneOpenDbg({ hook:null }); const c=$('scene'); n++;
       if(!pz || veiledAtEnd!==true || !c || c.classList.contains('veil')) miss(`Dark → Room: paused at the start ${pz}, veiled until drawn ${veiledAtEnd}, unveiled after ${!!c && !c.classList.contains('veil')}`); }
     /* (2) no audio node during whole switches (fades, nature crossfade, bed held and resumed); CONTROL one node made inside the window */
-    { await sleep(300); const amb0=RS.roomSwitchDbg().nature; counter=nodeCounter(); const ts=performance.now(), p=RS.roomSwitch(TEST); A.AC.createGain(); await p; const c1=counter.n;
+    { await sleep(300); const amb0=RS.roomSwitchDbg().nature; counter=nodeCounter(); const tint0=TN.tintNow(), ts=performance.now(), p=RS.roomSwitch(TEST); A.AC.createGain();
+      await sleep(650); const tintMid=TN.tintNow(); await p; const c1=counter.n;
+      /* (2c) DESIGN-1: THE TINT FOLLOWS THE ROOM — lime in the forest, eased (a colour between the two, 650 ms in), the test room's amber once in: the
+         root's tint and a tint accent (a link) both; the brand (Begin) unmoved. CONTROL: the tint pinned back to lime in the test room is caught */
+      { await sleep(Math.max(0, 1500-(performance.now()-ts)));
+        const rgb=tok=>{ const h=getComputedStyle(document.documentElement).getPropertyValue('--cv-'+tok).trim(); return `rgb(${parseInt(h.slice(1,3),16)}, ${parseInt(h.slice(3,5),16)}, ${parseInt(h.slice(5,7),16)})`; }, lnk=()=>getComputedStyle($('nightHowTo')).color, brand=()=>getComputedStyle($('nightBegin')).backgroundColor;
+        const follows=()=>TN.tintNow()===rgb(TR.TEST_ROOM.tint) && lnk()===rgb(TR.TEST_ROOM.tint) && brand()===rgb(FR.tint);
+        n+=4; notes.push(`the tint: forest ${tint0} → 650 ms into the switch ${tintMid} → the test room ${TN.tintNow()} (a link ${lnk()}, Begin ${brand()})`);
+        if(tint0!==rgb(FR.tint)) miss(`in the forest the tint reads ${tint0}, not the forest's ${rgb(FR.tint)}`);
+        if(!(tintMid!==tint0 && tintMid!==rgb(TR.TEST_ROOM.tint))) miss(`650 ms into the switch the tint is ${tintMid} — not eased (it should lie between ${tint0} and ${rgb(TR.TEST_ROOM.tint)})`);
+        if(!follows()) miss(`in the test room the tint did not follow: root ${TN.tintNow()}, a link ${lnk()}, Begin ${brand()} (wanted ${rgb(TR.TEST_ROOM.tint)}, Begin ${rgb(FR.tint)})`);
+        TN.tintApply({ tint:FR.tint }, { now:true }); const ctl=follows(); TN.tintApply(TR.TEST_ROOM, { now:true });
+        if(ctl) miss('CONTROL: the tint pinned to lime in the test room still read as following — the check cannot fail'); else notes.push('CONTROL: the tint pinned to lime in the test room is caught'); }
       const nat=RS.roomSwitchDbg().nature, B=BD.bedDbg(); await sleep(200); const B2=BD.bedDbg();
       /* (2b) the forest's sound really goes: the live slots 2.5 s in, then parked after the fade */
       { await sleep(Math.max(0, 2500-(performance.now()-ts))); const N=RS.roomSwitchDbg().nature, on=N && N.slots[N.cur], old=N && N.slots[1-N.cur]; n+=2;
@@ -110,6 +123,8 @@ export async function checkNightRoomSwitch(){
         for(let k=0;k<80 && !RS.roomSwitchDbg().nature.slots[1-RS.roomSwitchDbg().nature.cur].parked;k++){ await sleep(100); A.ambienceTick(); }
         n++; const P=RS.roomSwitchDbg().nature; if(!P.slots[1-P.cur].parked) miss(`the forest's nature slot was not taken out of the graph after its fade (${((performance.now()-ts)/1000).toFixed(1)} s): `+JSON.stringify(P.slots)); }
       const back=RS.roomSwitch(FOREST); await back; const c2=counter.n, names=counter.names.slice(); counter.off(); counter=null; n+=5;
+      { await sleep(1500); n++; const h=getComputedStyle(document.documentElement).getPropertyValue('--cv-'+FR.tint).trim(), t=TN.tintNow(), want=`rgb(${parseInt(h.slice(1,3),16)}, ${parseInt(h.slice(3,5),16)}, ${parseInt(h.slice(5,7),16)})`;
+        if(t!==want) miss(`back in the forest the tint reads ${t}, not ${want}`); }   // DESIGN-1
       notes.push(`audio nodes made during two whole switches: ${c2-1} (CONTROL, the row's own node: counted ${c1>=1 ? 'yes' : 'NO'}); nature ${amb0 && amb0.id} → ${nat && nat.id}`);
       if(c1<1) miss('CONTROL: the node the row made inside the window was not counted');
       if(c2!==1) miss(`${c2-1} audio node(s) made during the switches: ${names.join(', ')}`);

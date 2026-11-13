@@ -11,6 +11,8 @@
   function lang(){ try{ var s=localStorage.getItem('handsong.night.lang'); if(s==='en' || s==='ru') return s; }catch(e){}
     var L=(navigator.languages && navigator.languages.length) ? navigator.languages : [navigator.language||'']; for(var i=0;i<L.length;i++){ var c=String(L[i]).slice(0,2).toLowerCase(); if(c==='en' || c==='ru') return c; } return 'en'; }
   try{ document.documentElement.setAttribute('lang', lang()); }catch(e){}
+  /* DESIGN-1 part D: which level's still the start screen shows from the first paint (night.css: html[data-still]) — the stored picture level */
+  try{ document.documentElement.setAttribute('data-still', localStorage.getItem('handsong.sceneLevel')==='full' ? 'full' : 'reduced'); }catch(e){}
   var done=false, failed=false, slow=false, t0=Date.now();
   function el(id){ return document.getElementById(id); }
   function show(kind){ var L=T[lang()], box=el('nightBootMsg'); if(!box) return false; el('nightBootText').textContent=L[kind]; var b=el('nightBootReload'); b.textContent=L.reload; b.hidden=false; box.hidden=false; box.setAttribute('data-kind', kind); return true; }
