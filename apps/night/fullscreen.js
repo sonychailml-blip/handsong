@@ -47,6 +47,8 @@ export function fsCamera(){ camRan=true; if(want && !fsOn() && !asking && naviga
 export const fsStarted=()=>{ started=true; camRan=true; if(fsOn()) want=false; };   // the camera runs: a full screen now on is done; an exit from here is the person's
 export function fsToggle(){ if(!fsOn()){ want=false; return ask(); } want=false; try{ const p=D.exitFullscreen ? D.exitFullscreen() : D.webkitExitFullscreen && D.webkitExitFullscreen(); if(p && p.catch) p.catch(()=>{}); }catch(e){} return Promise.resolve(false); }
 export const fsOnChange=f=>{ onChange=f; };
+/* NIGHT-13b: a full-screen request in flight (the Begin tap's own, or the camera's) — the start's dot waits for the layout to settle */
+export const fsAsking=()=>!!asking;
 /* the toggle is shown where full screen can be had and is not already given by the home-screen app */
 export const fsCanToggle=()=>fsApi() && !fsStandalone();
 /* probe only: the counters (asked, granted, refused, exits, asked again, deferred at Begin, asked while undecided, landscape lock), the camera

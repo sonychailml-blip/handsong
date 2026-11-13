@@ -8592,3 +8592,12 @@ not a control · run a "random" failure many times and print WHERE and HOW MUCH 
 - Water: stronger Fresnel, clear and wobbling near the viewer, a mirror of the trunks, crowns and moon against a brighter sky (Detailed every frame, Standard every 1.5 s), a flow map (narrows faster, pools slower, eddies behind rocks), a dark wet edge.
 - Standard costs as before (detections −0.3 / −1.2 % vs Dark); Detailed about 2–3 points dearer (−57.5 %).
 - Rows: data «FOREST relief», «FOREST water flow» (app); browser «FOREST ground and water». Waiting for step 148 (the user picks the floor).
+
+## Moved from docs/night/HANDOFF.md at NIGHT-13b (2026-11-13)
+### NIGHT-10 (2026-11-11): choosing the camera (+ CORE-16). Log: `docs/night/WORK-LOG.md`
+- Settings → Camera: «Front» / «Back» on a phone, device names on a computer (no hardware numbers), «Camera N» before the permission; shown with two or more cameras.
+- A tap switches live (music and hand model go on); kept on this device; a kept camera that is gone opens the default quietly.
+- The back camera is not mirrored (picture and hands together, one source `camFacing`); the right hand still plays (MediaPipe's own labels, never flipped).
+- The calibration stays per camera (a lens changes the hand's size in the picture); a camera not offered yet gets the offer after a switch.
+- Core: CORE-16 `core/vision.js` opt-in camera pick (Full calls none of it; FULL untouched holds).
+- Rows: data «NIGHT camera names (app)»; runner «NIGHT camera choice» (made-up front and back cameras, two CONTROLS). Waiting for step 149.

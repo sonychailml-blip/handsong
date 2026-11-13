@@ -368,16 +368,13 @@ html[data-still="full"] .night-still{ background-image:var(--night-still-veil), 
 .night-still-lights{ position:absolute; inset:0; width:100%; height:100%; display:block; }
 .night-still.breathe{ animation:night-still-breathe var(--night-breathe) ease-in-out infinite alternate; }
 @keyframes night-still-breathe{ from{ filter:brightness(.88); } to{ filter:brightness(1.06); } }
-.night-still-dot{ position:fixed; left:0; top:0; z-index:var(--z-night-still); width:var(--night-gap-sm); height:var(--night-gap-sm); border-radius:var(--night-r-pill); background:var(--night-brand);
+.night-still-dot{ position:fixed; left:0; top:0; z-index:var(--z-night-dot); width:var(--night-gap-sm); height:var(--night-gap-sm); border-radius:var(--night-r-pill); background:var(--night-brand);
   filter:brightness(var(--dot-glow)); pointer-events:none; will-change:transform, opacity; }
-.night-still-dot::before{ content:''; position:absolute; inset:calc(-180% * var(--dot-halo)); border-radius:var(--night-r-pill); background:var(--night-dot-halo); pointer-events:none; }   /* NIGHT-13: its halo — a soft glow filling its own box (no gap round the dot), grown by still.js (DOT) */
-/* NIGHT-13: the Begin tap — the emblem's dot brightens and grows a soft halo, then stays a little bright while the start card goes (the flying dot takes over
-   from that look: pure/still.js DOT.glowHeld, haloHeld); reduced motion: none */
-:root{ --night-dot-pulse:520ms; --dot-glow:1; --dot-halo:1;
-  --night-dot-halo:radial-gradient(circle closest-side, color-mix(in srgb, var(--night-tint) 55%, transparent), color-mix(in srgb, var(--night-tint) 16%, transparent) 50%, transparent); }   /* the flying dot's brightness and halo (still.js sets them on the dot) */
-.night-start-head .emblem-glow.night-dot-pulse{ transform-box:fill-box; transform-origin:center; animation:night-dot-pulse var(--night-dot-pulse) var(--night-ease) forwards; }
-@keyframes night-dot-pulse{ 0%{ filter:var(--night-brand-glow-f); transform:scale(1); }
-  45%{ filter:brightness(1.9) drop-shadow(0 0 14px var(--night-brand)) drop-shadow(0 0 4px var(--night-brand)); transform:scale(1.25); }
-  100%{ filter:brightness(1.45) drop-shadow(0 0 10px var(--night-brand)); transform:scale(1); } }
-@media (prefers-reduced-motion: reduce){ .night-start-head .emblem-glow.night-dot-pulse{ animation:none; } }
+.night-still-dot::before{ content:''; position:absolute; inset:calc(-180% * var(--dot-halo)); border-radius:var(--night-r-pill); background:var(--night-dot-halo); opacity:var(--dot-halo-a); pointer-events:none; }   /* NIGHT-13: its halo — a soft glow filling its own box (no gap round the dot), grown by still.js (DOT) */
+/* NIGHT-13b: the dot is one element from the Begin tap to its landing: above the start card (its flare sits exactly on the emblem's dot, which steps aside),
+   the reveal and the mist; its trail on a canvas just under it; brightness, halo size and halo strength set by still.js (pure/still.js DOT); reduced motion: none */
+:root{ --z-night-dot:calc(var(--z-menu) + 2); --dot-glow:1; --dot-halo:1; --dot-halo-a:1;
+  --night-dot-halo:radial-gradient(circle closest-side, color-mix(in srgb, var(--night-tint) 60%, transparent), color-mix(in srgb, var(--night-tint) 18%, transparent) 50%, transparent); }
+.night-dot-trail{ position:fixed; left:0; top:0; width:100vw; height:100vh; z-index:var(--z-night-dot); pointer-events:none; }
+.night-start-head .emblem-glow.night-dot-out{ opacity:0; }
 @media (prefers-reduced-motion: reduce){ .night-still.breathe{ animation:none; } }

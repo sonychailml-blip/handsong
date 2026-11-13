@@ -5,7 +5,7 @@ import './texts.js';   // NIGHT-7: Night's own texts join the dictionaries befor
 import './icons.js';   // NIGHT-7c: Night's own drawn icons join the shared table before the markup is filled
 import { boot } from '../../core/legacy-ui/boot.js';
 import { shellDoors, setFaceHook } from '../../core/legacy-ui/ui.js';
-import { sceneRoomAdd, setBackground, backgroundOf, sceneInfo, scenePausing, sceneRoom, sceneLevel, sceneRest, sceneFlyPick, sceneFlyAt } from './scene/host.js';
+import { sceneRoomAdd, setBackground, backgroundOf, sceneInfo, scenePausing, sceneRoom, sceneLevel, sceneRest, sceneFlyPick, sceneFlyAt, sceneFlyLand } from './scene/host.js';
 import { hooks } from '../../core/hooks.js';
 import { nightShellWire, nightShellFace } from './shell.js';
 import { calTick } from './calib.js';
@@ -33,7 +33,7 @@ nightShellWire(shellDoors()); setFaceHook(nightShellFace);
    still opening (wait), or another background (other: a plain fade) */
 stillWire(()=>{ if(backgroundOf()!=='forest') return 'other'; const I=sceneInfo(); if(!I.webgl || I.level==='minimal') return I.opening ? 'wait' : 'stand-in';
   const c=document.getElementById('scene'); return !I.opening && I.rendered>0 && c && !c.classList.contains('veil') ? 'ready' : 'wait'; },
-  { rest:sceneRest, fly:{ pick:sceneFlyPick, at:sceneFlyAt } });   // NIGHT-13: the room's camera held at rest through the hand-over; the firefly the dot becomes
+  { rest:sceneRest, fly:{ pick:sceneFlyPick, at:sceneFlyAt, land:sceneFlyLand } });   // NIGHT-13: the room's camera held at rest through the hand-over; the firefly the dot becomes
 /* afterDraw: the calibration's picture is drawn in the loop, while the camera snapshot is still open (NIGHT-2 stage 3) */
 const Q=new URLSearchParams(location.search), probeQ=Q.has('probe');
 boot({ profile:'profile.night', afterDraw:()=>calTick(),

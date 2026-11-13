@@ -130,7 +130,11 @@ async function statsPage(label, dir, breakName=null){ const served=[], bad=[], s
     if(r.format!=='handsong/handstats' || !(r.gain>2) || r.phase!=='done' || JSON.parse(r.text).format!==r.format) bad.push('the report is wrong: '+JSON.stringify(r).slice(0,160));
     if(r.csp.length) bad.push('CSP violation: '+r.csp.slice(0,3).join('; '));
     await page.click('#go');
-    const copied=await page.waitForFunction(async t=>(await navigator.clipboard.readText())===t, r.text, { timeout:10e3 }).then(()=>true,()=>false); if(!copied) bad.push('the clipboard does not hold the report');
+    /* NIGHT-13b: the clipboard read in the page and compared here, polled with a time limit (an async waitForFunction predicate is truthy at once:
+       Playwright does not await it — this check could never fail); CONTROL: another text is never «held» */
+    const clipHolds=async (t, ms)=>{ const t0=Date.now(); while(Date.now()-t0<ms){ const got=await page.evaluate(()=>navigator.clipboard.readText().catch(()=>null)); if(got===t) return true; await page.waitForTimeout(200); } return false; };
+    if(!await clipHolds(r.text, 10e3)) bad.push('the clipboard does not hold the report');
+    else if(await clipHolds(r.text+' (CONTROL)', 1500)) bad.push('CONTROL: another text reads as held — the clipboard check cannot fail');
     if(!served.some(([u,st])=>/handstats\.js$/.test(u)&&st===200)) bad.push('the page script was not served');
   }catch(e){ bad.push('error: '+(e&&e.message||e)); } finally{ await browser.close().catch(()=>{}); srv.close(); }
   out(`[smoke] measuring page, ${label}: ${bad.length?'NOT A PASS — '+bad.slice(0,5).join(' · '):'PASS'}`); return bad; }

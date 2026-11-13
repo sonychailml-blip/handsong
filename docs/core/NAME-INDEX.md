@@ -62,7 +62,7 @@ NIGHT-7b — NIGHT'S EDITION: the build's (core/edition.js: 'release' in a playe
 
 ## apps/night/fullscreen.js
 NIGHT-7c — FULL SCREEN on computers and Android (Chrome, Edge, Firefox; iPadOS Safari through its prefixed door).
-- const (9): `fsApi`, `fsOn`, `fsStandalone`, `FS_RETRIES`, `fsStarted`, `fsOnChange`, `fsCanToggle`, `fsDbg`, `fsAskAlwaysDbg`
+- const (10): `fsApi`, `fsOn`, `fsStandalone`, `FS_RETRIES`, `fsStarted`, `fsOnChange`, `fsAsking`, `fsCanToggle`, `fsDbg`, `fsAskAlwaysDbg`
 - fn (3): `fsBegin`, `fsCamera`, `fsToggle`
 
 ## apps/night/guard.js
@@ -167,7 +167,7 @@ NIGHT-3: THE ROOM RECORD's shape and validator (pure, rule #36; data row «NIGHT
 ## apps/night/pure/still.js
 DESIGN-1 part D: THE START SCREEN'S STILL AND THE REVEAL — the law (pure, rule #36; data row «NIGHT start still (app)»).
 - const (9): `STILL`, `STILL_PHASES`, `stillEase`, `stillDot`, `stillFile`, `stillTan`, `stillWidest`, `stillVeilMax`, `DOT`
-- fn (5): `stillPhase`, `stillLook`, `stillFit`, `stillVeil`, `dotFlight`
+- fn (7): `stillPhase`, `stillLook`, `stillFit`, `stillVeil`, `dotFlare`, `dotGate`, `dotFlight`
 
 ## apps/night/rooms/forest/forest-answers.js
 NIGHT-6 slice 1 — THE FOREST ANSWERS (parts of the night forest room; forest.js builds them; the numbers are ./pure/answers.js): - DEW: points on the low leaves in view, one draw; each twinkles on …
@@ -331,7 +331,7 @@ CORE-20: Night fetches only the modes it plays — every room's moods and the pa
 
 ## apps/night/scene/host.js
 THE SCENE HOST and Night's BACKGROUNDS (VIS1b, RUN 6; Night's own since CORE-8 — the shared UI reaches it through hooks.scene).
-- const (30): `BACKGROUNDS`, `sceneRoomAdd`, `sceneRoomRemove`, `sceneRooms`, `sceneRoom`, `sceneRoomSet`, `SCENE_LEVEL_DEFAULT`, `SCENE_FADE`, `scenePausing`, `COMPILE_LOG`, `sceneFlyPick`, `sceneFlyAt`, `sceneRestDbg`, `sceneLitDbg`, `backgroundOf`, `sceneLevel`, `sceneShadowDbg`, `sceneOptDbg`, `sceneInfo`, `sceneRoomDbg`, `sceneLostDbg`, `sceneStartNote`, `sceneStartLevelDbg`, `sceneGuardDbg`, `sceneLevelDbg`, `sceneHeldDbg`, `sceneProgramsDbg`, `sceneClockDbg`, `sceneBedDbg`, `sceneOpenDbg`
+- const (31): `BACKGROUNDS`, `sceneRoomAdd`, `sceneRoomRemove`, `sceneRooms`, `sceneRoom`, `sceneRoomSet`, `SCENE_LEVEL_DEFAULT`, `SCENE_FADE`, `scenePausing`, `COMPILE_LOG`, `sceneFlyPick`, `sceneFlyAt`, `sceneFlyLand`, `sceneRestDbg`, `sceneLitDbg`, `backgroundOf`, `sceneLevel`, `sceneShadowDbg`, `sceneOptDbg`, `sceneInfo`, `sceneRoomDbg`, `sceneLostDbg`, `sceneStartNote`, `sceneStartLevelDbg`, `sceneGuardDbg`, `sceneLevelDbg`, `sceneHeldDbg`, `sceneProgramsDbg`, `sceneClockDbg`, `sceneBedDbg`, `sceneOpenDbg`
 - fn (10): `loadThree`, `sceneOpen`, `sceneSwitch`, `sceneClose`, `sceneRest`, `setBackground`, `setSceneLevel`, `sceneSnapDbg`, `sceneShotDbg`, `sceneLoseDbg`
 
 ## apps/night/settabs.js
@@ -1299,7 +1299,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 - const (5): `TEST_ROOM_ID`, `TEST_ROOM`, `testRoomMode`, `testRoomInfo`, `testRoomFreeLeaks`
 - fn (2): `testRoomInstall`, `testRoomRemove`
 
-_256 modules, 2730 exported names._
+_256 modules, 2734 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

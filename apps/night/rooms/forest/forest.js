@@ -352,6 +352,8 @@ export function buildForest(T, opt){
     /* NIGHT-6 slice 1: a glass note of the bed makes one far firefly twinkle (its glow only — the law moves it as ever) */
     const GL=ANSWERS.bed.glass; glow1.fill(0);
     for(let j=twinkles.length-1;j>=0;j--){ const w=twinkles[j], a=t-w.t0; if(a>GL.rise+GL.hold+GL.fall || a<-60){ twinkles.splice(j,1); continue; } glow1[w.i]=Math.max(glow1[w.i], swellAt(a, GL.rise, GL.hold, GL.fall)*GL.amp); }
+    /* NIGHT-13b: the firefly the start's dot became swells as it lands, then glows on as itself */
+    for(let j=lands.length-1;j>=0;j--){ const w=lands[j], a=t-(w.t0==null ? (w.t0=t) : w.t0); if(a>LAND.rise+LAND.hold+LAND.fall || a<-60){ lands.splice(j,1); continue; } glow1[w.i]=Math.max(glow1[w.i], swellAt(a, LAND.rise, LAND.hold, LAND.fall)*LAND.amp); }
     flies.forEach((q,i)=>{ pa[i*3]=q.p[0]; pa[i*3+1]=q.p[1]; pa[i*3+2]=q.p[2]; ga[i]=(q.glow*mg+glow1[i])*fk; });
     fg.attributes.position.needsUpdate=fg.attributes.aGlow.needsUpdate=true;
     wild.forEach((l,i)=>{ const q=flies[Math.min(flies.length-1,i*7)]; l.position.set(q.p[0],q.p[1],q.p[2]); l.intensity=q.glow*0.7*(1+0.5*Math.min(1,music))*fk; });
@@ -385,6 +387,7 @@ export function buildForest(T, opt){
   function project(i){ const r=rigs[i]; tmp.copy(r.cur).project(camera); return { x:(tmp.x+1)/2*W, y:(1-tmp.y)/2*H, sat:r.sat, on:r.on }; }
   /* NIGHT-13: a firefly on the screen — its place (the room's view px), its drawn radius (px of the view: the point's size law over the pixel ratio), its glow,
      its distance; flyPick: the one the start's dot becomes — far (≥ 8 m), glowing, nearest to the deep middle of the picture (0.56, 0.5) */
+  const LAND=Object.freeze({ rise:0.15, hold:0.9, fall:1.6, amp:1.6 }), lands=[];   // NIGHT-13b
   const flyTmp=V(0,0,0), flyAt=i=>{ const q=flies[i]; if(!q) return null; flyTmp.set(q.p[0], q.p[1], q.p[2]); const z=flyTmp.clone().applyMatrix4(camera.matrixWorldInverse).z; flyTmp.project(camera);
     const px=Math.max(1.5, fm.uniforms.uSize.value*fm.uniforms.uScale.value/Math.max(0.1, -z)), k=pxH>0 ? H/pxH : 1;
     return { i, x:(flyTmp.x+1)/2*W, y:(1-flyTmp.y)/2*H, r:px*k/2, glow:q.glow*fkNow, dist:-z, front:z<0 && Math.abs(flyTmp.x)<1 && Math.abs(flyTmp.y)<1 }; };
@@ -424,6 +427,6 @@ export function buildForest(T, opt){
   return { id:FOREST_ROOM.id, scene:s, camera, update, resize, place, glint, project, state, dispose, lightsOf, lifeDbg:life, detailDbg:detail, bed, texBytes, answersDbg:answers, floorDbg:floor, streamDbg:stream, woodDbg:wood, gustDbg:gust, canopyDbg:canopy, dappleDbg:DU, render, paintDbg:paint, mirrorDbg:mirror, hiddenDbg:hidden, foxDbg:FU, fernsDbg:{ fronds, frondM, frondD }, groundDbg:{ U:macroU, branches, brs:brs.length, litter },   // NIGHT-8: probes
     held:sec=>{ heldNow= sec>0 ? sec : 0; rare.held(sec); }, rareDbg:kind=>rare.force(kind, now, { light:rigs[0].cur, flies }), viewDbg:o=>{ const lens=v=>!!(v && (v.fov || v.rest)), had=lens(viewOver); viewOver=o||null; if(had || lens(viewOver)) resize(W, H, pxH); else aimCamera(); return viewOver; },
     rest:on=>{ const was=restOn; restOn=!!on; if(restOn && !was){ goalOf(camLook, camGoal); camOff.copy(camGoal); motionK=0; aimCamera(); } return restOn; },   // NIGHT-13: the camera at rest (host sceneRest)
-    flyAt, flyPick,   // NIGHT-13: the start's dot becomes one of the fireflies
+    flyAt, flyPick, flyLand:i=>{ if(flies[i]) lands.push({ i, t0:null }); return !!flies[i]; },   // NIGHT-13: the start's dot becomes one of the fireflies; 13b: its landing swell
     restDbg:()=>({ rest:restOn, motionK, off:[camOff.x, camOff.y, camOff.z], cam:[camera.position.x, camera.position.y, camera.position.z], fov:camera.fov }) };   // RUN 9 (slice 4): held — how long the playing note is held (host); rareDbg — probes / captures   // RUN 9: lifeDbg / detailDbg — probes only (uniforms, silhouette boxes)
 }

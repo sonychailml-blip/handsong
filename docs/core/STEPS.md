@@ -58,6 +58,7 @@ THERE in full and here as one index entry):
   152 Last touches and a faster start: How to play on the start screen, Settings' two lines gone, MediaPipe's binary preloaded early, only Night's own modes (NIGHT-12, CORE-20)
   153 Colour roles with the room's tint, settings in three tabs, the start screen's still and the reveal after Begin (DESIGN-1)
   154 Polish after DESIGN-1: the dot becomes a firefly, the still lines up with the live forest, settings without «More», the coaching line clear of the bars, the hand's light on the nearest finger, all points in Night's look (NIGHT-13, CORE-21)
+  155 The dot's flight, stronger and steady: the flare, a 3.4-s flight onto a firefly, no jump when full screen is entered at Begin (NIGHT-13b)
 
 ## Moved to `archive/CLAUDE-history.md` at DOC1 (grep by title; read only what the slice needs)
 - «Module map (full, moved at DOC1)» — every module's detailed paragraph (AUD1a … IDS1, SONG1, AUTOSAVE1, PACK1 …).

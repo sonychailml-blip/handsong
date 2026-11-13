@@ -4,7 +4,7 @@
    reveal clears the still from the FAR point of the picture (its horizon) outwards to the near edges, under a mist over the whole picture that rises and clears; the emblem's glowing
    dot drifts into the picture as the first firefly. Reduced motion, or a background other than the room's picture: a plain fade. */
 export const STILL=Object.freeze({ revealMs:2600, fadeMs:700, sceneInMs:800, far:Object.freeze([0.5, 0.42]), soft:0.22, mist:0.2,
-  dotMs:1900, dotTo:Object.freeze([0.57, 0.6]), dotLift:0.16, dotR0:4.2, dotR1:2.2 });   // NIGHT-13: dotMs = DOT.flyMs, dotLift = DOT.lift (the flight below)
+  dotMs:3400, dotTo:Object.freeze([0.57, 0.6]), dotLift:0.12, dotR0:4.2, dotR1:2.2 });   // NIGHT-13b: dotMs = DOT.flyMs, dotLift = DOT.lift (the flight below)
 export const STILL_PHASES=Object.freeze(['start', 'wait', 'reveal', 'done']);
 const clamp=x=>Math.max(0, Math.min(1, x));
 export const stillEase=x=>{ x=clamp(x); return x<0.5 ? 2*x*x : 1-Math.pow(-2*x+2, 2)/2; };
@@ -48,14 +48,26 @@ export function stillVeil(V, emax, n=24){ const out=[], sm=x=>{ x=clamp((x-V.fro
   for(let i=0;i<=n;i++){ const e=V.from+(1-V.from)*i/n; out.push([e/emax, V.k*sm(e)]); } out.unshift([0, 0]); if(emax>1) out.push([1, V.k]); return out; }
 /* the vignette's far corner in ellipse units for its centre (cx, cy — cy from the top, as night.css draws it) */
 export const stillVeilMax=V=>Math.hypot(Math.max(V.cx, 1-V.cx)/V.rx, Math.max(V.cy, 1-V.cy)/V.ry);
-/* NIGHT-13: THE TAP'S PULSE AND THE FIREFLY'S FLIGHT — at the Begin tap the emblem's dot brightens and grows a soft halo (night.css, pulseMs), held a
-   little bright while the start card goes; then the dot, from that place and look, lifts off and flies deep into the forest along a lifted curve,
-   shrinking with the distance, and becomes one of the room's fireflies (the target: that firefly's place and size on the screen, followed while it drifts);
-   it fades over the last quarter, where the firefly itself is. The flight runs inside the reveal (flyMs < revealMs): it adds no wait.
-   dotFlight(q, from {x, y, r}, to {x, y, r}, h) at flight progress q 0…1 on a screen of height h → { x, y, r, a, glow (brightness ×), halo (its glow's size ×) } */
-export const DOT=Object.freeze({ pulseMs:520, flyMs:1900, lift:0.16, glowHeld:1.45, haloHeld:2, fadeFrom:0.75 });
+/* NIGHT-13 / 13b: THE TAP'S FLARE AND THE FIREFLY'S FLIGHT — the dot is ONE element from the tap to its landing (apps/night/still.js). At the Begin tap
+   it waits for the layout to settle (a full screen entered in the tap, any resize: dotGate), then sits exactly on the emblem's dot and FLARES — several
+   times brighter with a large bright halo (flareMs), settling to a held glow while the start card goes; once the reveal begins (and the flare is over) it
+   lifts off and flies along a gentle arc deep into the forest (flyMs, longer than the reveal: it outlives it and stays above the mist), shrinking to the
+   size of the firefly it becomes (the target: that firefly's place and size, followed while it drifts), with a soft trail; over the last part it lands
+   (fades on the firefly while the room makes that firefly swell: it stays as that firefly). Its clock stops while the layout is unsettled (still.js).
+   No wait is added: the start, the reveal and playing go on as before. */
+export const DOT=Object.freeze({ flareMs:700, flyMs:3400, quietMs:220, gateMaxMs:2500, lift:0.12, glowPeak:3.6, haloPeak:4.8, glowHeld:1.9, haloHeld:2.4,
+  glowEnd:1.35, haloEnd:1.6, landFrom:0.85, trailMs:520 });
+/* the flare at t ms since it began → { glow (brightness ×), halo (size ×) }: up to the peak in a fifth, held, then down to the held glow */
+export function dotFlare(t){ const q=clamp(t/DOT.flareMs), up=clamp(q/0.2), down=stillEase(clamp((q-0.45)/0.55));
+  const k= q<0.45 ? stillEase(up) : 1-down; return { glow:DOT.glowHeld+(DOT.glowPeak-DOT.glowHeld)*k, halo:DOT.haloHeld+(DOT.haloPeak-DOT.haloHeld)*k }; }
+/* the gate before the flare: g = { tapAt, now, lastChange (the last resize / full-screen change, or null), asking (a full-screen request in flight) } →
+   true when the layout has settled: nothing asked, quiet for quietMs since the last change (and one frame after the tap), or gateMaxMs past the tap */
+export function dotGate(g){ if(g.now-g.tapAt>=DOT.gateMaxMs) return true; if(g.asking) return false;
+  const last=Math.max(g.tapAt, g.lastChange==null ? -Infinity : g.lastChange); return g.now-last>=DOT.quietMs; }
+/* dotFlight(q, from {x, y, r}, to {x, y, r}, h) at flight progress q 0…1 on a screen of height h → { x, y, r, a, glow, halo } — a gentle arc (the control
+   point a little above the higher end), the radius to the firefly's, the glow from held to its end, fading from landFrom */
 export function dotFlight(q, A, B, h){
   q=clamp(q); const e=stillEase(q), cx=(A.x+B.x)/2, cy=Math.min(A.y, B.y)-DOT.lift*h;
-  const x=(1-e)*(1-e)*A.x+2*(1-e)*e*cx+e*e*B.x, y=(1-e)*(1-e)*A.y+2*(1-e)*e*cy+e*e*B.y;
-  return { x, y, r:A.r+(B.r-A.r)*e, a: q<DOT.fadeFrom ? 1 : 1-(q-DOT.fadeFrom)/(1-DOT.fadeFrom), glow:DOT.glowHeld+(1-DOT.glowHeld)*e, halo:DOT.haloHeld+(1-DOT.haloHeld)*e };
+  const x=(1-e)*(1-e)*A.x+2*(1-e)*e*cx+e*e*B.x, y=(1-e)*(1-e)*A.y+2*(1-e)*e*cy+e*e*B.y, rq=Math.pow(e, 0.8);
+  return { x, y, r:A.r+(B.r-A.r)*rq, a: q<DOT.landFrom ? 1 : 1-(q-DOT.landFrom)/(1-DOT.landFrom), glow:DOT.glowHeld+(DOT.glowEnd-DOT.glowHeld)*e, halo:DOT.haloHeld+(DOT.haloEnd-DOT.haloHeld)*e };
 }

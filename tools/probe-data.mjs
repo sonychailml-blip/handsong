@@ -1781,8 +1781,19 @@ async function nightStartStill(){
     /* NIGHT-13: the flight to a firefly — from the emblem's place, radius and held glow to the firefly's place and size, faded there, inside the reveal */
     n+=3; const A={ x:75, y:40, r:5 }, B={ x:700, y:380, r:1.2 }, f0=SL.dotFlight(0, A, B, 800), f1=SL.dotFlight(1, A, B, 800);
     if(f0.x!==75 || f0.y!==40 || f0.r!==5 || f0.glow!==SL.DOT.glowHeld || f0.halo!==SL.DOT.haloHeld) miss('the flight does not start at the emblem in its held look: '+JSON.stringify(f0));
-    if(f1.x!==700 || f1.y!==380 || Math.abs(f1.r-1.2)>1e-12 || f1.a!==0 || f1.glow!==1) miss('the flight does not end on the firefly, at its size, faded: '+JSON.stringify(f1));
-    if(!(SL.DOT.flyMs<SL.STILL.revealMs && SL.DOT.flyMs>=1500 && SL.DOT.flyMs+SL.DOT.pulseMs<=2600)) miss(`the flight takes ${SL.DOT.flyMs} ms (inside the reveal's ${SL.STILL.revealMs} ms, about 1.5–2.5 s with the pulse wanted)`); }
+    if(f1.x!==700 || f1.y!==380 || Math.abs(f1.r-1.2)>1e-12 || f1.a!==0 || Math.abs(f1.glow-SL.DOT.glowEnd)>1e-12) miss('the flight does not end on the firefly, at its size, faded: '+JSON.stringify(f1));
+    /* NIGHT-13b: the flare 0.6–0.8 s, several times brighter (≥ 3×) with a large halo (≥ 4×), back to the held glow; the flight 3–4 s; visible until the landing */
+    n+=6; const D=SL.DOT; if(!(D.flareMs>=600 && D.flareMs<=800)) miss(`the flare takes ${D.flareMs} ms (0.6–0.8 s wanted)`);
+    if(!(D.flyMs>=3000 && D.flyMs<=4000)) miss(`the flight takes ${D.flyMs} ms (3–4 s wanted)`);
+    { let pk=0, ph=0; for(let t=0;t<=D.flareMs;t+=10){ const F=SL.dotFlare(t); pk=Math.max(pk, F.glow); ph=Math.max(ph, F.halo); } const e=SL.dotFlare(D.flareMs), z=SL.dotFlare(0);
+      if(!(pk>=3 && ph>=4)) miss(`the flare peaks at ${pk.toFixed(2)}× bright, a ${ph.toFixed(2)}× halo (≥ 3× and ≥ 4× wanted)`);
+      if(Math.abs(e.glow-D.glowHeld)>1e-9 || Math.abs(z.glow-D.glowHeld)>1e-9) miss('the flare does not start and end at the held glow'); }
+    { let low=Infinity; for(let q=0;q<D.landFrom;q+=0.01) low=Math.min(low, SL.dotFlight(q, A, B, 800).a); if(low<1) miss(`the dot fades before its landing (${low} at q < ${D.landFrom})`); }
+    /* the gate: a full-screen request in flight waits; quiet for quietMs after the last change goes; never longer than gateMaxMs; one frame after the tap at least */
+    { const judge=G=>[G({ tapAt:0, now:300, lastChange:null, asking:true })===false, G({ tapAt:0, now:500, lastChange:400, asking:false })===false, G({ tapAt:0, now:400+D.quietMs, lastChange:400, asking:false })===true,
+        G({ tapAt:0, now:D.gateMaxMs, lastChange:D.gateMaxMs-10, asking:true })===true, G({ tapAt:0, now:D.quietMs, lastChange:null, asking:false })===true, G({ tapAt:0, now:16, lastChange:null, asking:false })===false];
+      const ok=judge(SL.dotGate); if(ok.some(x=>!x)) miss('the gate: '+JSON.stringify(ok));
+      if(!judge(()=>true).some(x=>!x)) miss('CONTROL: a gate that never waits passed the gate checks'); else notes.push('CONTROL: a gate that never waits (a full screen in flight, a resize) is caught'); } }
   /* NIGHT-13: THE GEOMETRY — the still as placed (stillFit) shows every world direction where the live camera shows it, on every screen shape (portrait and
      landscape phones, laptops, full screens, a screen just under 4 : 5, the widest it covers); the corner silhouettes' 2D law = the 3D placement's projection;
      the files' own aspect = the record's; night.css's first paint = the law (the heights, the two screen limits, the vignette veil). CONTROL: DESIGN-1's fit

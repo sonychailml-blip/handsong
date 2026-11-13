@@ -221,6 +221,7 @@ export function sceneRest(on){ restWant=!!on; if(room && room.rest) room.rest(re
 /* NIGHT-13: the firefly the start's dot becomes — picked by the room (far, glowing, in the deep middle), then its place and size on the screen (view px) */
 export const sceneFlyPick=()=> room && room.flyPick && !opening ? room.flyPick() : null;
 export const sceneFlyAt=i=> room && room.flyAt && i!=null ? room.flyAt(i) : null;
+export const sceneFlyLand=i=> !!(room && room.flyLand && i!=null && room.flyLand(i));   // NIGHT-13b: the firefly swells as the dot lands on it
 export const sceneRestDbg=()=>({ want:restWant, room: room && room.restDbg ? room.restDbg() : null });
 /* NIGHT-13: the hands as the rooms see them — each light between the thumb and its nearest finger (pure/handlight.js), with its glow; a view without
    fingertips passes as it is. Visual only: the bus's handsView is never changed (the bars, the coaching line and the sound read it as before) */

@@ -906,7 +906,7 @@ const REVEAL_REC=()=>{ window.__rv=[]; window.__rvStop=false; const t0=performan
     const step=()=>{ const st=S.stillDbg(), c=document.getElementById('scene'), I=H.sceneInfo();
       window.__rv.push({ t:Math.round(performance.now()-t0), start:document.getElementById('start').classList.contains('on'), phase:st.phase, look:st.look, shown:st.shown,
         breathe:document.getElementById('nightStill').classList.contains('breathe'), dot:st.dot, sop:c ? +getComputedStyle(c).opacity : 0, veil:c ? c.classList.contains('veil') : true, rendered:I.rendered||0,
-        pulse:st.pulse, rest:(H.sceneRestDbg().room||{}).rest, motionK:(H.sceneRestDbg().room||{}).motionK });   // NIGHT-13: the tap's pulse, the room's camera at rest
+        pulse:st.pulse, rest:(H.sceneRestDbg().room||{}).rest, motionK:(H.sceneRestDbg().room||{}).motionK, dotSt:st.dotSt });   // NIGHT-13b: the dot outlives the reveal   // NIGHT-13: the tap's pulse, the room's camera at rest
       if(!window.__rvStop) requestAnimationFrame(step); };
     requestAnimationFrame(step); })(); };
 async function revealRun(page, o={}){
@@ -922,7 +922,7 @@ async function revealRun(page, o={}){
     await c.p.evaluate(REVEAL_REC); await tapAt(c.p, '#nightBegin');
     await c.p.waitForFunction(()=>!document.getElementById('start').classList.contains('on'), null, { timeout:LIMIT_START });
     if(o.late){ await c.p.waitForTimeout(2500); open(); }
-    const done=await c.p.waitForFunction(()=>{ const f=window.__rv[window.__rv.length-1]; return !!f && f.phase==='done' && f.sop>=0.99 && !f.veil && f.rendered>0; }, null, { timeout:90e3, polling:200 }).then(()=>true, ()=>false);
+    const done=await c.p.waitForFunction(()=>{ const f=window.__rv[window.__rv.length-1]; return !!f && f.phase==='done' && f.sop>=0.99 && !f.veil && f.rendered>0 && (f.dotSt==='done' || f.dotSt==='off'); }, null, { timeout:90e3, polling:200 }).then(()=>true, ()=>false);
     await c.p.waitForTimeout(400); await c.p.evaluate(()=>{ window.__rvStop=true; });
     const F=await c.p.evaluate(()=>window.__rv.slice());
     return { F, done, lights:pre.draws-d0, plain:pre.plain, image:pre.image };
@@ -1022,6 +1022,69 @@ async function uiNightStillMatch(page, label){
     if(!matchOk(m)) bad.push(`${at}: the still and the first live frame do not line up — ${matchTxt(m)}`); else lines.push(`${at}: ${matchTxt(m)}`); }
   const k=await stillMatchRun(page, { width:1536, height:730 }, { q:'&oldstill', old:true });
   if(k.err || matchOk(k)) bad.push(`CONTROL: DESIGN-1's fit on the laptop window ${k.err ? 'did not run: '+k.err : 'lined up — the check cannot fail ('+matchTxt(k)+')'}`); else lines.push(`CONTROL: DESIGN-1's fit on the laptop window is caught — ${matchTxt(k)}`);
+  return { pass:!bad.length, lines:[...lines.map(l=>`${label}: ${l}`), ...bad.map(b=>`${label}: NOT A PASS — ${b}`)] };
+}
+
+/* NIGHT-13b — «NIGHT dot flight»: the start's dot from the Begin tap to its landing, frame by frame, on fresh profiles with the forest (Standard). Cases: the
+   screen already at its final size (full screen on before Begin) and the layout resized right after the tap (as when the tap enters full screen: a phone
+   upright 390 × 760 → 844, on its side 844 × 340 → 390, a laptop window 1280 × 720 → 800), and a laptop resized in the middle of the flight
+   (1280 × 800 → 1536 × 864). Judged per frame: while the start card shows, the dot sits on the emblem's dot (within 1.5 px — it never shows at a stale place);
+   between two shown frames it moves at most 30 px (no jump; a frame after a hold is judged against its new layout); the flare peaks ≥ 3× bright; the flight
+   lasts 3–4 s (its own clock, less the holds) and the dot stays fully visible until its landing; it lands on a firefly (within its radius + 2 px; the room
+   told); the dot is above the start card, the still and the mist; the controls come while it flies (no wait added). CONTROL: ?probe&dotnogate (no gate,
+   no re-measure) with the phone upright resized at the tap must fail «on the emblem». */
+const DOT_REC=()=>{ window.__dr=[]; window.__drStop=false; const t0=performance.now();
+  (async ()=>{ const S=await import('/apps/night/still.js'); const $=id=>document.getElementById(id);
+    const step=()=>{ const st=S.stillDbg(), el=$('nightStillDot'), sh=$('nightShell');
+      window.__dr.push({ t:Math.round(performance.now()-t0), w:innerWidth, h:innerHeight, card:$('start').classList.contains('on'), st:st.dotSt, dot:st.dot, emb:st.emblem, shown:!!el && !el.hidden && +getComputedStyle(el).opacity>0.01,
+        op:el ? +getComputedStyle(el).opacity : 0, shell:!!sh && sh.classList.contains('show'), phase:st.phase });
+      if(!window.__drStop) requestAnimationFrame(step); };
+    requestAnimationFrame(step); })(); };
+async function dotRun(page, o){
+  const c=await freshPage(page, { q:o.q||'', init:[()=>{ try{ localStorage.setItem('handsong.nightBg','forest'); localStorage.setItem('handsong.sceneLevel','reduced'); }catch(e){} }, null] });
+  try{
+    await c.p.setViewportSize(o.from || o.vp); await c.p.goto(c.url); await c.p.waitForFunction(()=>window.__nightBoot && window.__nightBoot.state().done, null, { timeout:60e3 });
+    await c.p.evaluate(async ()=>{ window.__st=await import('/apps/night/still.js'); }); await c.p.waitForTimeout(600);
+    const z=await c.p.evaluate(()=>{ const n=e=>+getComputedStyle(document.getElementById(e)).zIndex||0; return { dot:n('nightStillDot'), trail:n('nightDotTrail'), start:n('start'), still:n('nightStill'), mist:n('nightStillMist') }; });
+    await c.p.evaluate(DOT_REC); await tapAt(c.p, '#nightBegin');
+    if(o.from) await c.p.setViewportSize(o.vp);   // the layout changes in the tap (as a full screen entered there)
+    if(o.mid){ await c.p.waitForFunction(()=>window.__st.stillDbg().dotSt==='fly', null, { timeout:120e3, polling:50 }); await c.p.waitForTimeout(1000); await c.p.setViewportSize(o.mid); }
+    const done=await c.p.waitForFunction(()=>window.__st.stillDbg().dotSt==='done', null, { timeout:150e3, polling:100 }).then(()=>true, ()=>false);
+    await c.p.waitForTimeout(200); await c.p.evaluate(()=>{ window.__drStop=true; });
+    const F=await c.p.evaluate(()=>window.__dr.slice()), D=await c.p.evaluate(()=>{ const d=window.__st.stillDbg(); return { peak:d.dotPeak, log:d.dotLog }; });
+    return { F, D, z, done };
+  } finally { await c.ctx.close().catch(()=>{}); }
+}
+function dotJudge(R){
+  const bad=[], F=R.F, D=R.D;
+  if(!R.done) bad.push('the dot did not finish within 150 s');
+  let off=0, offAt=null; for(const f of F) if(f.shown && f.card && f.emb && f.dot && (f.st==='flare' || f.st==='held')){ const e=Math.hypot(f.dot.x-f.emb.x, f.dot.y-f.emb.y); if(e>off){ off=e; offAt=f; } }
+  if(off>1.5) bad.push(`the dot is off the emblem's dot by ${off.toFixed(1)} px while the card shows (at ${offAt.t} ms, ${offAt.w}×${offAt.h})`);
+  let jump=0, jumpAt=null; for(let i=1;i<F.length;i++){ const a=F[i-1], b=F[i]; if(!(a.shown && b.shown && a.dot && b.dot) || a.w!==b.w || a.h!==b.h) continue; const m=Math.hypot(b.dot.x-a.dot.x, b.dot.y-a.dot.y); if(m>jump){ jump=m; jumpAt=b; } }
+  if(jump>30) bad.push(`the dot jumped ${jump.toFixed(0)} px in one frame (at ${jumpAt.t} ms, ${jumpAt.st})`);
+  if(!(D.peak>=3)) bad.push(`the flare peaked at ${(+D.peak).toFixed(2)}× (≥ 3× wanted)`);
+  const ev=k=>D.log.filter(x=>x.ev===k), fly=ev('fly')[0], end=ev('done')[0], holds=D.log.filter(x=>x.ev==='hold').length;
+  const flyFrames=F.filter(f=>f.st==='fly' && f.dot && f.dot.q<0.85), hidden=flyFrames.filter(f=>!f.shown || f.op<0.99);
+  const flyMs=fly && end ? end.t-fly.t : 0, held=F.filter(f=>f.st==='fly' && !f.shown).length*16;
+  if(!(flyMs-held>=2900 && flyMs-held<=4300)) bad.push(`the flight took ${flyMs} ms (${holds} holds) — 3–4 s wanted`);
+  if(hidden.length>(holds ? 40 : 0)) bad.push(`the dot was hidden or faint in ${hidden.length} flight frames before its landing`);
+  const last=F.filter(f=>f.st==='fly' && f.dot && f.dot.to && f.dot.q>=0.9).pop();
+  if(!last || Math.hypot(last.dot.x-last.dot.to.x, last.dot.y-last.dot.to.y)>last.dot.to.r+2 || !ev('land').length) bad.push(`the dot did not land on a firefly (${last ? JSON.stringify({ x:last.dot.x, y:last.dot.y, to:last.dot.to }) : 'no flight frame'}, landing told ${ev('land').length})`);
+  if(!(R.z.dot>R.z.start && R.z.dot>R.z.still && R.z.dot>=R.z.mist)) bad.push('the dot is not above the start card, the still and the mist: '+JSON.stringify(R.z));
+  if(!F.some(f=>f.st==='fly' && f.shell)) bad.push('the controls did not come while the dot flew');
+  return { bad, off, jump, flyMs:flyMs-held, holds, peak:D.peak };
+}
+async function uiNightDot(page, label){
+  const lines=[], bad=[];
+  const CASES=[['phone upright, full screen before', { vp:{ width:390, height:844 } }], ['phone upright, full screen at Begin', { from:{ width:390, height:760 }, vp:{ width:390, height:844 } }],
+    ['phone on its side, before', { vp:{ width:844, height:390 } }], ['phone on its side, at Begin', { from:{ width:844, height:340 }, vp:{ width:844, height:390 } }],
+    ['laptop, before', { vp:{ width:1280, height:800 } }], ['laptop, at Begin', { from:{ width:1280, height:720 }, vp:{ width:1280, height:800 } }],
+    ['laptop, resized mid-flight', { vp:{ width:1280, height:800 }, mid:{ width:1536, height:864 } }]];
+  for(const [name, o] of CASES){ const r=await dotRun(page, o), J=dotJudge(r);
+    if(J.bad.length) bad.push(`${name}: ${J.bad.join('; ')}`);
+    else lines.push(`${name}: on the emblem within ${J.off.toFixed(2)} px, largest step ${J.jump.toFixed(1)} px, flare ${J.peak.toFixed(2)}×, flight ${(J.flyMs/1000).toFixed(2)} s (${J.holds} holds), landed on a firefly, above the card and the mist, the controls came while it flew`); }
+  const k=await dotRun(page, { from:{ width:390, height:760 }, vp:{ width:390, height:844 }, q:'&dotnogate' }), K=dotJudge(k);
+  if(!(K.off>1.5)) bad.push(`CONTROL: the old way (no gate, no re-measure) stayed on the emblem (${K.off.toFixed(2)} px) — the check cannot fail`); else lines.push(`CONTROL: the old way with the layout resized at the tap is caught — the dot ${K.off.toFixed(1)} px off the emblem`);
   return { pass:!bad.length, lines:[...lines.map(l=>`${label}: ${l}`), ...bad.map(b=>`${label}: NOT A PASS — ${b}`)] };
 }
 
@@ -1371,6 +1434,7 @@ async function session(port, plan, label){
         ['NIGHT how to play', uiNightHowTo, 4*LIMIT_START, true], ['NIGHT settings tabs', uiNightSettings, 4*LIMIT_START, true],   // DESIGN-1 part C
         ['NIGHT reveal', uiNightReveal, 4*LIMIT_START, true],   // DESIGN-1 part D
         ['NIGHT still matches the live room', uiNightStillMatch, 9*LIMIT_START, true],   // NIGHT-13
+        ['NIGHT dot flight', uiNightDot, 10*LIMIT_START, true],   // NIGHT-13b
         ['NIGHT start timeline', uiNightTimeline, (THROTTLE ? 25 : 8)*60e3, false],   // NIGHT-12, NIGHT-11 part 3
         ['NIGHT first contact order', uiNightOrder, 4*LIMIT_START, true]];   // NIGHT-11 part 4
       const all=[];

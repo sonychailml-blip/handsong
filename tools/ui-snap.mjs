@@ -24,7 +24,7 @@ const ONLY=val('--only');   // comma list of screens
 const FOREST=argv.includes('--forest');   // RUN 9: the forest's own screens (GPU capture, the Night face)
 const TINT_DEMO=argv.includes('--tint-demo');   // DESIGN-1: the interface's tint in the forest and in the dev test room (warm amber), the same screens
 const REVEAL=argv.includes('--reveal');   // DESIGN-1 part D: the start still and the reveal held at fixed moments (apps/night/still.js stillDbg pin)
-const N13=val('--n13'), N13_OLD=argv.includes('--n13-old');   // NIGHT-13: 'all' | 'match' — the polish's screens; --n13-old: today's way where the app can still show it (DESIGN-1's still fit, the coaching line's old width, the light on thumb and index)
+const N13=val('--n13'), N13_OLD=argv.includes('--n13-old'), N13_ENTER=val('--n13-enter');   // NIGHT-13b: --n13 dot — the dot's flight in real time; --n13-enter WxH: the first size, the final one (--viewport) set in the Begin tap (as a full screen entered there)   // NIGHT-13: 'all' | 'match' — the polish's screens; --n13-old: today's way where the app can still show it (DESIGN-1's still fit, the coaching line's old width, the light on thumb and index)
 const VIEWPORT=val('--viewport');   // NIGHT-13: the first viewport, «WxH»
 const NIGHT=argv.includes('--night') || FOREST || TINT_DEMO || REVEAL || !!N13;   // RUN 7 (C6/C11): the Night face's screens instead (a phone viewport, the page apps/night/)
 const DPR=+val('--dpr')||0;   // NIGHT-11: the device pixel ratio of the capture (a mid phone is about 2.75; default 2 on the Night screens, 1 elsewhere)
@@ -209,17 +209,24 @@ const SCREENS_N13_MATCH=[
   ['n13-match-still', async p=>{ await p.waitForTimeout(1500); await p.evaluate(async ()=>{ window.__st=await import('/apps/night/still.js'); window.__st.stillDbg({ freeze:true }); });
     await p.waitForFunction(old=>{ const d=window.__st.stillDbg(); return !!d.fit && (old || d.overDrawn>0); }, N13_OLD, { timeout:20e3 });
     await p.addStyleTag({ content:N13_HIDE_A }); n13A=await n13Shot(p); }],
-  /* the tap's look on the emblem, shown before the tap (a cached start ends within a frame or two, the card gone before a shot): the very class the tap adds */
-  ['n13-tap-peak', async p=>{ await n13Drop(p, 'n13-a'); await p.evaluate(()=>document.querySelector('.night-start-head .emblem-glow').classList.add('night-dot-pulse'));   // held at its peak (45 % of 520 ms)
-    await p.addStyleTag({ content:'.night-start-head .emblem-glow.night-dot-pulse{ animation-play-state:paused !important; animation-delay:-234ms !important; } /*n13-peak*/' }); await p.waitForTimeout(150); }],
-  ['n13-tap-held', async p=>{ await n13Drop(p, 'n13-peak'); await p.waitForTimeout(700); }],
-  ['n13-fly-0', async p=>{ await p.evaluate(()=>document.querySelector('.night-start-head .emblem-glow').classList.remove('night-dot-pulse')); await p.click('#nightBegin'); await p.waitForFunction(()=>{ const s=document.getElementById('start'); return s && !s.classList.contains('on'); }, null, { timeout:180e3 });
+  ['n13-fly-0', async p=>{ await n13Drop(p, 'n13-a'); await p.click('#nightBegin'); await p.waitForFunction(()=>{ const s=document.getElementById('start'); return s && !s.classList.contains('on'); }, null, { timeout:180e3 });
     await p.evaluate(async ()=>{ window.__st.stillDbg({ pin:0 }); const G=await import('/core/gestures.js'); G.handsProbe(null); });
     await p.waitForFunction(()=>window.__st.stillDbg().readyAt!=null, null, { timeout:120e3, polling:200 }); await p.waitForTimeout(1200); await revealPin(p, 0); }],
   ...[1,2,3,4,5,6].map(k=>['n13-fly-'+k, async p=>{ await revealPin(p, Math.round(k*0.73/6*1000)/1000); }]),
   ['n13-live', async p=>{ await p.evaluate(()=>window.__st.stillDbg({ pin:null })); await p.waitForFunction(()=>window.__st.stillDbg().phase==='done', null, { timeout:30e3, polling:50 });
     await p.evaluate(async old=>{ if(!old) (await import('/apps/night/scene/host.js')).sceneRest(true); }, N13_OLD); await p.waitForTimeout(300); }],
   ['n13-match-live', async p=>{ await p.addStyleTag({ content:N13_HIDE_B }); const b=await n13Shot(p); if(n13A) await writeFile(path.join(OUT, SAVE, 'n13-match-edges.png'), Buffer.from(await n13Edges(p, n13A, b), 'base64')); }],
+];
+/* NIGHT-13b: --n13 dot — the start screen, then the Begin tap (with --n13-enter: the screen resized in the tap) and the screen photographed as fast as it
+   goes until the dot has landed (at most 22 s): n13d-00.png … with their times in n13d.json */
+const SCREENS_N13_DOT=[
+  ['n13d-start', async p=>{ await p.waitForTimeout(2500); }],
+  ['n13d-last', async p=>{ const dir=path.join(OUT, SAVE), times=[]; await p.evaluate(async ()=>{ window.__st=await import('/apps/night/still.js'); });
+    await p.click('#nightBegin'); const t0=Date.now(); if(N13_ENTER && VIEWPORT){ const [w,h]=VIEWPORT.split('x').map(Number); await p.setViewportSize({ width:w, height:h }); }
+    for(let k=0;k<120 && Date.now()-t0<22e3;k++){ const png=await p.screenshot({ animations:'allow', caret:'hide' }), st=await p.evaluate(()=>{ const d=window.__st.stillDbg(); return { st:d.dotSt, q:d.dot && d.dot.q }; });
+      await writeFile(path.join(dir, `n13d-${String(k).padStart(2,'0')}.png`), png); times.push({ k, t:Date.now()-t0, st:st.st, q:st.q });
+      if(st.st==='done' && times.filter(x=>x.st==='done').length>=2) break; }
+    await writeFile(path.join(dir, 'n13d.json'), JSON.stringify({ enter:N13_ENTER||null, viewport:VIEWPORT, times })); }],
 ];
 const SCREENS_N13=[...SCREENS_N13_MATCH,
   ['n13-light-index', async p=>{ await n13Drop(p, 'n13-b'); await p.evaluate(async old=>{ const H=await import('/apps/night/scene/host.js'); H.sceneRest(false); H.sceneLitDbg({ off:old }); }, N13_OLD); await n13Hands(p, [0.55, 1.1, 1.2, 1.3]); }],
@@ -341,18 +348,18 @@ async function capture(tag){
     const page=await ctx.newPage();
     if(LAPTOP){ const real=page.setViewportSize.bind(page); page.setViewportSize=v=>real(VP_LAPTOP[v.width+'x'+v.height]||v); }   // DESIGN-1: every screen's own size mapped
     const errs=[]; page.on('pageerror',e=>errs.push(String(e&&e.message||e))); page.on('console',m=>{ if(m.type()==='error') errs.push('console: '+m.text().slice(0,600)); });   // NIGHT-8c: a shader that fails to compile shows here
-    if(VIEWPORT){ const [w,h]=VIEWPORT.split('x').map(Number); await page.setViewportSize({ width:w, height:h }); }   // NIGHT-13
+    { const vp=N13_ENTER||VIEWPORT; if(vp){ const [w,h]=vp.split('x').map(Number); await page.setViewportSize({ width:w, height:h }); } }   // NIGHT-13; 13b: the first size of a resize in the tap
     await page.goto(`http://127.0.0.1:${port}/apps/${NIGHT?'night':'full'}/index.html?probe${TINT_DEMO ? '&testroom' : ''}${N13 && N13_OLD ? '&oldstill' : ''}`);
     await page.waitForFunction(()=>window.P && window.R, null, { timeout:60e3 }); await page.waitForTimeout(800);
     const FAST=argv.includes('--fast') ? new Set(['f-start','f-wide-still','f-wide-notes','f-close-water','f-close-rocks','f-close-ground','f-close-ground-off','f-close-far','f-close-bank','f-close-foot','f-close-trunks','f-close-trunk-l','f-close-trunk-r','f-close-end']) : null;   // NIGHT-8: look iterations — the start and the laptop-sized views only
-    for(const [name,act] of (N13 ? (N13==='match' ? SCREENS_N13_MATCH : SCREENS_N13) : REVEAL ? SCREENS_REVEAL : TINT_DEMO ? SCREENS_TINT : FOREST ? SCREENS_FOREST.filter(([n])=>!FAST || FAST.has(n)) : NIGHT ? SCREENS_NIGHT : SCREENS)){
+    for(const [name,act] of (N13 ? (N13==='match' ? SCREENS_N13_MATCH : N13==='dot' ? SCREENS_N13_DOT : SCREENS_N13) : REVEAL ? SCREENS_REVEAL : TINT_DEMO ? SCREENS_TINT : FOREST ? SCREENS_FOREST.filter(([n])=>!FAST || FAST.has(n)) : NIGHT ? SCREENS_NIGHT : SCREENS)){
       await act(page);
       if(ONLY && !ONLY.split(',').includes(name)) continue;
       await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
       if(BAR_KEEP.has(name)) await barOpen(page);   // RUN 8: the capture waits for an open top bar (the app is untouched)
       const st= FOREST || REVEAL || N13 ? { els:{}, table:[], props:[] } : await page.evaluate(STYLES_FN);   // RUN 9: the forest screens are pictures only (the style walk takes seconds — a falling star is over by then)
       if(BAR_KEEP.has(name) && await page.evaluate(()=>document.getElementById('bar').classList.contains('min'))) await barOpen(page);   // the style walk outlasted the bar's timer
-      const png=await page.screenshot({ animations: name==='n13-tap-peak' ? 'allow' : 'disabled', caret:'hide' });   // NIGHT-13: the tap's pulse held mid-way (a disabled animation would jump to its end)
+      const png=await page.screenshot({ animations:'disabled', caret:'hide' });
       await writeFile(path.join(dir,name+'.png'), png); res.screens[name]=st;
       if(FOREST){ const u=await page.evaluate(async ()=>{ const H=await import('/apps/night/scene/host.js'); return H.sceneShotDbg(); });   // NIGHT-8: the room's own frame too (no interface over the water and the ground)
         if(u) await writeFile(path.join(dir,name+'-room.png'), Buffer.from(u.split(',')[1], 'base64')); }

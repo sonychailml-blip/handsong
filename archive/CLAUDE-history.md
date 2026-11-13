@@ -1965,6 +1965,10 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
     3. The Poco on its side while playing (both hands up): whenever a coaching line shows (the first-minute hints, the calibration offer with its two buttons), it never touches the bars at the sides (the bars' words step aside while a line shows; their icons stay).
     4. The hand's light in the forest: bring each finger slowly towards the thumb — the light sits between the thumb and whichever finger is nearest, glides from one pair to the next without flicker (also with two fingers about equally near), and brightens as that finger closes; the notes sound exactly as before (which note, when).
     5. Settings → Hands → Hands on screen → All points: the hand drawn as Night's soft fireflies (the five fingertips as before, the other points small dim glows), no white dots or labels of the old style.
+155. The dot's flight, stronger and steady (NIGHT-13b), three checks by hand; the rest is in the runner's «NIGHT dot flight» and «NIGHT reveal», the data row «NIGHT start still» and the sequences on `tools/.ui-snap/n13.html` (section 1).
+    1. The Poco and the laptop, full screen OFF before Begin (so Begin turns it on): at the tap the emblem's dot does not jump — when the screen has settled it flares on its own place on the card, several times brighter with a large halo, then (when the forest comes out) flies deep into the forest. Also once with full screen already on (the corner button first), and once turning the phone during the flight: the dot never jumps.
+    2. The flight: about 3–4 s on a gentle arc with a soft glowing trail, getting smaller, always visible above the mist; it lands as one of the fireflies, which brightens for a moment and stays.
+    3. While it flies, raise a hand and play: the notes come at once (nothing waits for the dot); with «Reduce motion» on, no flare and no flight.
 
 ## Superseded at DOC1 (old lines verbatim, replaced in place above by a later slice)
 - NIGHT-2 stage 3 (2026-11-03, the rule of at most five manual checks) updated this line of CLAUDE.md's report format:
