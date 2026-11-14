@@ -1,0 +1,53 @@
+{
+ "renderer": "three.js r128 (MIT), vendored at apps/night/vendor/three-r128/",
+ "ss": 2,
+ "views": {
+  "laptop-dark": {
+   "ms": 4941,
+   "px": [
+    1280,
+    800
+   ],
+   "files": {
+    "laptop-dark.webp": 152802,
+    "laptop-depth.png": 94880
+   },
+   "windows": 27
+  },
+  "laptop-lit": {
+   "ms": 2552,
+   "px": [
+    1280,
+    800
+   ],
+   "files": {
+    "laptop-lit.webp": 166888
+   },
+   "windows": 27
+  },
+  "phone-dark": {
+   "ms": 3785,
+   "px": [
+    1073,
+    2321
+   ],
+   "files": {
+    "phone-dark.webp": 312188,
+    "phone-depth.png": 141919
+   },
+   "windows": 15
+  },
+  "phone-lit": {
+   "ms": 4071,
+   "px": [
+    1073,
+    2321
+   ],
+   "files": {
+    "phone-lit.webp": 332132
+   },
+   "windows": 15
+  }
+ },
+ "errors": []
+}

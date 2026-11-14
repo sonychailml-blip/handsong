@@ -1844,11 +1844,14 @@ async function nightHandLight(){
 }
 /* RAIN-0 — the rain room's laws (apps/night/rooms/rain/pure/; docs/night/design/RAIN/PLAN.md §7). «RAIN focus law (app)»: the focus from the playing
    hand's depth — exactly 0 near and 1 far (dead zones), monotone; the glide never overshoots, never moves faster than its limit (a target flipping
-   every frame cannot make it jump), is the same at 30 and 60 frames a second; without a hand it drifts slowly to the rest focus; the two blurs are
-   opposite. CONTROL: an un-eased law (the focus = its target) breaks the speed limit. */
+   every frame cannot make it jump), is the same at 30 and 60 frames a second; without a hand it drifts slowly to the rest focus. RAIN-0b: THE FOCUS
+   HAS MANY DEPTHS — each layer's blur is |its depth − the focus depth| × K: near, the glass sharp and the house opposite fully soft; far, the hills
+   sharp and the glass fully soft; a hand in the middle: the street (near and far) sharper than the glass AND the hills; the depth law (pure/city.js
+   depthOf) is monotone and lands on its anchors. CONTROLS: an un-eased law breaks the speed limit; a two-plane focus (one blur for the whole city)
+   fails the middle. */
 async function rainFocus(){
   const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); };
-  const F=await import(new URL('../apps/night/rooms/rain/pure/focus.js', import.meta.url).href), C=F.FOCUS;
+  const F=await import(new URL('../apps/night/rooms/rain/pure/focus.js', import.meta.url).href), C=F.FOCUS, CT=await import(new URL('../apps/night/rooms/rain/pure/city.js', import.meta.url).href);
   ok('the target is not exactly 0 near and 1 far', F.focusTarget(0)===0 && F.focusTarget(C.near)===0 && F.focusTarget(C.far)===1 && F.focusTarget(1)===1);
   { let mono=true; for(let x=0;x<1;x+=0.01) if(F.focusTarget(x+0.01)<F.focusTarget(x)-1e-12) mono=false; ok('the target is not monotone in the depth', mono); }
   const judge=step=>{ const bad=[];
@@ -1862,26 +1865,74 @@ async function rainFocus(){
     ok(`the glide depends on the frame rate: ${a} vs ${b}`, Math.abs(a-b)<=0.01); }
   { let f=1; for(let i=0;i<60;i++) f=F.focusStep(f, C.rest, 1/60, false); const one=f; for(let i=0;i<60*15;i++) f=F.focusStep(f, C.rest, 1/60, false);
     ok(`without a hand the focus does not drift slowly to rest: ${one.toFixed(3)} after 1 s, ${f.toFixed(3)} after 16 s (rest ${C.rest})`, one>0.5 && Math.abs(f-C.rest)<0.01); }
-  { const a=F.focusBlur(0), b=F.focusBlur(1); let mono=true; for(let x=0;x<1;x+=0.02){ const p=F.focusBlur(x), q=F.focusBlur(x+0.02); if(q.city>p.city+1e-12 || q.glass<p.glass-1e-12) mono=false; }
-    ok('the blurs are not opposite: '+JSON.stringify([a, b]), a.city===1 && a.glass===0 && b.city===0 && b.glass===1 && mono); }
+  /* many depths */
+  const LD=F.LAYER_DEPTH, near=F.focusBlur(0), far=F.focusBlur(1);
+  ok('near: the glass is not sharp or the house opposite not fully soft: '+JSON.stringify(near), near.glass===0 && near.facade===1 && near.hills===1);
+  ok('far: the hills are not sharp or the glass not fully soft: '+JSON.stringify(far), far.hills<=1e-12 && far.glass===1);
+  { let mono=true; for(let x=0;x<1;x+=0.02){ const p=F.focusBlur(x), q=F.focusBlur(x+0.02); if(q.glass<p.glass-1e-12 || q.hills>p.hills+1e-12) mono=false; } ok('the glass does not soften, or the hills sharpen, steadily as the focus goes out', mono); }
+  const mid=0.5/C.span, judgeMid=blur=>{ const g=blur(LD.glass), h=blur(LD.hills), s=[LD.streetNear, LD.street, LD.streetFar].map(blur); return s.every(v=>v<g-0.2 && v<h-0.2) ? null : { glass:g, hills:h, street:s }; };
+  { const why=judgeMid(dp=>F.blurAt(dp, mid)); ok('a hand in the middle: the street is not sharper than both the glass and the hills: '+JSON.stringify(why), !why);
+    notes.push(`the blurs, focus in the middle (depth ${F.focusDepth(mid).toFixed(2)}): `+Object.entries(F.focusBlur(mid)).map(([k, v])=>`${k} ${v.toFixed(2)}`).join(', ')); }
+  { const two=dp=> dp<=LD.frame ? Math.pow(mid, C.gamma) : Math.pow(1-mid, C.gamma), why=judgeMid(two); n++;
+    if(!why) d.push('CONTROL: a two-plane focus passed the middle — the check cannot fail'); else notes.push('CONTROL: a two-plane focus is caught (street = hills = '+why.hills.toFixed(2)+')'); }
+  { const A=CT.DEPTH.anchors; let mono=true; for(let x=1;x<6000;x*=1.05) if(CT.depthOf(x*1.05)<CT.depthOf(x)-1e-12) mono=false;
+    ok('the depth law is not monotone in the distance, or misses its anchors', mono && A.every(([dist, v])=>Math.abs(CT.depthOf(dist)-v)<1e-12) && CT.depthOf(0)===0);
+    notes.push('depth by distance: '+[20, 40, 60, 110, 450, 3200].map(x=>`${x} m ${CT.depthOf(x).toFixed(2)}`).join(', ')); }
   { const c=judge((f, t)=>t); n++; if(!c.length) d.push('CONTROL: an un-eased law passed the speed limit — the check cannot fail'); else notes.push('CONTROL: an un-eased focus is caught ('+c[0]+')'); }
   return { cases:n, total:d.length, differences:d, notes };
 }
+/* RAIN-0b — «RAIN view law (app)»: the eye on the 8th floor (pure/city.js). (1) The projection equals an independent pinhole (the point turned by the
+   yaw and the pitch, then divided) for seeded points; (2) the boulevard's vanishing point lies inside the narrowest crop (an upright phone), left of
+   the middle, the horizon above it; (3) on every screen shape (0.46 … 2.4 : 1, the room's lens law) the street fills the lower middle of the frame
+   and the house opposite is in view; (4) the windows: seeded, none overlapping, each one's centre seen on its own row by the ray cast; (5) the
+   traffic: seeded, cars on their lanes, no two cars of a lane inside each other over ten minutes. CONTROL: a mirrored projection fails (1) and (2). */
+async function rainView(){
+  const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); };
+  const CT=await import(new URL('../apps/night/rooms/rain/pure/city.js', import.meta.url).href), RV=await import(new URL('../apps/night/pure/room.js', import.meta.url).href), RR=(await import(new URL('../apps/night/rooms/rain/pure/room.js', import.meta.url).href)).RAIN_ROOM;
+  const { seeded }=await import(new URL('../core/pure/dsp.js', import.meta.url).href), c=CT.CAM, R=seeded(0x56494557);
+  const pin=P=>{ const y=c.yaw*Math.PI/180, p=-c.pitch*Math.PI/180; let x=P[0]-c.x, yy=P[1]-c.y, z=P[2]-c.z;
+    const x1=x*Math.cos(y)-z*Math.sin(y), z1=x*Math.sin(y)+z*Math.cos(y), y2=yy*Math.cos(p)+z1*Math.sin(p), z2=-yy*Math.sin(p)+z1*Math.cos(p); return [x1/z2, y2/z2]; };
+  const pts=Array.from({ length:200 }, ()=>[-30+120*R(), 60*R(), 5+500*R()]);
+  const worst=proj=>Math.max(...pts.map(P=>{ const q=proj(P), w=pin(P); return Math.max(Math.abs(q.x-w[0]), Math.abs(q.y-w[1])); }));
+  { const e=worst(CT.project); ok(`the projection differs from a pinhole by ${e}`, e<1e-9); }
+  const shapes=[[390, 844], [600, 800], [800, 800], [1280, 800], [844, 390], [1920, 800]], th=s=>Math.tan(RV.roomFov(RR.view, s[0], s[1])*Math.PI/360), V=CT.vanishing();
+  const vpIn=(v, s)=>{ const t=th(s), w=t*s[0]/s[1]; return v.x>-w && v.x<0 && v.y>0 && v.y<t; };
+  ok(`the boulevard's vanishing point (${V.x.toFixed(3)}, ${V.y.toFixed(3)}) is not inside an upright phone's crop, left of the middle, above the centre`, vpIn(V, shapes[0]));
+  for(const s of shapes){ const t=th(s), w=t*s[0]/s[1]; let street=0, all=0, opp=0;
+    for(let i=0;i<24;i++) for(let j=0;j<8;j++){ const x=-w*0.5+w*(i+0.5)/24, y=-t+t*0.6*(j+0.5)/8; all++; if(CT.sceneAt(x, y).kind==='street') street++; }
+    for(let i=0;i<40;i++) for(let j=0;j<20;j++) if(CT.sceneAt(-w+2*w*(i+0.5)/40, -t+2*t*(j+0.5)/20).kind==='opp') opp++;
+    ok(`${s[0]} × ${s[1]}: the street is ${(100*street/all).toFixed(0)} % of the lower middle (≥ 60 %), the house opposite in ${opp} of 800 samples`, street/all>=0.6 && opp>=20);
+    notes.push(`${s[0]}×${s[1]}: street ${(100*street/all).toFixed(0)} % of the lower middle, house opposite ${(100*opp/800).toFixed(0)} % of the frame`); }
+  const W=CT.cityWindows();
+  ok('the windows are not seeded (two calls differ)', JSON.stringify(W)===JSON.stringify(CT.cityWindows()));
+  { let over=0, wrong=0; for(let i=0;i<W.length;i++){ const a=W[i]; if(CT.sceneAt(a.x, a.y).kind!==a.side) wrong++;
+      for(let j=i+1;j<W.length;j++){ const b=W[j]; if(Math.abs(a.x-b.x)<a.hw+b.hw && Math.abs(a.y-b.y)<a.hh+b.hh) over++; } }
+    ok(`${over} pairs of windows overlap; ${wrong} of ${W.length} windows are not seen on their own row`, !over && wrong<=W.length*0.03); notes.push(`${W.length} windows (${W.filter(w=>w.side==='opp').length} on the house opposite), ${wrong} hidden by a nearer house`); }
+  { let bad=0, cars=0; const A=JSON.stringify(CT.trafficAt(123.4)), B=JSON.stringify(CT.trafficAt(123.4));
+    for(let t=0;t<600;t+=0.5){ const L=CT.trafficAt(t); for(const a of L){ if(a.kind==='car'){ cars++; if(!CT.STREET.lanes.some(l=>l.x===a.x && l.dir===a.dir)) bad++; }
+        for(const b of L) if(a!==b && a.lane===b.lane && a.lane>=0 && Math.abs(a.z-b.z)<a.len) bad++; } }
+    ok(`the traffic: ${bad} cars off their lanes or inside each other, or not seeded`, !bad && A===B && cars>0); notes.push(`${(cars/1200).toFixed(1)} cars on the boulevard on average`); }
+  { const mir=P=>{ const q=CT.project(P); return { x:-q.x, y:q.y }; }, e=worst(mir), v={ x:-V.x, y:V.y }; n++;
+    if(e<1e-9 || vpIn(v, shapes[0])) d.push('CONTROL: a mirrored projection passed — the check cannot fail'); else notes.push(`CONTROL: a mirrored projection is caught (${e.toFixed(2)} off, its vanishing point right of the middle)`); }
+  return { cases:n, total:d.length, differences:d, notes };
+}
 /* «RAIN window pick (app)»: which window a note lights — the light at a window's centre picks that window (every one); just beside a window, that window;
-   between two, the nearer; in the sky, none. The layout: seeded (two calls equal), no two windows overlap, each inside its house. CONTROL: a mirrored law. */
+   between two neighbours, the nearer; in the sky, none. RAIN-0b: the windows are the view law's (both rows, projected). CONTROL: a mirrored law. */
 async function rainPick(){
   const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); };
   const Wn=await import(new URL('../apps/night/rooms/rain/pure/windows.js', import.meta.url).href), W=Wn.windowsLayout();
   ok('the layout is not seeded (two calls differ)', JSON.stringify(W)===JSON.stringify(Wn.windowsLayout()));
-  { let over=0, out=0; for(let i=0;i<W.length;i++){ const a=W[i], H=Wn.HOUSES[a.house]; if(a.x-a.hw<H.x0 || a.x+a.hw>H.x1 || a.y+a.hh>H.y1 || a.y-a.hh<H.y0) out++;
-      for(let j=i+1;j<W.length;j++){ const b=W[j]; if(Math.abs(a.x-b.x)<a.hw+b.hw && Math.abs(a.y-b.y)<a.hh+b.hh) over++; } }
-    ok(`${over} pairs of windows overlap, ${out} leave their house`, !over && !out); notes.push(`${W.length} windows on ${Wn.HOUSES.length} houses`); }
   const self=pick=>W.filter((w, i)=>pick(W, w.x, w.y)!==i).length;
   ok(`${self(Wn.windowPick)} windows are not picked at their own centre`, self(Wn.windowPick)===0);
-  { const w=W[7], i=Wn.windowPick(W, w.x+w.hw+0.01, w.y); ok(`a point 0.01 beside window 7 picks ${i}`, i===7); }
-  { const a=W[3], b=W[4], mid=(a.x+b.x)/2; ok('between two windows the nearer is not picked', Wn.windowPick(W, mid-0.004, a.y)===3 && Wn.windowPick(W, mid+0.004, a.y)===4); }
-  ok('the sky picks a window', Wn.windowPick(W, 0, 0.6)===-1 && Wn.windowPick(W, 0.55, 0.3)===-1);
-  { const c=self((L, x, y)=>Wn.windowPick(L, -x, y)); n++; if(!c) d.push('CONTROL: a mirrored pick passed — the check cannot fail'); else notes.push(`CONTROL: a mirrored pick misses ${c} windows`); }
+  /* a large window of the house opposite, and its right-hand neighbour on the same floor */
+  const right=(q, i)=>W.map((o, j)=>[o, j]).filter(([o, j])=>j!==i && o.side===q.side && o.floor===q.floor && o.x>q.x && Math.abs(o.y-q.y)<q.hh).sort((a, b)=>a[0].x-b[0].x)[0];
+  const big=W.map((w, i)=>[w, i]).filter(([w, i])=>w.side==='opp' && right(w, i)).sort((a, b)=>b[0].hh-a[0].hh)[0], k=big[1], w=big[0];
+  { const i=Wn.windowPick(W, w.x+w.hw+0.002, w.y); ok(`a point just beside window ${k} picks ${i}`, i===k); }
+  { const nb=right(w, k);
+    if(!nb) d.push('no neighbour on the same floor for the between check');
+    else { n++; const mid=(w.x+w.hw+nb[0].x-nb[0].hw)/2, e=(nb[0].x-nb[0].hw-w.x-w.hw)/4; if(Wn.windowPick(W, mid-e, w.y)!==k || Wn.windowPick(W, mid+e, w.y)!==nb[1]) d.push('between two neighbours the nearer is not picked'); } }
+  ok('the sky picks a window', Wn.windowPick(W, 0, 0.62)===-1 && Wn.windowPick(W, -0.2, 0.5)===-1);
+  { const c=self((L, x, y)=>Wn.windowPick(L, -x, y)); n++; if(!c) d.push('CONTROL: a mirrored pick passed — the check cannot fail'); else notes.push(`CONTROL: a mirrored pick misses ${c} of ${W.length} windows`); }
   return { cases:n, total:d.length, differences:d, notes };
 }
 /* «RAIN window fade (app)»: the trace — nothing before the note, on within a third of a second, full while held, then down slowly: never up, never a jump
@@ -1902,25 +1953,131 @@ async function rainFade(){
   { const c=judge(a=> a>T.hold ? 0 : Wn.traceLevel(a)); n++; if(!c.some(x=>/jump/.test(x))) d.push('CONTROL: an instant switch-off passed — the check cannot fail'); else notes.push('CONTROL: an instant switch-off is caught'); }
   return { cases:n, total:d.length, differences:d, notes };
 }
-/* «RAIN glass law (app)»: the wipe map — a stamp clears its place and nothing beyond its radius; a weaker stamp never brings mist back; the mist returns
-   by one time constant, the same in one long step as in many short ones; in the end nothing is cleared; a place off the pane changes nothing.
-   CONTROL: a pane whose mist never returns. */
+/* «RAIN glass law (app)»: RAIN-0b — THE MIST (the wipe map): a stamp clears its place and nothing beyond its radius; a weaker stamp never brings mist back;
+   a place off the pane changes nothing; A HELD STROKE clears a continuous lane however fast the finger moves (CONTROL: stamps at the frames' places
+   leave gaps); the mist returns UNEVENLY but BOUNDED — slowly (half or more still clear after 20 s), mostly back by 75 s, all by three minutes, its
+   cells spread (σ), the edges of a lane first, never a cell rising without a stroke, a long frame ≈ short ones; after the first wipe the middle's
+   floor eases in (no jump) and holds the middle at most 70 % misted. THE DROPS (the simulation): two touching drops become one with the summed
+   area exactly; drops apart stay two; A RUNNING DROP NEVER PASSES THROUGH A RESTING ONE without merging (every step of half a minute of heavy rain, the
+   runner's swept path against every resting drop that survives the step); a drop placed in a runner's path is eaten; every bead takes its area
+   from its runner exactly; the water is booked (drops + ran off + evaporated = fell); the cap holds; the same seed gives the same rain; a runner's
+   lane is cleared of fine droplets and they grow back. CONTROLS: a stamp-only wipe, a simulation that never merges. */
 async function rainGlass(){
   const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); };
-  const G=await import(new URL('../apps/night/rooms/rain/pure/glass.js', import.meta.url).href), K=G.GLASS;
-  { const g=G.wipeNew(); ok('a new pane is not all mist', !g.live && g.a.every(v=>v===0));
-    const k=G.wipeStamp(g, 0.1, -0.05, 1); ok(`a stamp cleared ${k} cells, its place reads ${G.wipeAt(g, 0.1, -0.05)}`, k>0 && g.live && G.wipeAt(g, 0.1, -0.05)>0.5);
-    { const e=G.wipeNew(), cx=((40+0.5)/K.cols*2-1)*K.ext[0], cy=((20+0.5)/K.rows*2-1)*K.ext[1]; G.wipeStamp(e, cx, cy, 0.7); ok(`a stamp on a cell's centre reads ${G.wipeAt(e, cx, cy)} there, not exactly its amount 0.7`, Math.abs(G.wipeAt(e, cx, cy)-Math.fround(0.7))<1e-12); }
-    const cell=Math.max(2*K.ext[0]/K.cols, 2*K.ext[1]/K.rows); let far=0; for(let a=0;a<6.28;a+=0.3) far=Math.max(far, G.wipeAt(g, 0.1+(K.radius+2*cell)*Math.cos(a), -0.05+(K.radius+2*cell)*Math.sin(a)));
+  const G=await import(new URL('../apps/night/rooms/rain/pure/glass.js', import.meta.url).href), K=G.GLASS, DR=await import(new URL('../apps/night/rooms/rain/pure/drops.js', import.meta.url).href), DC=DR.DROPS;
+  /* the mist */
+  { const g=G.wipeNew(); ok('a new pane is not all mist', !g.live && !g.wiped && g.a.every(v=>v===0) && G.wipeAt(g, 0, 0)===0);
+    const k=G.wipeStamp(g, 0.1, -0.05, 1); ok(`a stamp cleared ${k} cells, its place reads ${G.wipeAt(g, 0.1, -0.05)}`, k>0 && g.live && G.wipeCell(g, 0.1, -0.05)>0.95);
+    { const e=G.wipeNew(), cx=((40+0.5)/K.cols*2-1)*K.ext[0], cy=((20+0.5)/K.rows*2-1)*K.ext[1]; G.wipeStamp(e, cx, cy, 0.7); ok(`a stamp on a cell's centre reads ${G.wipeCell(e, cx, cy)} there, not exactly its amount 0.7`, Math.abs(G.wipeCell(e, cx, cy)-Math.fround(0.7))<1e-12); }
+    const cell=Math.max(2*K.ext[0]/K.cols, 2*K.ext[1]/K.rows); let far=0; for(let a=0;a<6.28;a+=0.3) far=Math.max(far, G.wipeCell(g, 0.1+(K.spot+2*cell)*Math.cos(a), -0.05+(K.spot+2*cell)*Math.sin(a)));
     ok(`the stamp reaches beyond its radius (${far})`, far===0);
-    const before=G.wipeAt(g, 0.1, -0.05); G.wipeStamp(g, 0.1, -0.05, 0.3); ok('a weaker stamp brought mist back', G.wipeAt(g, 0.1, -0.05)===before);
+    const before=G.wipeCell(g, 0.1, -0.05); G.wipeStamp(g, 0.1, -0.05, 0.3); ok('a weaker stamp brought mist back', G.wipeCell(g, 0.1, -0.05)===before);
     ok('a place off the pane changed it or threw', G.wipeStamp(g, 9, 9, 1)===0); }
-  const refog=step=>{ const a=G.wipeNew(), b=G.wipeNew(); G.wipeStamp(a, 0, 0, 1); G.wipeStamp(b, 0, 0, 1); const v0=G.wipeAt(a, 0, 0), T=K.refog*Math.LN2;
-    step(a, T); for(let i=0;i<600;i++) step(b, T/600); const va=G.wipeAt(a, 0, 0), vb=G.wipeAt(b, 0, 0); for(let i=0;i<60;i++) step(a, 10);
-    return { half:va/v0, same:Math.abs(va-vb), gone:!a.live && a.a.every(v=>v===0) }; };
-  { const r=refog(G.wipeStep); notes.push(`the mist is half back after ${(K.refog*Math.LN2).toFixed(1)} s (${r.half.toFixed(4)}); one step vs 600: ${r.same.toExponential(1)} apart`);
-    ok(`the mist does not return by its time constant (${r.half})`, Math.abs(r.half-0.5)<1e-3); ok(`the return depends on the frame length (${r.same})`, r.same<1e-5); ok('ten minutes later something is still cleared', r.gone);
-    const c=refog(()=>true); n++; if(Math.abs(c.half-0.5)<1e-3 || c.gone) d.push('CONTROL: a pane whose mist never returns passed — the check cannot fail'); else notes.push('CONTROL: a pane whose mist never returns is caught'); }
+  /* a held stroke: the finger 0.09 units a frame (a fast swipe) — every point of its path is clear; the CONTROL stamps only at the frames' places */
+  const path=[]; for(let i=0;i<=10;i++) path.push([-0.45+0.09*i, 0.12*Math.sin(i*0.7)]);
+  const along=g=>{ let m=1; for(let i=0;i<path.length-1;i++) for(let s=0;s<=20;s++){ const t=s/20; m=Math.min(m, G.wipeCell(g, path[i][0]+(path[i+1][0]-path[i][0])*t, path[i][1]+(path[i+1][1]-path[i][1])*t)); } return m; };
+  { const g=G.wipeNew(); for(let i=1;i<path.length;i++) G.wipeStroke(g, ...path[i-1], ...path[i], 1); const m=along(g); ok(`a held stroke leaves a gap: ${m.toFixed(3)} at its clearest-missing point`, m>=0.99);
+    const c=G.wipeNew(); for(const p of path) G.wipeStamp(c, p[0], p[1], 1, K.stroke); const mc=along(c); n++;
+    if(mc>=0.5) d.push(`CONTROL: stamps at the frames' places passed continuity (${mc.toFixed(3)}) — the check cannot fail`); else notes.push(`a held stroke is continuous (${m.toFixed(2)} everywhere); CONTROL: stamps only at the frames leave gaps (${mc.toFixed(2)})`); }
+  /* the mist returns: a stroke across the middle */
+  { const g=G.wipeNew(), lane=[], edge=[], core=[]; G.wipeStroke(g, -0.4, 0.05, 0.4, -0.05, 1);
+    for(let x=-0.34;x<=0.34;x+=0.01){ const yc=0.05-(x+0.4)*0.125; for(let dy=-0.022;dy<=0.0221;dy+=0.002){ lane.push([x, yc+dy]); (Math.abs(dy)>0.014 ? edge : Math.abs(dy)<0.006 ? core : []).push([x, yc+dy]); } }
+    const mean=P=>P.reduce((a, [x, y])=>a+G.wipeCell(g, x, y), 0)/P.length, sd=P=>{ const m=mean(P); return Math.sqrt(P.reduce((a, [x, y])=>a+(G.wipeCell(g, x, y)-m)**2, 0)/P.length); };
+    let t=0, rose=0, prev=Float32Array.from(g.a), floorJump=0, prevF=g.floorK; const at={};
+    const run=T=>{ while(t<T-1e-9){ G.wipeStep(g, 0.1); t+=0.1; for(let i=0;i<g.a.length;i++){ if(g.a[i]>prev[i]+1e-7) rose++; } prev.set(g.a); floorJump=Math.max(floorJump, g.floorK-prevF); prevF=g.floorK; } };
+    run(20); at[20]=mean(lane); run(25); at.edge=mean(edge); at.core=mean(core); run(40); at[40]=mean(lane); at.sd=sd(lane); run(75); at[75]=mean(lane); run(180); at[180]=g.live;
+    ok(`the mist returns too fast: ${at[20].toFixed(2)} of the lane still clear after 20 s (≥ 0.5)`, at[20]>=0.5);
+    ok(`the mist is not mostly back by 75 s: ${at[75].toFixed(2)} still clear (≤ 0.25)`, at[75]<=0.25);
+    ok('three minutes later something is still cleared', at[180]===false);
+    ok(`the mist returns evenly: σ ${at.sd.toFixed(3)} across the lane at 40 s (≥ 0.04)`, at.sd>=0.04);
+    ok(`the lane's edges do not mist first: edge ${at.edge.toFixed(2)}, core ${at.core.toFixed(2)} at 25 s`, at.edge<at.core-0.05);
+    ok(`${rose} cells rose without a stroke`, rose===0);
+    ok(`the floor jumps (${floorJump.toFixed(3)} in 0.1 s)`, floorJump<=0.05);
+    const mid=G.wipeAt(g, 0, 0), out=G.wipeAt(g, 0.9, 0.5); ok(`after the first wipe the middle is not held at most 70 % misted (clear ${mid.toFixed(3)}), or the floor reaches the edge (${out})`, mid>=0.29 && out===0);
+    notes.push(`the lane still clear: ${at[20].toFixed(2)} at 20 s, ${at[40].toFixed(2)} at 40 s (σ ${at.sd.toFixed(2)}), ${at[75].toFixed(2)} at 75 s; edges ${at.edge.toFixed(2)} vs core ${at.core.toFixed(2)} at 25 s; the middle's floor ${mid.toFixed(2)}`); }
+  { const a=G.wipeNew(), b=G.wipeNew(); G.wipeStamp(a, 0, 0, 1); G.wipeStamp(b, 0, 0, 1); for(let i=0;i<300;i++) G.wipeStep(a, 1/15); for(let i=0;i<1200;i++) G.wipeStep(b, 1/60);
+    let e=0; for(let i=0;i<a.a.length;i++) e=Math.max(e, Math.abs(a.a[i]-b.a[i])); ok(`the return depends on the frame length (${e.toFixed(4)} apart after 20 s)`, e<=0.02); }
+  /* the drops */
+  { const S=DR.dropsNew(1); DR.dropAdd(S, 0, 0, 0.006); DR.dropAdd(S, 0.009, 0, 0.004); const A=0.006**2+0.004**2;
+    ok(`two touching drops did not become one with the summed area (${S.list.length} drops, area ${S.list[0] && S.list[0].r**2} vs ${A})`, S.list.length===1 && Math.abs(S.list[0].r**2-A)<=1e-18);
+    const T=DR.dropsNew(1); DR.dropAdd(T, 0, 0, 0.006); DR.dropAdd(T, 0.0105, 0, 0.004); ok('two drops apart merged', T.list.length===2); }
+  const heavy=(merge, secs)=>{ const S=DR.dropsNew(0x52414931, { cap:320, merge, log:true }); DR.dropsRegion(S, 0.83, 0.52); let pass=0, steps=0, worstLedger=0, overCap=0;
+    for(let i=0;i<secs*60;i++){ const before=new Map(S.list.map(q=>[q.id, { x:q.x, y:q.y, r:q.r, mv:q.mv }])); DR.dropsStep(S, DC.step, 0.85); steps++;
+      const after=new Map(S.list.map(q=>[q.id, q])); if(S.list.length>S.cap) overCap++; worstLedger=Math.max(worstLedger, Math.abs(DR.dropsLedger(S)));
+      for(const [id, b] of before){ if(!b.mv) continue; const a=after.get(id); if(!a) continue;
+        const vx=a.x-b.x, vy=a.y-b.y, L=vx*vx+vy*vy;
+        for(const [oid, ob] of before){ if(oid===id || ob.mv) continue; const oa=after.get(oid); if(!oa || oa.mv || oa.x!==ob.x || oa.y!==ob.y) continue;
+          const t= L>0 ? Math.max(0, Math.min(1, ((ob.x-b.x)*vx+(ob.y-b.y)*vy)/L)) : 0, ex=ob.x-(b.x+t*vx), ey=ob.y-(b.y+t*vy), rr=(b.r+ob.r)*DC.touch;
+          if(ex*ex+ey*ey<rr*rr*(1-1e-9)) pass++; } } }
+    return { S, pass, steps, worstLedger, overCap }; };
+  { const H=heavy(true, 30), beads=H.S.log.filter(e=>e.k==='bead'), merges=H.S.log.filter(e=>e.k==='merge');
+    ok(`a running drop passed through ${H.pass} resting drops without merging (${H.steps} steps of heavy rain)`, H.pass===0);
+    const badBead=beads.filter(e=>Math.abs(e.before-(e.after+e.bead))>1e-15*e.before).length; ok(`${badBead} of ${beads.length} beads did not take their area from the runner exactly`, beads.length>20 && badBead===0);
+    const badMerge=merges.filter(e=>Math.abs(e.after-(e.A+e.B))>1e-15*e.after).length; ok(`${badMerge} of ${merges.length} merges did not sum the areas`, merges.length>50 && badMerge===0);
+    ok(`the water is not booked: ${H.worstLedger.toExponential(2)} off (fell ${H.S.fell.toExponential(2)})`, H.worstLedger<=1e-12);
+    ok(`the cap was exceeded in ${H.overCap} steps`, H.overCap===0);
+    const R2=heavy(true, 5).S, R3=heavy(true, 5).S; ok('the same seed gave a different rain', JSON.stringify(R2.list.map(q=>[q.x, q.y, q.r]))===JSON.stringify(R3.list.map(q=>[q.x, q.y, q.r])));
+    notes.push(`half a minute of heavy rain: ${H.S.list.length} drops (${H.S.list.filter(q=>q.mv).length} running), ${merges.length} merges, ${beads.length} beads; ran off ${(100*H.S.ranOff/H.S.fell).toFixed(0)} %, evaporated under the cap ${(100*H.S.evaporated/H.S.fell).toFixed(0)} %`);
+    const C0=heavy(false, 20); n++; if(C0.pass===0) d.push('CONTROL: a simulation that never merges passed — the check cannot fail'); else notes.push(`CONTROL: a simulation that never merges lets runners through ${C0.pass} resting drops`); }
+  { const S=DR.dropsNew(5, { log:true }); const big=DR.dropAdd(S, 0, 0.3, 0.014); big.mv=true; big.v=DC.vMax*0.6; const small=DR.dropAdd(S, 0.0005, 0.05, 0.003); const A0=big.r**2+small.r**2;
+    for(let i=0;i<120;i++) DR.dropsStep(S, DC.step, 0); const ate=S.log.some(e=>e.k==='merge' && e.from===small.id);
+    ok('a drop in a runner\'s path was not eaten', ate && !S.list.some(q=>q.id===small.id)); ok(`the water of that run is not booked (${DR.dropsLedger(S).toExponential(2)})`, Math.abs(DR.dropsLedger(S))<=1e-15 && A0>0);
+    ok(`the runner's lane is not cleared of fine droplets (${DR.laneAt(S, 0, 0.2).toFixed(2)})`, DR.laneAt(S, 0, 0.2)>0.5);
+    for(let i=0;i<150;i++) DR.laneStep(S, 1); ok('the fine droplets never grow back into the lane', !S.laneLive && DR.laneAt(S, 0, 0.2)===0); }
+  return { cases:n, total:d.length, differences:d, notes };
+}
+/* RAIN-3 — «RAIN nature (app)»: a room's layered recordings and event sounds (apps/night/pure/layers.js), the law alone (the browser row «RAIN nature»
+   renders the graph). (1) THE BALANCE: near × cos, far × sin of the focus — equal power at every focus, exactly; at f = 0 the far output is exactly 0,
+   at f = 1 the near layer is (events off); (2) NO CLICK: a start, a stop and a focus jumping 0 → 1 change the gains at most by their ramps a sample
+   (the wake fade, the focus's τ); CONTROL an instant swap (no ramps) jumps; (3) asleep: zeros and nothing computed; (4) THE GRAINS never read across a
+   file's ends and never loop: a recording with a click at both ends renders no click, and 120 s show no repeating envelope (self-similarity);
+   (5) THE EVENTS: seeded (two calls equal), the same over one window as over two halves, at their recipe's rate (±35 % over ten minutes), drips panned,
+   none in a recipe without events; (6) THE RECIPE: the rain room's validates and its files exist; the validator refuses each damage; the forest
+   has no layers (its sound builds nothing new). */
+async function rainNature(){
+  const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); }, fs=await import('node:fs');
+  const LY=await import(new URL('../apps/night/pure/layers.js', import.meta.url).href), K=LY.LAYERS, RATE=48000;
+  const RV=await import(new URL('../apps/night/pure/room.js', import.meta.url).href), RR=(await import(new URL('../apps/night/rooms/rain/pure/room.js', import.meta.url).href)).RAIN_ROOM, FR=(await import(new URL('../apps/night/rooms/forest/pure/room.js', import.meta.url).href)).FOREST_ROOM;
+  const noise=(len, seed)=>{ let s=seed>>>0||1; const a=new Float32Array(len); for(let i=0;i<len;i++){ s^=s<<13; s>>>=0; s^=s>>>17; s^=s<<5; s>>>=0; a[i]=(s/4294967296-0.5)*0.5; } return a; };
+  const mk=(L0={ near:{ gain:1 }, far:{ gain:1 } }, len=RATE*20)=>{ const st=LY.layersNew(RATE, L0); LY.layersRec(st, 'near', noise(len, 3), noise(len, 4), 1); LY.layersRec(st, 'far', noise(len, 5), noise(len, 6), 1); return st; };
+  const run=(st, sec, f, on=true, t0=0)=>{ const N=Math.round(RATE*sec), o={ nL:new Float32Array(N), nR:new Float32Array(N), fL:new Float32Array(N), fR:new Float32Array(N) };
+    for(let i=0;i<N;i+=128){ if(typeof f==='function') LY.layersFocus(st, f(t0+i/RATE)); LY.layersOn(st, typeof on==='function' ? on(t0+i/RATE) : on); LY.layersOut(st, t0+i/RATE, o.nL, o.nR, o.fL, o.fR, i, Math.min(128, N-i)); } return o; };
+  const rms=a=>Math.sqrt(a.reduce((s, v)=>s+v*v, 0)/a.length);
+  /* (1) the balance */
+  { const s0=mk(); s0.fs=0; s0.g=1; s0.on=true; s0.sleep=false; const a=run(s0, 1, ()=>0); const s1=mk(); LY.layersFocus(s1, 1); s1.fs=1; s1.g=1; s1.on=true; s1.sleep=false; const b=run(s1, 1, ()=>1);
+    ok(`at the focus on the glass the far output is not exactly 0 (${rms(a.fL)})`, a.fL.every(v=>v===0) && rms(a.nL)>0.05);
+    ok(`with the focus far the near layer is not ~0 (${rms(b.nL).toExponential(1)})`, rms(b.nL)<1e-9 && rms(b.fL)>0.05);
+    let worst=0; for(let f=0;f<=1;f+=0.01){ const q=f*Math.PI/2; worst=Math.max(worst, Math.abs(Math.cos(q)**2+Math.sin(q)**2-1)); } ok(`the balance is not equal power (${worst})`, worst<1e-12);
+    const st=mk(); st.g=1; st.on=true; st.sleep=false; st.fs=0.5; st.f=0.5; const c=run(st, 2, ()=>0.5), pn=rms(c.nL)**2+rms(c.nR)**2, pf=rms(c.fL)**2+rms(c.fR)**2;
+    notes.push(`the middle (f = 0.5): near ${(10*Math.log10(pn)).toFixed(1)} dB, far ${(10*Math.log10(pf)).toFixed(1)} dB (equal noise in both)`); ok(`in the middle the two layers are not equal within 1 dB (${(10*Math.log10(pn/pf)).toFixed(2)})`, Math.abs(10*Math.log10(pn/pf))<1); }
+  /* (2) no click: the per-sample gain step at a start, a stop, a focus jump — against the ramps; CONTROL instant */
+  const steps=(st, sec, f, on)=>{ const N=Math.round(RATE*sec); let worst=0, prevN=null, prevF=null; const z=new Float32Array(128);
+    for(let i=0;i<N;i+=128){ LY.layersFocus(st, f(i/RATE)); LY.layersOn(st, on(i/RATE)); LY.layersOut(st, i/RATE, z, z.slice(), z.slice(), z.slice(), 0, 128);
+      if(st.sleep && !st.gn) continue; const gn= st.sleep ? z : st.gn, gf= st.sleep ? z : st.gf; for(let j=0;j<128;j++){ if(prevN!=null) worst=Math.max(worst, Math.abs(gn[j]-prevN), Math.abs(gf[j]-prevF)); prevN=gn[j]; prevF=gf[j]; } } return worst; };
+  { const lim=Math.max(1/(K.wake*RATE)*1.5, (1-Math.exp(-1/(K.focusTc*RATE)))*Math.PI/2*1.01), w=steps(mk(), 3, t=>t<1.2 ? 0 : 1, t=>t>0.1 && t<2.2);
+    ok(`a start, a focus jump or a stop clicks: a gain step of ${w.toExponential(2)} a sample (the ramps allow ${lim.toExponential(2)})`, w<=lim);
+    const c=mk(); c.dg=1; c.kf=1; const wc=steps(c, 3, t=>t<1.2 ? 0 : 1, t=>t>0.1 && t<2.2); n++;
+    if(wc<=lim) d.push('CONTROL: an instant swap passed the click check — the check cannot fail'); else notes.push(`no click: the largest gain step ${w.toExponential(2)} a sample; CONTROL an instant swap steps ${wc.toFixed(2)}`); }
+  /* (3) asleep */
+  { const st=mk(); const a=run(st, 1, ()=>0, false); ok('asleep, the layers are not silent or still compute', a.nL.every(v=>v===0) && a.fL.every(v=>v===0) && st.frames===0); }
+  /* (4) the grains: a file with a loud click at both ends — never heard; no repeating envelope over 120 s */
+  { const len=RATE*12, L=noise(len, 9), R=noise(len, 10); for(let i=0;i<200;i++){ L[i]=R[i]=1; L[len-1-i]=R[len-1-i]=1; }
+    const st=LY.layersNew(RATE, { near:{ gain:1 } }); LY.layersRec(st, 'near', L, R, 1); st.g=1; st.on=true; st.sleep=false; const a=run(st, 60, ()=>0); let peak=0; for(const v of a.nL) peak=Math.max(peak, Math.abs(v));
+    ok(`a grain read across the file's ends (peak ${peak.toFixed(2)})`, peak<0.6); ok(`the file was refused or played no grains (${st.grains})`, st.grains>=7); notes.push(`a 12-s file with clicks at both ends: 60 s in ${st.grains} grains, peak ${peak.toFixed(2)} (the click is 1.0)`);
+    ok('a recording shorter than a grain and its edges was taken', !LY.layersRec(LY.layersNew(RATE, {}), 'near', noise(RATE*5, 1), null, 1)); }
+  /* (5) the events */
+  { const E=RR.nature.layers.events, A=LY.layersEvents(E, 7, 0, 600), B=LY.layersEvents(E, 7, 0, 600), C=[...LY.layersEvents(E, 7, 0, 300), ...LY.layersEvents(E, 7, 300, 600)];
+    ok('the events are not seeded (two calls differ)', JSON.stringify(A)===JSON.stringify(B)); ok('one window and its two halves give different events', JSON.stringify(A)===JSON.stringify(C));
+    for(const [kind, P] of [['drip', E.drips], ['tick', E.tick]]){ const m=A.filter(e=>e.kind===kind).length, want=600/P.every; ok(`${m} ${kind}s in ten minutes, the recipe asks about ${want.toFixed(0)}`, Math.abs(m/want-1)<=0.35); notes.push(`${m} ${kind}s in ten minutes (about ${want.toFixed(0)} asked)`); }
+    ok('the drips are not panned', A.filter(e=>e.kind==='drip').some(e=>e.pan<-0.3) && A.filter(e=>e.kind==='drip').some(e=>e.pan>0.3));
+    ok('a recipe without events makes events', LY.layersEvents(null, 7, 0, 600).length===0 && LY.layersEvents({}, 7, 0, 600).length===0); }
+  /* (6) the recipe */
+  { ok('the rain room\'s record with its layers is refused: '+RV.checkRoom(RR, { ids:[RR.id] }), RV.checkRoom(RR, { ids:[RR.id] })===null);
+    for(const k of ['near', 'far']){ const f=new URL('../apps/night/rooms/rain/'+RR.nature.layers[k].file, import.meta.url); ok(`the ${k} layer's file ${RR.nature.layers[k].file} is missing`, fs.existsSync(f)); }
+    const dmg=[['layers', r=>{ r.nature.layers=5; }], ['layers.near.file', r=>{ r.nature.layers.near.file='../x.wav'; }], ['layers.far.gain', r=>{ r.nature.layers.far.gain=3; }], ['layers.far.send', r=>{ r.nature.layers.far.send=-1; }],
+      ['layers.events.drips.every', r=>{ r.nature.layers.events.drips.every=0; }], ['layers.events.tick.gain', r=>{ r.nature.layers.events.tick.gain=2; }], ['layers.near.norm', r=>{ r.nature.layers.near.norm=0; }]];
+    for(const [name, f]of dmg){ const r=JSON.parse(JSON.stringify(RR)); f(r); ok(`the damage ${name} is not refused`, RV.checkRoom(r, { ids:[RR.id] })!==null); }
+    ok('the forest has a layers part (its sound would build new nodes)', !('layers' in FR.nature)); }
   return { cases:n, total:d.length, differences:d, notes };
 }
 /* «RAIN stays out of the players' edition (app)»: the rain room is a DEVELOPMENT room until the founder approves it. (1) Its record is valid as a
@@ -2422,9 +2579,11 @@ const ROWS=[
   ['NIGHT start still (app)',   ()=>nightStartStill(),  r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // DESIGN-1 part D
   ['NIGHT hand light anchor (app)', ()=>nightHandLight(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-13
   ["RAIN focus law (app)", ()=>rainFocus(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-0
+  ["RAIN view law (app)", ()=>rainView(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-0b
   ["RAIN window pick (app)", ()=>rainPick(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-0
   ["RAIN window fade (app)", ()=>rainFade(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-0
   ["RAIN glass law (app)", ()=>rainGlass(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-0
+  ["RAIN nature (app)", ()=>rainNature(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-3
   ["RAIN stays out of the players' edition (app)", ()=>rainGate(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-0
   ['NIGHT music bed law (app)', ()=>nightBedLaw(),     r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // NIGHT-3 stage 4
   ['NIGHT music bed v2 law (app)', ()=>nightBed2Law(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-4

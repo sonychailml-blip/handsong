@@ -40,7 +40,7 @@ function buildSlot(E, bus, seed, A, now, ns){
     crickets.push({ st, g, osc:o, p, next:st.next(), on:k<C.n }); }
   /* NIGHT-8: the stream — its gain in this slot's mix and a little into the echo; the nature worklet's output joins it once loaded (ambienceBrook) */
   const S=A.stream, sg=ac.createGain(), ss=ac.createGain(); sg.gain.value= S ? S.gain : 0; ss.gain.value= S ? S.send : 0; sg.connect(mix); sg.connect(ss); ss.connect(roomIn);
-  return { A, mix, ns, dl, elp, efb, dGate, dSend, dRoot, dRootA, dFifth, dFifthA, bp, lfo, lg, wg, ws, clp, cg, cs, sg, ss, crickets, origin:now, corigin:now, parked:false, parkAt:0 };
+  return { A, mix, roomIn, ns, dl, elp, efb, dGate, dSend, dRoot, dRootA, dFifth, dFifthA, bp, lfo, lg, wg, ws, clp, cg, cs, sg, ss, crickets, origin:now, corigin:now, parked:false, parkAt:0 };
 }
 /* build into `dest` (the master's input) from the recipe A; `seed` shifts every seeded part (a probe's control) → the ambience object.
    slots 2 (NIGHT-3 stage 5 part 2): a second, parked slot for room switches; 1 = the first slot alone */
@@ -88,6 +88,7 @@ function retune(E, amb, n, B, t){
   /* the wind sweep keeps its phase: the origin moves so that rate × (time − origin) runs on from where the old rate left it */
   if(W.rate!==old.wind.rate){ sp(n.lfo.frequency, W.rate); n.origin=t-old.wind.rate*(t-n.origin)/W.rate; }
   sp(n.sg.gain, B.stream ? B.stream.gain : 0); sp(n.ss.gain, B.stream ? B.stream.send : 0);   // NIGHT-8: the stream's level in the new room (none: 0)
+  if(amb.layers) layersSlot(amb, n, B, t, sp);   // RAIN-3: the layered recordings' level in the new room (none: 0)
   const C=B.crickets; sp(n.clp.frequency, C.lp); sp(n.cg.gain, C.gain); sp(n.cs.gain, C.send);
   n.crickets.forEach((c,k)=>{ if(k<C.n){ c.st=cricketStream(C, (C.seed+amb.seed)>>>0, k); c.next=c.st.next(); sp(c.osc.frequency, c.st.freq); sp(c.p.pan, C.pans[k%C.pans.length]); c.on=true; }
     else { c.on=false; sp(c.g.gain, 0); } });
@@ -108,6 +109,7 @@ function ambienceRoom(E, amb, B, when, o={}){
   else { n.mix.gain.setValueAtTime(0, t); n.mix.gain.setTargetAtTime(1, t, AMB_SWAP.in); a.mix.gain.setValueAtTime(1, t); a.mix.gain.setTargetAtTime(0, t, AMB_SWAP.out); }
   if(amb.on) amb.bus.gain.setTargetAtTime(B.master*amb.level*amb.level, t, AMB_SWAP.in);
   if(B.stream && amb.on && amb.level>0) brookSleep(amb, false, null); else brookSleep(amb, true, t+BROOK_SLEEP_S);   // NIGHT-8: a room without a stream lets it sleep after the fade
+  layersWake(amb, !!(B.layers && amb.on && amb.level>0), B);   // RAIN-3
   amb.cur=1-amb.cur; Object.assign(amb, { A:B, dGate:n.dGate, dRoot:n.dRoot, dFifth:n.dFifth, crickets:n.crickets, origin:n.origin, corigin:n.corigin });
   return true;
 }
@@ -137,5 +139,36 @@ function ambienceSet(E, amb, on, level, when, drone=true){
   amb.bus.gain.setTargetAtTime(on ? amb.A.master*v*v : 0, t, on ? 0.6 : 0.8);
   amb.dGate.gain.setTargetAtTime(on && drone ? 1 : 0, t, on && drone ? amb.A.drone.tc : 0.8);
   if(on && v>0 && amb.A.stream) brookSleep(amb, false, null); else brookSleep(amb, true, t+BROOK_SLEEP_S);   // NIGHT-8: the stream sleeps once faded out (or in a room without one)
+  layersWake(amb, !!(on && v>0 && amb.A.layers), amb.A);   // RAIN-3
 }
-export { buildAmbience, ambienceSchedule, ambienceTune, ambienceSet, ambienceRoom, ambienceBrook, ambienceBrookLight, ambienceBrookStats, ambienceBrookRec };
+/* RAIN-3: A ROOM's LAYERED RECORDINGS — the nature worklet's «night-layers» node (apps/night/pure/layers.js), built ONCE per ambience, only when a room
+   whose recipe has `layers` plays (opt-in: the forest never builds it, its graph and sound stay exactly as they were), never torn down (rule #3).
+   Its two outputs feed per slot: near → the slot's mix; far → the mix and, by `far.send`, the slot's echo (the street has more of the room's echo).
+   A slot whose recipe has no layers holds them at 0. → amb.layers, or null (already built / the recipe has none) */
+export const LAYERS_WORKLET='night-layers';
+function ambienceLayers(E, amb, N, seed=0){
+  if(amb.layers || !N || !N.layers) return null; const L=N.layers;
+  const node=new AudioWorkletNode(E.ac, LAYERS_WORKLET, { numberOfInputs:0, numberOfOutputs:2, outputChannelCount:[2, 2], processorOptions:{ layers:L, seed:((L.seed>>>0)+seed)>>>0 } });
+  const ac=E.ac, slots=amb.slots.map(sl=>{ const ln=ac.createGain(), lf=ac.createGain(), ls=ac.createGain(), on=sl.A===N || !!sl.A.layers;
+    ln.gain.value= on ? 1 : 0; lf.gain.value= on ? 1 : 0; ls.gain.value= on && sl.A.layers ? sl.A.layers.far.send : 0;
+    node.connect(ln, 0); node.connect(lf, 1); node.connect(ls, 1); ln.connect(sl.mix); lf.connect(sl.mix); ls.connect(sl.roomIn); return { ln, lf, ls }; });
+  amb.layers={ node, slots, on:false, rec:{ near:null, far:null }, focus:-1 };
+  layersWake(amb, !!(amb.on && amb.level>0 && amb.A.layers), amb.A); return amb.layers;
+}
+/* the layers' gains in slot n for recipe B (retune's AudioParam setter) */
+function layersSlot(amb, n, B, t, sp){ const i=amb.slots.indexOf(n), g=amb.layers.slots[i]; if(!g) return; const on=!!B.layers;
+  sp(g.ln.gain, on ? 1 : 0); sp(g.lf.gain, on ? 1 : 0); sp(g.ls.gain, on ? B.layers.far.send : 0); }
+/* awake (fading in) for a room with layers while the ambience plays, else fading out and asleep; a new room's numbers go with it */
+function layersWake(amb, on, A){ const L=amb.layers; if(!L) return; const msg=[]; if(A && A.layers && L.recipe!==A.layers){ L.recipe=A.layers; msg.push({ k:'recipe', L:A.layers }); }
+  if(L.on!==on){ L.on=on; msg.push({ k:'on', v:on }); } if(msg.length) L.node.port.postMessage(msg); }
+/* a layer's recording into its node: 'near' | 'far', its two channels (at this context's rate; moved, not copied), its level → a promise of true / false */
+function ambienceLayersRec(E, amb, which, L, R, norm){ const b=amb.layers; if(!b) return Promise.resolve(false);
+  return new Promise(res=>{ const p=b.node.port, f=e=>{ if(e.data && e.data.rec && e.data.rec.which===which){ p.removeEventListener('message', f); b.rec[which]= e.data.rec.ok ? 'on' : 'refused'; res(!!e.data.rec.ok); } };
+    p.addEventListener('message', f); p.start(); const tr=[L && L.buffer, R && R.buffer!==(L && L.buffer) ? R.buffer : null].filter(Boolean); p.postMessage([{ k:'rec', which, L, R, norm }], tr); }); }
+/* the focus (0 the glass … 1 the far city) — the picture's eased number; sent only when it moved */
+function ambienceLayersFocus(E, amb, f){ const b=amb.layers; if(!b || !(Math.abs(f-b.focus)>0.002)) return; b.focus=f; b.node.port.postMessage([{ k:'focus', v:f }]); }
+/* the node's counters → a promise (null after ms) */
+function ambienceLayersStats(E, amb, ms=2000){ const b=amb.layers; if(!b) return Promise.resolve(null);
+  return new Promise(res=>{ const p=b.node.port, f=e=>{ if(e.data && e.data.stats){ p.removeEventListener('message', f); res(e.data.stats); } };
+    p.addEventListener('message', f); p.start(); p.postMessage([{ k:'stats' }]); setTimeout(()=>{ p.removeEventListener('message', f); res(null); }, ms); }); }
+export { buildAmbience, ambienceSchedule, ambienceTune, ambienceSet, ambienceRoom, ambienceBrook, ambienceBrookLight, ambienceBrookStats, ambienceBrookRec, ambienceLayers, ambienceLayersRec, ambienceLayersFocus, ambienceLayersStats };

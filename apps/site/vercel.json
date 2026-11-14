@@ -4,7 +4,13 @@
   "installCommand": "",
   "cleanUrls": true,
   "trailingSlash": true,
-  "ignoreCommand": "if git diff --quiet \"${VERCEL_GIT_PREVIOUS_SHA:-HEAD^}\" HEAD -- . ; then echo 'apps/site unchanged - skip'; exit 0; else echo 'apps/site changed - build'; exit 1; fi",
+  "redirects": [
+    { "source": "/install", "destination": "/space/", "permanent": true },
+    { "source": "/install/", "destination": "/space/", "permanent": true },
+    { "source": "/ru/install", "destination": "/ru/space/", "permanent": true },
+    { "source": "/ru/install/", "destination": "/ru/space/", "permanent": true }
+  ],
+  "ignoreCommand":"if git diff --quiet \"${VERCEL_GIT_PREVIOUS_SHA:-HEAD^}\" HEAD -- . ; then echo 'apps/site unchanged - skip'; exit 0; else echo 'apps/site changed - build'; exit 1; fi",
   "headers": [
     {
       "source": "/(.*)",

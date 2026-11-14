@@ -2,7 +2,7 @@
      forest  the night forest through the room's camera AT REST (the still's lens, as tools/night-still.mjs; silhouettes and vignette off,
              NOT dimmed), rendered once into tools/.site-src/forest-raw.png (git-ignored; --fresh renders again)
      night-card.webp/.jpg   portrait 9:14 crop for the Night card and page (each ≤ 150 KB)
-     forest-wall.webp/.jpg  landscape crop for the Install picture (the forest on a projected wall)
+     forest-wall.webp/.jpg  landscape crop for the Space picture (the forest on a projected wall)
      og.jpg                 1200 × 630 sharing picture: the forest + the emblem and the hand·song wordmark (the site's own Literata)
      demo-card.webp/.jpg    the live https://handsong.vercel.app start screen at phone size (portrait 9:14)
      icon-32.png, apple-touch-icon.png (180), ../favicon.ico (PNG inside), from apps/site/favicon.svg (the five-dot emblem)

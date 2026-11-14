@@ -45,7 +45,7 @@
 - What's next: The full Handsong — with an editor, recording and saving your melodies — is in the works. The tech demo stays open until it's out.
 - Closing band: Want to hear when the full version is out? Write to us. · hello@handsong.app
 
-## Install page
+## Install page (SITE-2, 2026-11-14: now «Handsong Space», page `/space/` — the live wording is in `tools/site/texts.mjs`; this copy is the approved original)
 - Label: Coming soon · pilots open
 - Title: Handsong *Install*
 - Lead: A musical installation where visitors play with their hands in the air and the space answers with light and sound. No complex equipment, no sensors.

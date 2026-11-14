@@ -154,6 +154,11 @@ NIGHT-11 part 2 — LINKS OPENED INSIDE A MESSENGER (audit W4).
 - const (3): `IN_APPS`, `QUICK_DENY_MS`, `quickDeny`
 - fn (1): `inAppOf`
 
+## apps/night/pure/layers.js
+RAIN-3: A ROOM's LAYERED RECORDINGS — near and far, crossfaded by the focus — and its EVENT SOUNDS on a seeded schedule (pure, rule #36; data row «RAIN nature (app)»), run unchanged by the nature w…
+- const (3): `LAYERS`, `layerMinLen`, `layersStats`
+- fn (6): `layersEvents`, `layersNew`, `layersRec`, `layersFocus`, `layersOn`, `layersOut`
+
 ## apps/night/pure/pixels.js
 NIGHT-11 part 5 — THE SCENE'S PIXEL BUDGET (audit P4).
 - const (6): `PIX_LEVELS`, `PIX_STEP`, `GUARD`, `ratioOld`, `bufferOf`, `guardNew`
@@ -330,32 +335,47 @@ RAIN-0: THE RAIN ROOM JOINS THE APP — loaded only by the development rooms' do
 - const (1): `RAIN`
 - fn (1): `rainInstall`
 
+## apps/night/rooms/rain/pure/city.js
+RAIN-0b: THE VIEW LAW — the eye on the 8th floor, looking slightly down and diagonally along the boulevard (concept §3), as ONE pure projection used by the painting, the depth map, the lights, the …
+- const (11): `CAM`, `STREET`, `BLOCKS`, `FLOOR`, `FAR`, `camBasis`, `vanishing`, `DEPTH`, `hillsAt`, `RAIN_CITY_SEED`, `TRAFFIC`
+- fn (8): `project`, `rayOf`, `depthOf`, `sceneAt`, `cityWindows`, `cityLamps`, `cityTrees`, `trafficAt`
+
+## apps/night/rooms/rain/pure/drops.js
+RAIN-0b: THE DROPS ON THE PANE — a stateful simulation, so drops see each other (pure, rule #36; data row «RAIN glass law (app)»).
+- const (4): `DROPS`, `PANE_EXT`, `dropsLedger`, `dropStretch`
+- fn (6): `dropsNew`, `dropsRegion`, `dropAdd`, `dropsStep`, `laneStep`, `laneAt`
+
 ## apps/night/rooms/rain/pure/focus.js
 RAIN-0: DEPTH IS FOCUS — the law (pure, rule #36; data row «RAIN focus law (app)»).
-- const (2): `FOCUS`, `focusBlur`
+- const (5): `FOCUS`, `LAYER_DEPTH`, `focusDepth`, `blurAt`, `focusBlur`
 - fn (2): `focusTarget`, `focusStep`
 
 ## apps/night/rooms/rain/pure/glass.js
-RAIN-0: THE GLASS's law (pure, rule #36; data row «RAIN glass law (app)») — THE WIPE MAP: a small grid over the pane (view-angle units, as the windows) holding how much of the mist is cleared at ea…
-- const (2): `GLASS`, `wipeNew`
-- fn (3): `wipeStamp`, `wipeStep`, `wipeAt`
+RAIN-0: THE GLASS's law (pure, rule #36; data row «RAIN glass law (app)») — THE WIPE MAP: a grid over the pane (view-angle units, as the windows) holding how much of the MIST (inside, on the room's…
+- const (4): `GLASS`, `midAt`, `wipeStamp`, `wipeAt`
+- fn (4): `wipeNew`, `wipeStroke`, `wipeStep`, `wipeCell`
 
 ## apps/night/rooms/rain/pure/room.js
 RAIN-0: THE RAIN ROOM'S RECORD (docs/night/design/RAIN/CONCEPT.md, PLAN.md) — what the room is, as data (pure, rule #36; checked by apps/night/pure/room.js).
 - const (1): `RAIN_ROOM`
 
 ## apps/night/rooms/rain/pure/windows.js
-RAIN-0: THE WINDOWS — their places on the placeholder city, which one a note lights, and how a lit window fades (pure, rule #36; data rows «RAIN window pick (app)», «RAIN window fade (app)»).
-- const (8): `RAIN_SEED`, `HOUSES`, `HILL`, `hillAt`, `PICK_REACH`, `TRACE`, `AMB_LEVEL`, `windowLight`
-- fn (4): `windowsLayout`, `farLights`, `windowPick`, `traceLevel`
+RAIN-0: THE WINDOWS — their places, which one a note lights, and how a lit window fades (pure, rule #36; data rows «RAIN window pick (app)», «RAIN window fade (app)»).
+- const (6): `RAIN_SEED`, `windowsLayout`, `PICK_REACH`, `TRACE`, `AMB_LEVEL`, `windowLight`
+- fn (3): `farLights`, `windowPick`, `traceLevel`
+
+## apps/night/rooms/rain/rain-city.js
+RAIN-0b: THE STAND-IN CITY's prepared picture and its DEPTH MAP, painted ONCE on the GPU (an opening, a resize, a mood): one ray per pixel through the view law (pure/city.js — this shader is its po…
+- const (1): `CITY_F`
+- fn (1): `cityUniforms`
 
 ## apps/night/rooms/rain/rain-glass.js
 RAIN-0: THE RAIN ROOM'S SHADERS (our own, written from the physics: a drop is a small strong lens that shows the view upside down and wide, darker at its rim; a running drop leaves a wet lane and b…
-- const (8): `QUAD_V`, `BLUR_F`, `VIEW_F`, `WIN_V`, `WIN_F`, `PT_V`, `PT_F`, `glassShader`
+- const (10): `QUAD_V`, `BLUR_F`, `VIEW_F`, `WIN_V`, `WIN_F`, `LIGHT_V`, `LIGHT_F`, `DROP_V`, `DROP_F`, `glassShader`
 
 ## apps/night/rooms/rain/rain.js
 RAIN-0 — THE RAIN ROOM's picture (docs/night/design/RAIN/CONCEPT.md; the plan and what is still a placeholder: PLAN.md).
-- const (3): `RAIN_LEVELS`, `BOKEH`, `rainAssets`
+- const (4): `RAIN_LEVELS`, `FINGER_GAP`, `BOKEH`, `rainAssets`
 - fn (1): `buildRain`
 
 ## apps/night/rooms/rain/standin.js
@@ -364,8 +384,8 @@ RAIN-0: the rain room's 2D STAND-IN — the «low» level and the fallback witho
 
 ## apps/night/roomswitch.js
 NIGHT-3 stage 5 part 2: THE ROOM SWITCH — one door for everything a room change touches, in this order: the music bed fades out and holds (it takes the new room's recipes while silent); the picture…
-- const (8): `ROOM_KEY`, `ROOM_NAME_MS`, `roomCurrent`, `roomNature`, `natureModule`, `roomNext`, `roomSwitchDbg`, `natureAmbDbg`
-- fn (6): `natureLoad`, `natureRecOf`, `natureRecPcm`, `natureLight`, `roomRestore`, `roomSwitch`
+- const (9): `ROOM_KEY`, `ROOM_NAME_MS`, `roomCurrent`, `roomNature`, `natureModule`, `natureLayersDbg`, `roomNext`, `roomSwitchDbg`, `natureAmbDbg`
+- fn (8): `natureLoad`, `natureRecOf`, `natureRecPcm`, `natureRecStereo`, `natureFocus`, `natureLight`, `roomRestore`, `roomSwitch`
 
 ## apps/night/scalepick.js
 CORE-20: Night fetches only the modes it plays — every room's moods and the page profile's moods (core/scalepick.js reads the profile) — and what they need.
@@ -388,8 +408,8 @@ RUN 7 (C6 + C11, Night plan §5; docs/night/QUALITY.md points 4, 5, 6, 9, 10) �
 
 ## apps/night/sound/ambience.js
 THE ROOMS' AMBIENCE (RUN 7, C4c; Night's own since CORE-7): drone + wind + distant crickets + one soft echo (NIGHT-8: + the stream), built from a room's NATURE recipe (the forest's: apps/night/room…
-- const (3): `NATURE_WORKLET`, `BROOK_SLEEP_S`, `AMB_SWAP`
-- fn (9): `buildAmbience`, `ambienceSchedule`, `ambienceTune`, `ambienceSet`, `ambienceRoom`, `ambienceBrook`, `ambienceBrookLight`, `ambienceBrookStats`, `ambienceBrookRec`
+- const (4): `NATURE_WORKLET`, `BROOK_SLEEP_S`, `AMB_SWAP`, `LAYERS_WORKLET`
+- fn (13): `buildAmbience`, `ambienceSchedule`, `ambienceTune`, `ambienceSet`, `ambienceRoom`, `ambienceBrook`, `ambienceBrookLight`, `ambienceBrookStats`, `ambienceBrookRec`, `ambienceLayers`, `ambienceLayersRec`, `ambienceLayersFocus`, `ambienceLayersStats`
 
 ## apps/night/sound/bed.js
 NIGHT-3 stage 4: THE MUSIC BED's SOUND — built once on the first On into the master's input (the sleep fade and the limiter cover it; live sound, never a track — rule #31), from a room's bed recipe B.
@@ -1260,6 +1280,7 @@ SPLIT-2: the probe entry of the Night page: its own rows and the core rows flagg
 - → ./night/nightmigrate.js (1): `checkNightMigrate`
 - → ./night/nightprofile.js (1): `checkNightProfile`
 - → ./night/pixels.js (2): `checkNightPixels`, `checkNightDetailedGuard`
+- → ./night/rainnature.js (1): `checkRainNature`
 - → ./night/rainroom.js (1): `checkRainRoom`
 - → ./night/roomswitch.js (1): `checkNightRoomSwitch`
 - → ./night/scales.js (1): `checkNightScales`
@@ -1329,6 +1350,10 @@ SPLIT-2: row «NIGHT profile round trip» on Night's page: the checks of C0 that
 NIGHT-11 part 5 — rows «NIGHT pixel budget» and «NIGHT Detailed guard», on the running app with the forest open.
 - fn (2): `checkNightPixels`, `checkNightDetailedGuard`
 
+## tools/probes/night/rainnature.js
+RAIN-3: row «RAIN nature» (P.night) — the rain room's layered recordings in the real graph (apps/night/sound/ambience.js, the nature worklet's «night-layers»), rendered OFFLINE (deterministic, no r…
+- fn (1): `checkRainNature`
+
 ## tools/probes/night/rainroom.js
 RAIN-0: row «RAIN room» (P.night, drawn) — the rain room (apps/night/rooms/rain/, a development room: the row adds it and takes it out again).
 - fn (1): `checkRainRoom`
@@ -1355,7 +1380,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 - const (5): `TEST_ROOM_ID`, `TEST_ROOM`, `testRoomMode`, `testRoomInfo`, `testRoomFreeLeaks`
 - fn (2): `testRoomInstall`, `testRoomRemove`
 
-_268 modules, 2784 exported names._
+_273 modules, 2840 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 
@@ -1381,3 +1406,5 @@ NIGHT-7b (2026-11-11): `apps/night/ghost.js` deleted (`GHOST`, `ghostArm`, `ghos
 NIGHT-7c (2026-11-11): storage `handsong.nightMusic` and `handsong.nightMusicVol` no longer read (now `handsong.nightMusicMode`, `handsong.nightMusicLevel`); the cards' version `1` → `2`; the forest icon on the Depth bar and the Lightweight switch → `depth`, `lightweight`.
 
 NIGHT-8b (2026-11-11): `apps/night/fullscreen.js` `fsFlowTap` and `fsFlowEnd` deleted (the page's own tap listener asks for full screen once the camera runs; the flow needs no end); the full-screen icon paths moved to `apps/night/pure/fsicons.js` (`FS_ENTER`, `FS_EXIT`); the bark's program key `handsong.bark7` → `handsong.bark8`.
+
+RAIN-0b (2026-11-14): `apps/night/rooms/rain/pure/windows.js` `HOUSES`, `HILL`, `hillAt` deleted (the placeholder houses; the windows now come from `pure/city.js cityWindows`, the far lights from `sceneAt`); `apps/night/rooms/rain/rain-glass.js` `PT_V`, `PT_F` deleted (the point lights became the instanced `LIGHT_V`/`LIGHT_F`); `buildRain`'s `depthReadDbg` became `rtReadDbg`; the rain record's levels `drops` (layers) → `drops` (the simulation's cap), `rivulets` → `fine` (procedural fine-droplet layers), + `cars`.

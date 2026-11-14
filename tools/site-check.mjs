@@ -35,10 +35,21 @@ const exists=async f=>{ try{ return (await stat(f)).isFile(); }catch(e){ return 
 const VJ=JSON.parse(await readFile(path.join(SITE,'vercel.json'),'utf8'));
 const HDR=(VJ.headers||[]).map(h=>({ re:new RegExp('^'+h.source.replace(/\(\.\*\)/g,'.*')+'$'), hs:h.headers }));
 const OVERLAY=new Map();   // path → { html, noCsp }
+let RED=VJ.redirects||[];   // SITE-2: the redirects the server honours (the CONTROL empties it for a moment)
+/* SITE-2 — «SITE no product named Install»: the venue product was renamed «Space» (the founder: «Install» read as installing software). The old name
+   is nowhere in the written pages, both languages (the product's name, «Handsong Install», a link to /install/), and the old address answers a
+   permanent redirect to /space/ (and /ru/install to /ru/space/). «installation» / «инсталляция» (the art form) and «nothing to install» stay. */
+const OLD_NAME=/Handsong Install|>Install<|"Install"|href="(\/ru)?\/install\/?"/;
+const OLD_ADDR=[['/install','/space/'],['/install/','/space/'],['/ru/install','/ru/space/'],['/ru/install/','/ru/space/']];
+const oldNames=files=>files.map(([f, s])=>{ const m=s.match(OLD_NAME); return m ? `${f}: «${m[0]}»` : null; }).filter(Boolean);
+async function oldAddrs(base){ const bad=[]; for(const [from, to] of OLD_ADDR){ const r=await fetch(base+from,{ redirect:'manual' }); if(r.status!==308 || r.headers.get('location')!==to) bad.push(`${from} → ${r.status} ${r.headers.get('location')||''} (wanted 308 ${to})`); } return bad; }
+async function siteFiles(d=SITE, out=[]){ const { readdir }=await import('node:fs/promises'); for(const e of await readdir(d,{ withFileTypes:true })){ const f=path.join(d,e.name);
+  if(e.isDirectory()) await siteFiles(f, out); else if(/\.(html|xml)$/.test(e.name)) out.push([path.relative(SITE,f).replace(/\\/g,'/'), await readFile(f,'utf8')]); } return out; }
 function headersFor(p, noCsp){ const o={}; for(const h of HDR) if(h.re.test(p)) for(const { key, value } of h.hs) if(!(noCsp && key==='Content-Security-Policy')) o[key]=value; return o; }
 const srv=http.createServer(async (q,r)=>{ try{
   const u=new URL(q.url,'http://x'); let p=decodeURIComponent(u.pathname);
   if(OVERLAY.has(p)){ const o=OVERLAY.get(p); r.writeHead(200,{ 'content-type':MIME['.html'], ...headersFor(p,o.noCsp) }); r.end(o.html); return; }
+  { const rd=RED.find(x=>x.source===p); if(rd){ r.writeHead(rd.permanent ? 308 : 307,{ location:rd.destination }); r.end(); return; } }   // SITE-2: vercel.json redirects (exact sources)
   if(p.includes('..')){ r.writeHead(400); r.end(); return; }
   if(/\/index\.html$/.test(p) || /\.html$/.test(p)){ const to=p.replace(/index\.html$/,'').replace(/\.html$/,'/'); r.writeHead(308,{ location:to }); r.end(); return; }   // cleanUrls
   let f=path.join(SITE,p);
@@ -162,6 +173,13 @@ try{
     ['/night/','ru-RU',null,false,'/night/','a deep link in a Russian browser'], ['/ru/','en-US',null,false,'/ru/','the Russian home in an English browser'] ];
   for(const [u,loc,sv,th,want,what] of L){ const r=await landing(u,loc,sv,th); if(r.at!==want) fail(`first visit (${what}): ${u} → ${r.at}, wanted ${want}`); for(const e of r.errs) fail(`first visit (${what}): ${e}`); }
   out(`first visit: ${L.length} cases`);
+  /* SITE-2: no product named Install (+ its two CONTROLS) */
+  { const files=await siteFiles(), names=oldNames(files), addrs=await oldAddrs(BASE);
+    for(const x of names) fail('the old product name: '+x); for(const x of addrs) fail('the old address: '+x);
+    const cName=oldNames([['control.html', files.find(([f])=>f==='index.html')[1].replace('</main>','<p>Handsong Install</p></main>')]]).length>0;
+    const keep=RED; RED=[]; const cAddr=(await oldAddrs(BASE)).length>0; RED=keep;
+    out(`no product named Install: ${files.length} pages and files (both languages) ${names.length ? names.length+' with the old name' : 'clean'}, /install and /ru/install ${addrs.length ? 'NOT redirected' : '→ 308 /space/ and /ru/space/'} · controls: a page naming it ${cName?'caught':'NOT CAUGHT'}, the redirect missing ${cAddr?'caught':'NOT CAUGHT'}`);
+    if(!cName || !cAddr) fail('a CONTROL of «no product named Install» was not caught'); }
   /* CONTROLS */
   const homeHtml=await readFile(path.join(SITE,'index.html'),'utf8'), nightHtml=await readFile(path.join(SITE,'night/index.html'),'utf8');
   OVERLAY.set('/__control/broken/', { html:homeHtml.replace('</main>','<p><a href="/no-such-page/">x</a></p></main>') });
@@ -180,7 +198,7 @@ try{
 finally{ await browser.close().catch(()=>{}); srv.close(); }
 
 async function gallery(shots){
-  const PG={ home:'Главная', night:'Night', demo:'Технодемо', install:'Install', '404':'Страница 404 (на двух языках)' }, LG={ en:'английская версия', ru:'русская версия', both:'' }, VW={ phone:'телефон, 390 px', laptop:'ноутбук, 1280 px' };
+  const PG={ home:'Главная', night:'Night', demo:'Технодемо', space:'Space', '404':'Страница 404 (на двух языках)' }, LG={ en:'английская версия', ru:'русская версия', both:'' }, VW={ phone:'телефон, 390 px', laptop:'ноутбук, 1280 px' };
   const rows=[]; for(const pg of [...PAGES,'404']){ const s=shots.filter(x=>x.pg===pg); if(!s.length) continue;
     rows.push(`<h2>${PG[pg]}</h2><div class="row">${s.map(x=>`<figure class="${x.view}"><a href="${x.file}"><img src="${x.file}" alt="" loading="lazy"></a><figcaption>${PG[pg]}${LG[x.lang]?' — '+LG[x.lang]:''} · ${VW[x.view]}</figcaption></figure>`).join('')}</div>`); }
   const html=`<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>handsong.app — снимки страниц</title>
@@ -194,4 +212,4 @@ ${rows.join('\n')}</body></html>`;
 
 const secs=((Date.now()-T0)/1000).toFixed(1);
 if(fails.length){ console.log(`\n[site-check] problems (${fails.length}):`); for(const f of fails) console.log('  ✗ '+f); out(`NOT A PASS — ${fails.length} problem(s) · ${secs} s`); process.exit(1); }
-out(`PASS — every page in both languages at phone and laptop width: links, console, own origin only, switch, first visit, 404, contrast, weight; 3 controls caught · ${secs} s`);
+out(`PASS — every page in both languages at phone and laptop width: links, console, own origin only, switch, first visit, 404, contrast, weight, no product named Install; 5 controls caught · ${secs} s`);

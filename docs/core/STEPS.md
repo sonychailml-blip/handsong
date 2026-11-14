@@ -63,6 +63,9 @@ THERE in full and here as one index entry):
   157 MediaPipe from our own origin; Night's second visit with no network (a build's precache) and the quiet «A new version is ready» line (CORE-22 + NIGHT-14)
   158 Night's offline second visit on a phone, a short first visit enough; the dev branch alias as the test address (NIGHT-14b)
   159 A Detailed player offline before its pictures are cached: Standard, then Detailed once they are in (NIGHT-14c)
+  160 «A new version is ready» on the Poco: the start screen, a reload, a return from the background (NIGHT-14d)
+  161 The room «Rain»: drops that see each other, the mist as the first touch, the focus at many depths, the view along the boulevard, the baked city's look test (RAIN-0b)
+  162 The room «Rain»'s sound: the pane near, the wet street far, crossfaded by the hand's depth; drips and a quiet tick; the candidates by ear (RAIN-3)
 
 ## Moved to `archive/CLAUDE-history.md` at DOC1 (grep by title; read only what the slice needs)
 - «Module map (full, moved at DOC1)» — every module's detailed paragraph (AUD1a … IDS1, SONG1, AUTOSAVE1, PACK1 …).

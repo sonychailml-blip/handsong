@@ -224,6 +224,38 @@
    ],
    "replace": "kept while the user compares it with our baked floor (NIGHT-9); CC0 photo material"
   },
+{
+   "id": "rain-bake-textures",
+   "name": "The rain room's baked city: CC0 PBR textures for the offline bake (RAIN-0b look test; slice 1 bakes the whole boulevard) — «Painted Plaster Wall», «Large Sandstone Blocks», «Asphalt 02», «Red Sandstone Pavement»: colour, normal (OpenGL) and AO/roughness/metal maps, 1k",
+   "class": "image",
+   "use": "dev-only",
+   "version": "Poly Haven, 1k JPG, downloaded 2026-11-14",
+   "licence": "CC0-1.0",
+   "source": "Poly Haven, every asset CC0 1.0 (https://polyhaven.com/license): https://polyhaven.com/a/painted_plaster_wall (Amal Kumar), https://polyhaven.com/a/large_sandstone_blocks (Rob Tuytel), https://polyhaven.com/a/asphalt_02 (Rob Tuytel), https://polyhaven.com/a/red_sandstone_pavement (Amal Kumar). Stored unchanged in the design sources tools/design/rain/tex/ (never fetched at run time, never shipped: the bake renders them into our own prepared pictures). SHA-1: painted_plaster_wall diff 028753ef493ca191a1d9aab4f8fdb6ff145ecb02, nor_gl 449d724dc51363a878c6b742a4394e6e1eebbacf, arm 2143556e45c306c25287806d5a7bce7626e487bf; large_sandstone_blocks diff 939b802b754ca9bffb0daada3b1efa06ba2f4252, nor_gl 680d3fe63e4f76c82625f23ed9164e1633ebaeaa, arm 01c6eebb8ddcb5ccf87c3547d8c039719052dd19; asphalt_02 diff 7f91edd454e5460a905ac601fe35e5a4607ef25a, nor_gl 8231d4bd07170ead4c6672a548e602611666abe5, arm c70a1ce6b63916d85e21ef121ee280600af9c2b1; red_sandstone_pavement diff f348b5fbe56311fa1e17bcbb20cad5f7de76ab33, nor_gl bbaf9a1fe064d7d4119cca9e190d598bf7428fd1, arm 299c5110e8149d95ef40c445be9b57a1ec3ab7b1. The bake's renderer is three.js r128 (MIT, register entry threejs-r128).",
+   "replace": "kept — CC0 photo material for our own baked pictures (the baked layers will be their own register entry when they ship, slice 1)"
+  },
+  {
+   "id": "rain-recordings",
+   "name": "The rain room's sound (RAIN-3, development room): rain on a window pane, close (the near layer), and a rainy urban street (the far layer), played in grains by the nature worklet, crossfaded by the focus",
+   "class": "sound",
+   "use": "shipped",
+   "version": "Freesound #648529 and #238019 (the sites' HQ previews, 2026-11-14)",
+   "licence": "CC0-1.0",
+   "source": "nicoproson, «RAIN on glass window.wav», Freesound https://freesound.org/people/nicoproson/sounds/648529/ (Creative Commons 0; preview SHA-1 ead1afc1260eb9304da340fe5379a09a8b83c733); eaglechopper, «Urban street in rainy weather», Freesound https://freesound.org/people/eaglechopper/sounds/238019/ (Creative Commons 0; preview SHA-1 a3d27eb739626742d8550d0c725accd330314e03). The full-quality originals need a Freesound account; the public HQ previews (MP3, stereo) were used. Our edit (ffmpeg, a dev tool outside the repo): 60-s excerpts (from 30 s and 120 s), rumble below 45 Hz removed, then 45 s each, stereo 48 kHz MP3 96 kbit/s. Chosen by default for the founder's choice by ear (tools/design/rain/sound/listen/index.html).",
+   "files": [
+    "apps/night/rooms/rain/sound/pane.mp3",
+    "apps/night/rooms/rain/sound/street.mp3"
+   ]
+  },
+  {
+   "id": "rain-sound-candidates",
+   "name": "The rain room's sound candidates for the founder's choice (RAIN-3): three of rain on a window pane, three of a wet street from above, 60-s excerpts in the design sources tools/design/rain/sound/",
+   "class": "sound",
+   "use": "dev-only",
+   "version": "Freesound HQ previews, 2026-11-14",
+   "licence": "CC0-1.0",
+   "source": "Every one Creative Commons 0 on its Freesound page: bastipictures «rain against window 2» https://freesound.org/people/bastipictures/sounds/243781/ (preview SHA-1 1ac44d5be93abbcb0d76e3e047334083948c0069); nicoproson «RAIN on glass window.wav» https://freesound.org/people/nicoproson/sounds/648529/; ckjzam «Rain on window» https://freesound.org/people/ckjzam/sounds/457153/ (0f600f267c3f84552e1bb1f47d24acad2a32f088); eaglechopper «Urban street in rainy weather» https://freesound.org/people/eaglechopper/sounds/238019/; humi74 «Light rain at night with cars passing by .wav» https://freesound.org/people/humi74/sounds/532392/ (b8c07ecde11f6878c7c8be38f74a027c56d3b8f2); mzui «Residential Street Distant Traffic Wet Road.wav» https://freesound.org/people/mzui/sounds/135078/ (a76338a16a2f19f09b82cbcb89056f1fb384c346). Excerpts cut with ffmpeg (dev tool outside the repo); never shipped (tools/ is not shipped)."
+  },
   {
    "id": "system-fonts",
    "name": "Interface and canvas text — the device's system fonts (CSS --font stack, canvas system-ui)",

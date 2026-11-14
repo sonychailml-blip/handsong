@@ -1,16 +1,12 @@
-# RAIN: the room «Rain» — the plan (RAIN-0, 2026-11-13)
+# RAIN: the room «Rain» — the plan (RAIN-0, 2026-11-13; rewritten at RAIN-0b, 2026-11-14)
 
 ## Коротко по-русски (для основателя)
-1. Комната строится в 11 шагов после этого; каждый шаг — один запуск Opus на высоком усилии, в конце каждого есть что посмотреть или послушать.
-2. Сделано сейчас (RAIN-0): дождь на стекле, фокус от глубины руки и окно, которое зажигает нота. Город пока условный — простая заглушка в цветах концепции.
-3. Комната видна только в разработке: адрес с `?room=rain`. В версии для игроков её нет, кнопки «Комната» нет.
-4. Порядок шагов такой, чтобы «вау» пришло рано: сначала дом напротив с окнами и жизнью в них, потом рама, подоконник, крыши, холмы и небо, потом звук дождя.
-5. Затем игра вблизи (стереть запотевшее стекло), живая улица (машины, трамвай), вторая рука.
-6. Звук — отдельные шаги: записи дождя и улицы (только CC0), новые тембры (электропиано, вибрафон, контрабас в фоне), три настроения со своими ладами и гармонией.
-7. Потом: фон, показанный в картинке (светофоры, трамвай на смене аккорда), город засыпает, редкие события.
-8. В конце — проход по красоте (написанные слои) и выпуск: замеры на Poco и iPhone, кнопка «Комната» для игроков только после вашего одобрения.
-9. Стоимость: «Стандартная» картинка должна быть плавной на среднем Android и iPhone; каждый шаг меряет цену на ноутбуке и печатает её. Числа ниже с пометкой «оценка» ещё не измерены.
-10. Вопросы к вам — в конце файла (§9): пять решений, которые меняют порядок или объём работы.
+1. RAIN-0b (2026-11-14) переделал стекло, туман, фокус и вид. Капли теперь настоящие: каждая видит соседей, сливается с ними, тяжёлая бежит вниз рывками, съедает всё на пути и оставляет бусинки. Стекло сначала всё запотевшее; палец (щипок рядом) рисует непрерывную чистую полосу, туман возвращается неровно за 60–90 секунд. Фокус — у каждого слоя своя глубина: рука посередине = резкая улица, мягкие стекло и холмы.
+2. Вид: 8-й этаж, дом стоит в начале бульвара, взгляд вдоль бульвара чуть вправо, к дому напротив. На любом экране улица внизу; телефон вертикально смотрит вдоль бульвара. Город пока простая заглушка.
+3. Город будет запечённой 3D-моделью: строится кодом, текстуры только CC0 (Poly Haven, ambientCG), рендер один раз, заранее (three.js, MIT). Никаких ИИ-картинок. Проба вида — кусок фасада напротив: `tools/design/rain/looktest/index.html`.
+4. Ваши решения §9 записаны: порядок — стекло/фокус/вид + проба (сделано) → запечённый город с окнами и жизнью → рама и старт → остальное (звук можно отдельно); больше улицы; новые тембры только в Night; щёточный ритм за переключателем, решите на слух; ранний замер Poco на адресе dev-ветки.
+5. Запечённый город — новый шаг 1; шаг 10 — проход по красоте уже на нём; бюджет 15 МБ остаётся (оценка всего города ≈ 5–6 МБ).
+6. Комната видна только в разработке (`?room=rain`). Числа с пометкой «оценка» не измерены.
 
 ---
 
@@ -28,8 +24,8 @@
 - **The room is unique.** Nothing is copied or moved out of the forest into shared code. Shared stays what is shared today: the scene host, the room record and switching, the music-bed machinery, the nature slots, the hands, settings.
 - **Dev only until approved.** The room is registered by `apps/night/rooms/dev.js` only in the development edition and only when the address asks (`?room=rain`). Its id `room.rain` is NOT in `ROOM_IDS` (so it is never remembered on a device). No Room button for players. The data row «RAIN stays out of the players' edition (app)» fails if that changes. Slice 11 lifts this, after the founder's approval.
 - **Full untouched, the forest untouched.** `FULL untouched` and `NIGHT untouched` hold in every run; no forest print is renewed.
-- **Licence (#32) and privacy (#33).** Recordings: CC0 only, each a register entry with its source. Painted layers: our own work, or AI-generated with the tool and its terms registered. No new host, no new network call beyond the room's own files on our origin (each listed in the static check's network guard).
-- **What never changes during play is prepared ahead** (the forest's rule): painted layers and atlases ship as files; a small tool in `tools/` regenerates them.
+- **Licence (#32) and privacy (#33).** Recordings: CC0 only, each a register entry with its source. ⛳ **No AI-generated images anywhere** (the founder, RAIN-0b): the city is a 3D model built by our code and baked offline; its materials are CC0 PBR textures only (Poly Haven, ambientCG), each a register entry, stored in the design sources `tools/design/rain/tex/` and never fetched at run time; the renderer used for a bake must be MIT / BSD / Apache / ISC / zlib (today three.js r128, MIT, the vendored copy). No new host, no new network call beyond the room's own files on our origin (each listed in the static check's network guard).
+- **What never changes during play is prepared ahead** (the forest's rule): the baked layers, the depth maps, the window map and its lit atlas ship as files; `tools/rain-bake.mjs` rebuilds them from the model.
 - **Colours are tokens** (`--cv-rain-*` in `night.css`); the concept's style bible is the source.
 - **Checks: Level 2** per CLAUDE.md «Check levels» (static, data, the full Night suite); Level 3 when a slice has a core part. At most five manual checks. A slice that cannot finish green stops at its last green state.
 
@@ -38,20 +34,21 @@
 | The concept's direction (§9) | The plan |
 |---|---|
 | The camera breathes and leans slightly | **Confirmed.** The city is so far away that the lean shows only between the glass / the frame and the city. So the lean moves the glass layer and the frame over the city, a strong depth cue at no cost. |
-| Layered 2.5D planes, windows as instances with their own state | **Confirmed, simplified.** The city's still parts are drawn ONCE into a picture (at the opening, a resize, a mood change), not every frame. Only what changes is drawn each frame: lit windows, lamps, later cars and trams, as light sprites. |
-| The rain on glass is a full-screen pass | **Confirmed.** One pass: drops of several sizes, rivulets with trails, mist, clearing, refraction. All procedural, our own shader written from the physics (a lens, a wet film, a frosted pane). |
-| The focus pull blends pre-blurred versions | **Confirmed, with one addition.** The still city has one pre-blurred copy (made once). Lights are NOT blurred by a filter: each light sprite grows into a soft disc as it leaves focus and dims by its area. That is the bokeh, and it costs only fill. |
+| Layered 2.5D planes, windows as instances with their own state | **Replaced (RAIN-0b).** The city is a 3D model baked ONCE, offline, into prepared pictures with a DEPTH MAP and an exact WINDOW MAP (`tools/rain-bake.mjs`). In the room only what changes is drawn each frame: lit windows (their lit variants from the bake), lamps, cars, the tram, reflections, as light sprites, each at its own depth. Until slice 1 ships the bake, a stand-in is painted once on the GPU by the view law's port (`rain-city.js`). |
+| The rain on glass is a full-screen pass | **Confirmed, with a simulation (RAIN-0b).** The drops are objects simulated on the CPU (`pure/drops.js`: merging, running, beads, lanes) drawn as sprites into a DROP MAP; the glass stays one pass that reads it (lenses, wet lanes, procedural fine droplets, the mist inside over all). |
+| The focus pull blends pre-blurred versions | **Confirmed, with many depths (RAIN-0b).** The prepared picture carries its depth (alpha); the view pass blends four copies (sharp and three blurred) by \|depth − focus\| × K per pixel. Lights are NOT blurred by a filter: each light sprite grows by its OWN depth into a soft disc (a window: a soft rounded rectangle) and dims by its area. |
 | Phones first; Standard smooth, Detailed adds detail | **Confirmed.** Standard: 30 frames a second at the host's reduced resolution, fewer drop layers. Detailed: 60, one more drop layer and a second rivulet layer. |
 | A file budget of its own (15 MB) | **Confirmed.** A data row «RAIN files (app)» from slice 2 on: fails above 15 MB, prints the size every run. |
 
-**One frame, in order** (three passes and two small ones):
-1. **The view** (full size): the city's prepared picture, sharp and blurred mixed by the focus, then the light sprites on top.
-2. **The soft copy** (a sixteenth of the pixels): the view shrunk and blurred, for what is seen through mist.
-3. **The glass** (full size, to the screen): drops and rivulets bend the view, mist shows the soft copy, the hand's light glows in the mist. Later: the frame and sill on top, the film grade.
+**One frame, in order** (RAIN-0b: 9 draws, 7 programs):
+1. **The view** (full size): the prepared picture's four copies blended per pixel by the depth map, then the lit windows and the light sprites, each sized by its own depth.
+2. **The soft copy** (a sixteenth of the pixels): the view shrunk and blurred, for what is seen through mist and inside a drop.
+3. **The drop map** (full size): the simulated drops as sprites (the place inside each drop, premultiplied by its mask).
+4. **The glass** (full size, to the screen): the drops bend the view, the fine droplets and the wet lanes, then the mist (inside, over everything) with its clearing, the hand's light. Later: the frame and sill on top, the film grade.
 
 **The world is fixed, the screen is a crop of it.** The glass and the city are placed in view-angle units, not screen units. A wider lens shows more glass and more city. So the start still (slice 2) can be this room's world through a wider lens, placed by the room's lens law, exactly as the forest's.
 
-**Depth is focus** is one eased number, 0 (the glass) … 1 (the city), from the playing hand's depth (the same `d` the forest reads, so the calibration's near and far points map as in the forest). The city's blur falls and the glass's blur rises with it. The sound's closeness needs nothing new for the played notes: the shared acoustic (`fdepth`) already follows the same depth. The room sounds' near / far balance comes in slice 3.
+**Depth is focus** is one eased number, 0 (the glass) … 1 (the hills; RAIN-0b: a depth on the layers' line, glass 0, frame 0.03, street 0.35–0.65, the facade opposite ≈ 0.72, roofs ≈ 0.82, hills ≈ 0.95, sky 1), from the playing hand's depth (the same `d` the forest reads, so the calibration's near and far points map as in the forest). The city's blur falls and the glass's blur rises with it. The sound's closeness needs nothing new for the played notes: the shared acoustic (`fdepth`) already follows the same depth. The room sounds' near / far balance comes in slice 3.
 
 ## 3. Budget and gates
 
@@ -110,23 +107,41 @@ What the numbers say, and what they do not:
 
 **Not built in RAIN-0, by the founder's narrowing:** the windowsill and frame, the boulevard, the real facade, roofs, hills and sky as layers; the window lives; the start still and the room's own reveal (slices 1 and 2). **Honest limits of what was built:** the running drops' lanes are faint in a still picture (judge them in motion, step 156); a mood change repaints the city in one frame (§8); the Mood button still reads the forest's mood names; the room's sounds are a placeholder hiss.
 
+## 4b. RAIN-0b as built (2026-11-14): the glass alive, the mist first, many depths, the view, and the baked city's look test
+
+The founder's verdict on RAIN-0: the glass did not feel alive, the city was dull and primitive. RAIN-0b:
+- **Drops that see each other** (`pure/drops.js`, the reference's behaviour, our own code): every drop an object (place, radius, speed); a landing drop merges with every drop it touches (areas add exactly); a heavy drop starts to run; a runner goes down stop-and-go on a wandering path, eats every drop its swept path touches, leaves beads (each bead's area taken from it exactly) and clears the fine droplets in its lane (a lane map they grow back into, τ 24 s). Fixed 1/60-s steps, seeded; the water booked exactly (drops + ran off + evaporated under the cap = fell). Caps: Standard 260, Detailed 420. Drawn as sprites into the drop map; the fine droplets stay procedural (1 / 2 layers).
+- **The mist is the first touch** (`pure/glass.js`): the pane opens fully misted (the city only soft lights). A held pinch near = a finger on the glass: the capsule between the light's last place and this one is cleared (continuous at any speed); a short note clears a spot. The map is 320 × 172 over the pane (about a fifth of a phone's pixels), soft but defined edges. The mist returns unevenly (a seeded rate per cell, faster beside misted neighbours — the edges first): about 80 % back at 60 s, 95 % at 90 s. After the first wipe the middle is never more than 70 % misted (the floor eases in over ~6 s). The mist is inside: wiping never removes a drop (drops show faintly through the mist).
+- **Many depths** (`pure/focus.js`, `pure/city.js` depthOf): every pixel and light has its own depth; blur = |depth − focus depth| × 1.8, the widest radius 0.06 view-angle units. A hand in the middle: the street sharp, the glass and the hills soft.
+- **The view** (`pure/city.js`, the view law): our house at the head of the boulevard, the eye on the 8th floor (25 m) over the near road, turned 14° towards the right-hand row (the house opposite), 13° down. The vanishing point sits a little left of the middle, so an upright phone looks along the boulevard; every screen shape (0.46 … 2.4 : 1) sees the street in its lower middle (83–100 % of it) and the house opposite (14–29 % of the frame). The stand-in is painted once on the GPU by the law's port (`rain-city.js`; the browser row compares its depth with the law's). Lamps, cars (a seeded schedule, no two inside each other) and an occasional tram are light sprites with streaked reflections in the wet street.
+- **The look test of the baked city** (`tools/rain-bake.mjs --look`, model `tools/design/rain/bake/model.js`): a section of the facade opposite modelled by code (rusticated ground floor with arched shopfronts, three floors of tall arched windows with surrounds and keystones, pilasters, string courses, the cornice on brackets, wrought-iron balconies with whiplash curls, stucco panels; pavement, kerb, wet asphalt, rails, wires, a lamp), CC0 Poly Haven textures, night lights (lamps lighting the plaster from below, balcony shadows thrown up the wall, lit rooms), wet reflections; baked 2× supersampled with three.js r128 at a laptop and a phone size, windows dark and lit, with its depth map and window map, and two blur levels by the room's own method. Page: `tools/design/rain/looktest/index.html`.
+- **Measured** (laptop, Intel HD 4000, idle, `node tools/rain-snap.mjs --cost`): Standard 921 × 438 — the room's frame time on the main thread 2.1–2.2 ms (RAIN-0: 0.7–0.8; the drops' simulation and the maps' upload; gate 3 ms), 22 frames a second (cap 30), 9 draws, 7 programs, texture memory 5.9 MB, opened in 0.13–0.15 s, hand detections against Dark −0.1 / +0.5 %; Detailed 1305 × 620 — 2.6–2.7 ms, 38–39 fps (cap 60), 11.8 MB, −0.4 / +0.4 %. The bake: 2.6–4.9 s per view and variant (4 of them); the look test's files 1.4 MB. Not measured on any phone.
+- **Not done:** the frame and sill, the window lives in the room (slice 1, from the bake), the start still (slice 2); timing runs (§3) wait for an idle machine.
+
+## 4c. RAIN-3 as built (2026-11-14): the room's sound, near and far (slice 3)
+
+- **Recordings** (CC0, Freesound, register «rain-recordings»; the full-quality originals need an account, so the sites' public HQ previews were used): the pane near — «RAIN on glass window» (nicoproson #648529) — and the street far — «Urban street in rainy weather» (eaglechopper #238019), 45 s each, stereo MP3 96 kbit/s, 0.54 MB each (1.08 MB). Chosen by default for the founder's ear among three candidates each (`tools/design/rain/sound/listen/index.html`, `node tools/rain-listen.mjs`; register «rain-sound-candidates»).
+- **The law** (`apps/night/pure/layers.js`, shared machinery naming no room): each layer in stereo grains (5–9 s, equal-power joins of 1.5 s, never across the file's ends, never a loop); near × cos, far × sin of the focus (equal power); the picture's own eased focus (`natureFocus`, the same number), smoothed only against steps (τ 0.08 s); on / off over 0.6 s; a soft fallback synthesis while a layer has no recording; events on a seeded schedule of absolute time — drips from the cornice (every ≈ 3.5 s, panned, louder near) and a quiet tick in the room (every ≈ 9 s). The picture shows each drip falling past the window when it is heard (the host hands an opt-in room the audio clock).
+- **The graph** (`sound/ambience.js`): the nature worklet's second processor «night-layers», built only when a room whose recipe has `nature.layers` plays (the forest builds nothing new; once built, it adds exactly 0 in the forest's slot); near → the slot's mix, far → the mix and the echo (send 0.35); the slots' crossfade carries a room switch.
+- **Measured:** the law 7–9 µs a 128-frame quantum per layer in node (two layers ≈ 15–20 µs, est. ≈ 1 % of a quantum on the laptop's audio thread); the level (K-like, offline) −56.9 dB against the forest's −56.5 dB (near −55.5, far −58.8); a room switch moves the envelope at most 0.15 % a millisecond; files 1.08 MB.
+- **Rows:** data «RAIN nature (app)» (27 cases, CONTROL an instant swap); P.night «RAIN nature» (offline: the forest unchanged, the balance in the graph, the level, the switch; CONTROLS) and «RAIN room» (the live node follows the focus, both recordings play). «NIGHT room switch» unchanged.
+- **Not done:** the tram's bell and thunder (slices 5 and 9, with their pictures); with the picture off (Dark or Camera) the near / far balance holds its last value (the picture sends the focus).
+
 ## 5. The slices, in order
 
 Each slice is one run for Opus at high effort. Each ends with something to look at or listen to. Each report has: static check, data runner, the full Night suite; the room's rows; the budget before and after at Standard and Detailed; captures at phone and laptop size; tree hashes; at most five manual checks.
 
-**Order:** the picture that answers playing first (windows with lives), then the whole frame, then the sound that makes it a place. Then the rest of the playing, the street, the music, the long night. The look pass and the release gate come last.
+**Order (the founder's decision, RAIN-0b §9.1):** the glass, the focus, the view and the look test (RAIN-0b, done) → the baked city with its windows and lives (slice 1) → the frame and the start (slice 2) → the rest. The sound (slice 3) may run separately, in any order.
 
-### Slice 1: the house opposite and its windows (large; the first «wow»)
+### Slice 1: the baked city, its windows and their lives (large; the first «wow»)
 - **Builds.**
-  - The real view: the eye on the 8th floor, looking slightly down and diagonally along the boulevard. One pure projection law (`pure/city.js`) used by the painting, the sprites and the note's pick.
-  - The Art Nouveau facade opposite and its neighbours along the street: plaster, cornices, tall windows, balconies, a mansard roof. Painted by our own drawing code into the prepared picture, in the concept's palette.
-  - Every window an instance with its own state. **The lives**: one prepared sheet of small interiors (a lamp behind a curtain, a reader, someone cooking, a cat on the sill, a plant, a TV's blue flicker; at least six), drawn by a tool in `tools/` (`rain-bake.mjs`), registered as our own work.
-  - A note lights the window where the light points, with its life; the trace fades slowly (RAIN-0's law, kept).
-  - The city's own lit windows per mood (few at Late night, many at Evening).
-- **Measures.** A window's height on screen at phone and laptop size (the lives must read: at least 30 px on a 390 × 844 phone). The cost of 300 window sprites out of focus (the worst fill).
-- **Rows.** Data: «RAIN view law» (the projection against a pinhole camera; the facade's windows never overlap; CONTROL a mirrored projection). «RAIN window pick» extended to the projected windows. Browser: «RAIN room» extended (a note lights the window under the light, on both screen shapes).
-- **Cost (est.).** Laptop: +0.2 ms a frame, +1 program, +1 draw; the sheet 0.7 MB of texture. Phones: the fill of the out-of-focus discs is the risk; the count of lit windows is capped per level.
-- **You look at:** far focus on the facade; playing a phrase and watching windows come on; the same on a phone held upright.
+  - **The model** grows from the look test (`tools/design/rain/bake/model.js`) to the whole view of the view law (`pure/city.js`): the Art Nouveau house opposite and its neighbours along the boulevard (each block its own proportions and ornament from one seeded procedural kit: arched and straight windows, cornices, pilasters, wrought-iron balconies, a mansard roof with dormers), the left-hand row, roofs (chimneys, antennas, water tanks), the street (asphalt, kerbs, tram tracks and wires, plane trees, lamps, awnings), the old town on the hills (wooden balconies, domes, the fortress wall, the TV tower) as simpler far masses. Tbilisi-inspired, no real building copied, no readable text, no brands. CC0 materials only (more from Poly Haven / ambientCG, each a register entry).
+  - **The bake** (`node tools/rain-bake.mjs --city`): per screen shape (the room's lens law: upright, square-ish, wide), colour layers per depth band, the DEPTH MAP, the exact WINDOW MAP (id, rectangle, depth per window), the lit-interior variant of every window with its small life (a lamp behind a curtain, a reader, someone cooking, a cat, a plant, a TV's blue flicker — the look test draws six) as an atlas; masters at the highest quality, smaller copies for Standard. Registered as our own renders of CC0 material.
+  - **In the room:** the baked layers replace the stand-in's painting (`rain-city.js`), the window map replaces `cityWindows` for the pick (the law and the fade stay), a lit window shows its baked life; the city's own lit windows per mood. Live in code: lights, cars, tram, reflections, rain, glass, focus.
+- **Measures.** A window's height on screen at phone and laptop size (the lives must read: at least 30 px on a 390 × 844 phone at the nearest windows). The bake's time. Files per level against the 15 MB budget (the look test's estimate: ≈ 5–6 MB). The cost of 300 window sprites out of focus.
+- **Rows.** Data: «RAIN files (app)» starts here (≤ 15 MB); «RAIN window pick» on the baked window map (each window inside its depth band, none overlapping; CONTROL a mirrored law); the bake's windows agree with the view law (their centres project where the law sees the house). Browser: «RAIN room» extended (a note lights the window under the light, on both screen shapes; the painted depth equals the map's).
+- **Cost (est.).** +1–2 texture samples in the view pass; the atlas ≈ 0.5 MB of texture per level.
+- **You look at:** far focus on the facade; a phrase played, windows coming on with their lives; a phone held upright.
 
 ### Slice 2: the whole frame, and the start (large)
 - **Builds.**
@@ -205,8 +220,8 @@ Each slice is one run for Opus at high effort. Each ends with something to look 
 - **Cost (est.).** About 0; fireworks and lightning are a few sprites and one term.
 - **You look at:** the room's clock moved to a few moments; the sleep timer at 15 minutes.
 
-### Slice 10: the look pass (large)
-- **Builds.** The prepared layers repainted at their best: masters at the highest quality, smaller copies for Standard (the forest's texture rule). Painted layers may be AI-generated (tool and terms registered) or our own. The film: grain, grade, a gentle vignette. The yellow plane leaf on the glass. Detailed's extras.
+### Slice 10: the look pass on the baked city (large)
+- **Builds.** The baked city at its best: the model's detail and materials where the eye rests, the night light (more lamps, the warm glow on low clouds, the old town's lights), the bake at its highest quality with smaller copies for Standard (the forest's texture rule). No AI images (the founder). The film: grain, grade, a gentle vignette. The yellow plane leaf on the glass. Detailed's extras.
 - **Measures.** Files per level against the 15 MB budget; texture memory; the opening time with the files.
 - **Rows.** «RAIN files (app)»; the licence register's row with the new entries.
 - **You look at:** before / after pairs on a local page, phone and laptop.
@@ -222,12 +237,12 @@ Laptop = Intel HD 4000, Standard. «Fill» = extra pixels shaded, as a share of 
 
 | Item | Per frame | Programs, draws, memory | Standard | Detailed |
 |---|---|---|---|---|
-| The city's prepared picture, sharp + blurred | 2 samples in the view pass | 1 program; repainted only at an opening, a resize, a mood change | ✓ | ✓ |
+| The city's prepared picture + its depth, four copies (RAIN-0b) | 4 samples in the view pass | 2 programs (painting, blur); made only at an opening, a resize, a mood change | ✓ | ✓ |
+| The drop simulation and its map (RAIN-0b) | CPU: a few hundred drops at 60 steps a second; the map: sprites, fill ≈ 0.03 | 1 program, 1 draw | 260 drops | 420 |
 | Light sprites, out of focus (the bokeh) | fill 0.3–1.0 × a screen | 1–2 programs, 2 draws | 220 windows, 120 far lights | 320, 260 |
 | The soft copy for the mist | 1/16 of a screen | 1 program, 1 draw | ✓ | ✓ |
-| The glass: static drops | per layer about 12 % of the pass | in the glass program | 3 layers | 4 |
-| The glass: rivulets with trails and beads | per layer about 20 % of the pass | same | 1 layer | 2 |
-| The glass: mist, clearing, the wipe map | 2 samples | a 64 × 40 one-byte map updated on the CPU | ✓ | ✓ |
+| The glass: the fine droplets (procedural) | per layer about 12 % of the pass | in the glass program | 1 layer | 2 |
+| The glass: mist, clearing, the lanes (RAIN-0b) | 1 sample (two channels) | a 320 × 172 two-byte map updated on the CPU (only the cleared box visited) | ✓ | ✓ |
 | The frame and sill (slice 2) | 1 sample | 1 texture, 1–4 MB | ✓ | ✓ (larger) |
 | Window lives (slice 1) | 1 sample per lit window pixel | 1 sheet, 0.7 MB | ✓ | ✓ |
 | The street's moving lights (slice 5) | fill 0.05 | 1 program, 1 draw | 40 | 80 |
@@ -239,14 +254,15 @@ Laptop = Intel HD 4000, Standard. «Fill» = extra pixels shaded, as a share of 
 
 | Row | Where | What it holds | Since |
 |---|---|---|---|
-| «RAIN focus law (app)» | data | the focus from the hand's depth: exactly 0 near and 1 far, monotone, eased, never faster than its limit, the same at 30 and 60 frames a second; the two blurs opposite; CONTROL an un-eased law | RAIN-0 |
+| «RAIN focus law (app)» | data | the focus from the hand's depth: exactly 0 near and 1 far, monotone, eased, never faster than its limit, the same at 30 and 60 frames a second; RAIN-0b: many depths — near the glass sharp and the facade soft, far the hills sharp, in the middle the street sharper than the glass and the hills, the depth law monotone on its anchors; CONTROLS an un-eased law, a two-plane focus | RAIN-0 |
+| «RAIN view law (app)» | data | the projection equals an independent pinhole; the vanishing point inside an upright phone's crop; the street in the lower middle and the house opposite in view on six screen shapes; the windows seeded, never overlapping, each seen on its own row; the traffic seeded, on its lanes, no two cars inside each other; CONTROL a mirrored projection | RAIN-0b |
 | «RAIN window pick (app)» | data | which window a note lights: the one under the light, else the nearest within reach, else none; CONTROL a mirrored law | RAIN-0 |
 | «RAIN window fade (app)» | data | the trace: on at once, full while held, then slowly down, never up, no jump, still visible after ten minutes; CONTROL an instant off | RAIN-0 |
-| «RAIN glass law (app)» | data | the wipe map: a stamp clears, the mist comes back slowly and exactly, nothing outside the patch moves; CONTROL no refog | RAIN-0 |
+| «RAIN glass law (app)» | data | RAIN-0b: the mist — a stamp clears, nothing beyond it moves, a held stroke is continuous at any speed, the return slow, uneven, edges first, bounded, the middle's floor; the drops — touching drops become one with the summed area, a runner never passes through a resting drop without merging, beads take their area exactly, the water booked, the cap held, seeded; CONTROLS a stamp-only wipe, a simulation that never merges | RAIN-0 |
 | «RAIN stays out of the players' edition (app)» | data | the room's record is valid; not pinned; registered only through the dev door; the door closed in the release edition and without the address word; CONTROLS | RAIN-0 |
-| «RAIN room» | P.night, drawn | switching in and out; nothing left after dispose (programs, geometries, textures, contexts); the focus follows the hand's depth together with the sound's depth; a far note lights the window under the light; a near note clears the mist; CONTROLS | RAIN-0 |
+| «RAIN room» | P.night, drawn | switching in and out; nothing left after dispose (programs, geometries, textures, contexts); RAIN-0b: opens misted and wet, the painted depth equals the law's; the focus follows the hand's depth together with the sound's depth (near, middle, far; CONTROL two planes); a far note lights the window under the light (the clock jump read on an event, with a limit); a near note clears the mist; a finger's stroke is continuous; CONTROLS | RAIN-0 |
 | «NIGHT room switch», «NIGHT untouched», «FULL untouched» | existing | the switching machinery and both apps as they were | always |
-| «RAIN view law», «RAIN files», «RAIN nature», «RAIN street law», «RAIN night law» | data / P.night | as in their slices | 1, 2, 3, 5, 9 |
+| «RAIN files», «RAIN nature», «RAIN street law», «RAIN night law» | data / P.night | as in their slices | 1, 3, 5, 9 |
 
 ## 8. Risks
 
@@ -254,17 +270,18 @@ Laptop = Intel HD 4000, Standard. «Fill» = extra pixels shaded, as a share of 
 |---|---|---|
 | The glass shader is too heavy for a mid Android at Standard | the budget each slice; the phone run in slice 11 (earlier if the founder can run «Measure this device» on a preview) | the §3 levers, best first |
 | Out-of-focus discs overdraw when many windows are lit (Evening, near focus) | the fill measured in slice 1 at the worst case | a cap on drawn discs per level; the dimmest merge into the blurred picture |
-| The look reads as a shader demo, not a film frame | the founder's eye after slices 1 and 2; the look pass | painted layers earlier (part of slice 10 moved up) |
+| The look reads as a shader demo, not a film frame | the founder's eye after slices 1 and 2; the look pass | the baked city's detail and light first (part of slice 10 moved up) |
 | Cold blue overall, or neon overload (the concept's «avoid») | captures against the style bible's colours in every slice | the tokens, not the code, are corrected |
 | The city reads as a real place or shows readable text | the founder's eye; no text is ever drawn | — |
 | New timbres or modes change Full | `FULL untouched`, GOLD, the census, the scale snapshot's declared renewal | the core part stops and is redone as opt-in |
 | The recordings' loops are heard | the self-similarity measure; the founder's ear | another recording, or the synthesis |
 | A mood change repaints the city in one frame (a hitch) | the frame gap printed at a mood change | the repaint spread over frames with a crossfade (slice 2) |
 
-## 9. Decisions for the founder
+## 9. The founder's decisions (recorded at RAIN-0b, 2026-11-14)
 
-1. **The order** in §5: windows with lives first, then the whole frame and the start, then the sound of rain. Or the sound before the frame?
-2. **The view's share** (the concept's open question): settled in slice 2 on real screens. On a phone held upright the facade fills most of the frame and the street shows only at the right edge. Is that right, or should the upright view look more along the boulevard (smaller windows, more street)?
-3. **The new timbres in Full** (slice 6): shown in Full's timbre lists too, or kept for Night only?
-4. **The brushed rhythm** in «After the rain» (the concept's open question): built behind a switch in slice 7, you decide by ear.
-5. **A phone number early:** can you run «Measure this device» with `?room=rain` on a preview on the Poco after slice 1? It tells us early whether the glass fits Standard.
+1. **The order:** the glass, the focus, the view and the look test (RAIN-0b) → the baked city with its windows and lives (slice 1) → the frame and the start (slice 2) → the rest. The sound may run separately (RAIN-3 follows RAIN-0b directly).
+2. **The view:** more street; the upright phone looks along the boulevard (smaller windows, more street) — built in RAIN-0b's view law.
+3. **The new timbres** (slice 6): Night only; Full's lists and sound stay untouched.
+4. **The brushed rhythm** in «After the rain» (slice 7): behind a switch, decided by ear.
+5. **An early Poco number:** yes — the test address is the dev branch alias **https://handsong-night-git-dev-mihail-bridge.vercel.app**. The rain room there: **https://handsong-night-git-dev-mihail-bridge.vercel.app/?room=rain** (a preview build is the development edition; «Measure this device» under ⓘ with the rain room current). The room's files are not in the offline precache (development only): open it online.
+6. **No AI-generated images:** the city is a 3D model built by code and baked offline from CC0 materials (§1).

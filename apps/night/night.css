@@ -54,7 +54,7 @@
   --cv-forest-core:#f6ffd0; --cv-forest-halo:#9be04a; --cv-forest-trail:#c8ff70; --cv-forest-fx:#9fd0ff;
   /* RAIN-0: the room «Rain» (a development room; docs/night/design/RAIN/CONCEPT.md §8, the style bible): its amber on the interface, its windows,
      lamps and playing light; then each mood's sky, cloud underside, cloud body, hills' haze, stone, plaster, wet asphalt and the pane's mist */
-  --cv-rain-tint:#f4c98a; --cv-rain-honey:#ffb95e; --cv-rain-amber:#f29a3a; --cv-rain-lamp:#ffc27a; --cv-rain-light:#ffd9a0; --cv-rain-fx:#e86a92; --cv-rain-pane:#0d0f16;
+  --cv-rain-tint:#f4c98a; --cv-rain-honey:#ffb95e; --cv-rain-amber:#f29a3a; --cv-rain-lamp:#ffc27a; --cv-rain-light:#ffd9a0; --cv-rain-fx:#e86a92; --cv-rain-pane:#0d0f16; --cv-rain-head:#fff0d6; --cv-rain-tail:#ff3c2d;
   --cv-rain-sky:#1b1a2b; --cv-rain-glow:#8a5a44; --cv-rain-cloud:#5a3a4a; --cv-rain-haze:#2b2536; --cv-rain-stone:#2a2220; --cv-rain-plaster:#6b5440; --cv-rain-asphalt:#121621; --cv-rain-mist:#b9a48e;
   --cv-rain-eve-sky:#23203a; --cv-rain-eve-glow:#a06a48; --cv-rain-eve-cloud:#6a4456; --cv-rain-eve-haze:#352c40; --cv-rain-eve-stone:#2e2523; --cv-rain-eve-plaster:#76593f; --cv-rain-eve-asphalt:#141826; --cv-rain-eve-mist:#c2aa90;
   --cv-rain-after-sky:#171a2c; --cv-rain-after-glow:#6f5560; --cv-rain-after-cloud:#453848; --cv-rain-after-haze:#272838; --cv-rain-after-stone:#262224; --cv-rain-after-plaster:#5e4c42; --cv-rain-after-asphalt:#0f1420; --cv-rain-after-mist:#a8a8b4;
@@ -115,6 +115,11 @@ body.night-plain .night-glass{ background:var(--night-surface-plain); -webkit-ba
   padding:var(--night-pad); border-radius:var(--night-r-card); border:1px solid var(--night-hairline); text-align:center; color:var(--night-ink); font-size:var(--night-fs-body); line-height:var(--night-lh);
   pointer-events:auto; cursor:pointer; box-shadow:var(--night-shadow); }
 #nightShell .night-notice[hidden]{ display:none; }
+/* NIGHT-14d: «A new version is ready» on the start screen — at the top, clear of the start card (apps/night/update.js) */
+#start .night-upd{ position:fixed; left:50%; top:var(--night-edge); transform:translateX(-50%); z-index:calc(var(--z-menu) + 1); width:min(520px, calc(100vw - 4 * var(--night-edge))); margin:0;
+  padding:var(--night-pad); border-radius:var(--night-r-card); text-align:center; color:var(--night-ink); font-family:var(--night-font-body); font-size:var(--night-fs-body);
+  line-height:var(--night-lh); cursor:pointer; box-shadow:var(--night-shadow); }
+#start .night-upd[hidden]{ display:none; }
 body.night-notice-on .night-idle, body.night-notice-on .night-hint, body.night-notice-on .night-coach{ visibility:hidden; }
 .night-rb{ display:flex !important; flex-direction:column; align-items:center; gap:var(--night-gap-sm); min-width:0; }
 .night-circ{ width:var(--night-btn); height:var(--night-btn); border-radius:var(--night-r-pill); display:flex; align-items:center; justify-content:center;

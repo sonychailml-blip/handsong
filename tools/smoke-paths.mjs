@@ -357,6 +357,77 @@ async function precacheRows(dir){
   finally{ await browser.close().catch(()=>{}); srv.close(); rmSync(WORK,{ recursive:true, force:true }); }
   out(`[smoke] precache (NIGHT-14), the players' tree: ${bad.length?'NOT A PASS — '+bad.length+' problem(s)':'PASS'}`); for(const n of notes) out('    '+n); for(const b of bad.slice(0,10)) out('    '+b);
   return bad.length; }
+/* NIGHT-14d — THE «A NEW VERSION IS READY» LINE, end to end (the founder saw none on the Poco). Trees A (the players' build) and B (one harmless
+   change, its list re-hashed). Each case: a fresh profile settles on A (the worker in control, every file cached), B is deployed, and
+   (a) the start screen, one reload; (b) the start screen, B already installed and waiting, then a reload — how long the line stays, then one more
+   reload; (c) during play, the tab in the background while B is deployed, then back in view.
+   The line must appear within 30 s and be SEEN: displayed, and the element at its centre is the line (nothing over it); where (start screen / play);
+   how long it stays; a tap must open B (the page reloads, only B's cache, B's file served). CONTROL: the line muted (window.__updateMute, read by
+   apps/night/update.js) — the same case must see no line. Every wait has an upper limit. */
+async function updateRows(dir){
+  const bad=[], notes=[], miss=s=>bad.push(s), WORK=path.join(BUILD_DIR,'night-update'), A=path.join(WORK,'A'), B=path.join(WORK,'B'), CHANGED='apps/night/texts.js', MARK='NIGHT-14d smoke: version B';
+  rmSync(WORK,{ recursive:true, force:true }); cpSync(dir,A,{ recursive:true }); cpSync(dir,B,{ recursive:true });
+  appendFileSync(path.join(B,CHANGED),`\n/* ${MARK} */\n`); rehashPrecache(B);
+  const LA=readPrecache(A), LB=readPrecache(B), PRE='handsong-night-precache-', nAll=LA.files.filter(f=>f[3]!=='nosimd').length;
+  const cur={ dir:A }, srv=http.createServer(async (q,r)=>{ let p=decodeURIComponent(new URL(q.url,'http://x').pathname); if(p.endsWith('/')) p+='index.html';
+    try{ const b=await readFile(path.join(cur.dir,p)); r.writeHead(200,{ 'content-type':MIME[path.extname(p).toLowerCase()]||'application/octet-stream', 'cache-control':'no-store' }); r.end(b); }catch(e){ r.writeHead(404); r.end(); } });
+  await new Promise(res=>srv.listen(0,'127.0.0.1',res)); const origin=`http://127.0.0.1:${srv.address().port}`;
+  const browser=await chromium.launch({ channel:'chrome', headless:true, args:['--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream','--autoplay-policy=no-user-gesture-required'] });
+  const until=async (p, fn, arg, ms)=>{ const t0=Date.now(); while(Date.now()-t0<ms){ if(await p.evaluate(fn, arg).catch(()=>false)) return Date.now()-t0; await new Promise(r=>setTimeout(r,250)); } return -1; };
+  /* the line as a person sees it — the start screen's own (#nightUpdateStart) or the play's notice line: null = neither present; otherwise which, where,
+     whether it is shown at all and whether anything covers its centre. `ever` (window.__lineEver) remembers a line present but never seen */
+  const SEEN=()=>{ const st=document.getElementById('start'), where=st && st.classList.contains('on') ? 'start screen' : 'play';
+    const cand=[document.getElementById('nightUpdateStart'), document.getElementById('nightNotice')].filter(el=>el && (el.id==='nightUpdateStart' ? !el.hidden : el.dataset.notice==='update'));
+    let best=null; for(const el of cand){ const cs=getComputedStyle(el), r=el.getBoundingClientRect();
+      let shown=!el.hidden && cs.display!=='none' && cs.visibility!=='hidden' && +cs.opacity>0.5 && r.width>10 && r.height>10; for(let e=el.parentElement; shown && e; e=e.parentElement){ const s=getComputedStyle(e); if(e.hidden || s.display==='none' || s.visibility==='hidden') shown=false; }
+      const top=shown ? document.elementFromPoint(r.left+r.width/2, r.top+r.height/2) : null, o={ id:el.id, seen:shown && !!top && (top===el || el.contains(top)), shown, over:top && top!==el && !el.contains(top) ? (top.id || top.className || top.tagName) : null, where };
+      if(!best || o.seen) best=o; }
+    if(best && !best.seen) window.__lineEver=best; return best; };
+  const settle=async (ctx, what)=>{ const p=await ctx.newPage(); await p.goto(origin+'/');
+    const t=await until(p, async ([pre, n])=>{ const r=await navigator.serviceWorker.getRegistration(), k=(await caches.keys()).find(x=>x.startsWith(pre)); return !!(navigator.serviceWorker.controller && r && r.active && k && (await (await caches.open(k)).keys()).length>=n); }, [PRE, nAll], 180e3);
+    if(t<0) miss(`${what}: version A did not settle within 180 s`); return t<0 ? null : p; };
+  const DIAG=async ()=>{ const r=await navigator.serviceWorker.getRegistration(), U=await import('/apps/night/update.js'), N=await import('/apps/night/notice.js');
+    return JSON.stringify({ controller:!!navigator.serviceWorker.controller, waiting:!!(r && r.waiting), installing:!!(r && r.installing), update:U.updateDbg(), notice:N.noticeDbg() }); };
+  const waitLine=async (p, ms=30e3)=>{ const t0=Date.now(); let last=null; while(Date.now()-t0<ms){ last=await p.evaluate(SEEN).catch(()=>null); if(last && last.seen) return { ms:Date.now()-t0, ...last }; await new Promise(r=>setTimeout(r,250)); } return { ms:-1, ...(last||{ shown:false }), ever:await p.evaluate(()=>window.__lineEver||null).catch(()=>null), diag:await p.evaluate(DIAG).catch(e=>'unreadable: '+e.message.slice(0,80)) }; };
+  const stays=async (p, cap)=>{ const t0=Date.now(); while(Date.now()-t0<cap){ const s=await p.evaluate(SEEN).catch(()=>null); if(!s || !s.seen) return Date.now()-t0; await new Promise(r=>setTimeout(r,250)); } return cap; };
+  const lasts=(ms, cap)=>ms>=cap ? `still there after ${cap/1000} s` : `it stays ${(ms/1000).toFixed(1)} s`;
+  const tapOpensB=async (p, what, id)=>{ const nav=p.waitForNavigation({ timeout:60e3 }).then(()=>true, ()=>false); await p.click('#'+id); if(!await nav){ miss(`${what}: a tap did not reload`); return false; }
+    const ok=await until(p, async ([v, f, mark])=>(await caches.keys()).join()==='handsong-night-precache-'+v && !!navigator.serviceWorker.controller && (await (await fetch('/'+f)).text()).includes(mark), [LB.version, CHANGED, MARK], 60e3);
+    if(ok<0) miss(`${what}: after the tap the page is not on version B (B's cache alone, B's file served)`); return ok>=0; };
+  const waiting=p=>until(p, async ()=>{ const r=await navigator.serviceWorker.getRegistration(); return !!(r && r.waiting); }, null, 120e3);
+  const ctxOf=async (mute=false)=>{ const c=await browser.newContext({ viewport:{ width:412, height:915 } }); await c.grantPermissions(['camera','microphone'],{ origin }); await c.addInitScript(FRAMES_COUNTER); if(mute) await c.addInitScript(()=>{ window.__updateMute=true; }); return c; };
+  const say=(what, L)=>L.ms<0 ? `${what}: NO line seen within 30 s (${L.id ? L.id+' present but '+(L.shown ? 'covered by '+L.over : 'not displayed') : 'none present'}, ${L.where||'?'}; ever present unseen: ${JSON.stringify(L.ever||null)}) — ${L.diag}` : `${what}: the line (${L.id}) seen after ${(L.ms/1000).toFixed(1)} s on the ${L.where}`;
+  /* the tab to the background and back: headless Chrome keeps every tab «visible», so the page's own visibility is emulated (the event the code listens to) */
+  const setVis=(p, v)=>p.evaluate(v=>{ Object.defineProperty(document, 'visibilityState', { configurable:true, get:()=>v }); Object.defineProperty(document, 'hidden', { configurable:true, get:()=>v==='hidden' }); document.dispatchEvent(new Event('visibilitychange')); }, v);
+  try{
+    /* (a) the start screen, one reload */
+    { const ctx=await ctxOf(), p=await settle(ctx, '(a)'); if(p){ cur.dir=B; await p.reload(); const L=await waitLine(p); const s=say('(a) start screen, one reload', L); if(L.ms<0) miss(s); else { notes.push(s); if(await tapOpensB(p, '(a)', L.id)) notes.push('(a) a tap opened version B'); } } cur.dir=A; await ctx.close(); }
+    /* (b) B already waiting, then a reload: how long it stays, then one more reload and a tap */
+    { const ctx=await ctxOf(), p=await settle(ctx, '(b)'); if(p){ cur.dir=B; await p.evaluate(async ()=>{ const r=await navigator.serviceWorker.getRegistration(); await r.update().catch(()=>{}); });
+        if(await waiting(p)<0) miss('(b) version B not waiting within 120 s');
+        else { await p.reload(); const L=await waitLine(p); const s=say('(b) start screen, B waiting, a reload', L); if(L.ms<0) miss(s); else { const st=await stays(p, 45e3); notes.push(`${s}; ${lasts(st, 45e3)}`); if(st<45e3) miss('(b) on the start screen the line went away while B still waits');
+            await p.reload(); const L2=await waitLine(p); const s2=say('(b) one more reload', L2); if(L2.ms<0) miss(s2); else { notes.push(s2); if(await tapOpensB(p, '(b)', L2.id)) notes.push('(b) a tap opened version B'); } } } }
+      cur.dir=A; await ctx.close(); }
+    /* (c) during play, backgrounded while B is deployed, then back in view */
+    { const ctx=await ctxOf(), p=await settle(ctx, '(c)'); if(p){ await p.waitForSelector('#nightBegin',{ state:'visible', timeout:90e3 }).catch(()=>{}); await p.click('#nightBegin').catch(()=>{});
+        if(await until(p, ()=>window.__frames>0, null, 120e3)<0) miss('(c) the play did not start');
+        await setVis(p, 'hidden'); cur.dir=B; await new Promise(r=>setTimeout(r, 8000)); await setVis(p, 'visible');
+        notes.push('(c) the tab put in the background while B was deployed, then back (visibility emulated: headless Chrome keeps every tab visible)');
+        const L=await waitLine(p); const s=say('(c) during play, back in view', L); if(L.ms<0) miss(s);
+        else { const st=await stays(p, 45e3); notes.push(`${s}; ${lasts(st, 45e3)}`); if(st<15e3) miss('(c) during play the line went away in under 15 s');
+          await setVis(p, 'hidden'); await new Promise(r=>setTimeout(r, 1000)); await setVis(p, 'visible');
+          const L2=await waitLine(p); const s2=say('(c) back in view once more, B still waiting', L2); if(L2.ms<0) miss(s2); else { notes.push(s2); if(await tapOpensB(p, '(c)', L2.id)) notes.push('(c) a tap opened version B'); } } }
+      cur.dir=A; await ctx.close(); }
+    /* CONTROL: case (b) with the line muted — the row must see no line */
+    { const ctx=await ctxOf(true), p=await settle(ctx, 'CONTROL'); if(p){ cur.dir=B; await p.evaluate(async ()=>{ const r=await navigator.serviceWorker.getRegistration(); await r.update().catch(()=>{}); });
+        if(await waiting(p)<0) miss('CONTROL: version B not waiting within 120 s');
+        else { await p.reload(); const L=await waitLine(p, 15e3); if(L.ms>=0) miss('CONTROL: with the line muted a line was still seen — the row cannot fail'); else notes.push('CONTROL: the line muted → no line seen'); } }
+      cur.dir=A; await ctx.close(); }
+  }catch(e){ miss('error: '+(e&&e.message||e).split('\n')[0]); }
+  finally{ await browser.close().catch(()=>{}); srv.close(); rmSync(WORK,{ recursive:true, force:true }); }
+  out(`[smoke] the «new version» line (NIGHT-14d), the players' tree: ${bad.length?'NOT A PASS — '+bad.length+' problem(s)':'PASS'}`); for(const n of notes) out('    '+n); for(const b of bad.slice(0,10)) out('    '+b);
+  return bad.length; }
+{ const i=argv.indexOf('--update'); if(i>=0){ const f=await updateRows(path.resolve(ROOT, argv[i+1])); out(`[smoke] --update ${argv[i+1]}: ${f?'failed':'ok'} (a diagnosis, not a verdict of the whole test)`); process.exit(f?1:0); } }
 /* NIGHT-14b — --precache-url URL: the offline second visit against a DEPLOYED Night (a Vercel preview or the dev branch alias): Vercel's own headers,
    compression and protection, which no local tree has (NIGHT-14's install passed every local row and failed on the founder's phone). A disk profile, as
    on a phone (an in-memory HTTP cache drops the 8–11 MB MediaPipe files). Deployment protection: the bypass secret from VERCEL_AUTOMATION_BYPASS_SECRET or
@@ -461,7 +532,7 @@ if(BUILD){ fails+=await redirectCheck();
   { const dep=build('night','deploy'), ed=await readFile(path.join(dep,'core/edition.js'),'utf8');   // NIGHT-7: the tree Vercel's production makes for Night: the release edition, no probes
     if(!/EDITION='release'/.test(ed)){ out('[smoke] night deploy: NOT A PASS — not the release edition'); fails++; }
     if((await run('night',dep,'/',false,false)).length) fails++; fails+=await probeGate('night',dep,false);
-    fails+=await precacheRows(dep); } }   // NIGHT-14
+    fails+=await precacheRows(dep); fails+=await updateRows(dep); } }   // NIGHT-14, NIGHT-14d
 if(!NO_CONTROL){ const c=await run('full',prodFull||ROOT,'/',true); const caught=c.some(x=>/ks-worklet/.test(x));
   out(`[smoke] CONTROL (a missing worklet must fail): ${caught?'caught':'NOT CAUGHT — the test cannot fail'}`); if(!caught) fails++; }
 out(`[smoke] ${fails?'NOT A PASS — '+fails+' target(s) failed':'PASS — every target loaded, control caught'}`);

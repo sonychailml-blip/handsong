@@ -10,7 +10,7 @@ import { ROOMS, roomById } from './rooms/index.js';
 import { ROOM_IDS } from './pure/room.js';
 import { bedHold, bedResume, bedTakesDrone } from './bed.js';
 import { tintApply } from './tint.js';   // DESIGN-1: the interface takes the room's tint
-import { buildAmbience, ambienceSchedule, ambienceTune, ambienceSet, ambienceRoom, ambienceBrook, ambienceBrookLight, ambienceBrookRec, NATURE_WORKLET } from './sound/ambience.js';
+import { buildAmbience, ambienceSchedule, ambienceTune, ambienceSet, ambienceRoom, ambienceBrook, ambienceBrookLight, ambienceBrookRec, ambienceLayers, ambienceLayersRec, ambienceLayersFocus, ambienceLayersStats, NATURE_WORKLET } from './sound/ambience.js';
 
 export const ROOM_KEY='handsong.nightRoom';
 export const ROOM_NAME_MS=1500, ROOM_QUIET_MS=2500;   // the name's time on screen; without the room's picture, the bed waits out the nature crossfade
@@ -26,8 +26,8 @@ export const roomNature=()=>roomCurrent().nature;
    plays the CURRENT room's recipe, so after a switch the slots crossfade. The live drone steps aside while the music bed plays (a render copy
    keeps it). N0 — the first room's recipe: the module's default level and look-ahead */
 export const natureModule=N0=>({ level:N0.level, ahead:N0.ahead, schedule:ambienceSchedule, tune:ambienceTune,
-  build:(E, dest, seed)=>{ const a=buildAmbience(E, dest, seed, roomNature(), 2); if(!E.offline){ liveAmb=a; natureBrook(E, a, seed); } return a; },
-  set:(E, amb, on, level, when)=>{ ambienceRoom(E, amb, roomNature(), when); ambienceSet(E, amb, on, level, when, E.offline || !bedTakesDrone()); } });
+  build:(E, dest, seed)=>{ const a=buildAmbience(E, dest, seed, roomNature(), 2); if(!E.offline){ liveAmb=a; natureBrook(E, a, seed); natureLayers(E, a, seed); } return a; },
+  set:(E, amb, on, level, when)=>{ if(!E.offline) natureLayers(E, amb, amb.seed); ambienceRoom(E, amb, roomNature(), when); ambienceSet(E, amb, on, level, when, E.offline || !bedTakesDrone()); } });   // RAIN-3: a room with layered recordings builds their node when it first plays
 /* NIGHT-8: THE STREAM'S WORKLET — its module into a context once (→ a promise of true; false: no AudioWorklet or it failed — the nature plays
    without the stream), then the node joins the live ambience (the first room with a stream gives the voices; built once, rule #3) */
 const loads=new WeakMap();
@@ -45,13 +45,30 @@ function natureBrook(E, a, seed){ const v=brookVoices(); if(!v) return;
 const recBytes=new Map();   // url → a promise of the file's bytes
 export function natureRecOf(){ const R=[roomById(sceneRoom()), ...ROOMS].find(r=>r && r.base && r.record.nature.stream && r.record.nature.stream.rec);
   return R ? { url:new URL(R.record.nature.stream.rec.file, R.base).href, norm:R.record.nature.stream.rec.norm } : null; }
-export function natureRecPcm(ac, url){
-  let p=recBytes.get(url);
+/* a room file's bytes, fetched once a session from our own origin (the one fetch of a room's sound) */
+function natureBytes(url){ let p=recBytes.get(url);
   if(!p){ p=fetch(url).then(r=>{ if(!r.ok) throw new Error(r.status+' '+url); return r.arrayBuffer(); }); recBytes.set(url, p); p.catch(()=>{ if(recBytes.get(url)===p) recBytes.delete(url); }); }
-  return p.then(b=>ac.decodeAudioData(b.slice(0))).then(buf=>{ const n=buf.length, C=buf.numberOfChannels, m=new Float32Array(n);
+  return p; }
+export function natureRecPcm(ac, url){
+  return natureBytes(url).then(b=>ac.decodeAudioData(b.slice(0))).then(buf=>{ const n=buf.length, C=buf.numberOfChannels, m=new Float32Array(n);
     for(let c=0;c<C;c++){ const d=buf.getChannelData(c); for(let i=0;i<n;i++) m[i]+=d[i]/C; } return m; }); }
 function natureRec(E, a){ const R=natureRecOf(); if(!R || !a.brook) return; a.brook.rec='loading';
   natureRecPcm(E.ac, R.url).then(pcm=>ambienceBrookRec(E, a, pcm, R.norm), e=>{ a.brook.rec='failed'; console.warn('[night] the stream recording did not load — the synthesis plays:', e); }); }   // eslint-disable-line no-console
+/* RAIN-3: a room file decoded in stereo into a context (the browser resamples): → a promise of [L, R] (a mono file gives the same channel twice) */
+export function natureRecStereo(ac, url){ return natureBytes(url).then(b=>ac.decodeAudioData(b.slice(0))).then(buf=>{ const L=buf.getChannelData(0).slice(); return [L, buf.numberOfChannels>1 ? buf.getChannelData(1).slice() : L]; }); }
+/* RAIN-3: THE LAYERED RECORDINGS of the current room (its recipe's `nature.layers`): the node built once when such a room first plays (opt-in: a room
+   without layers builds nothing), then each layer's file from the room's folder, decoded in stereo, handed to the node with its level. A failure leaves
+   that layer to the node's own soft synthesis (the fallback). */
+function natureLayers(E, a, seed){
+  const R=roomById(sceneRoom()); if(!a || a.layers || !R || !R.base || !R.record.nature.layers) return;
+  const N=R.record.nature; a.layersWant=a.layersWant||natureLoad(E.ac).then(ok=>{ if(!ok || !ambienceLayers(E, a, N, seed)) return;
+    for(const which of ['near', 'far']){ const L=N.layers[which]; a.layers.rec[which]='loading';
+      natureRecStereo(E.ac, new URL(L.file, R.base).href).then(([l, r])=>ambienceLayersRec(E, a, which, l, r, L.norm), e=>{ a.layers.rec[which]='failed'; console.warn('[night] a layer of the room sound did not load — its synthesis plays:', e); }); } });   // eslint-disable-line no-console
+}
+/* RAIN-3: the focus (0 the glass … 1 the far city), the picture's own eased number, for the layers' near / far balance (no layers: nothing) */
+export function natureFocus(f){ if(liveAmb && liveAmb.layers) ambienceLayersFocus(null, liveAmb, f); }
+/* probe: the live layers' node — its counters, its recordings' state and whether it plays → a promise (null without the node) */
+export const natureLayersDbg=()=> liveAmb && liveAmb.layers ? ambienceLayersStats(null, liveAmb).then(st=>st && { ...st, rec:{ ...liveAmb.layers.rec }, playing:liveAmb.layers.on }) : Promise.resolve(null);
 /* the Lighter mode (the shell): fewer bubbles, the nearest voices only */
 export function natureLight(v){ brookLight=!!v; if(liveAmb && liveAmb.brook) ambienceBrookLight(null, liveAmb, brookLight); }
 /* at the start, before the first picture: the remembered room, if it is a real one this app has */

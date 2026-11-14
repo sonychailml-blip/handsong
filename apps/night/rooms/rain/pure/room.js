@@ -2,7 +2,7 @@
    apps/night/pure/room.js). A DEVELOPMENT room until the founder approves it: its id is not pinned (never remembered on a device), it is
    registered only by apps/night/rooms/dev.js. What is a placeholder here and which slice of PLAN.md replaces it:
    - moods: the three Night modes stand in for the room's own modes (slice 7); the looks are already the room's three moods;
-   - nature: the shared wind voice tuned high and wide as a soft rain hiss, no crickets (slice 3: CC0 recordings, near and far);
+   - nature: RAIN-3's layered CC0 recordings (the pane near, the street far, crossfaded by the focus) with drips and a tick; the shared wind voice is only a breath of air (no crickets);
    - bed, bed2: a quiet recipe of the room's own numbers on today's machinery (slice 7: the three moods' recipes, the new voices);
    - still: the names of the start stills (slice 2 makes the files; until then the start screen shows the first room's);
    - icon: the shared «depth» icon (slice 2 draws the room's own).
@@ -15,8 +15,8 @@ export const RAIN_ROOM=F({
   format:'handsong/room', version:1, id:'room.rain', name:F({ en:'Rain', ru:'Дождь' }), icon:'depth', tint:'rain-tint', tokens:'rain-',
   still:F({ full:'still/still-full.webp', reduced:'still/still-reduced.webp', fov:68, aspect:1.85 }),
   view:F({ fov:55, tallFov:68, tall:0.8 }),
-  /* what each picture level draws: the glass's drop layers and rivulet layers, the far lights */
-  levels:F({ full:F({ drops:4, rivulets:2, farLights:260, lean:true }), reduced:F({ drops:3, rivulets:1, farLights:120, lean:true }) }),
+  /* what each picture level draws (RAIN-0b): the most simulated drops on the pane, the procedural fine-droplet layers, the far lights, the most cars */
+  levels:F({ full:F({ drops:420, fine:2, farLights:260, cars:24, lean:true }), reduced:F({ drops:260, fine:1, farLights:120, cars:14, lean:true }) }),
   looks:F({
     late:LOOK('rain-', 0.95, 0.4, 0.1),            // Late night: drizzle, a few windows
     evening:LOOK('rain-eve-', 0.7, 0.65, 0.42),    // Evening boulevard: steady rain, many windows
@@ -25,9 +25,14 @@ export const RAIN_ROOM=F({
   moods:F({ 'major-penta':'late', 'minor-penta':'evening', 'egyptian':'after' }), look:'late',
   nature:F({ id:'ambience.rain',
     drone:F({ root:0.07, fifth:0.035, tc:1.4, send:0.2 }),
-    wind:F({ hz:2600, q:0.35, sweep:500, rate:0.045, gain:0.03, send:0.1, sec:2, seed:0x5241494E }),
+    wind:F({ hz:2600, q:0.35, sweep:500, rate:0.045, gain:0.012, send:0.1, sec:2, seed:0x5241494E }),   // RAIN-3: only a breath of air now (the layers carry the rain; it stays if they cannot play)
     crickets:F({ n:1, fLo:4300, fHi:4900, pulsesLo:3, pulsesHi:5, pulse:0.012, gap:0.016, every:F([0.6, 1.8]), lp:7000, gain:0, send:0, pans:F([0]), seed:0x52414E43 }),
     echo:F({ time:0.21, fb:0.3, lp:2200 }),
+    /* RAIN-3: the layered recordings (apps/night/pure/layers.js; CC0, register «rain-recordings»): near — rain on the pane, close and dry; far — the wet
+       street from above, with more of the echo; crossfaded by the picture's focus. norm: each file levelled to the forest's stream (tools/rain-listen.mjs),
+       × 1.78 (+5 dB: the rain is this room's main nature sound, as the forest's wind and crickets are). Events: drips from the cornice, a quiet tick */
+    layers:F({ near:F({ file:'sound/pane.mp3', norm:1.46, gain:1 }), far:F({ file:'sound/street.mp3', norm:1.5, gain:1, send:0.35 }),
+      events:F({ drips:F({ every:3.5, gain:0.06, hz:2300 }), tick:F({ every:9, gain:0.02 }) }), seed:0x52414933 }),
     level:0.6, master:0.42, ahead:0.35 }),
   acoustic:'fdepth',
   bed:F({ master:0.2, level:0.6, wave:F([1, 0.22, 0.08]), detune:F([2, 6]), cut:F([2.6, 4]), q:0.4,

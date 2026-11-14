@@ -60,6 +60,8 @@
      приложение поднимает уже выбор урока — тем же кликом. Демо строёв (demo.js) и мини-учебник (#helpOv)
      живы в коде, но кнопок запуска у них нет — им место внутри обучения, туда и переедут. -->
 <div id="start" class="ov on">
+  <!-- NIGHT-14d: «A new version is ready» on the start screen (apps/night/update.js) — the play's notice line is hidden here -->
+  <button id="nightUpdateStart" class="night-upd night-glass" hidden></button>
   <div class="startCard">
     <!-- RUN 7 (C7): THE NIGHT START — the same card restyled when the app boots in Night (body.night-boot): the emblem and the wordmark, the
          two setup tips (NIGHT-7b: always shown; no saved flag hides them), «Begin» = the same start handler as Play (rule #1: the sound

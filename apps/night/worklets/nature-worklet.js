@@ -7,6 +7,7 @@
    hands over to it in BROOK_REC.swap s (equal power) and is no longer computed; → posts { rec:{ ok, len } }. Without it the synthesis plays on. */
 import { brookNew, brookOut, brookStats } from '../pure/brook.js';
 import { recNew, recOut, recStats, BROOK_REC } from '../pure/brookrec.js';
+import { layersNew, layersRec, layersFocus, layersOn, layersOut, layersStats } from '../pure/layers.js';
 
 class NightNature extends AudioWorkletProcessor{
   constructor(opt){
@@ -37,3 +38,27 @@ class NightNature extends AudioWorkletProcessor{
   }
 }
 registerProcessor('night-nature', NightNature);
+/* RAIN-3: «night-layers» — a room's layered recordings and its event sounds (apps/night/pure/layers.js, imported unchanged; the listening render
+   tools/rain-listen.mjs runs the same law). Two stereo outputs: [0] near + events, [1] far (the graph sends more of it into the room's echo).
+   Built only for a room whose nature recipe has `layers` (apps/night/sound/ambience.js ambienceLayers). Messages (batches): { k:'rec', which, L, R,
+   norm } → posts { rec:{ which, ok } }; { k:'focus', v }; { k:'on', v } (fades over LAYERS.wake s; asleep once faded: zeros, nothing computed);
+   { k:'recipe', L } (a new room's numbers); { k:'stats' } → posts { stats }. */
+class NightLayers extends AudioWorkletProcessor{
+  constructor(opt){
+    super();
+    const o=(opt && opt.processorOptions)||{};
+    this.st=layersNew(sampleRate, o.layers||{}, o.seed>>>0 || undefined);
+    this.port.onmessage=e=>{ for(const m of (Array.isArray(e.data) ? e.data : [e.data])){
+      if(m.k==='rec') this.port.postMessage({ rec:{ which:m.which, ok:layersRec(this.st, m.which, m.L, m.R, m.norm) } });
+      else if(m.k==='focus') layersFocus(this.st, m.v);
+      else if(m.k==='on') layersOn(this.st, m.v);
+      else if(m.k==='recipe' && m.L) this.st.L=m.L;
+      else if(m.k==='stats') this.port.postMessage({ stats:layersStats(this.st) }); } };
+  }
+  process(inputs, outputs){
+    const a=outputs[0], b=outputs[1], n=a[0].length;
+    layersOut(this.st, currentTime, a[0], a[1]||a[0], b[0], b[1]||b[0], 0, n);
+    return true;
+  }
+}
+registerProcessor('night-layers', NightLayers);

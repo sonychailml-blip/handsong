@@ -8,7 +8,7 @@ export const ROOM_IDS=Object.freeze(['room.forest']);   // pinned: never renamed
 export const ROOM_LEVELS=Object.freeze(['full','reduced']);   // the WebGL levels; «minimal» is the 2D stand-in
 export const ROOM_ACOUSTICS=Object.freeze(['fdepth']);
 const FIELDS=['format','version','id','name','icon','tint','still','view','tokens','levels','looks','moods','look','nature','acoustic','bed','bed2'];   // DESIGN-1: tint — the room's light on the interface   // NIGHT-8: icon — the room's own picture for its Room-sounds slider
-const NATURE=['id','drone','wind','crickets','echo','stream','level','master','ahead'];   // NIGHT-8: stream (optional: a room without water has none)
+const NATURE=['id','drone','wind','crickets','echo','stream','layers','level','master','ahead'];   // RAIN-3: layers (optional: the layered recordings near / far)   // NIGHT-8: stream (optional: a room without water has none)
 const plain=o=> o!==null && typeof o==='object' && !Array.isArray(o);
 /* DESIGN-1: a room's TINT (a token of the room, its colour in night.css) colours the interface's small accents (--night-tint) with dark ink on it (a
    chosen segment): a light colour — at least 7 : 1 against that ink and against the night base (WCAG's relative luminance; the data row «NIGHT room
@@ -25,6 +25,19 @@ export const roomModes=records=>[...new Set(records.flatMap(r=>Object.keys((r &&
    allowed (default ROOM_IDS; a development room passes its own, never pinned and never remembered) */
 /* NIGHT-13: the camera's vertical field of view (degrees) for a view w × h by the room's lens law (its record's `view`) — the room and its start still read it */
 export const roomFov=(view, w, h)=> w/h<view.tall ? view.tallFov : view.fov;
+/* RAIN-3: a room's layered recordings: { near, far: { file «….mp3» in the room folder, norm (0, 64], gain [0, 1], synth? [0, 1]; far also send [0, 1] }, events?:
+   { drips?, tick?: { every > 0 s, gain [0, 1], hz? }, }, seed? } → null, or what is wrong */
+function checkLayers(L){
+  if(!plain(L)) return ': { near, far, events?, seed? }';
+  for(const k of Object.keys(L)) if(!['near','far','events','seed'].includes(k)) return `: unknown field «${k}»`;
+  for(const w of ['near','far']){ const Y=L[w]; if(!plain(Y) || typeof Y.file!=='string' || !/^[a-z0-9_-]+(\/[a-z0-9_-]+)*\.mp3$/.test(Y.file) || !num(Y.norm) || Y.norm<=0 || Y.norm>64 || !num(Y.gain) || Y.gain<0 || Y.gain>1
+      || (Y.synth!=null && (!num(Y.synth) || Y.synth<0 || Y.synth>1)) || (w==='far' ? !num(Y.send) || Y.send<0 || Y.send>1 : Y.send!=null)) return `.${w}: { file «….mp3» in the room folder, norm (0, 64], gain 0…1${w==='far' ? ', send 0…1' : ''} }`; }
+  if(L.events!=null){ if(!plain(L.events)) return '.events: { drips?, tick? }';
+    for(const [k, E] of Object.entries(L.events)){ if(!['drips','tick'].includes(k)) return `.events: unknown field «${k}»`;
+      if(!plain(E) || !num(E.every) || E.every<=0 || !num(E.gain) || E.gain<0 || E.gain>1 || (E.hz!=null && (!num(E.hz) || E.hz<200 || E.hz>12000))) return `.events.${k}: { every > 0 s, gain 0…1, hz? }`; } }
+  if(L.seed!=null && !(Number.isInteger(L.seed) && L.seed>=0)) return '.seed: a whole number ≥ 0';
+  return null;
+}
 export function checkRoom(r, known={}){
   if(!plain(r)) return 'not an object';
   for(const k of Object.keys(r)) if(!FIELDS.includes(k)) return `unknown field «${k}»`;
@@ -65,6 +78,7 @@ export function checkRoom(r, known={}){
     const why=checkBrookVoices(S.voices); if(why) return 'nature.stream.'+why;
     if(S.rec!=null && (!plain(S.rec) || typeof S.rec.file!=='string' || !/^[a-z0-9_-]+(\/[a-z0-9_-]+)*\.mp3$/.test(S.rec.file) || !num(S.rec.norm) || S.rec.norm<=0 || S.rec.norm>64))
       return 'nature.stream.rec: { file «….mp3» in the room folder, norm above 0, at most 64 }'; }   // NIGHT-8b: the stream's recording
+  if(N.layers!=null){ const why=checkLayers(N.layers); if(why) return 'nature.layers'+why; }   // RAIN-3
   if(!num(N.level) || N.level<0 || N.level>1) return 'nature.level: 0…1';
   if(!num(N.master) || N.master<=0 || N.master>1) return 'nature.master: above 0, at most 1';
   if(!num(N.ahead) || N.ahead<=0 || N.ahead>2) return 'nature.ahead: above 0, at most 2 s';

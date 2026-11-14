@@ -3,6 +3,7 @@
 These files are the founder's approved mock-ups, made on a design canvas. They are the source of truth for the look and the Russian texts. They are NOT the site itself: they use a canvas runtime (`<x-dc>`, `support.js`, `{{…}}` holes) that the real site must not use. Rebuild them as plain static HTML/CSS.
 
 Files:
+- ⛳ SITE-2 (2026-11-14): the third product «Install» is now **«Handsong Space»** (page `/space/`; `/install` redirects). The mock-ups here keep the old name — unchanged on purpose; the live texts are in `tools/site/texts.mjs`.
 - `Gallery.dc.html` — the home page: three tall app cards at the top (Night · Tech demo · Install), then "What Handsong is" with a video placeholder and a plain list of what makes it different, then contacts.
 - `Night.dc.html`, `Demo.dc.html`, `Install.dc.html` — the "More" page of each app.
 - `copy-en.md` — the English texts, page by page, matching the Russian ones.

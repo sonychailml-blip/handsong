@@ -1,7 +1,8 @@
 /* RAIN-0 — THE RAIN ROOM'S CAPTURES AND COST (dev tool; never runs in the app). Its own server and a fresh headless Chrome (a fake camera),
    Night with «?probe&room=rain» (the development door), Begin, the room's picture, two synthetic hands through the real gesture path.
-     node tools/rain-snap.mjs                 captures → tools/.ui-snap/rain0/ + index.html (Russian captions): a phone upright and a laptop,
-                                              Standard — the focus near, the focus far, after a short phrase played far, a note wiped near
+     node tools/rain-snap.mjs                 captures → tools/.ui-snap/rain0b/ + index.html (Russian captions): a phone upright and a laptop,
+                                              Standard — RAIN-0b: the misted start, a finger's stroke, the focus near / middle / far, a phrase far,
+                                              drops merging (a short sequence of crops). (RAIN-0's captures stay in tools/.ui-snap/rain0/.)
      node tools/rain-snap.mjs --level full    the same at Detailed (files named …-full)
      node tools/rain-snap.mjs --cost          no captures: per level, the room against Dark (hand detections a second, the forest budget's
                                               method), its frame time, draws, programs, texture memory and opening time, printed as JSON */
@@ -12,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
 
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), argv=process.argv.slice(2), val=f=>{ const i=argv.indexOf(f); return i>=0 ? argv[i+1] : null; };
-const LEVEL=val('--level')==='full' ? 'full' : 'reduced', COST=argv.includes('--cost'), FOREST=argv.includes('--forest'), OUT=path.join(ROOT, 'tools/.ui-snap/rain0'), SUF=LEVEL==='full' ? '-full' : '';
+const LEVEL=val('--level')==='full' ? 'full' : 'reduced', COST=argv.includes('--cost'), FOREST=argv.includes('--forest'), OUT=path.join(ROOT, 'tools/.ui-snap/rain0b'), SUF=LEVEL==='full' ? '-full' : '';
 const MIME={ '.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.mjs':'text/javascript; charset=utf-8', '.json':'application/json; charset=utf-8', '.css':'text/css; charset=utf-8',
   '.png':'image/png', '.webp':'image/webp', '.svg':'image/svg+xml', '.mp3':'audio/mpeg', '.woff2':'font/woff2', '.wasm':'application/wasm' };
 const srv=await new Promise(res=>{ const s=http.createServer(async (q, r)=>{ try{ let p=decodeURIComponent(new URL(q.url, 'http://x').pathname); if(p.endsWith('/')) p+='index.html';
@@ -28,7 +29,7 @@ async function open(vp, level, dpr=1){
   await ctx.addInitScript(l=>{ try{ localStorage.setItem('handsong.nightBg', 'forest'); localStorage.setItem('handsong.sceneLevel', l); localStorage.setItem('handsong.night.lang', 'en'); }catch(e){} }, level);
   const p=await ctx.newPage(), errs=[]; p.on('pageerror', e=>errs.push(String(e))); p.on('response', r=>{ if(r.status()===404) errs.push('404 '+new URL(r.url()).pathname); });
   await p.goto(`http://127.0.0.1:${port}/apps/night/index.html?probe${FOREST ? '' : '&room=rain'}`);
-  await p.waitForFunction(()=>window.P && window.__nightBoot && window.__nightBoot.state().done, null, { timeout:120e3 });
+  try{ await p.waitForFunction(()=>window.P && window.__nightBoot && window.__nightBoot.state().done, null, { timeout:120e3 }); }catch(e){ console.log('[rain-snap] the page did not boot:', errs.slice(0, 6)); throw e; }
   await p.click('#nightBegin');
   await p.waitForFunction(()=>!document.getElementById('start').classList.contains('on'), null, { timeout:180e3 });
   await p.evaluate(async want=>{ window.__H=await import('/apps/night/scene/host.js'); window.__G=await import('/core/gestures.js'); window.__PO=await import('/core/gestures/pose.js'); window.__V=await import('/core/vision.js');
@@ -45,7 +46,10 @@ const note=async (p, x, y, s)=>{ await hand(p, x, y, s, false, 4); await p.waitF
 const stateOf=p=>p.evaluate(()=>{ const R=window.__H.sceneRoomDbg(), S=R && R.state ? R.state() : null, I=window.__H.sceneInfo();
   return { focus:S && +S.focus.toFixed(3), lit:S && S.litNow, picks:S && S.picks, wipes:S && S.wipes, light:S && S.light, buffer:S && S.buffer, frameMs:I.frameMs, fps:I.fps, calls:I.calls, programs:I.programs, openMs:I.openMs, texMB:+(I.texBytes/1048576).toFixed(2), level:I.level, errors:I.errors }; });
 try{
-  if(argv.includes('--row')){   // the browser row «RAIN room» alone (a quick look while working; the judged run is the Night suite's)
+  if(argv.includes('--eval')){   // a quick look while working: the room open, a near hand, then the given module's default export run in the page (its JSON printed)
+    const { ctx, p, errs }=await open({ width:1280, height:800 }, LEVEL); await hand(p, 0.5, 0.45, 0.32, false, 40); await p.waitForTimeout(2000);
+    console.log(JSON.stringify(await p.evaluate(async f=>(await import(f)).default(), '/'+val('--eval')), null, 1), errs.slice(0, 5)); await ctx.close();
+  } else if(argv.includes('--row')){   // the browser row «RAIN room» alone (a quick look while working; the judged run is the Night suite's)
     const { ctx, p, errs }=await open({ width:1280, height:800 }, LEVEL);
     console.log(JSON.stringify(await p.evaluate(async ()=>(await import('/tools/probes/night/rainroom.js')).checkRainRoom()), null, 1), errs.slice(0, 5)); await ctx.close();
   } else if(COST){
@@ -65,28 +69,43 @@ try{
       out[lv].errors=errs.slice(0, 5); await ctx.close(); }
     console.log(JSON.stringify(out, null, 1));
   } else {
-    await mkdir(OUT, { recursive:true }); const made=[], log={};
+    await mkdir(OUT, { recursive:true }); const made=[], log={}, seqs={};
     for(const [tag, vp, dpr] of [['phone', { width:390, height:844 }, 2.75], ['laptop', { width:1280, height:800 }, 1]]){
-      const { ctx, p, errs }=await open(vp, LEVEL, dpr), shot=async (name, ru)=>{ const f=`${tag}-${name}${SUF}.png`; await p.screenshot({ path:path.join(OUT, f) }); log[f]=await stateOf(p); made.push([f, ru]); };
-      await hand(p, 0.6, 0.5, 0.3, false, 8); await p.waitForTimeout(2200);
-      await shot('near', 'Рука близко: фокус на стекле, капли резкие, город в мягких кругах света');
-      await note(p, 0.62, 0.45, 0.3); await note(p, 0.5, 0.52, 0.3); await p.waitForTimeout(500);
-      await shot('near-wiped', 'Рука близко, две ноты: запотевшее стекло протёрто там, где был свет');
-      await hand(p, 0.5, 0.45, 0.12, false, 8); await p.waitForTimeout(2600);
-      await shot('far', 'Рука далеко: фокус уехал в город, капли размыты, окна резкие');
-      for(const [x, y] of [[0.35, 0.42], [0.5, 0.5], [0.62, 0.38], [0.7, 0.56], [0.44, 0.6]]) await note(p, x, y, 0.12);
+      const { ctx, p, errs }=await open(vp, LEVEL, dpr), shot=async (name, ru, clip)=>{ const f=`${tag}-${name}${SUF}.png`; await p.screenshot({ path:path.join(OUT, f), clip }); log[f]=await stateOf(p); made.push([f, ru]); };
+      await shot('start', 'Начало: всё стекло запотело, город читается только как мягкие огни');
+      /* a finger on the glass: the pinch held near, drawn across in small steps */
+      await hand(p, 0.62, 0.42, 0.3, false, 30); await p.waitForTimeout(1800);
+      for(let i=0;i<=24;i++){ const u=i/24; await hand(p, 0.62-0.3*u, 0.42+0.18*Math.sin(u*3.1), 0.3, true, 2); await p.waitForTimeout(60); }
+      await hand(p, 0.32, 0.45, 0.3, false, 4); await p.waitForTimeout(600);
+      await shot('stroke', 'Палец на стекле: удерживаемый щипок рядом рисует непрерывную чистую полосу в тумане');
+      await hand(p, 0.5, 0.45, 0.3, false, 8); await p.waitForTimeout(1800);
+      await shot('near', 'Фокус близко: капли резкие, улица и дом напротив в мягком боке');
+      /* the middle: the hand size whose focus lands on the street */
+      const mid=await p.evaluate(async ()=>{ const FO=await import('/apps/night/rooms/rain/pure/focus.js'), R=window.__H.sceneRoomDbg(); let lo=0.08, hi=0.34, best=0.17;
+        for(let it=0;it<8;it++){ const s=(lo+hi)/2; best=s; const G=window.__G, c=window.__clk; for(let i=0;i<40;i++){ c.t+=1000/30; G.processHandsProbe({ landmarks:[window.__PO.pose({ x:0.5, y:0.45, s, gaps:[1, 1, 1, 1] })], handednesses:[[{ categoryName:'Right' }]] }); }
+          await new Promise(r=>setTimeout(r, 250)); if(FO.focusDepth(R.state().target)>FO.LAYER_DEPTH.street) lo=s; else hi=s; } return best; });
+      await hand(p, 0.5, 0.45, mid, false, 8); await p.waitForTimeout(2200);
+      await shot('mid', 'Фокус посередине: улица резкая, стекло и холмы мягкие');
+      await hand(p, 0.5, 0.45, 0.08, false, 8); await p.waitForTimeout(2600);
+      await shot('far', 'Фокус далеко: холмы и крыши резкие, дом напротив чуть мягче, капли размыты');
+      for(const [x, y] of [[0.7, 0.5], [0.75, 0.56], [0.66, 0.45], [0.8, 0.6], [0.3, 0.55]]) await note(p, x, y, 0.1);
       await p.waitForTimeout(700);
-      await shot('far-phrase', 'Рука далеко, сыграна короткая фраза: ноты зажгли окна там, куда показывал свет');
-      await p.evaluate(()=>window.__G.handsProbe(null)); await p.waitForTimeout(3500);
-      await shot('rest', 'Рук нет: фокус медленно вернулся к стеклу; зажжённые окна остаются и гаснут медленно');
+      await shot('far-phrase', 'Фокус далеко, сыграна короткая фраза: ноты зажгли окна там, куда показывал свет');
+      /* drops merging: the focus on the glass, a heavy rain, six crops of the same place a third of a second apart */
+      await hand(p, 0.15, 0.85, 0.32, false, 30); await p.evaluate(()=>window.__H.sceneRoomDbg().rainDbg(0.95)); await p.waitForTimeout(2500); await hand(p, 0.15, 0.85, 0.32, false, 30);
+      const W=vp.width, Hh=vp.height, side=Math.min(W, Hh)*0.3, clip={ x:Math.round(W*0.5-side/2), y:Math.round(Hh*0.42-side/2), width:Math.round(side), height:Math.round(side) }; seqs[tag]=[];
+      for(let k=1;k<=6;k++){ const f=`${tag}-drops-${k}${SUF}.png`; await p.screenshot({ path:path.join(OUT, f), clip }); seqs[tag].push(f); await hand(p, 0.15, 0.85, 0.32, false, 6); await p.waitForTimeout(280); }
+      log[tag+'-drops']=await p.evaluate(()=>window.__H.sceneRoomDbg().state().drops);
+      await p.evaluate(()=>window.__H.sceneRoomDbg().rainDbg(null));
       if(errs.length) log[tag+'-errors']=errs.slice(0, 8); await ctx.close(); }
-    await writeFile(path.join(OUT, `rain0${SUF}.json`), JSON.stringify(log, null, 1));
-    const html=`<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>RAIN-0 — комната «Дождь», основа</title>
-<style>body{background:#101014;color:#e8e4dc;font:16px/1.5 system-ui,sans-serif;margin:0;padding:24px;max-width:1500px} h1{font-weight:500} figure{margin:0 0 36px} img{max-width:100%;height:auto;border-radius:8px;display:block} img.phone{max-height:80vh} figcaption{margin-top:8px;color:#c9c2b6} .row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2.6fr);gap:24px;align-items:start} p.note{color:#a59e92}</style>
-<h1>RAIN-0 — комната «Дождь»: основа (${LEVEL==='full' ? 'Детальная' : 'Стандартная'} картинка)</h1>
-<p class="note">Город здесь — условная заглушка в цветах концепции: два простых дома, линия холмов с огнями, небо. Настоящие слои (дом напротив, подоконник, бульвар, крыши, холмы, небо) и жизнь в окнах — следующие шаги плана. Слева телефон (390 × 844), справа ноутбук (1280 × 800).</p>
-${['near', 'near-wiped', 'far', 'far-phrase', 'rest'].map(n=>{ const a=made.find(m=>m[0]===`phone-${n}${SUF}.png`), b=made.find(m=>m[0]===`laptop-${n}${SUF}.png`);
+    await writeFile(path.join(OUT, `rain0b${SUF}.json`), JSON.stringify(log, null, 1));
+    const html=`<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>RAIN-0b — стекло, туман, фокус, вид</title>
+<style>body{background:#101014;color:#e8e4dc;font:16px/1.5 system-ui,sans-serif;margin:0;padding:24px;max-width:1500px} h1{font-weight:500} figure{margin:0 0 36px} img{max-width:100%;height:auto;border-radius:8px;display:block} img.phone{max-height:80vh} figcaption{margin-top:8px;color:#c9c2b6} .row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2.6fr);gap:24px;align-items:start} .seq{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px} p.note{color:#a59e92} a{color:#f4c98a}</style>
+<h1>RAIN-0b — стекло, туман, фокус, вид (${LEVEL==='full' ? 'Детальная' : 'Стандартная'} картинка)</h1>
+<p class="note">Город — простая заглушка (вид с 8-го этажа вдоль бульвара; дом напротив справа). Настоящий город будет запечённой 3D-моделью: <a href="../../design/rain/looktest/index.html">проба вида фасада</a>. Слева телефон (390 × 844), справа ноутбук (1280 × 800).</p>
+${['start', 'stroke', 'near', 'mid', 'far', 'far-phrase'].map(n=>{ const a=made.find(m=>m[0]===`phone-${n}${SUF}.png`), b=made.find(m=>m[0]===`laptop-${n}${SUF}.png`);
   return `<div class="row"><figure><img class="phone" src="${a[0]}" alt=""><figcaption>${a[1]} (телефон)</figcaption></figure><figure><img src="${b[0]}" alt=""><figcaption>${b[1]} (ноутбук)</figcaption></figure></div>`; }).join('\n')}
+${Object.entries(seqs).map(([tag, L])=>`<figure><div class="seq">${L.map(f=>`<img src="${f}" alt="">`).join('')}</div><figcaption>Капли видят друг друга (${tag==='phone' ? 'телефон' : 'ноутбук'}): одно и то же место стекла шесть раз через треть секунды, сильный дождь — бегущая капля съедает те, что на пути, оставляет бусинки, новые капли сливаются со старыми</figcaption></figure>`).join('\n')}
 </html>`;
     await writeFile(path.join(OUT, `index${SUF}.html`), html);
     console.log(JSON.stringify(log, null, 1)); console.log(`[rain-snap] ${made.length} captures → ${path.relative(ROOT, OUT).replace(/\\/g, '/')}/index${SUF}.html`);

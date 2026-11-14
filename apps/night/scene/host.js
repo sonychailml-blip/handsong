@@ -220,7 +220,8 @@ function sceneFrame(t, bus){
   const t0=performance.now();
   /* NIGHT-6 slice 1: the music bed's new events, each at the room time it is heard */
   { const B=bus.since('bed', bedSeq), ck=bus.get('audioClock'); bedSeq=B.seq;
-    if(room.bed && ck) for(const it of B.items) if(Number.isFinite(it.at)) room.bed(it, heardMs(ck, it.at, bedLate)/1000+clockOff); }
+    if(room.bed && ck) for(const it of B.items) if(Number.isFinite(it.at)) room.bed(it, heardMs(ck, it.at, bedLate)/1000+clockOff);
+    if(room.heard && ck) room.heard(ck); }   // RAIN-3: an opt-in room takes the audio clock (its sound's events shown when heard)
   room.update(dt, t/1000+clockOff, litHands(bus.get('handsView')||[]), bus.get('nightFx'), bus.get('nightSky'));   // RUN 7 (C5): the Night effects' values; RUN 9: the mood and the sleep
   renderer.info.reset(); draw();
   info.calls=renderer.info.render.calls; info.tris=renderer.info.render.triangles;   // NIGHT-6 slice 0: this frame's draw calls and triangles (slice 8: every pass of it)

@@ -1,0 +1,8 @@
+[
+ { "id":"near-a", "layer":"near", "file":"near-a.mp3", "title":"Дождь по окну (rain against window 2)", "author":"bastipictures", "url":"https://freesound.org/people/bastipictures/sounds/243781/", "from":2 },
+ { "id":"near-b", "layer":"near", "file":"near-b.mp3", "title":"Дождь по стеклу (RAIN on glass window)", "author":"nicoproson", "url":"https://freesound.org/people/nicoproson/sounds/648529/", "from":30 },
+ { "id":"near-c", "layer":"near", "file":"near-c.mp3", "title":"Дождь по окну (Rain on window)", "author":"ckjzam", "url":"https://freesound.org/people/ckjzam/sounds/457153/", "from":0 },
+ { "id":"far-a", "layer":"far", "file":"far-a.mp3", "title":"Улица в дождь (Urban street in rainy weather)", "author":"eaglechopper", "url":"https://freesound.org/people/eaglechopper/sounds/238019/", "from":120 },
+ { "id":"far-c", "layer":"far", "file":"far-c.mp3", "title":"Ночью лёгкий дождь, проезжают машины (Light rain at night with cars passing by)", "author":"humi74", "url":"https://freesound.org/people/humi74/sounds/532392/", "from":60 },
+ { "id":"far-d", "layer":"far", "file":"far-d.mp3", "title":"Тихая улица, далёкий шум, мокрая дорога (Residential Street Distant Traffic Wet Road)", "author":"mzui", "url":"https://freesound.org/people/mzui/sounds/135078/", "from":10 }
+]

@@ -1,4 +1,4 @@
-/* SITE-1 — THE BRAND SITE'S PAGES from one template: apps/site/{,night/,demo/,install/}index.html in English, the same under ru/, the
+/* SITE-1 — THE BRAND SITE'S PAGES from one template: apps/site/{,night/,demo/,space/}index.html in English, the same under ru/, the
    bilingual 404.html, sitemap.xml and robots.txt. The texts live in tools/site/texts.mjs. The written files are plain static HTML (no
    build step on the host); tools/site-check.mjs fails when a page differs from what this tool makes.
      node tools/site-pages.mjs           report which files are out of date (exit 1 if any)
@@ -10,8 +10,8 @@ import { T, LINKS, ORIGIN } from './site/texts.mjs';
 
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), SITE=path.join(ROOT,'apps/site');
 export const CSP="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'";
-export const PAGES=['home','night','demo','install'];
-const SLUG={ home:'/', night:'/night/', demo:'/demo/', install:'/install/' };
+export const PAGES=['home','night','demo','space'];   // SITE-2: «Install» renamed «Space» (/install redirects: apps/site/vercel.json)
+const SLUG={ home:'/', night:'/night/', demo:'/demo/', space:'/space/' };
 const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 export const pathOf=(lang,page)=>T[lang].prefix+SLUG[page];
 const other=l=>l==='en'?'ru':'en';
@@ -19,7 +19,7 @@ const other=l=>l==='en'?'ru':'en';
 const CHEVRON='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 6l-6 6 6 6"/></svg>';
 const EMBLEM='<span class="emblem" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>';
 const pic=(name,w,h,alt,lazy)=>`<picture><source type="image/webp" srcset="/img/${name}.webp"><img src="/img/${name}.jpg" alt="${esc(alt)}" width="${w}" height="${h}" decoding="async"${lazy?' loading="lazy"':''}></picture>`;
-/* the Install picture: the forest on a projected wall, a visitor in front (drawn, the projection a real frame) */
+/* the Space picture: the forest on a projected wall, a visitor in front (drawn, the projection a real frame) */
 const wall=(alt,lazy)=>`<span class="wall"${alt?` role="img" aria-label="${esc(alt)}"`:''}><span class="wall-proj">${pic('forest-wall',720,405,'',lazy)}</span><span class="wall-beam"></span><span class="wall-person"></span></span>`;
 
 function langSwitch(lang,page,t){
@@ -115,7 +115,7 @@ function home(lang){
 <div class="apps">
 ${card('night', pic('night-card',740,1151,''), C.night.go, LINKS.night, C.night.more, p('night'))}
 ${card('demo', `<span class="screen">${pic('demo-card',740,1151,'',true)}</span>`, C.demo.go, LINKS.demo, C.demo.more, p('demo'))}
-${card('install', wall('',true), C.install.go, p('install'), C.install.more, p('install')+'#contact')}
+${card('space', wall('',true), C.space.go, p('space'), C.space.more, p('space')+'#contact')}
 </div>
 </section>
 <section id="about" class="rule">
@@ -131,7 +131,7 @@ ${H.diff.map(([b,s])=>`<li><b>${esc(b)}</b> <span>${esc(s)}</span></li>`).join('
 }
 function appPage(lang,page){
   const t=T[lang], P=t[page], heroPic= page==='night' ? `<div class="hero-pic hero-night">${pic('night-card',740,1151,P.picAlt)}</div>`
-    : page==='demo' ? `<div class="hero-pic hero-demo"><span class="screen">${pic('demo-card',740,1151,P.picAlt)}</span></div>` : `<div class="hero-pic hero-install">${wall(P.picAlt)}</div>`;
+    : page==='demo' ? `<div class="hero-pic hero-demo"><span class="screen">${pic('demo-card',740,1151,P.picAlt)}</span></div>` : `<div class="hero-pic hero-space">${wall(P.picAlt)}</div>`;
   const goHref= page==='night' ? LINKS.night : page==='demo' ? LINKS.demo : '#contact';
   let body=`<section class="wrap hero">
 ${heroPic}
@@ -157,7 +157,7 @@ ${P.feats.map(s=>`<li>${esc(s)}</li>`).join('\n')}
 `;
   if(page==='demo') body+=`<section class="wrap band-wrap"><div class="band"><p class="band-h">${esc(P.band)}</p><span class="email email-l">${LINKS.email}</span></div></section>
 `;
-  if(page==='install') body+=`<section class="rule"><div class="wrap stack">
+  if(page==='space') body+=`<section class="rule"><div class="wrap stack">
 <h2 class="h2">${esc(P.spacesH)}</h2>
 <div class="tiles">
 ${P.spaces.map(([h,s])=>`<div class="tile"><h3 class="h4">${esc(h)}</h3><p class="soft">${esc(s)}</p></div>`).join('\n')}
