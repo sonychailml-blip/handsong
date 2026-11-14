@@ -214,7 +214,9 @@ async function redirectCheck(){ const served=[], srv=await serve(ROOT,'/',served
        fetched only the changed file. Every wait has an upper limit and fails when it is reached.
    NIGHT-14b: (0) before (1), a first visit cut short (the model refused): the install fails, nothing takes over, the files it stored are kept — and
    (1)'s install resumes without downloading them again (each entry's download time unchanged); (1) waits for the top-up (the later files); (5) the
-   exact CONTROL of (2): version B's worker without its navigation branch takes over — the offline visit must fail. */
+   exact CONTROL of (2): version B's worker without its navigation branch takes over — the offline visit must fail.
+   NIGHT-14c: (6) after (2), Detailed chosen with its pictures not in the cache, offline: the room drawn at Standard, the choice kept (the settings say
+   Detailed), every picture there; online, the top-up brings them in → Detailed with every picture. CONTROL: the hold off → pictures missing. */
 /* the frame counter imports vision.js only once Night's boot is done: an import at document start would load the module graph out of Night's order
    (scalepick.js first; core/scales.js has a top-level await) — it stalled the page's start */
 const FRAMES_COUNTER=()=>{ (async ()=>{ for(let i=0;i<2400;i++){ try{ if(!(window.__nightBoot && window.__nightBoot.state().done)) throw 0; const V=await import('/core/vision.js'); if(V.pumpStats().processed>0){ window.__frames=V.pumpStats().processed; return; } }catch(e){} await new Promise(r=>setTimeout(r,100)); } })(); };
@@ -285,6 +287,42 @@ async function precacheRows(dir){
       const loaded=await q.goto(origin+'/?v=3',{ timeout:20e3 }).then(()=>q.waitForSelector('#nightBegin',{ state:'visible', timeout:10e3 })).then(()=>true, ()=>false); await c2.close();
       if(loaded) miss('CONTROL: offline without the precache the page still opened — the offline check cannot fail'); else notes.push('CONTROL: offline without the precache the page does not open'); }
     await ctx.setOffline(false);
+    /* (6) NIGHT-14c: Detailed chosen, its pictures not in the cache yet, offline → the room drawn at Standard, the choice kept (the settings still say
+       Detailed), no missing picture; online, the top-up brings them in → Detailed with every picture. CONTROL: the hold off → the offline Detailed
+       room misses its pictures (the check must see it). */
+    await p.close().catch(()=>{});
+    { const LATER=LA.files.filter(f=>f[4]===1 && f[0].startsWith('apps/night/rooms/')).map(f=>f[0]);
+      const H='/apps/night/scene/host.js', drop=q=>q.evaluate(async ([pre, list])=>{ const c=await caches.open((await caches.keys()).find(k=>k.startsWith(pre))); for(const p of list) await c.delete('/'+p); localStorage.setItem('handsong.sceneLevel', 'full'); }, [PRE, LATER]);
+      const booted=q=>until(q, ()=>!!(window.__nightBoot && window.__nightBoot.state().done), null, 90e3, 'Detailed held: Night booted');
+      const roomUp=(q, lv, what)=>until(q, async ([H, lv])=>{ const m=await import(H), i=m.sceneInfo(); return !!(i.id && !i.opening && i.webgl && i.level===lv); }, [H, lv], 90e3, what);
+      const look=q=>q.evaluate(async H=>{ const m=await import(H), i=m.sceneInfo(), r=m.sceneRoomDbg(), f=r && r.state ? r.state().files : null, seg=document.querySelector('#nightQualSeg .on');
+        return { level:i.level, held:i.held, choice:m.sceneLevel(), seg:seg ? seg.dataset.q : null, web:!!(f && f.web), floor:!!(f && f.floor), errors:f ? f.errors.length : -1 }; }, H);
+      if(LATER.length<5) miss(`Detailed held: only ${LATER.length} later room files in the list`);
+      else { let q=await ctx.newPage(); await q.goto(origin+'/'); await booted(q); await drop(q); await q.close();
+        await ctx.setOffline(true); q=await ctx.newPage(); await q.goto(origin+'/?held'); let L=null;
+        if(await booted(q) && await started(q, 'Detailed held, offline') && await roomUp(q, 'reduced', 'Detailed held, offline: the room open at Standard')){ L=await look(q);
+          if(L.held!=='full' || L.choice!=='full' || L.seg!=='full' || !L.web || !L.floor || L.errors) miss('Detailed held, offline: '+JSON.stringify(L)+' (expected Standard drawn, the choice Detailed, every picture)');
+          else notes.push(`Detailed chosen, ${LATER.length} pictures not cached, offline: drawn at Standard, the choice kept, every picture there`); }
+        await ctx.setOffline(false);
+        if(L && !bad.some(b=>b.startsWith('Detailed held'))){
+          await q.evaluate(()=>navigator.serviceWorker.controller.postMessage({ type:'handsong-night-topup' }));
+          if(await until(q, async H=>(await import(H)).sceneHoldDbg().backDue, H, 120e3, 'Detailed held: the precache\'s word that the files are in')){
+            await q.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));   // a quiet moment: the page back in view
+            if(await roomUp(q, 'full', 'Detailed back: the room open at Detailed')){ const B2=await look(q);
+              if(B2.held || !B2.web || !B2.floor || B2.errors) miss('Detailed back: '+JSON.stringify(B2)); else notes.push('online, the top-up done: back to Detailed, every picture there'); } } }
+        await q.close();
+        /* CONTROL: the same offline visit with the hold off */
+        q=await ctx.newPage(); await q.goto(origin+'/'); await booted(q); await drop(q); await q.close();
+        await ctx.setOffline(true); q=await ctx.newPage(); await q.goto(origin+'/?held-control');
+        if(await booted(q)){ await q.evaluate(async H=>(await import(H)).sceneHoldDbg({ off:true }), H);
+          if(await started(q, 'CONTROL (hold off), offline') && await roomUp(q, 'full', 'CONTROL (hold off): the room open at Detailed')){ const C2=await look(q);
+            if(C2.web && C2.floor && !C2.errors) miss('CONTROL: with the hold off the offline Detailed room still had every picture — the check cannot fail'); else notes.push(`CONTROL: the hold off → the offline Detailed room misses pictures (${C2.errors} failed)`); } }
+        await q.evaluate(async H=>(await import(H)).sceneHoldDbg({ off:false }), H).catch(()=>{}); await ctx.setOffline(false);
+        /* back to a whole cache and the default level for the rows below */
+        await q.evaluate(()=>{ localStorage.removeItem('handsong.sceneLevel'); navigator.serviceWorker.controller.postMessage({ type:'handsong-night-topup' }); });
+        await until(q, async ([pre, n])=>{ const k=(await caches.keys()).find(x=>x.startsWith(pre)); return !!k && (await (await caches.open(k)).keys()).length>=n; }, [PRE, LA.files.filter(f=>f[3]!=='nosimd').length], 120e3, 'Detailed held: the cache whole again');
+        p=q; } }
+    if(p.isClosed()){ p=await ctx.newPage(); await p.goto(origin+'/'); }
     /* (3) version C: a file that does not match its hash — the install must fail, the running version stays */
     cur.dir=C; log.length=0;
     const failed=await p.evaluate(async ()=>{ const r=await navigator.serviceWorker.getRegistration(); await r.update().catch(()=>{}); const w=r.installing; if(!w) return 'no install started';
@@ -331,12 +369,17 @@ async function precacheRows(dir){
    for the page and the worker alike), the first visit lasts exactly PHONE.playMs and the tab is closed whatever the worker is doing; it must be in
    control with the start files by then. NIGHT-14's worker (one file at a time, everything before taking over) fails it on the real preview. */
 const PHONE=Object.freeze({ rtt:150, mbit:8, playMs:60e3 });
-/* a CONNECT proxy (HTTPS passes through untouched) that delays every chunk by half a round trip and caps each direction's rate; s.off refuses new tunnels */
-async function phoneProxy(){ const s={ off:false }, rate=PHONE.mbit*1e3/8;   // bytes per ms
-  const pipe=(a, b)=>{ let free=0; a.on('data', d=>{ const now=Date.now(); free=Math.max(free, now)+d.length/rate; a.pause(); setTimeout(()=>{ b.write(d); a.resume(); }, free-now+PHONE.rtt/2); });
-    a.on('end', ()=>setTimeout(()=>b.end(), PHONE.rtt/2)); a.on('error', ()=>b.destroy()); };
+/* a CONNECT proxy (HTTPS passes through untouched): each direction a pipeline — a chunk leaves half a round trip after the link has carried it at the
+   capped rate (the delay added ONCE, as a real link does: pausing the socket for it per chunk queued every stream of an HTTP/2 connection behind the
+   last one, NIGHT-14c); s.off refuses new tunnels; s.down counts the bytes down */
+async function phoneProxy(){ const s={ off:false, down:0 }, rate=PHONE.mbit*1e3/8;   // bytes per ms
+  /* one ordered queue per direction, drained by one timer (a timer per chunk can fire two chunks of one millisecond out of order: TLS breaks) */
+  const pipe=(a, b, down)=>{ let free=0, timer=null, ended=false; const q=[];
+    const pump=()=>{ timer=null; const now=Date.now(); while(q.length && q[0].at<=now) b.write(q.shift().d); if(q.length) timer=setTimeout(pump, q[0].at-now); else if(ended) b.end(); };
+    a.on('data', d=>{ if(down) s.down+=d.length; const now=Date.now(); free=Math.max(free, now)+d.length/rate; q.push({ at:free+PHONE.rtt/2, d }); if(!timer) timer=setTimeout(pump, Math.max(0, q[0].at-now)); });
+    a.on('end', ()=>{ ended=true; if(!timer) timer=setTimeout(pump, PHONE.rtt/2); }); a.on('error', ()=>b.destroy()); };
   s.srv=http.createServer((q,r)=>{ r.writeHead(501); r.end(); });
-  s.srv.on('connect', (q, sock, head)=>{ if(s.off){ sock.destroy(); return; } const [h, port]=q.url.split(':'), up=net.connect(+port||443, h, ()=>{ sock.write('HTTP/1.1 200 OK\r\n\r\n'); if(head.length) up.write(head); pipe(up, sock); pipe(sock, up); });
+  s.srv.on('connect', (q, sock, head)=>{ if(s.off){ sock.destroy(); return; } const [h, port]=q.url.split(':'), up=net.connect(+port||443, h, ()=>{ sock.write('HTTP/1.1 200 OK\r\n\r\n'); if(head.length) up.write(head); pipe(up, sock, true); pipe(sock, up); });
     up.on('error', ()=>sock.destroy()); sock.on('error', ()=>up.destroy()); });
   await new Promise(r=>s.srv.listen(0,'127.0.0.1',r)); s.url='http://127.0.0.1:'+s.srv.address().port; return s; }
 async function precacheUrlRow(url, phone=false){
@@ -361,7 +404,7 @@ async function precacheUrlRow(url, phone=false){
     notes.push(`list ${L.version}: ${L.files.length} files, ${nStart} to start (with SIMD), ${nAll} in all`);
     let last='', lastAt=0, ok=false; const t1=Date.now(), ready=s=>!!(s.controlled && s.active==='activated' && (s.caches && s.caches[NAME]||0)>=nStart);
     while(Date.now()-t1<(phone ? PHONE.playMs : 300e3)){ const s=await state(p), shape=JSON.stringify({ ...s, caches:Object.keys(s.caches||{}) });
-      if(shape!==last || Date.now()-lastAt>10e3){ notes.push(`${sec()}: ${JSON.stringify(s)}`); last=shape; lastAt=Date.now(); }
+      if(shape!==last || Date.now()-lastAt>10e3){ notes.push(`${sec()}: ${JSON.stringify(s)}${px ? ` · ${(px.down/1048576).toFixed(1)} MB down` : ''}`); last=shape; lastAt=Date.now(); }
       if(ready(s) && !ok){ ok=true; notes.push(`${sec()}: in control, the start files cached`); if(!phone) break; } await p.waitForTimeout(1000); }
     if(phone){ const s=await state(p); notes.push(`${sec()}: the ${PHONE.playMs/1000} s visit ends — ${JSON.stringify(s)}`); if(!ok) miss(`the founder's steps: the worker not in control with every start file after a ${PHONE.playMs/1000} s first visit on a phone network`); }
     else if(!ok){ miss('first visit: the worker not installed, activated and in control with every start file within 300 s'); throw STOP; }

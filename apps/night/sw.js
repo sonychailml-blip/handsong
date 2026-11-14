@@ -46,7 +46,9 @@ async function fill(files, { fetch:get=true, strict=true }={}){
   return failed;
 }
 let topping=null;
-const topUp=()=>topping || (topping=fill(FILES, { strict:false }).catch(()=>[]).finally(()=>{ topping=null; }));
+/* NIGHT-14c: a top-up that leaves nothing missing tells the pages ('handsong-night-files-in': a held Detailed may come back, scene/host.js) */
+const topUp=()=>topping || (topping=fill(FILES, { strict:false }).then(async failed=>{ if(!failed.length) for(const c of await self.clients.matchAll({ type:'window' })) c.postMessage({ type:'handsong-night-files-in' }); return failed; })
+  .catch(()=>[]).finally(()=>{ topping=null; }));
 self.addEventListener('install', e=>{ if(!PRECACHE){ self.skipWaiting(); return; }
   e.waitUntil((async ()=>{
     await fill(FILES.filter(f=>!f[4]));                          // what Night needs to start: without it the install fails

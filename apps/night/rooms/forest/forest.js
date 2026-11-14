@@ -76,9 +76,17 @@ const WOOD_MEMO=new Map(), LITTER_MEMO=new Map();   // NIGHT-8: + the litter's p
 const IMG={}, LOADING={}, assetErr=[];
 async function fileImage(url){ const r=await fetch(url); if(!r.ok) throw new Error(r.status+' '+url.pathname);
   const u=URL.createObjectURL(await r.blob()), img=new Image(); try{ img.src=u; await img.decode(); } finally { URL.revokeObjectURL(u); } return img; }
-/* the files of `level` ('full' | 'reduced'), once per session → a promise of the loaded images by name */
-export function forestAssets(level='full'){ const all=FOREST_TEX[level]||FOREST_TEX.full, skip=scanOf(level) ? BAKED_KEYS : SCAN_KEYS, want=Object.fromEntries(Object.entries(all).filter(([k])=>!skip.includes(k)));
-  return Promise.all(Object.values(want).map(n=>LOADING[n] || (LOADING[n]=fileImage(TEX[n]).then(img=>{ IMG[n]=img; }, e=>{ assetErr.push(n+': '+String(e&&e.message||e)); })))).then(()=>IMG); }
+const levelFiles=level=>{ const all=FOREST_TEX[level]||FOREST_TEX.full, skip=scanOf(level) ? BAKED_KEYS : SCAN_KEYS; return Object.entries(all).filter(([k])=>!skip.includes(k)).map(([, n])=>n); };
+/* the files of `level` ('full' | 'reduced'), once per session → a promise of the loaded images by name. NIGHT-14c: a failed file is forgotten, so a
+   later call fetches it again (it may be in the precache by then) */
+export function forestAssets(level='full'){
+  return Promise.all(levelFiles(level).map(n=>LOADING[n] || (LOADING[n]=fileImage(TEX[n]).then(img=>{ IMG[n]=img; }, e=>{ delete LOADING[n]; assetErr.push(n+': '+String(e&&e.message||e)); })))).then(()=>IMG); }
+/* NIGHT-14c: are `level`'s files here without asking the network? Under a precache (a worker in control) each must be in its cache; with no worker
+   (the repository, Live Server) the network serves them as before → true */
+export async function forestHas(level='full'){
+  if(typeof navigator==='undefined' || !navigator.serviceWorker || !navigator.serviceWorker.controller || typeof caches==='undefined') return true;
+  for(const n of levelFiles(level)) if(!IMG[n] && !(await caches.match(TEX[n].href))) return false;
+  return true; }
 /* probes only: the prepared files loaded so far (the prefetch's proof) */
 export const forestAssetsDbg=()=>Object.keys(IMG).sort();
 /* colour helpers: a token's text → [r, g, b, a]; jittered variants in HSL (texture painting only) */

@@ -8,7 +8,8 @@ import { ROOM_IDS } from '../pure/room.js';
 export const ROOMS=Object.freeze([
   Object.freeze({ record:FOREST_ROOM, standIn:standInForest, base:new URL('./forest/', import.meta.url).href,   // NIGHT-8b: base — the room's folder (its sound files)
     load:(o={})=>import('./forest/forest.js').then(m=>m.forestAssets(o.level).then(()=>m.buildForest)),   // NIGHT-6: the level's prepared files first
-    prefetch:(o={})=>import('./forest/forest.js').then(m=>m.forestAssets(o.level)) }),   // NIGHT-6: its code and files fetched ahead (main.js, while the start card shows)
+    prefetch:(o={})=>import('./forest/forest.js').then(async m=>m.forestAssets(o.level==='full' && !(await m.forestHas('full')) ? 'reduced' : o.level)),   // NIGHT-6: its code and files fetched ahead (main.js, while the start card shows); NIGHT-14c: Detailed not cached yet → Standard's
+    has:(o={})=>import('./forest/forest.js').then(m=>m.forestHas(o.level)) }),   // NIGHT-14c: the level's files here without the network (the scene host holds Detailed back otherwise)
 ]);
 const LIST=[...ROOMS];
 export const roomsAll=()=>LIST.slice();

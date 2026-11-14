@@ -189,6 +189,7 @@ const RESERVED=new Set(('break case catch class const continue debugger default 
   'true false null undefined NaN Infinity arguments').split(' '));
 const GLOBALS=new Set((
   /* DESIGN-1: the start still watches the start card */ 'MutationObserver '+
+  /* NIGHT-14c: the forest asks the precache (Cache Storage) whether Detailed's pictures are in */ 'caches '+
   /* JavaScript */ 'Math JSON Object Array Number String Boolean Symbol BigInt Map Set WeakMap WeakSet WeakRef Promise Proxy Reflect Intl Date RegExp '+
   'Error TypeError RangeError SyntaxError ReferenceError AggregateError ArrayBuffer SharedArrayBuffer DataView Float32Array Float64Array Int8Array '+
   'Int16Array Int32Array Uint8Array Uint8ClampedArray Uint16Array Uint32Array parseInt parseFloat isNaN isFinite encodeURIComponent '+

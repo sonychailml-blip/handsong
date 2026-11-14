@@ -16,11 +16,12 @@ export const NEVER=[/^tools\//, /^apps\/night\/rooms\/rain\//, /^sw\.js$/, /\.md
    groundn — every level draws the scanned one, FOREST_LEVELS groundScan) and the scan's 2048 copies (no level's FOREST_TEX set names them); both are
    kept for the captures' comparisons. Data row «NIGHT precache list (app)» proves no level's file is skipped and every skipped file is one no level fetches. */
 export const NIGHT_SKIP=Object.freeze([/^apps\/night\/rooms\/forest\/tex\/groundn?-\d+\.png$/, /^apps\/night\/rooms\/forest\/scan\/litter-(col|nor)-2048\.jpg$/]);
-/* NIGHT-14b: files Night does not need to START — the Detailed level's own pictures and still (Standard, the default, draws the smaller ones) and the
-   install icons: the worker installs them after the start set, so a short first visit already starts offline next time. Data row «NIGHT precache list
-   (app)» proves no file the Standard level fetches is here. */
+/* NIGHT-14b: files Night does not need to START — the Detailed level's own pictures (Standard, the default, draws the smaller ones) and the install
+   icons: the worker installs them after the start set, so a short first visit already starts offline next time; a player who chose Detailed gets
+   Standard until they are in (NIGHT-14c, scene/host.js). NIGHT-14c: every level's still is a START file (the start screen shows the chosen level's
+   still before anything else: 66 KB). Data row «NIGHT precache list (app)» proves no file the Standard level fetches and no still is here. */
 export const NIGHT_LATER=Object.freeze([/^icons\//, /^apps\/night\/rooms\/forest\/tex\/(web|crown|dapple|groundm)-1024\.png$/, /^apps\/night\/rooms\/forest\/tex\/(floor|shade)-2048\.png$/,
-  /^apps\/night\/rooms\/forest\/tex\/moon-512\.png$/, /^apps\/night\/rooms\/forest\/scan\/litter-arm-1024\.jpg$/, /^apps\/night\/rooms\/forest\/still\/still-full\.webp$/]);
+  /^apps\/night\/rooms\/forest\/tex\/moon-512\.png$/, /^apps\/night\/rooms\/forest\/scan\/litter-arm-1024\.jpg$/]);
 const listAll=d=>readdirSync(d,{ withFileTypes:true }).flatMap(e=>e.isDirectory() ? listAll(path.join(d,e.name)) : [path.join(d,e.name)]);
 const rel=(OUT,f)=>path.relative(OUT,f).replace(/\\/g,'/');
 export const groupOf=p=>/^core\/vendor\/mediapipe\/[^/]+\/wasm\/vision_wasm_nosimd_internal\./.test(p) ? 'nosimd' : /^core\/vendor\/mediapipe\/[^/]+\/wasm\/vision_wasm_internal\./.test(p) ? 'simd' : '';

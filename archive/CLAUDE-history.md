@@ -1985,6 +1985,8 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
     2. A short first visit: Chrome → the alias's site settings → clear its data; open, wait only until Begin shows, close, airplane mode, reopen. If it does not open: online once more for about 20 s (the install goes on where it stopped, nothing downloaded twice), then offline again — does it open now?
     3. An iPhone (Safari): step 1.
     4. The update line on the alias (as step 157.3): Night open on the Poco, a later commit pushed; when its preview is ready, reload once — «A new version is ready», a tap opens the new version.
+159. A Detailed player offline before Detailed's pictures are cached (NIGHT-14c). The rest is in the runners: smoke «precache (NIGHT-14)» (6) with its CONTROL, the data row «NIGHT precache list (app)».
+    1. The Poco, the dev alias: clear the alias's data, open, choose Detailed in Settings, wait only until Begin shows, close, airplane mode, reopen and Begin: is the forest whole (Standard's look, no black or missing ground, leaves, moon) and do the Settings still say Detailed? Then online again, play a minute, switch to another app and back: is it Detailed now?
 
 ## Superseded at DOC1 (old lines verbatim, replaced in place above by a later slice)
 - NIGHT-2 stage 3 (2026-11-03, the rule of at most five manual checks) updated this line of CLAUDE.md's report format:

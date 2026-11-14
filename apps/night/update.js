@@ -26,6 +26,9 @@ export function updateWire(){
   if(!('serviceWorker' in navigator)) return;
   const register=()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); };
   if(document.readyState==='complete') register(); else addEventListener('load', register, { once:true });
+  /* NIGHT-14c: the worker's word that every listed file is in → the page's event (scene/host.js brings a held Detailed back) */
+  navigator.serviceWorker.addEventListener('message', e=>{ if(e.data && e.data.type==='handsong-night-files-in') window.dispatchEvent(new Event('night-files-in')); });
+  navigator.serviceWorker.startMessages();
   navigator.serviceWorker.ready.then(reg=>{
     if(reg.active) reg.active.postMessage({ type:'handsong-night-topup' });
     if(reg.waiting) offer(reg);

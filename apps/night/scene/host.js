@@ -56,6 +56,23 @@ addEventListener('pagehide', ()=>{ if(runOn) runFlag(false); });
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden' && runOn) runFlag(false); });
 const heldAt=new Map();   // RUN 9: owner → when its note began (ms)
 let THREE=null, loading=null, renderer=null, glCanvas=null, onLost=null, room=null, want=null, level=startLevel(), made=0, live=0, last=0, notesSeq=0, bg='camera';
+/* NIGHT-14c: DETAILED HELD BACK — the player chose Detailed, but its pictures are not here without the network (the precache still topping up, or
+   offline): the room opens at Standard — never a missing picture — and the choice stays (sceneLevel() still answers Detailed, the setting is not
+   rewritten). Detailed comes back once its files are in: the precache says so ('night-files-in', apps/night/update.js) and the switch waits for a
+   quiet moment — the page back in view — so a playing player never sees the forest rebuilt; any later opening checks again. holdOff: the probes'
+   CONTROL only (opens Detailed regardless, as before) */
+let held=null, holdOff=false, backDue=false;
+async function holdCheck(R){
+  if(held){ level=held; held=null; }
+  if(level!=='full' || holdOff || !R.has) return;
+  let ok=true; try{ ok=await R.has({ level:'full' }); }catch(e){}
+  if(!ok){ held='full'; level='reduced'; } }
+function comeBack(){
+  if(!backDue || held!=='full' || document.visibilityState!=='visible') return; backDue=false;
+  const R=ROOMS.get(roomId); if(!R || !R.has || bg!=='forest' || !room) return;
+  R.has({ level:'full' }).then(ok=>{ if(ok && held==='full') setSceneLevel('full'); }, ()=>{}); }
+addEventListener('night-files-in', ()=>{ if(held==='full'){ backDue=true; if(!room) comeBack(); } });
+document.addEventListener('visibilitychange', comeBack);
 /* NIGHT-6: the music bed's events (bus «bed», each at its audio time) reach the room at the page time they are heard (the bus «audioClock», the
    shell's); bedLate — probe CONTROL only: map through the current time, ignoring the output latency. OPEN_LOG — every opening of this page
    session (the first is the cold one: three.js, the files, every program compiled) */
@@ -149,12 +166,12 @@ async function compileSliced(r, scene, camera, alive, step=1){ const kids=scene.
   const a=performance.now(); r.compile(scene, camera); COMPILE_LOG.push([Math.round(performance.now()-a), 'all']); return true; }
 /* open a room (its id, default the current room); opt.level 'full' | 'reduced' | 'minimal' → sceneInfo() */
 export async function sceneOpen(id=roomId, opt={}){
-  want=id; if(opt.level && LV[opt.level]) level=opt.level;
+  want=id; if(opt.level && LV[opt.level]){ level=opt.level; if(opt.level!=='reduced') held=null; }   // NIGHT-14c: a reopen at Standard (a lost context) keeps a held Detailed
   const R=ROOMS.get(id); if(!R) throw new Error(`no room «${id}»`);
   if(room && room.id===id && (renderer || level==='minimal') && !opening) return sceneInfo();
   const op=openBegin(id);
   let build;
-  try{ await loadThree(); build=await R.load({ level }); }   // NIGHT-6: a room may fetch only the files of the level it opens at
+  try{ await loadThree(); await holdCheck(R); build=await R.load({ level }); }   // NIGHT-6: a room may fetch only the files of the level it opens at; NIGHT-14c: Detailed held back while its files are not here
   catch(e){ if(opening===op) openFail(op, e); throw e; }
   if(want!==id || opening!==op) return sceneInfo();
   if(room){ room.dispose(); room=null; }
@@ -266,16 +283,16 @@ export const backgroundOf=()=>bg;
 /* choose the scene's quality → a promise of sceneInfo(); an open room is rebuilt at the new level (its WebGL context released first) */
 export function setSceneLevel(v){
   if(!LV[v]) return Promise.resolve(sceneInfo());
-  level=v; try{ localStorage.setItem(LEVEL_KEY, v); }catch(e){} guardReset(); if(v!=='full' && runOn) runFlag(false);
+  level=v; held=null; backDue=false; try{ localStorage.setItem(LEVEL_KEY, v); }catch(e){} guardReset(); if(v!=='full' && runOn) runFlag(false);
   if(bg!=='forest') return Promise.resolve(sceneInfo());
   if(room){ room.dispose(); room=null; } dropRenderer(true); stackSet('scene', false);
   return sceneOpen(roomId).catch(e=>{ errors.push(String(e&&e.message||e)); level='minimal'; return sceneInfo(); });
 }
-export const sceneLevel=()=>level;
+export const sceneLevel=()=>held||level;   // NIGHT-14c: the player's choice (a held Detailed included); sceneInfo().level is what is drawn
 const shadowOn=()=> shadowOver!=null ? shadowOver : LV[level].shadow;
 export const sceneShadowDbg=v=>{ shadowOver= v==null ? null : !!v; return shadowOver; };
 export const sceneOptDbg=o=>{ optOver=o||null; return optOver; };   // measurement only (slice 5's budget passes)
-export const sceneInfo=()=>({ id:room?room.id:null, room:roomId, bg, level, webgl:!!renderer, contextsMade:made, contextsLive:live, fps:info.fps, frameMs:Math.round(info.ms*10)/10,
+export const sceneInfo=()=>({ id:room?room.id:null, room:roomId, bg, level, held,webgl:!!renderer, contextsMade:made, contextsLive:live, fps:info.fps, frameMs:Math.round(info.ms*10)/10,
   opening:opening ? { id:opening.id, frames:opening.frames, late:opening.late, ms:Math.round(performance.now()-opening.t0) } : null, opens:{ ...OPENS },
   memory:renderer ? { geometries:renderer.info.memory.geometries, textures:renderer.info.memory.textures } : null,
   pixelRatio: renderer ? renderer.getPixelRatio() : 0, guard:(()=>{ const v=view(); return { step:guard.step, steps:stepsOf(v.w, v.h, v.dpr, level), downs:guard.downs, ups:guard.ups, buffer:glCanvas ? [glCanvas.width, glCanvas.height] : null }; })(),   /* NIGHT-11 part 5 */ fpsCap:LV[level].fps, shadow: renderer ? renderer.shadowMap.enabled : false, openMs:info.openMs||0,   // RUN 9 (slice 5)
@@ -313,6 +330,8 @@ export const sceneStartNote=()=>{ const n=startNote; startNote=null; return n; }
 /* probe only: the start's level decision again (with its side effects); the pixel guard's inputs — view {w,h,dpr} (the law's screen), sample() →
    {fps,cap,det,cam}, periodMs, reset (null clears each) */
 export const sceneStartLevelDbg=()=>startLevel();
+/* NIGHT-14c, probes only: { off } — Detailed opens regardless of its files (the CONTROL); → { off, held, backDue } */
+export const sceneHoldDbg=(o={})=>{ if('off' in o) holdOff=!!o.off; return { off:holdOff, held, backDue }; };
 export const sceneGuardDbg=(o={})=>{ if('view' in o) viewOver=o.view||null; if('sample' in o) sampleOver=o.sample||null; if('periodMs' in o) gPeriod=o.periodMs==null ? 1000 : +o.periodMs;
   if(o.reset) guardReset(); if(renderer && ('view' in o || o.reset)) resize(); return { ...guard, view:view(), ratio:renderer ? renderer.getPixelRatio() : 0 }; };
 export const sceneLevelDbg=v=>{ if(LV[v]) level=v; return level; };

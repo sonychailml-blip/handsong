@@ -19,7 +19,7 @@ import { stillWire } from './still.js';   // DESIGN-1 part D: the start still wa
 import { updateWire } from './update.js';   // NIGHT-14: «A new version is ready» (a build's precache)
 import { fsCamera } from './fullscreen.js';   // NIGHT-11 part 3: full screen when the camera runs, while the Begin tap still counts   // NIGHT-11 part 2: the start's own words
 
-for(const R of ROOMS) sceneRoomAdd(R.record.id, { load:R.load, standIn:R.standIn, three:()=>import('./vendor/three-r128/three.min.js') });   // NIGHT-3: the rooms, by id
+for(const R of ROOMS) sceneRoomAdd(R.record.id, { load:R.load, has:R.has, standIn:R.standIn, three:()=>import('./vendor/three-r128/three.min.js') });   // NIGHT-3: the rooms, by id
 roomRestore();   // NIGHT-3 stage 5 part 2: the room remembered on this device, before the first picture
 devRoomInstall().catch(e=>console.warn('[night] the development room was not added:', e));   // RAIN-0: «?room=rain», the development edition only (rooms/dev.js)   // eslint-disable-line no-console
 camRestore();   // NIGHT-10: before the start — the start opens the kept camera (the default when it is gone)

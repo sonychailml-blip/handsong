@@ -1738,6 +1738,15 @@ async function nightPrecacheList(){
   n++; if(std.size<8 || !SF(R,'full')) miss(`the Standard level's files could not be read (${std.size})`); else { const b=judgeLater(PC.NIGHT_LATER); if(b.length) miss('the Standard level would wait for the top-up: '+b.join(', ')); else notes.push(`none of the Standard level's ${std.size} files waits for the top-up`); }
   n++; { const real=[...Object.values(texOf), FB+SF(R,'full'), FB+SF(R,'reduced')], stale=PC.NIGHT_LATER.filter(r=>!r.source.startsWith('^icons') && !real.some(p=>r.test(p))); if(stale.length) miss('a later pattern matches no forest file (stale?): '+stale.map(String).join(', ')); }
   n++; if(!judgeLater([...PC.NIGHT_LATER, /litter-col-1024\.jpg$/]).length) miss('CONTROL: a later pattern catching a Standard file passed'); else notes.push('CONTROL: a later pattern catching a Standard file is caught');
+  /* NIGHT-14c: every level's still is a start file (the start screen shows the chosen level's still first — a Detailed player offline included) */
+  const stills=['full','reduced'].map(lv=>SF(R, lv)).filter(Boolean).map(s=>FB+s), stillLater=later=>stills.filter(p=>later.some(r=>r.test(p)));
+  n++; if(stills.length!==2) miss('the stills could not be read'); else { const b=stillLater(PC.NIGHT_LATER); if(b.length) miss('a still waits for the top-up: '+b.join(', ')); else notes.push('every level\'s still is a start file'); }
+  n++; if(!stillLater([...PC.NIGHT_LATER, /still-full\.webp$/]).length) miss('CONTROL: a later still passed'); else notes.push('CONTROL: a later still is caught');
+  /* NIGHT-14c: the held Detailed's wiring (the behaviour itself: smoke «precache (NIGHT-14)» (6), with its CONTROL) */
+  { const H=await rd('apps/night/scene/host.js'), I=await rd('apps/night/rooms/index.js'), M=await rd('apps/night/main.js'), U=await rd('apps/night/update.js');
+    n++; if(!H.includes('await holdCheck(R); build=await R.load({ level });') || !/export const sceneLevel=\(\)=>held\|\|level;/.test(H) || !I.includes("has:(o={})=>import('./forest/forest.js').then(m=>m.forestHas(o.level))")
+      || !M.includes('has:R.has') || !sw.includes("c.postMessage({ type:'handsong-night-files-in' })") || !U.includes("dispatchEvent(new Event('night-files-in'))") || !H.includes("addEventListener('night-files-in'"))
+      miss('the held Detailed lost a link (host holdCheck / the room\'s has / main.js passing it / the worker\'s word / update.js relaying it)'); }
   /* (2c) NIGHT-14b: every media file a room record names (an address made at run time, unseen by the build's walk) is listed through NIGHT_INCLUDE */
   const roomsDir=new URL('../apps/night/rooms/', import.meta.url), named=[], tex=new Set(Object.values(texOf));
   for(const e of fs.readdirSync(roomsDir,{ withFileTypes:true })) if(e.isDirectory() && e.name!=='rain'){ const f=new URL(e.name+'/pure/room.js', roomsDir); if(!fs.existsSync(f)) continue;
