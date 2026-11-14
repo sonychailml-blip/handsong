@@ -6,12 +6,14 @@
    --build also builds production and preview trees (tools/.build/) and checks them: each from the root and a sub-folder; `?probe` must give window.P on a preview and nothing on production;
    the root redirect; Night's Measure button (on, and hidden in a release edition — and on the repo's page with ?release, NIGHT-7b). */
 import http from 'node:http';
+import net from 'node:net';
 import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { chromium } from 'playwright-core';
-import { cpSync, rmSync, appendFileSync } from 'node:fs';
+import { cpSync, rmSync, appendFileSync, existsSync, readFileSync } from 'node:fs';
+import os from 'node:os';
 import { readPrecache, rehashPrecache } from './precache.mjs';   // NIGHT-14
 
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), CDN_DIR=path.join(ROOT,'tools','.cdn-cache');
@@ -209,7 +211,13 @@ async function redirectCheck(){ const served=[], srv=await serve(ROOT,'/',served
        without the precache must fail);
    (3) version C: its install fails and the running version stays (never a mix); (4) version B: installed beside the running one, which still gets its
        own files (no mix); the quiet line says so; a tap reloads into B: the old cache gone, every listed file present with B's hash, and the update
-       fetched only the changed file. Every wait has an upper limit and fails when it is reached. */
+       fetched only the changed file. Every wait has an upper limit and fails when it is reached.
+   NIGHT-14b: (0) before (1), a first visit cut short (the model refused): the install fails, nothing takes over, the files it stored are kept — and
+   (1)'s install resumes without downloading them again (each entry's download time unchanged); (1) waits for the top-up (the later files); (5) the
+   exact CONTROL of (2): version B's worker without its navigation branch takes over — the offline visit must fail. */
+/* the frame counter imports vision.js only once Night's boot is done: an import at document start would load the module graph out of Night's order
+   (scalepick.js first; core/scales.js has a top-level await) — it stalled the page's start */
+const FRAMES_COUNTER=()=>{ (async ()=>{ for(let i=0;i<2400;i++){ try{ if(!(window.__nightBoot && window.__nightBoot.state().done)) throw 0; const V=await import('/core/vision.js'); if(V.pumpStats().processed>0){ window.__frames=V.pumpStats().processed; return; } }catch(e){} await new Promise(r=>setTimeout(r,100)); } })(); };
 async function precacheRows(dir){
   const bad=[], notes=[], miss=s=>bad.push(s), WORK=path.join(BUILD_DIR,'night-precache'), A=path.join(WORK,'A'), B=path.join(WORK,'B'), C=path.join(WORK,'C'), CHANGED='apps/night/texts.js';
   rmSync(WORK,{ recursive:true, force:true }); cpSync(dir,A,{ recursive:true }); cpSync(dir,B,{ recursive:true });
@@ -218,7 +226,10 @@ async function precacheRows(dir){
   const LA=readPrecache(A), LB=readPrecache(B), listed=new Set(LA.files.map(f=>f[0]));
   if(LA.version===LB.version) miss('a changed file did not change the version');
   if(LA.files.some(f=>/^tools\/|^apps\/night\/rooms\/rain\//.test(f[0]))) miss('the list holds a tool or a development room');
-  const cur={ dir:A }, log=[], served={ n:0, bytes:0 }, srv=http.createServer(async (q,r)=>{ let p=decodeURIComponent(new URL(q.url,'http://x').pathname); if(p.endsWith('/')) p+='index.html';
+  /* cur.refuse: paths answered 503 (an install cut short); cur.sw: the worker script served instead of the folder's (the exact CONTROL) */
+  const cur={ dir:A, refuse:null, sw:null }, log=[], served={ n:0, bytes:0 }, srv=http.createServer(async (q,r)=>{ let p=decodeURIComponent(new URL(q.url,'http://x').pathname); if(p.endsWith('/')) p+='index.html';
+    if(cur.refuse && cur.refuse.test(p)){ r.writeHead(503); r.end(); return; }
+    if(cur.sw && p==='/sw.js'){ log.push(p); r.writeHead(200,{ 'content-type':'text/javascript; charset=utf-8', 'cache-control':'no-store' }); r.end(cur.sw); return; }
     try{ const b=await readFile(path.join(cur.dir,p)); log.push(p); served.n++; served.bytes+=b.length; r.writeHead(200,{ 'content-type':MIME[path.extname(p).toLowerCase()]||'application/octet-stream', 'cache-control':'no-store' }); r.end(b); }catch(e){ r.writeHead(404); r.end(); } });
   await new Promise(res=>srv.listen(0,'127.0.0.1',res)); const origin=`http://127.0.0.1:${srv.address().port}`;
   const browser=await chromium.launch({ channel:'chrome', headless:true, args:['--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream','--autoplay-policy=no-user-gesture-required','--disable-background-timer-throttling','--disable-renderer-backgrounding'] });
@@ -226,9 +237,6 @@ async function precacheRows(dir){
   const until=async (p, fn, arg, ms, what)=>{ const t0=Date.now(); while(Date.now()-t0<ms){ if(await p.evaluate(fn, arg).catch(()=>false)) return true; await new Promise(r=>setTimeout(r,250)); } miss(`${what}: not within ${ms/1000} s`); return false; };
   const started=async (p, what)=>{ await p.waitForSelector('#nightBegin',{ state:'visible', timeout:90e3 }); await p.waitForFunction(()=>!document.body.classList.contains('night-loading'), null, { timeout:90e3 }); await p.click('#nightBegin');
     return until(p, ()=>window.__frames>0, null, 120e3, what+': a camera frame detected'); };
-  /* the frame counter imports vision.js only once Night's boot is done: an import at document start would load the module graph out of Night's order
-     (scalepick.js first; core/scales.js has a top-level await) — it stalled the page's start */
-  const FRAMES=()=>{ (async ()=>{ for(let i=0;i<2400;i++){ try{ if(!(window.__nightBoot && window.__nightBoot.state().done)) throw 0; const V=await import('/core/vision.js'); if(V.pumpStats().processed>0){ window.__frames=V.pumpStats().processed; return; } }catch(e){} await new Promise(r=>setTimeout(r,100)); } })(); };
   /* in the page: this app's caches and what they hold (pathnames), checked against a list */
   const census=(p, files)=>p.evaluate(async ({ files, prefix })=>{ const names=await caches.keys(), mine=names.filter(n=>n.startsWith(prefix)), out={ names, extra:[], missing:[], wrong:[] };
     if(mine.length!==1) return out; const c=await caches.open(mine[0]), keys=(await c.keys()).map(q=>new URL(q.url).pathname.slice(1)), want=new Map(files.map(f=>[f[0], f[1]]));
@@ -237,19 +245,32 @@ async function precacheRows(dir){
     for(const k of keys) if(want.has(k)){ const b=await (await c.match('/'+k)).arrayBuffer(), h=[...new Uint8Array(await crypto.subtle.digest('SHA-256', b))].map(x=>x.toString(16).padStart(2,'0')).join(''); if(h!==want.get(k)) out.wrong.push(k); }
     return out; }, { files, prefix:'handsong-night-precache-' });
   try{
-    const ctx=await browser.newContext({ viewport:{ width:1280, height:800 } }); await ctx.grantPermissions(['camera','microphone'],{ origin }); await ctx.addInitScript(FRAMES);
-    const seen=new Set(); ctx.on('request', q=>{ const u=new URL(q.url()); if(u.origin===origin) seen.add(decodeURIComponent(u.pathname.slice(1))||'index.html'); });
+    const ctx=await browser.newContext({ viewport:{ width:1280, height:800 } }); await ctx.grantPermissions(['camera','microphone'],{ origin }); await ctx.addInitScript(FRAMES_COUNTER);
+    const seen=new Set(); ctx.on('request', q=>{ const u=new URL(q.url()); if(u.origin===origin && u.protocol!=='blob:') seen.add(decodeURIComponent(u.pathname.slice(1))||'index.html'); });
     /* (1) first visit */
     const events=[]; ctx.on('page', q=>{ q.on('crash', ()=>events.push('page crashed')); q.on('framenavigated', fr=>{ if(fr===q.mainFrame()) events.push('navigated to '+fr.url().replace(origin,'')); }); q.on('pageerror', e=>events.push('page error: '+String(e&&e.message||e).slice(0,120))); });
-    let p=await ctx.newPage(); await p.goto(origin+'/');
+    /* (0) NIGHT-14b: a first visit cut short — the hand model refused (MediaPipe's files come last in the start set): the install fails, nothing takes
+       over, and what it stored stays for the next visit */
+    const PRE='handsong-night-precache-', stamps=p=>p.evaluate(async pre=>{ const k=(await caches.keys()).find(n=>n.startsWith(pre)), o={}; if(!k) return o; const c=await caches.open(k);
+      for(const q of await c.keys()) o[new URL(q.url).pathname]=(await c.match(q)).headers.get('x-handsong-at'); return o; }, PRE);
+    cur.refuse=/hand_landmarker\.task$/; let p=await ctx.newPage(); await p.goto(origin+'/');
+    await until(p, async ()=>{ const r=await navigator.serviceWorker.getRegistration(), busy=r && (r.installing || r.waiting || r.active); return !busy && (await caches.keys()).length>0; }, null, 120e3, 'a first visit cut short: its install ended');
+    const before=await stamps(p), n0=Object.keys(before).length, ctl0=await p.evaluate(()=>!!navigator.serviceWorker.controller);
+    if(n0<50 || ctl0) miss(`a first visit cut short: ${n0} files stored, in control ${ctl0} (expected: many files kept, nothing in control)`); else notes.push(`a first visit cut short (the model refused): the install failed, ${n0} files kept for the next visit`);
+    await p.close(); cur.refuse=null;
+    p=await ctx.newPage(); await p.goto(origin+'/');
     const filled=await until(p, async v=>{ const r=navigator.serviceWorker && await navigator.serviceWorker.getRegistration(); return !!(navigator.serviceWorker.controller && r && r.active && (await caches.keys()).includes('handsong-night-precache-'+v)); }, LA.version, 240e3, 'first visit: the precache filled and in control');
     if(!filled){ const why=await p.evaluate(async ()=>{ const r=await navigator.serviceWorker.getRegistration(), st=w=>w ? w.state+' '+w.scriptURL.replace(location.origin,'') : null, out={ controller:!!navigator.serviceWorker.controller, installing:st(r&&r.installing), waiting:st(r&&r.waiting), active:st(r&&r.active), caches:{} };
         for(const k of await caches.keys()) out.caches[k]=(await (await caches.open(k)).keys()).length; return out; }).catch(e=>'unreadable: '+e.message);
       notes.push('first visit, not filled: '+JSON.stringify(why)+' · page events '+JSON.stringify(events.slice(0,8))+' · sw.js asked '+log.filter(x=>x==='/sw.js').length+' times · served '+served.n+' files, the last: '+log.slice(-4).join(' ')); }
-    if(filled && await started(p,'first visit')){ await p.waitForTimeout(3000);
+    if(filled){ const after=await stamps(p), again=Object.keys(before).filter(k=>after[k]!==before[k]);
+      if(again.length) miss(`the resumed install downloaded again ${again.length} file(s) it had: ${again.slice(0,4).join(', ')}`); else notes.push(`the next visit resumed the install: the ${n0} kept files not downloaded again`); }
+    if(filled && await started(p,'first visit')){
+      await until(p, async ([pre, n])=>{ const k=(await caches.keys()).find(x=>x.startsWith(pre)); return !!k && (await (await caches.open(k)).keys()).length>=n; }, [PRE, LA.files.filter(f=>f[3]!=='nosimd').length], 120e3, 'first visit: the top-up (every listed file)');
       const k=await census(p, LA.files); if(k.names.filter(n=>n.startsWith('handsong-night-precache-')).length!==1 || k.names.length!==1) miss('caches after the first visit: '+k.names.join(', '));
       if(k.extra.length) miss('cached outside the list: '+k.extra.slice(0,5).join(', ')); if(k.missing.length) miss('listed but not cached: '+k.missing.slice(0,5).join(', ')); if(k.wrong.length) miss('cached with another hash: '+k.wrong.slice(0,5).join(', '));
-      const uncovered=[...seen].filter(x=>!listed.has(x) && !/^(_vercel\/|sw\.js$|favicon\.ico$)/.test(x) && !/vision_wasm_nosimd/.test(x));   // the counter, the worker's own script, the browser's own icon request if(uncovered.length) miss('the start fetched files the list does not hold: '+uncovered.slice(0,6).join(', '));
+      /* not counted: the Vercel counter, the worker's own script, the browser's own icon request (NIGHT-14b: this check sat behind a comment and never ran) */
+      const uncovered=[...seen].filter(x=>!listed.has(x) && !/^(_vercel\/|sw\.js$|favicon\.ico$)/.test(x) && !/vision_wasm_nosimd/.test(x)); if(uncovered.length) miss('the start fetched files the list does not hold: '+uncovered.slice(0,6).join(', '));
       await p.evaluate(async ()=>{ const c=await caches.open((await caches.keys())[0]); await c.put('/not-listed.txt', new Response('x')); });
       const kc=await census(p, LA.files); if(!kc.extra.includes('not-listed.txt')) miss('CONTROL: an entry outside the list was not seen — «nothing outside the list» cannot fail'); else notes.push('CONTROL: an entry outside the list is seen');
       await p.evaluate(async ()=>{ const c=await caches.open((await caches.keys())[0]); await c.delete('/not-listed.txt'); });
@@ -281,12 +302,93 @@ async function precacheRows(dir){
       if(said){ const nav=p.waitForNavigation({ timeout:60e3 }).then(()=>true, ()=>false); await p.click('#nightNotice'); if(!await nav) miss('a tap on the line did not reload');
         await until(p, async v=>(await caches.keys()).join()==='handsong-night-precache-'+v && !!navigator.serviceWorker.controller, LB.version, 60e3, 'after the reload: only version B\'s cache');
         const k=await census(p, LB.files); if(k.extra.length || k.missing.length || k.wrong.length) miss(`version B in the cache: ${k.missing.length} missing, ${k.wrong.length} with another hash, ${k.extra.length} outside the list`); else notes.push(`the update replaced every file: ${LB.files.length} listed, all with version B's hash`);
-        if(!await p.evaluate(async f=>(await (await fetch('/'+f)).text()).includes('the update row'), CHANGED)) miss('after the update the page still gets the old file'); } }
+        if(!await p.evaluate(async f=>(await (await fetch('/'+f)).text()).includes('the update row'), CHANGED)) miss('after the update the page still gets the old file');
+        /* (5) NIGHT-14b, the exact CONTROL of the offline check: version B's worker WITHOUT its navigation branch takes over — the offline visit must fail */
+        const FALLBACK="if(q.mode==='navigate'){ if(p!=='' && p!=='index.html') return; p='index.html'; }", swB=readFileSync(path.join(B,'sw.js'),'utf8');
+        if(!swB.includes(FALLBACK)) miss('CONTROL: the navigation branch not found in sw.js');
+        else { cur.sw=swB.replace(FALLBACK, "if(q.mode==='navigate') return;   // CONTROL: no navigation fallback");
+          const took=await p.evaluate(async ()=>{ const r=await navigator.serviceWorker.getRegistration(); await r.update(); const w=r.installing || r.waiting; if(!w) return 'no new worker';
+            const ok=await new Promise(res=>{ const t=setTimeout(()=>res('not installed within 120 s'), 120e3), chk=()=>{ if(w.state==='installed' || w.state==='activated'){ clearTimeout(t); res('ok'); } else if(w.state==='redundant'){ clearTimeout(t); res('redundant'); } }; w.addEventListener('statechange', chk); chk(); });
+            if(ok!=='ok') return ok; const ch=new Promise(res=>{ navigator.serviceWorker.addEventListener('controllerchange', ()=>res('ok'), { once:true }); setTimeout(()=>res('no take-over within 30 s'), 30e3); });
+            w.postMessage({ type:'handsong-night-update' }); return await ch; }).catch(e=>'error: '+e.message.split('\n')[0]);
+          if(took!=='ok') miss('CONTROL could not be set up: the worker without its navigation branch: '+took);
+          else { await ctx.setOffline(true); const q=await ctx.newPage(); const opened=await q.goto(origin+'/',{ timeout:20e3 }).then(()=>q.waitForSelector('#nightBegin',{ state:'visible', timeout:10e3 })).then(()=>true, ()=>false); await q.close(); await ctx.setOffline(false);
+            if(opened) miss('CONTROL: a worker without its navigation branch still opened the page offline — the offline check cannot fail'); else notes.push('CONTROL: a worker without its navigation branch: the offline visit fails'); } } } }
     await ctx.close();
   }catch(e){ miss('error: '+(e&&e.message||e).split('\n')[0]); }
   finally{ await browser.close().catch(()=>{}); srv.close(); rmSync(WORK,{ recursive:true, force:true }); }
   out(`[smoke] precache (NIGHT-14), the players' tree: ${bad.length?'NOT A PASS — '+bad.length+' problem(s)':'PASS'}`); for(const n of notes) out('    '+n); for(const b of bad.slice(0,10)) out('    '+b);
   return bad.length; }
+/* NIGHT-14b — --precache-url URL: the offline second visit against a DEPLOYED Night (a Vercel preview or the dev branch alias): Vercel's own headers,
+   compression and protection, which no local tree has (NIGHT-14's install passed every local row and failed on the founder's phone). A disk profile, as
+   on a phone (an in-memory HTTP cache drops the 8–11 MB MediaPipe files). Deployment protection: the bypass secret from VERCEL_AUTOMATION_BYPASS_SECRET or
+   the file ~/.handsong-vercel-bypass (read, never printed) sets Vercel's cookie on the first visit, as the founder's login does on the phone.
+   (1) first visit online: the worker installed, activated and in control, its cache holding every START file (states, cache names and entries printed;
+       limit 300 s); the top-up (the later files) waited for, limit 180 s, reported;
+   (2) second visit OFFLINE: the page answered by the worker, Begin works and a camera frame is detected;
+   (3) CONTROL: the worker left with no answer for the navigation (the cached page deleted from its cache): the offline visit must fail.
+   --phone: the founder's steps (the NIGHT-14b failure): a phone-like network (a local proxy adding PHONE.rtt ms per round trip, PHONE.mbit Mbit/s,
+   for the page and the worker alike), the first visit lasts exactly PHONE.playMs and the tab is closed whatever the worker is doing; it must be in
+   control with the start files by then. NIGHT-14's worker (one file at a time, everything before taking over) fails it on the real preview. */
+const PHONE=Object.freeze({ rtt:150, mbit:8, playMs:60e3 });
+/* a CONNECT proxy (HTTPS passes through untouched) that delays every chunk by half a round trip and caps each direction's rate; s.off refuses new tunnels */
+async function phoneProxy(){ const s={ off:false }, rate=PHONE.mbit*1e3/8;   // bytes per ms
+  const pipe=(a, b)=>{ let free=0; a.on('data', d=>{ const now=Date.now(); free=Math.max(free, now)+d.length/rate; a.pause(); setTimeout(()=>{ b.write(d); a.resume(); }, free-now+PHONE.rtt/2); });
+    a.on('end', ()=>setTimeout(()=>b.end(), PHONE.rtt/2)); a.on('error', ()=>b.destroy()); };
+  s.srv=http.createServer((q,r)=>{ r.writeHead(501); r.end(); });
+  s.srv.on('connect', (q, sock, head)=>{ if(s.off){ sock.destroy(); return; } const [h, port]=q.url.split(':'), up=net.connect(+port||443, h, ()=>{ sock.write('HTTP/1.1 200 OK\r\n\r\n'); if(head.length) up.write(head); pipe(up, sock); pipe(sock, up); });
+    up.on('error', ()=>sock.destroy()); sock.on('error', ()=>up.destroy()); });
+  await new Promise(r=>s.srv.listen(0,'127.0.0.1',r)); s.url='http://127.0.0.1:'+s.srv.address().port; return s; }
+async function precacheUrlRow(url, phone=false){
+  const STOP={}, bad=[], notes=[], miss=s=>bad.push(s), base=url.replace(/[?#].*$/,'').replace(/\/?$/,'/'), origin=new URL(base).origin, BP=path.join(os.homedir(),'.handsong-vercel-bypass');
+  const secret=(process.env.VERCEL_AUTOMATION_BYPASS_SECRET || (existsSync(BP) ? readFileSync(BP,'utf8') : '')).trim(), clean=s=>secret ? String(s).split(secret).join('<secret>').split(encodeURIComponent(secret)).join('<secret>') : String(s);
+  const UD=path.join(BUILD_DIR,'precache-url-profile'), T0=Date.now(), sec=()=>((Date.now()-T0)/1000).toFixed(0)+' s';
+  rmSync(UD,{ recursive:true, force:true }); const px=phone ? await phoneProxy() : null;
+  if(phone) notes.push(`--phone: +${PHONE.rtt} ms per round trip, ${PHONE.mbit} Mbit/s; the first visit lasts ${PHONE.playMs/1000} s, then the tab is closed and the network cut`);
+  const ctx=await chromium.launchPersistentContext(UD,{ channel:'chrome', headless:true, viewport:{ width:412, height:915 }, ...(px ? { proxy:{ server:px.url } } : {}), args:['--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream','--autoplay-policy=no-user-gesture-required'] });
+  const until=async (p, fn, arg, ms, what)=>{ const t0=Date.now(); while(Date.now()-t0<ms){ if(await p.evaluate(fn, arg).catch(()=>false)) return true; await new Promise(r=>setTimeout(r,250)); } miss(`${what}: not within ${ms/1000} s`); return false; };
+  const state=p=>p.evaluate(async ()=>{ const r=await navigator.serviceWorker.getRegistration(), s=w=>w ? w.state : null, o={ controlled:!!navigator.serviceWorker.controller, installing:s(r&&r.installing), waiting:s(r&&r.waiting), active:s(r&&r.active), caches:{} };
+    for(const k of await caches.keys()) o.caches[k]=(await (await caches.open(k)).keys()).length; return o; }).catch(e=>({ unreadable:e.message.split('\n')[0] }));
+  try{
+    await ctx.grantPermissions(['camera','microphone'],{ origin }); await ctx.addInitScript(FRAMES_COUNTER);
+    let p=ctx.pages()[0] || await ctx.newPage();
+    /* (1) first visit */
+    const r0=await p.goto(base+(secret ? `?x-vercel-protection-bypass=${encodeURIComponent(secret)}&x-vercel-set-bypass-cookie=true` : ''),{ timeout:120e3 });
+    notes.push(`first visit: HTTP ${r0 && r0.status()}${secret ? ' (protection bypass: a cookie set, as a login does)' : ''}`);
+    const L=await p.evaluate(async ()=>{ const m=/^const PRECACHE=(\{.*\});/m.exec(await (await fetch('sw.js',{ cache:'no-store' })).text()); return m ? JSON.parse(m[1]) : null; }).catch(()=>null);
+    if(!L){ miss('the deployed sw.js carries no precache list (a repository tree, or protection answered instead)'); throw STOP; }
+    const NAME='handsong-night-precache-'+L.version, nStart=L.files.filter(f=>!f[4] && f[3]!=='nosimd').length, nAll=L.files.filter(f=>f[3]!=='nosimd').length;
+    notes.push(`list ${L.version}: ${L.files.length} files, ${nStart} to start (with SIMD), ${nAll} in all`);
+    let last='', lastAt=0, ok=false; const t1=Date.now(), ready=s=>!!(s.controlled && s.active==='activated' && (s.caches && s.caches[NAME]||0)>=nStart);
+    while(Date.now()-t1<(phone ? PHONE.playMs : 300e3)){ const s=await state(p), shape=JSON.stringify({ ...s, caches:Object.keys(s.caches||{}) });
+      if(shape!==last || Date.now()-lastAt>10e3){ notes.push(`${sec()}: ${JSON.stringify(s)}`); last=shape; lastAt=Date.now(); }
+      if(ready(s) && !ok){ ok=true; notes.push(`${sec()}: in control, the start files cached`); if(!phone) break; } await p.waitForTimeout(1000); }
+    if(phone){ const s=await state(p); notes.push(`${sec()}: the ${PHONE.playMs/1000} s visit ends — ${JSON.stringify(s)}`); if(!ok) miss(`the founder's steps: the worker not in control with every start file after a ${PHONE.playMs/1000} s first visit on a phone network`); }
+    else if(!ok){ miss('first visit: the worker not installed, activated and in control with every start file within 300 s'); throw STOP; }
+    if(!phone){ const topped=await until(p, async ([n, k])=>((await (await caches.open(n)).keys()).length>=k), [NAME, nAll], 180e3, 'the top-up (every listed file)');
+      { const s=await state(p); notes.push(`${sec()}: ${topped ? 'topped up' : 'NOT topped up'} — caches ${JSON.stringify(s.caches)}`); } }
+    await p.close();
+    /* (2) offline second visit */
+    await ctx.setOffline(true); if(px) px.off=true; p=await ctx.newPage();
+    let nav=null; try{ nav=await p.goto(base,{ timeout:30e3 }); }catch(e){ miss('offline second visit: '+e.message.split('\n')[0]+' (the browser\'s offline page)'); }
+    if(nav){ if(!nav.fromServiceWorker()) miss('offline second visit: the page did not come from the worker');
+      await p.waitForSelector('#nightBegin',{ state:'visible', timeout:90e3 }).catch(()=>{}); await p.waitForFunction(()=>!document.body.classList.contains('night-loading'), null, { timeout:90e3 }).catch(()=>{});
+      if(await p.isVisible('#nightBegin')){ await p.click('#nightBegin'); if(await until(p, ()=>window.__frames>0, null, 120e3, 'offline second visit: a camera frame detected')) notes.push('offline second visit: the page from the worker, Begin works, a camera frame detected'); }
+      else miss('offline second visit: Begin not visible'); }
+    /* (3) CONTROL: the worker left with no answer for the navigation (its cached page deleted; the script of a worker cannot be swapped on a deployed
+       URL — Playwright's routing never sees the browser's own fetch of it; the exact control, a worker script without its navigation branch, is in
+       the local precache row): the offline visit must fail */
+    if(!nav){ notes.push('CONTROL skipped: the offline visit already failed'); throw STOP; }
+    const gone=await p.evaluate(async n=>(await caches.open(n)).delete(new URL('index.html', location.href).href), NAME).catch(()=>false);
+    if(!gone){ miss('CONTROL could not be set up: the cached page was not found in the cache of the worker'); throw STOP; }
+    await p.close(); p=await ctx.newPage();
+    const opened=await p.goto(base,{ timeout:20e3 }).then(()=>p.waitForSelector('#nightBegin',{ state:'visible', timeout:10e3 })).then(()=>true, ()=>false);
+    if(opened) miss('CONTROL: with no answer for the navigation the page still opened offline — the offline check cannot fail'); else notes.push('CONTROL: the worker with no answer for the navigation: the offline visit fails (the offline page of the browser)');
+  }catch(e){ if(e!==STOP) miss('error: '+(e&&e.message||e).split('\n')[0]); }
+  finally{ await ctx.close().catch(()=>{}); rmSync(UD,{ recursive:true, force:true }); if(px) px.srv.close(); }
+  out(clean(`[smoke] precache on a deployed Night (NIGHT-14b) ${base}: ${bad.length ? 'NOT A PASS — '+bad.length+' problem(s)' : 'PASS'}`)); for(const n of notes) out(clean('    '+n)); for(const b of bad.slice(0,10)) out(clean('    '+b));
+  return bad.length; }
+{ const i=argv.indexOf('--precache-url'); if(i>=0){ const f=await precacheUrlRow(argv[i+1], argv.includes('--phone')); out(`[smoke] --precache-url: ${f ? 'NOT A PASS' : 'PASS'} (the deployed Night only; not a verdict of the whole test)`); process.exit(f ? 1 : 0); } }
 /* --only app@prefix [--repeat N] (NIGHT-3): one repo-tree page, N times — a diagnosis of one target; it is never a pass of the whole test */
 /* --precache DIR (NIGHT-14): only the precache rows, on a built Night tree — a diagnosis, never a verdict of the whole test */
 { const i=argv.indexOf('--precache'); if(i>=0){ const f=await precacheRows(path.resolve(ROOT, argv[i+1])); out(`[smoke] --precache ${argv[i+1]}: ${f?'failed':'ok'} (a diagnosis, not a verdict of the whole test)`); process.exit(f?1:0); } }

@@ -1698,16 +1698,22 @@ async function nightPrecacheList(){
   const T=fs.mkdtempSync(path.join(os.tmpdir(), 'handsong-pc-')), put=(p, t)=>{ fs.mkdirSync(path.dirname(path.join(T,p)), { recursive:true }); fs.writeFileSync(path.join(T,p), t); };
   try{
     for(const p of ['index.html','manifest.json','icons/i.png','core/a.js','core/data/m.json','core/vendor/mediapipe/9/vision_bundle.mjs','core/vendor/mediapipe/9/wasm/vision_wasm_internal.wasm','core/vendor/mediapipe/9/wasm/vision_wasm_nosimd_internal.wasm',
-      'core/vendor/mediapipe/9/LICENSE','core/vendor/mediapipe/9/README.md','tools/probes/x.js','apps/night/rooms/rain/r.js','apps/night/rooms/forest/tex/ground-1024.png','apps/night/rooms/forest/tex/groundm-1024.png','THIRD-PARTY-LICENSES.md']) put(p, p);
+      'core/vendor/mediapipe/9/LICENSE','core/vendor/mediapipe/9/README.md','tools/probes/x.js','apps/night/rooms/rain/r.js','apps/night/rooms/forest/tex/ground-1024.png','apps/night/rooms/forest/tex/groundm-1024.png','THIRD-PARTY-LICENSES.md',
+      'apps/night/rooms/forest/sound/s.mp3','apps/night/rooms/forest/still/s.webp','apps/night/rooms/rain/still/r.webp']) put(p, p);   // NIGHT-14b: a room's still/ and sound/ (named by its record) listed; the development room's not
     put('sw.js', sw);
-    const L=PC.precachePaths(T, ['core/a.js','tools/probes/x.js','apps/night/rooms/rain/r.js','sw.js','apps/night/rooms/forest/tex/ground-1024.png','apps/night/rooms/forest/tex/groundm-1024.png','core/missing.js'], PC.NIGHT_SKIP);
-    const want=['core/a.js','core/data/m.json','core/vendor/mediapipe/9/vision_bundle.mjs','core/vendor/mediapipe/9/wasm/vision_wasm_internal.wasm','core/vendor/mediapipe/9/wasm/vision_wasm_nosimd_internal.wasm','apps/night/rooms/forest/tex/groundm-1024.png','icons/i.png','index.html','manifest.json'].sort();
+    const L=PC.precachePaths(T, ['core/a.js','tools/probes/x.js','apps/night/rooms/rain/r.js','sw.js','apps/night/rooms/forest/tex/ground-1024.png','apps/night/rooms/forest/tex/groundm-1024.png','core/missing.js'], PC.NIGHT_SKIP, PC.NIGHT_INCLUDE);
+    const want=['core/a.js','core/data/m.json','core/vendor/mediapipe/9/vision_bundle.mjs','core/vendor/mediapipe/9/wasm/vision_wasm_internal.wasm','core/vendor/mediapipe/9/wasm/vision_wasm_nosimd_internal.wasm','apps/night/rooms/forest/tex/groundm-1024.png','icons/i.png','index.html','manifest.json',
+      'apps/night/rooms/forest/sound/s.mp3','apps/night/rooms/forest/still/s.webp'].sort();
     n++; if(JSON.stringify(L)!==JSON.stringify(want)) miss('the list of a made-up tree: '+JSON.stringify(L)+' (expected '+JSON.stringify(want)+')');
-    const r1=PC.writePrecache(T, L), P1=PC.readPrecache(T);
+    const r1=PC.writePrecache(T, L, [/^icons\//]), P1=PC.readPrecache(T);
     n++; if(!P1 || P1.version!==r1.version || P1.files.length!==L.length) miss('the list does not round-trip through sw.js');
     n++; { const g=Object.fromEntries(P1.files.map(f=>[f[0], f[3]])); if(g['core/vendor/mediapipe/9/wasm/vision_wasm_internal.wasm']!=='simd' || g['core/vendor/mediapipe/9/wasm/vision_wasm_nosimd_internal.wasm']!=='nosimd' || g['core/a.js']!=='') miss('MediaPipe\'s groups are wrong: '+JSON.stringify(g)); }
+    /* NIGHT-14b: stage 1 = the later patterns' files, last; within stage 0 MediaPipe last */
+    n++; { const ord=P1.files.map(f=>f[0]), st=P1.files.map(f=>f[4]), v=ord.map(p=>p.startsWith('core/vendor/')), iv=v.indexOf(true);
+      if(st[ord.indexOf('icons/i.png')]!==1 || st.filter(x=>x===1).length!==1 || ord[ord.length-1]!=='icons/i.png' || iv<1 || v.slice(iv, -1).some(x=>!x) || st.slice(0,-1).some(x=>x!==0)) miss('the stages or the order are wrong: '+JSON.stringify(P1.files.map(f=>[f[0], f[4]]))); }
     fs.appendFileSync(path.join(T,'core/a.js'), ' '); const r2=PC.rehashPrecache(T);
     n++; if(r2.version===r1.version) miss('one changed byte did not change the version');
+    n++; { const P2=PC.readPrecache(T), f=P2 && P2.files.find(x=>x[0]==='icons/i.png'); if(!f || f[4]!==1) miss('a re-hash lost the stages'); }
     n++; if((fs.readFileSync(path.join(T,'sw.js'),'utf8').match(/^const PRECACHE=/gm)||[]).length!==1) miss('a re-hash left more than one PRECACHE line');
     fs.writeFileSync(path.join(T,'sw.js'), sw.replace('const PRECACHE=null;', 'const LIST=null;'));
     n++; let threw=false; try{ PC.writePrecache(T, L); }catch(e){ threw=true; } if(!threw) miss('CONTROL: a sw.js without its PRECACHE line was filled anyway'); else notes.push('CONTROL: a sw.js without its PRECACHE line fails the build');
@@ -1724,10 +1730,27 @@ async function nightPrecacheList(){
   n++; { const b=judge(PC.NIGHT_SKIP); if(b.length) miss(b.join('; ')); }
   n++; { const skipped=Object.values(texOf).filter(p=>PC.NIGHT_SKIP.some(r=>r.test(p))); if(!skipped.length) miss('the skip list skips nothing of the forest (stale?)'); else notes.push(`skipped (no level fetches them): ${skipped.map(p=>p.split('/').pop()).join(', ')}`); }
   n++; if(!judge([...PC.NIGHT_SKIP, /groundm-1024\.png$/]).length) miss('CONTROL: a skip catching a level\'s file passed'); else notes.push('CONTROL: a skip catching a level\'s file is caught');
+  /* (2b) NIGHT-14b: the later files against the Standard level (reduced, the default): nothing it fetches may wait for the top-up */
+  const SF=(await import(new URL('../apps/night/pure/still.js', import.meta.url).href)).stillFile, FB='apps/night/rooms/forest/', std=new Set();
+  { const Lv=R.levels.reduced, skip=Lv.groundScan ? BAKED : SCAN; for(const [k, name] of Object.entries(sets.reduced||{})) if(!skip.includes(k)) std.add(texOf[name]); }
+  if(SF(R,'reduced')) std.add(FB+SF(R,'reduced')); if(R.still && R.still.over && R.still.over.sprites) std.add(FB+R.still.over.sprites);
+  const judgeLater=later=>[...std].filter(p=>later.some(r=>r.test(p)));
+  n++; if(std.size<8 || !SF(R,'full')) miss(`the Standard level's files could not be read (${std.size})`); else { const b=judgeLater(PC.NIGHT_LATER); if(b.length) miss('the Standard level would wait for the top-up: '+b.join(', ')); else notes.push(`none of the Standard level's ${std.size} files waits for the top-up`); }
+  n++; { const real=[...Object.values(texOf), FB+SF(R,'full'), FB+SF(R,'reduced')], stale=PC.NIGHT_LATER.filter(r=>!r.source.startsWith('^icons') && !real.some(p=>r.test(p))); if(stale.length) miss('a later pattern matches no forest file (stale?): '+stale.map(String).join(', ')); }
+  n++; if(!judgeLater([...PC.NIGHT_LATER, /litter-col-1024\.jpg$/]).length) miss('CONTROL: a later pattern catching a Standard file passed'); else notes.push('CONTROL: a later pattern catching a Standard file is caught');
+  /* (2c) NIGHT-14b: every media file a room record names (an address made at run time, unseen by the build's walk) is listed through NIGHT_INCLUDE */
+  const roomsDir=new URL('../apps/night/rooms/', import.meta.url), named=[], tex=new Set(Object.values(texOf));
+  for(const e of fs.readdirSync(roomsDir,{ withFileTypes:true })) if(e.isDirectory() && e.name!=='rain'){ const f=new URL(e.name+'/pure/room.js', roomsDir); if(!fs.existsSync(f)) continue;
+    for(const m of fs.readFileSync(f,'utf8').matchAll(/'([\w./-]+\.(?:mp3|webp|png|jpg|wav|ogg))'/g)) named.push(`apps/night/rooms/${e.name}/${m[1]}`); }
+  const judgeInc=list=>list.filter(p=>!PC.NIGHT_INCLUDE.some(r=>r.test(p)) && !tex.has(p));
+  n++; if(named.length<4) miss(`the room records name ${named.length} media files (the read is stale?)`); else { const b=judgeInc(named); if(b.length) miss('named by a room record but not listed: '+b.join(', ')); else notes.push(`every media file the room records name is listed (${named.length})`); }
+  n++; if(!judgeInc([...named, FB+'tex2/x.png']).length) miss('CONTROL: a room file outside the listed folders passed'); else notes.push('CONTROL: a room file outside the listed folders is caught');
   /* (3) the repository's worker and the build */
   n++; if((sw.match(/^const PRECACHE=null;/gm)||[]).length!==1 || !/if\(!PRECACHE\) return;/.test(sw)) miss('the repository\'s sw.js is not the no-cache worker (PRECACHE null, fetch passed on)');
+  n++; if(!sw.includes('await fill(FILES.filter(f=>!f[4]));') || !sw.includes("for(const mode of ['force-cache', 'reload'])") || !sw.includes("t==='handsong-night-topup'") || !(await rd('apps/night/update.js')).includes("type:'handsong-night-topup'"))
+    miss('the worker lost NIGHT-14b\'s install (the start files only, the browser\'s copy first, the top-up at the page\'s word)');
   const B=await rd('tools/build.mjs'), door=(/const DEV_DOOR="([^"]+)"/.exec(B)||[])[1], dev=await rd('apps/night/rooms/dev.js');
-  n++; if(!/if\(app==='night'\) pc=writePrecache\(OUT, precachePaths\(OUT, seen, NIGHT_SKIP\)\)/.test(B)) miss('the build does not write Night\'s list (and only Night\'s)');
+  n++; if(!/if\(app==='night'\) pc=writePrecache\(OUT, precachePaths\(OUT, seen, NIGHT_SKIP, NIGHT_INCLUDE\), NIGHT_LATER\)/.test(B)) miss('the build does not write Night\'s list (and only Night\'s)');
   n++; if(!door || dev.split(door).length!==2 || !/if\(RELEASE && app==='night'\)\{ rmSync\(path\.join\(OUT,'apps\/night\/rooms\/rain'\)/.test(B)) miss('the build cannot take the rain room out of the players\' edition (its folder, or the door\'s exact import())');
   return { cases:n, total:d.length, differences:d, notes };
 }

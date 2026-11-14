@@ -61,6 +61,7 @@ THERE in full and here as one index entry):
   155 The dot's flight, stronger and steady: the flare, a 3.4-s flight onto a firefly, no jump when full screen is entered at Begin (NIGHT-13b)
   156 The room «Rain», its foundation (development only, «?room=rain»): the rain on the glass, depth is focus, a note lights a window, on a placeholder city (RAIN-0)
   157 MediaPipe from our own origin; Night's second visit with no network (a build's precache) and the quiet «A new version is ready» line (CORE-22 + NIGHT-14)
+  158 Night's offline second visit on a phone, a short first visit enough; the dev branch alias as the test address (NIGHT-14b)
 
 ## Moved to `archive/CLAUDE-history.md` at DOC1 (grep by title; read only what the slice needs)
 - «Module map (full, moved at DOC1)» — every module's detailed paragraph (AUD1a … IDS1, SONG1, AUTOSAVE1, PACK1 …).

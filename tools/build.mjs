@@ -8,7 +8,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statS
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { precachePaths, writePrecache, NIGHT_SKIP } from './precache.mjs';   // NIGHT-14
+import { precachePaths, writePrecache, NIGHT_SKIP, NIGHT_LATER, NIGHT_INCLUDE } from './precache.mjs';   // NIGHT-14
 
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), argv=process.argv.slice(2), posix=path.posix;
 const die=s=>{ console.error('[build] FAILED — '+s); process.exit(1); };
@@ -80,6 +80,6 @@ for(const m of page.matchAll(/<script\b[^>]*\btype="module"[^>]*\bsrc="([^"]+)"/
   if(!closure.length || !html.includes('</head>')) die('no module closure to preload, or the page has no </head>');
   writeFileSync(path.join(OUT,'index.html'), html.replace('</head>', `<!-- CORE-20: the static module closure, preloaded (written by tools/build.mjs) -->\n${tags}\n</head>`)); }
 /* NIGHT-14: Night's precache list, written into its sw.js last (after every change to the tree, so the hashes are the shipped bytes) */
-let pc=null; if(app==='night') pc=writePrecache(OUT, precachePaths(OUT, seen, NIGHT_SKIP));
+let pc=null; if(app==='night') pc=writePrecache(OUT, precachePaths(OUT, seen, NIGHT_SKIP, NIGHT_INCLUDE), NIGHT_LATER);
 const bytes=all.reduce((n,f)=>n+statSync(path.join(OUT,f)).size,0), h=createHash('sha256'); for(const f of all){ h.update(f); h.update(readFileSync(path.join(OUT,f))); }
-console.log(`[build] PASS — ${app}${PREVIEW?' · preview: ?probe kept':' · production: no probes'}${RELEASE?' · release edition':''} · ${all.length} files, ${(bytes/1048576).toFixed(1)} MB, ${seen.size} loads resolved, ${closure.length} modules preloaded${pc ? ` · precache ${pc.version}: ${pc.n} files, ${(pc.simdBytes/1048576).toFixed(1)} MB cached (${(pc.bytes/1048576).toFixed(1)} MB listed with both MediaPipe builds)` : ''} · tree ${h.digest('hex').slice(0,16)} → ${path.relative(ROOT,OUT).replace(/\\/g,'/')}`);
+console.log(`[build] PASS — ${app}${PREVIEW?' · preview: ?probe kept':' · production: no probes'}${RELEASE?' · release edition':''} · ${all.length} files, ${(bytes/1048576).toFixed(1)} MB, ${seen.size} loads resolved, ${closure.length} modules preloaded${pc ? ` · precache ${pc.version}: ${pc.n} files, ${(pc.simdBytes/1048576).toFixed(1)} MB cached, ${(pc.startBytes/1048576).toFixed(1)} MB of it to start (${(pc.bytes/1048576).toFixed(1)} MB listed with both MediaPipe builds)` : ''} · tree ${h.digest('hex').slice(0,16)} → ${path.relative(ROOT,OUT).replace(/\\/g,'/')}`);
