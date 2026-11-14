@@ -43,7 +43,7 @@ async function setup(){
   const blank=()=>{ const c=typeof OffscreenCanvas!=='undefined' ? new OffscreenCanvas(640,480) : Object.assign(document.createElement('canvas'),{ width:640, height:480 }); c.getContext('2d'); return c; };
   stream=await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'user', width:{ ideal:640 }, height:{ ideal:480 } }, audio:false });
   const v=$('video'); v.srcObject=stream; v.hidden=false; await v.play();
-  if(!det){ try{ det=await createDetector({ delegate:'GPU', blank }); delegate='GPU'; }catch(e){ det=await createDetector({ delegate:'CPU', blank }); delegate='CPU'; } }
+  if(!det){ try{ det=await createDetector({ delegate:'GPU', blank, files:'own' }); delegate='GPU'; }catch(e){ det=await createDetector({ delegate:'CPU', blank, files:'own' }); delegate='CPU'; } }   // CORE-22: MediaPipe from our origin, as the apps
   try{ await navigator.wakeLock.request('screen'); }catch(e){}
   pump();
 }

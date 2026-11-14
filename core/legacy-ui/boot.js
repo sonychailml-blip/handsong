@@ -129,11 +129,12 @@ function startFail(err){
    message as before; the other half goes on and a retry reuses it. opt.onCamera() once the camera runs (both paths). Without the options: the old
    staged order, untouched. */
 let detP=null, detShow=null, detLast='';
+const handFiles=()=>OPT.handFiles ? { files:OPT.handFiles } : {};   // CORE-22 (opt-in): opt.handFiles 'own' — MediaPipe from our origin (absent: the CDN, as before)
 function detStart(){
   if(stage.det) return Promise.resolve();
   if(detP) return detP;
   const show=s=>{ detLast=s; if(detShow) detShow(s); };
-  const p= OPT.startSay ? initDetector(show, { say:(k,f)=>show(OPT.startSay(k,f)||t(k)), stallMs:OPT.modelStallMs, ...(OPT.freshRetry ? { freshRetry:true } : {}) }) : initDetector(show);   // CORE-20: freshRetry
+  const p= OPT.startSay ? initDetector(show, { say:(k,f)=>show(OPT.startSay(k,f)||t(k)), stallMs:OPT.modelStallMs, ...(OPT.freshRetry ? { freshRetry:true } : {}), ...handFiles() }) : initDetector(show, handFiles());   // CORE-20: freshRetry; CORE-22: handFiles
   detP=p.then(()=>{ stage.det=true; detP=null; }, e=>{ detP=null; throw e; });
   return detP;
 }
@@ -167,7 +168,7 @@ async function startApp(){
     if(!stage.audio){ await initAudio(); stage.audio=true; }   // rule #1: the context is created in this click's synchronous part (first press only)
     await AC.resume();
     const say=OPT.startSay ? (k,f)=>msg(OPT.startSay(k,f)||t(k)) : null;   // CORE-18 (opt-in): the app's own loading words, the model's progress
-    if(!stage.det){ if(say) await initDetector(msg, { say, stallMs:OPT.modelStallMs, ...(OPT.freshRetry ? { freshRetry:true } : {}) }); else await initDetector(msg); stage.det=true; }
+    if(!stage.det){ if(say) await initDetector(msg, { say, stallMs:OPT.modelStallMs, ...(OPT.freshRetry ? { freshRetry:true } : {}), ...handFiles() }); else await initDetector(msg, handFiles()); stage.det=true; }
     if(say) say('load.camera'); else msg(t('load.camera'));
     await startCamera();                     // 0b: one getUserMedia, one retry after ~1 s, tracks released on failure
     if(OPT.onCamera) OPT.onCamera();
@@ -189,7 +190,7 @@ async function startApp(){
     return false;
   }finally{ starting=false; }
 }
-/* SPLIT-2: an app's entry calls this once. CORE-19: parallel, earlyModel, onCamera (above). CORE-20: freshRetry — a retried model build skips what the page preloaded (vision.initDetector). CORE-18: failText (err) → the app's words for a failed start or null; startSay (key, frac) → its loading words or null (with the model's progress); modelStallMs. opt: profile (the id to open in), frameFilter (res, t) → res, afterDraw (t) once per play-screen frame (CORE-6), detectPause () → true while no camera frame may be taken (CORE-12). Returns startApp for the entry's own buttons (still inside their click: rule #1).
+/* SPLIT-2: an app's entry calls this once. CORE-22: handFiles 'own' (MediaPipe's files from our origin). CORE-19: parallel, earlyModel, onCamera (above). CORE-20: freshRetry — a retried model build skips what the page preloaded (vision.initDetector). CORE-18: failText (err) → the app's words for a failed start or null; startSay (key, frac) → its loading words or null (with the model's progress); modelStallMs. opt: profile (the id to open in), frameFilter (res, t) → res, afterDraw (t) once per play-screen frame (CORE-6), detectPause () → true while no camera frame may be taken (CORE-12). Returns startApp for the entry's own buttons (still inside their click: rule #1).
    ?probe loads what the page declares in <link rel="handsong-probes">: without the flag, or without the tag (a shipped page), nothing is loaded. */
 export function boot(opt={}){
   OPT=opt; if(opt.parallel && opt.earlyModel) setTimeout(earlyDetector, 0);   // CORE-19: the model before the tap

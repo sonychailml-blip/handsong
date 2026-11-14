@@ -12,6 +12,7 @@ export const NIGHT_TEXTS=Object.freeze({
     'night.q.detailed':'Detailed — for strong devices',
     'night.set.camera':'Camera', 'night.cam.front':'Front', 'night.cam.back':'Back', 'night.cam.n':'Camera {n}',   // NIGHT-10
     'night.audio.tap':'Tap to continue',   // NIGHT-11: the phone stopped the sound
+    'night.update.ready':'A new version is ready. Tap to open it.',   // NIGHT-14: the precache found a new version
     'night.cam.lost':'The camera stopped. Close other apps that use it, then tap here to try again.',
     /* NIGHT-11 part 2: the start's own words — the model's progress, a failed start (phone / computer, Night's button), a messenger's browser */
     'night.load.model':'Getting the hand model ready…',
@@ -73,6 +74,7 @@ export const NIGHT_TEXTS=Object.freeze({
     'night.q.detailed':'Подробная — для мощных устройств',
     'night.set.camera':'Камера', 'night.cam.front':'Передняя', 'night.cam.back':'Задняя', 'night.cam.n':'Камера {n}',   // NIGHT-10
     'night.audio.tap':'Коснитесь, чтобы продолжить',   // NIGHT-11
+    'night.update.ready':'Готова новая версия. Коснитесь, чтобы открыть её.',   // NIGHT-14
     'night.cam.lost':'Камера остановилась. Закройте другие приложения, которые её используют, и коснитесь здесь, чтобы попробовать снова.',
     /* NIGHT-11 part 2 */
     'night.load.model':'Готовлю модель рук…',

@@ -137,7 +137,7 @@ export async function checkWorker(){
     cases++; if(!L.latText().includes(t('diag.pathWorker'))) miss('the meter does not say the worker runs');
     /* (2) identity on the same frames */
     V.pumpDbg({ hold:true }); await sleep(300);
-    D=await H.createDetector({ blank:()=>{ const c=new OffscreenCanvas(640,480); c.getContext('2d').fillRect(0,0,640,480); return c; } });
+    D=await H.createDetector({ ...(V.handFilesOf()==='own' ? { files:'own' } : {}), blank:()=>{ const c=new OffscreenCanvas(640,480); c.getContext('2d').fillRect(0,0,640,480); return c; } });
     const acts=['search','track1','track2','search','track1','search'], cmp=async fake=>{ const bad=[];
       if(fake) V.pumpDbg({ fake:true });
       for(let i=0;i<acts.length;i++){ await new Promise(r=>video.requestVideoFrameCallback?video.requestVideoFrameCallback(()=>r()):setTimeout(r,50));

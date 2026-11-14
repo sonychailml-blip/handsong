@@ -3,5 +3,5 @@ import { boot } from '../../core/legacy-ui/boot.js';
 import './demo.js';   // side effect: the demo «journey through the tunings» (no camera); guarded, it has no start button today
 import { openLessons, wireStarter } from './tutor.js';
 
-wireStarter(boot());   // a lesson or «Free play» starts the app with the same start, inside that click (rule #1)
+wireStarter(boot({ handFiles:'own' }));   // CORE-22: MediaPipe's files from our own origin (the CSP names only 'self'); a lesson or «Free play» starts the app with the same start, inside that click (rule #1)
 document.getElementById('learnBtn').onclick=()=>{ openLessons(); };

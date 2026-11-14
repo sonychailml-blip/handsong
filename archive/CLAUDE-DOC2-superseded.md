@@ -39,3 +39,14 @@ SITE-1 (2026-11-13), `CLAUDE.md` «Check levels», Level 1 (the site's check add
 SITE-1 (2026-11-13), `CLAUDE.md` «Two apps, one core» (the SITE track added):
 ⛳ Handsong (`apps/full/`) and Handsong Night (`apps/night/`, code id `night`) share `core/`. Every run belongs to ONE track: CORE-n, FULL-n or NIGHT-n.
 Run names and logs: `CORE-n`, `FULL-n`, `NIGHT-n`, counted separately (`NIGHT-0` is history; Night starts at `NIGHT-1`). If a NIGHT or FULL run needs a core change, that part is a small `CORE-n` with its own record and both apps' checks. Each log entry in `docs/<track>/WORK-LOG.md` starts: track, number, date, tree hashes before and after.
+
+CORE-22 + NIGHT-14 (2026-11-13), `CLAUDE.md` «What this is», «Running / developing» and hard rule #33 (MediaPipe from our own origin; Night's precache):
+  A page holds markup only; `core/legacy-ui/style.css` + `core/tokens.css` (+ `apps/night/night.css`) all CSS; the only external dependency is `@mediapipe/tasks-vision` from a CDN
+  (`core/vision.js`). Each app has its own `manifest.json` + `sw.js` (PWA pair) and declares its profile and probes (`<link rel="handsong-profile">`, `<link rel="handsong-probes">`); root `index.html` is a redirect.
+- Scale data are JSON files in `core/data/`, fetched at start. MediaPipe model/WASM/library come from CDNs — internet required. ⚠️ The apps
+  do not work offline at all (SW caches nothing on purpose). Needs a webcam + WebGL. Audio starts only on the "▶ Play" click.
+    is limited to: loading itself and its assets (own origin; the pinned MediaPipe files of the register); links the person opens (feedback,
+    Content-Security-Policy `<meta>` first in each page (`apps/<app>/index.html`, the same line, static check 16) — `connect-src`/`script-src` list only our origin and the MediaPipe paths, no
+
+CORE-22 + NIGHT-14 (2026-11-13), `docs/core/MODULE-MAP.md` «Root / Pages» (Night's SW precaches in a build):
+- **Root:** `index.html` redirect only; `vercel.json`. **Pages:** `apps/<app>/index.html` markup only (CSP `<meta>` first, rule #33; `#privacyNote`), `manifest.json`/`sw.js` PWA (cache-free SW); `core/tokens.css` THE design tokens (DOM +

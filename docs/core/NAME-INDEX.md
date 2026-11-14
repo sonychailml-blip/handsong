@@ -419,6 +419,11 @@ DESIGN-1 part B: THE ROOM'S TINT ON THE INTERFACE — the current room's record 
 - const (1): `tintNow`
 - fn (1): `tintApply`
 
+## apps/night/update.js
+NIGHT-14 — «A NEW VERSION IS READY».
+- const (1): `updateDbg`
+- fn (1): `updateWire`
+
 ## apps/night/worklets/bed-worklet.js
 NIGHT-4: THE MUSIC BED v2 — one AudioWorklet processor «night-bed» holding every voice of the bed and its own reverb (design: docs/night/design/NIGHT-3-rooms/PLAN.md §4b; the law apps/night/pure/be…
 - exports: none
@@ -551,7 +556,7 @@ CORE-1: the live calibration service, thin over core/pure/handcal.js: the record
 
 ## core/handdet.js
 LAT2 — the hand DETECTOR: MediaPipe's hand model, worker-safe (no DOM — it runs inside core/hand-worker.js and, as the fallback, on the main thread through vision.js).
-- const (3): `MP_WASM`, `MP_MODEL`, `EMPTY_RESULT`
+- const (6): `MP_VER`, `MP_WASM`, `MP_MODEL`, `MP_SOURCES`, `mpFilesOf`, `EMPTY_RESULT`
 - fn (2): `plainResult`, `createDetector`
 
 ## core/hooks.js
@@ -1018,7 +1023,7 @@ Vercel Web Analytics queue stub — a classic script, not a module: calls made b
 
 ## core/vision.js
 (no head comment)
-- const (12): `video`, `canvas`, `ctx`, `camLabel`, `modelInfo`, `visionOpts`, `VISION_DEF`, `lowInfo`, `pathInfo`, `pumpStats`, `camStats`, `setCameraPick`
+- const (13): `video`, `canvas`, `ctx`, `handFilesOf`, `camLabel`, `modelInfo`, `visionOpts`, `VISION_DEF`, `lowInfo`, `pathInfo`, `pumpStats`, `camStats`, `setCameraPick`
 - fn (25): `initVision`, `initDetector`, `startCamera`, `switchCamera`, `setHandsSink`, `pollFrame`, `camInfo`, `setHandsTracked`, `setModelDelegate`, `setCamFps`, `setDetectPath`, `setLowLight`, `pumpDbg`, `pumpStepDbg`, `detRunDbg`, `lowDbg`, `camSimDbg`, `camOpenDbg`, `camStatsDbg`, `cameraSwitch`, `cameraList`, `cameraPickInfo`, `cameraWatch`, `cameraWatchRetry`, `cameraWatchDbg`
 
 ## tools/probes/core/calpanel.js
@@ -1350,7 +1355,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 - const (5): `TEST_ROOM_ID`, `TEST_ROOM`, `testRoomMode`, `testRoomInfo`, `testRoomFreeLeaks`
 - fn (2): `testRoomInstall`, `testRoomRemove`
 
-_267 modules, 2776 exported names._
+_268 modules, 2782 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

@@ -3,11 +3,11 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
-<!-- PRIV1 (hard rule #33): the browser itself refuses any address not listed here. connect-src/script-src name only our own origin and
-     the pinned MediaPipe files (register tools/licences.json); the Vercel counter is same-origin. No inline script (the counter's stub is
+<!-- PRIV1 (hard rule #33): the browser itself refuses any address not listed here. connect-src/script-src name only our own origin (CORE-22:
+     MediaPipe's pinned files are served from it too, core/vendor/mediapipe/; register tools/licences.json); the Vercel counter is same-origin. No inline script (the counter's stub is
      core/va-stub.js); 'wasm-unsafe-eval' lets the hand model's WebAssembly compile; inline style attributes stay allowed. A new host needs
      the user's decision, a register entry and a line here. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net/npm/@mediapipe/ 'wasm-unsafe-eval'; connect-src 'self' https://cdn.jsdelivr.net/npm/@mediapipe/ https://storage.googleapis.com/mediapipe-models/; img-src 'self' data: blob:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/>
 <!-- CORE-11: this app's own names in the shared stores (core/storens.js): on one origin with Full it never reads Full's settings or songs -->
 <meta name="handsong-store" content="night">

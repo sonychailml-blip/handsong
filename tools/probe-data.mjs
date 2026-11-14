@@ -1627,25 +1627,108 @@ async function nightScalesLoad(){
     notes.push('CONTROLS: an unloaded room mode caught; a room mode loaded once named; a missing mode caught; a profile mood loaded'); }
   return { cases:n, total:d.length, differences:d, notes };
 }
-/* CORE-20: MEDIAPIPE'S BINARY EARLY, NEVER AGAINST THE PAGE'S OWN FILES — apps/night/early.js names the very files core/handdet.js loads (its MP_WASM
-   folder under the library it imports: the SIMD loader and binary MediaPipe picks); it waits for the load event and for Begin to work before it
-   preloads, never preloads the model (the early model build already asks for it), skips Save-Data and the old-start / old-load CONTROLS, and the
-   page loads it right after the guard, before any module. CONTROL: an address one character off is caught. */
+/* CORE-20: MEDIAPIPE'S BINARY EARLY, NEVER AGAINST THE PAGE'S OWN FILES — apps/night/early.js names the very files core/handdet.js loads (CORE-22:
+   its own copy, MP_SOURCES.own — the wasm folder resolved from each file's own address: the SIMD loader and binary MediaPipe picks); it names no other
+   host, waits for the load event and for Begin to work before it preloads, never preloads the model (the early model build already asks for it), skips
+   Save-Data and the old-start / old-load CONTROLS, and the page loads it right after the guard, before any module. CONTROL: an address one character
+   off is caught. */
 async function nightEarlyModel(){
   const d=[], notes=[]; let n=0; const miss=s=>d.push(s), rd=f=>readFile(new URL(f, import.meta.url), 'utf8');
   const H=await rd('../core/handdet.js'), E=await rd('../apps/night/early.js'), page=await rd('../apps/night/index.html');
   const code=E.replace(/\/\*[\s\S]*?\*\//g, ' ');
   const c=(src, re)=>{ const m=re.exec(src); return m ? m[1] : null; };
-  const lib=c(H, /from\s+"(https:\/\/cdn\.jsdelivr\.net\/npm\/@mediapipe\/tasks-vision@[\d.]+)"/), wasm=c(H, /MP_WASM="([^"]+)"/), eMP=c(E, /MP='([^']+)'/);
-  const judge=mp=>{ const b=[]; if(mp!==lib) b.push(`library ${mp} ≠ ${lib}`); if(mp+'/wasm'!==wasm) b.push(`wasm folder ${mp}/wasm ≠ ${wasm}`); return b; };
+  const base=new URL('../', import.meta.url), relOf=(spec, from)=>spec==null ? null : new URL(spec, new URL(from, base)).href.slice(base.href.length);
+  const wasm=relOf(c(H, /own:[\s\S]*?wasm:new URL\('([^']+)'/), 'core/handdet.js'), eMP=relOf(c(code, /MP=new URL\('([^']+)'/), 'apps/night/early.js');
+  const judge=mp=>{ const b=[]; if(!wasm) b.push('core/handdet.js names no own wasm folder'); else if(mp+'/wasm'!==wasm) b.push(`wasm folder ${mp}/wasm ≠ ${wasm}`); return b; };
   n++; const bad=judge(eMP); if(bad.length) miss('early.js names other files than core/handdet.js: '+bad.join('; '));
   n++; if(!judge(eMP+'x').length) miss('CONTROL: an address one character off passed');
+  n++; if(/https?:\/\//.test(code)) miss('early.js names another host (CORE-22: our own origin only)');
   n++; if(!/vision_wasm_internal\.wasm/.test(code) || !/vision_wasm_internal\.js/.test(code)) miss('early.js does not name the SIMD loader and binary');
   n++; if(/hand_landmarker|mediapipe-models|modulepreload/.test(code)) miss('early.js preloads the model or the library (the early model build asks for them already: a later preload downloads twice)');
   n++; if(!/addEventListener\('load'/.test(code) || !/__nightBoot/.test(code) || !/requestIdleCallback/.test(code)) miss('early.js does not wait for the load event, Begin working and an idle moment');
   n++; if(!/saveData/.test(code) || !/oldstart/.test(code) || !/oldload/.test(code)) miss('early.js does not skip Save-Data or the old-start / old-load CONTROLS');
   n++; { const iG=page.indexOf('src="guard.js"'), iE=page.indexOf('src="early.js"'), iM=page.indexOf('type="module"'); if(!(iG>0 && iE>iG && (iM<0 || iE<iM))) miss('the page does not load early.js right after the guard, before the modules'); }
-  notes.push(`early files: ${wasm}/vision_wasm_internal.{js,wasm}, after the load event and Begin working`);
+  notes.push(`early files: ${wasm}/vision_wasm_internal.{js,wasm} (our own origin), after the load event and Begin working`);
+  return { cases:n, total:d.length, differences:d, notes };
+}
+/* CORE-22 — «MEDIAPIPE FROM OUR ORIGIN (core)»: (1) core/handdet.js's own copy (MP_SOURCES.own: the library, the wasm folder, the model, under
+   core/vendor/mediapipe/<MP_VER>/) exists, and every vendored file equals the SHA-256 its README.md pins (the bytes the apps loaded from the CDN);
+   (2) the default stays the CDN (an app that does not opt in: core rule 4) and both app entries opt in (handFiles 'own'), as do the probes that build a
+   detector themselves; (3) both pages' CSP name no host at all — script-src 'self' 'wasm-unsafe-eval', connect-src 'self' — so the browser refuses
+   MediaPipe's old hosts (the runner's CSP row proves the refusal live); (4) the register lists every vendored file as shipped. CONTROLS: a hash one
+   character off, and a CSP that still names a host, are caught. */
+async function coreMpOwn(){
+  const d=[], notes=[]; let n=0; const miss=s=>d.push(s), fs=await import('node:fs'), { createHash }=await import('node:crypto');
+  const rd=f=>readFile(new URL('../'+f, import.meta.url), 'utf8'), H=await rd('core/handdet.js');
+  const ver=(/export const MP_VER='([^']+)'/.exec(H)||[])[1], dir=`core/vendor/mediapipe/${ver}/`;
+  n++; if(!ver) miss('core/handdet.js has no MP_VER');
+  const own=[...((/own:Object\.freeze\(\{([\s\S]*?)\}\)\s*\}\)/.exec(H)||[])[1]||'').matchAll(/new URL\('\.\/([^']+)'/g)].map(m=>'core/'+m[1]);
+  n++; if(own.length!==3 || own.some(p=>!p.startsWith(dir))) miss('MP_SOURCES.own is not three addresses under '+dir+': '+JSON.stringify(own));
+  for(const p of own){ n++; if(!fs.existsSync(new URL('../'+p, import.meta.url))) miss('missing: '+p); }
+  const readme=await rd(dir+'README.md').catch(()=>''), pins=[...readme.matchAll(/^\| `([^`]+)` \|[^|]*\| (\d+) \| `([0-9a-f]{64})` \|$/gm)].map(m=>({ f:m[1], bytes:+m[2], sha:m[3] }));
+  n++; if(pins.length<7) miss(`${dir}README.md pins ${pins.length} files (7 expected)`);
+  const shaOf=p=>createHash('sha256').update(fs.readFileSync(new URL('../'+p, import.meta.url))).digest('hex');
+  const judge=list=>list.filter(x=>{ try{ return shaOf(dir+x.f)!==x.sha; }catch(e){ return true; } }).map(x=>x.f);
+  n++; { const bad=judge(pins); if(bad.length) miss('vendored files differ from their pinned hash: '+bad.join(', ')); }
+  n++; if(pins.length && !judge([{ ...pins[0], sha:(pins[0].sha[0]==='0'?'1':'0')+pins[0].sha.slice(1) }]).length) miss('CONTROL: a hash one character off passed');
+  const onDisk=fs.readdirSync(new URL('../'+dir, import.meta.url), { recursive:true, withFileTypes:true }).filter(e=>e.isFile()).map(e=>(e.parentPath||e.path).replace(/\\/g,'/').replace(/^.*\/mediapipe\/[^/]+\/?/, '')+'/'+e.name).map(x=>x.replace(/^\//,''));
+  n++; { const extra=onDisk.filter(x=>x!=='README.md' && !pins.some(p=>p.f===x)); if(extra.length) miss('vendored files without a pinned hash: '+extra.join(', ')); }
+  n++; if(!/files:src='cdn'/.test(H) || !/MP_SOURCES\[src==='own' \? 'own' : 'cdn'\]/.test(H)) miss('core/handdet.js: the default is no longer the CDN (core rule 4)');
+  for(const [f, re] of [['apps/full/main.js', /handFiles:'own'/], ['apps/night/main.js', /handFiles:'own'/], ['tools/probes/core/handstats.js', /files:'own'/], ['tools/probes/core/detect.js', /handFilesOf\(\)==='own'/]]){ n++; if(!re.test(await rd(f))) miss(f+' does not opt in to our own copy'); }
+  const cspOf=h=>(/<meta http-equiv="Content-Security-Policy" content="([^"]*)"/.exec(h)||[])[1]||'';
+  const cspBad=c=>{ const b=[]; if(!c) b.push('no policy'); if(/https?:/.test(c)) b.push('names a host'); if(!/script-src 'self' 'wasm-unsafe-eval';/.test(c)) b.push('script-src is not «self + wasm»'); if(!/connect-src 'self';/.test(c)) b.push('connect-src is not «self»'); return b; };
+  for(const f of ['apps/full/index.html','apps/night/index.html','tools/probes/core/handstats.html']){ n++; const b=cspBad(cspOf(await rd(f))); if(b.length) miss(`${f}: the CSP ${b.join(', ')}`); }
+  n++; if(!cspBad(cspOf(await rd('apps/night/index.html')).replace("connect-src 'self';", "connect-src 'self' https://storage.googleapis.com/mediapipe-models/;")).length) miss('CONTROL: a CSP naming the old model host passed');
+  const reg=JSON.parse(await rd('tools/licences.json')), listed=new Set(reg.items.filter(i=>/^mediapipe-/.test(i.id) && i.use==='shipped').flatMap(i=>i.files||[]));
+  n++; { const un=onDisk.map(x=>dir+x).filter(x=>!listed.has(x)); if(un.length) miss('vendored files not in the register as shipped: '+un.join(', ')); }
+  notes.push(`MediaPipe ${ver}: ${pins.length} files pinned (${(pins.reduce((s,p)=>s+p.bytes,0)/1048576).toFixed(1)} MB) and matching; both pages' CSP name only 'self'; default CDN, both apps opt in`);
+  return { cases:n, total:d.length, differences:d, notes };
+}
+/* NIGHT-14 — «NIGHT precache list (app)»: (1) tools/precache.mjs on a made-up built tree: a tool, a development room, sw.js, a doc and a licence text
+   are never listed; MediaPipe's binaries carry their group (simd / nosimd); the list round-trips through sw.js; one changed byte changes the version;
+   a tree whose sw.js lost its PRECACHE line fails (CONTROL). (2) The skip list against the forest's own tables: no file a level fetches (FOREST_TEX's set
+   for the level, minus the floor it does not draw — FOREST_LEVELS groundScan) is skipped, and every skipped file is one no level fetches (CONTROL: a skip
+   catching a level's file is caught). (3) The repository's sw.js caches nothing (PRECACHE null, the fetch handler returns at once); the build writes the
+   list for Night only and takes the rain room out of the players' edition through the door's exact import() (rooms/dev.js holds it once). */
+async function nightPrecacheList(){
+  const d=[], notes=[]; let n=0; const miss=s=>d.push(s), fs=await import('node:fs'), os=await import('node:os'), path=await import('node:path');
+  const PC=await import(new URL('./precache.mjs', import.meta.url).href), rd=f=>readFile(new URL('../'+f, import.meta.url), 'utf8');
+  const sw=await rd('apps/night/sw.js');
+  /* (1) a made-up tree */
+  const T=fs.mkdtempSync(path.join(os.tmpdir(), 'handsong-pc-')), put=(p, t)=>{ fs.mkdirSync(path.dirname(path.join(T,p)), { recursive:true }); fs.writeFileSync(path.join(T,p), t); };
+  try{
+    for(const p of ['index.html','manifest.json','icons/i.png','core/a.js','core/data/m.json','core/vendor/mediapipe/9/vision_bundle.mjs','core/vendor/mediapipe/9/wasm/vision_wasm_internal.wasm','core/vendor/mediapipe/9/wasm/vision_wasm_nosimd_internal.wasm',
+      'core/vendor/mediapipe/9/LICENSE','core/vendor/mediapipe/9/README.md','tools/probes/x.js','apps/night/rooms/rain/r.js','apps/night/rooms/forest/tex/ground-1024.png','apps/night/rooms/forest/tex/groundm-1024.png','THIRD-PARTY-LICENSES.md']) put(p, p);
+    put('sw.js', sw);
+    const L=PC.precachePaths(T, ['core/a.js','tools/probes/x.js','apps/night/rooms/rain/r.js','sw.js','apps/night/rooms/forest/tex/ground-1024.png','apps/night/rooms/forest/tex/groundm-1024.png','core/missing.js'], PC.NIGHT_SKIP);
+    const want=['core/a.js','core/data/m.json','core/vendor/mediapipe/9/vision_bundle.mjs','core/vendor/mediapipe/9/wasm/vision_wasm_internal.wasm','core/vendor/mediapipe/9/wasm/vision_wasm_nosimd_internal.wasm','apps/night/rooms/forest/tex/groundm-1024.png','icons/i.png','index.html','manifest.json'].sort();
+    n++; if(JSON.stringify(L)!==JSON.stringify(want)) miss('the list of a made-up tree: '+JSON.stringify(L)+' (expected '+JSON.stringify(want)+')');
+    const r1=PC.writePrecache(T, L), P1=PC.readPrecache(T);
+    n++; if(!P1 || P1.version!==r1.version || P1.files.length!==L.length) miss('the list does not round-trip through sw.js');
+    n++; { const g=Object.fromEntries(P1.files.map(f=>[f[0], f[3]])); if(g['core/vendor/mediapipe/9/wasm/vision_wasm_internal.wasm']!=='simd' || g['core/vendor/mediapipe/9/wasm/vision_wasm_nosimd_internal.wasm']!=='nosimd' || g['core/a.js']!=='') miss('MediaPipe\'s groups are wrong: '+JSON.stringify(g)); }
+    fs.appendFileSync(path.join(T,'core/a.js'), ' '); const r2=PC.rehashPrecache(T);
+    n++; if(r2.version===r1.version) miss('one changed byte did not change the version');
+    n++; if((fs.readFileSync(path.join(T,'sw.js'),'utf8').match(/^const PRECACHE=/gm)||[]).length!==1) miss('a re-hash left more than one PRECACHE line');
+    fs.writeFileSync(path.join(T,'sw.js'), sw.replace('const PRECACHE=null;', 'const LIST=null;'));
+    n++; let threw=false; try{ PC.writePrecache(T, L); }catch(e){ threw=true; } if(!threw) miss('CONTROL: a sw.js without its PRECACHE line was filled anyway'); else notes.push('CONTROL: a sw.js without its PRECACHE line fails the build');
+  } finally { fs.rmSync(T, { recursive:true, force:true }); }
+  /* (2) the skip list against the forest's tables */
+  const F=await rd('apps/night/rooms/forest/forest.js'), R=(await import(new URL('../apps/night/rooms/forest/pure/room.js', import.meta.url).href)).FOREST_ROOM;
+  const texOf=Object.fromEntries([...F.matchAll(/'([\w-]+)':new URL\('\.\/((?:tex|scan)\/[^']+)'/g)].map(m=>[m[1], 'apps/night/rooms/forest/'+m[2]]));
+  const setsSrc=(/export const FOREST_TEX=Object\.freeze\(\{([\s\S]*?)\}\) \}\);/.exec(F)||[])[0]||'', sets={};
+  for(const m of setsSrc.matchAll(/(\w+):Object\.freeze\(\{([^}]*)\}/g)) sets[m[1]]=Object.fromEntries([...m[2].matchAll(/(\w+):'([\w-]+)'/g)].map(x=>[x[1], x[2]]));
+  const keys=re=>{ const m=re.exec(F); return m ? [...m[1].matchAll(/'(\w+)'/g)].map(x=>x[1]) : null; }, SCAN=keys(/const SCAN_KEYS=\[([^\]]*)\]/), BAKED=keys(/BAKED_KEYS=\[([^\]]*)\]/);
+  n++; if(Object.keys(texOf).length<10 || !sets.full || !sets.reduced || !SCAN || !BAKED) miss('the forest\'s tables could not be read (FOREST_TEX, TEX, SCAN_KEYS, BAKED_KEYS)');
+  const fetched=new Set(); for(const [lv, L] of Object.entries(R.levels)){ const set=sets[lv]; if(!set) continue; const skip=L.groundScan ? BAKED : SCAN; for(const [k, name] of Object.entries(set)) if(!skip.includes(k)) fetched.add(texOf[name]); }
+  const judge=skip=>{ const b=[]; for(const p of fetched) if(skip.some(r=>r.test(p))) b.push('skips a file a level fetches: '+p); for(const p of Object.values(texOf)) if(skip.some(r=>r.test(p)) && fetched.has(p)) b.push(p); return [...new Set(b)]; };
+  n++; { const b=judge(PC.NIGHT_SKIP); if(b.length) miss(b.join('; ')); }
+  n++; { const skipped=Object.values(texOf).filter(p=>PC.NIGHT_SKIP.some(r=>r.test(p))); if(!skipped.length) miss('the skip list skips nothing of the forest (stale?)'); else notes.push(`skipped (no level fetches them): ${skipped.map(p=>p.split('/').pop()).join(', ')}`); }
+  n++; if(!judge([...PC.NIGHT_SKIP, /groundm-1024\.png$/]).length) miss('CONTROL: a skip catching a level\'s file passed'); else notes.push('CONTROL: a skip catching a level\'s file is caught');
+  /* (3) the repository's worker and the build */
+  n++; if((sw.match(/^const PRECACHE=null;/gm)||[]).length!==1 || !/if\(!PRECACHE\) return;/.test(sw)) miss('the repository\'s sw.js is not the no-cache worker (PRECACHE null, fetch passed on)');
+  const B=await rd('tools/build.mjs'), door=(/const DEV_DOOR="([^"]+)"/.exec(B)||[])[1], dev=await rd('apps/night/rooms/dev.js');
+  n++; if(!/if\(app==='night'\) pc=writePrecache\(OUT, precachePaths\(OUT, seen, NIGHT_SKIP\)\)/.test(B)) miss('the build does not write Night\'s list (and only Night\'s)');
+  n++; if(!door || dev.split(door).length!==2 || !/if\(RELEASE && app==='night'\)\{ rmSync\(path\.join\(OUT,'apps\/night\/rooms\/rain'\)/.test(B)) miss('the build cannot take the rain room out of the players\' edition (its folder, or the door\'s exact import())');
   return { cases:n, total:d.length, differences:d, notes };
 }
 /* DESIGN-1 part B — «NIGHT room tint (app)»: every real room names a tint token whose colour (night.css --cv-<token>) is light enough for the
@@ -2330,6 +2413,8 @@ const ROWS=[
   ['NIGHT full-screen icons (app)', ()=>nightFsIcons(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-8b
   ['NIGHT scales loaded (app)', ()=>nightScalesLoad(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // CORE-20
   ['NIGHT early model files (app)', ()=>nightEarlyModel(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // CORE-20
+  ['CORE-22 MediaPipe from our origin (core)', ()=>coreMpOwn(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // CORE-22
+  ['NIGHT precache list (app)', ()=>nightPrecacheList(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-14
   ['FOREST relief (app)',       ()=>forestRelief(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-9
   ['FOREST water flow (app)',   ()=>forestWaterFlow(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-9
   ['NIGHT camera names (app)',  ()=>nightCameraNames(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-10

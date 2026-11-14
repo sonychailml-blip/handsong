@@ -4,7 +4,7 @@
 import { t, onLangChange } from '../../core/i18n.js';
 
 const $=id=>document.getElementById(id);
-export const NOTICE_PRI=Object.freeze({ audio:0, camera:1, info:2 });
+export const NOTICE_PRI=Object.freeze({ audio:0, camera:1, info:2, update:3 });   // NIGHT-14: a new version — the quietest
 const live=new Map();   // id → { key, params, tap }
 let shown=null;
 function render(){

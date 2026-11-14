@@ -35,7 +35,7 @@ const VP_LAPTOP={ '390x844':{ width:1280, height:800 }, '844x390':{ width:1024, 
 const GROUND=val('--ground');   // NIGHT-9: 'baked' | 'scan' — which bare floor the forest draws (the user's comparison; forest.js forestGroundDbg, set before the room opens)
 const out=s=>console.log(s);
 const MIME={ '.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.json':'application/json; charset=utf-8', '.css':'text/css; charset=utf-8',
-  '.png':'image/png', '.svg':'image/svg+xml', '.webmanifest':'application/manifest+json', '.mp3':'audio/mpeg' };
+  '.png':'image/png', '.svg':'image/svg+xml', '.webmanifest':'application/manifest+json', '.mp3':'audio/mpeg', '.wasm':'application/wasm' };   // CORE-22
 const SERVE=val('--root') ? path.resolve(val('--root')) : ROOT;   // DESIGN-1: serve a frozen copy of the tree (a second capture of unchanged code while the tree is edited)
 function serve(){
   const srv=http.createServer(async (q,r)=>{ try{ const u=new URL(q.url,'http://x'); let p=decodeURIComponent(u.pathname); if(p.endsWith('/')) p+='index.html';

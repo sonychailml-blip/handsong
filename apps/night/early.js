@@ -6,9 +6,10 @@
    request modes (the binary by fetch, CORS without credentials; the loader as an anonymous script) and gets the preloaded copies. Low priority. Not
    with Save-Data (the model then waits for the tap, as before); not under ?probe&oldstart or ?probe&oldload (the CONTROLS of the start timeline and
    of the loading measurement). The no-SIMD build is left to the library (MediaPipe's own SIMD test decides; preloading the wrong one would cost
-   11 MB). The addresses are core/handdet.js's: data row «NIGHT early model files (app)» compares them. */
+   11 MB). The addresses are core/handdet.js's: data row «NIGHT early model files (app)» compares them. CORE-22: from our own origin (same-origin preloads). */
 (function(){
-  var MP='https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35';
+  /* CORE-22: our own copy (core/handdet.js MP_SOURCES.own), resolved from this script's address: the same files in the repository and in a build */
+  var MP=new URL('../../core/vendor/mediapipe/0.10.35', document.currentScript && document.currentScript.src || location.href).href;
   var q=location.search, probe=/[?&]probe\b/.test(q);
   try{ var c=navigator.connection; if(c && c.saveData) return; }catch(e){}
   if(probe && /[?&](oldstart|oldload)\b/.test(q)) return;

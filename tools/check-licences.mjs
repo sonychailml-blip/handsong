@@ -6,7 +6,7 @@
    CC0, CC-BY 4.0, OFL, own work, AI-generated with its tool; a service needs the user's recorded decision; GPL/AGPL/LGPL/MPL/SA/NC/ND
    refused); (2) every external URL in the shipped files (comments ignored) and every root-absolute or missing local reference in
    index.html/manifest.json belongs to an entry, and every entry's URLs are still used; the CSP host sources each cover a register entry; (3) every non-code file (images, fonts,
-   sounds, models, .wasm…) and everything under apps/night/vendor/ belongs to an entry; (4) every package in tools/package-lock.json has an entry
+   sounds, models, .wasm…) and everything under a vendor/ folder (core/, apps/full/, apps/night/) belongs to an entry; (4) every package in tools/package-lock.json has an entry
    with the same version and licence; (5) the icon/glyph audit: every Unicode symbol or emoji used outside comments is listed, and
    every listed one is still used; (6) THIRD-PARTY-LICENSES.md equals the generated text. CONTROLS (must fail): an unlisted URL, an unlisted CSP host, a GPL
    licence, an unlisted glyph, an unlisted image file, a package version bump, a reference-only address in a shipped file. Reference prototypes
@@ -107,7 +107,7 @@ export function check(inp){
   for(const it of items) if((it.urls||[]).length && !urlUsed.get(it.id)) diff.push(`entry ${it.id}: none of its addresses is used any more — remove the entry`);
   // (3) files that are not our code, data or docs
   const fileOwner=f=>items.find(it=>(it.files||[]).includes(f));
-  for(const f of files){ if(!(f.startsWith('apps/night/vendor/')||!OWN_EXT.has(extname(f).toLowerCase()))) continue; cases++;
+  for(const f of files){ if(!(/^(core|apps\/(full|night))\/vendor\//.test(f)||!OWN_EXT.has(extname(f).toLowerCase()))) continue; cases++;   // CORE-22: core/vendor/ too (MediaPipe's files)
     if(!fileOwner(f)) diff.push(`${f}: a file that is not our code — not in the register (${REG_FILE})`); }
   // (4) packages of the developer tools
   for(const [key,p] of Object.entries(lock.packages||{})){ if(!key) continue; cases++;

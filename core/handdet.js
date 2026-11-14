@@ -5,11 +5,19 @@
    Measured (headless, LAT2a): L2 on one hand 87 ms (it palm-searches every frame), L1 45 ms; switching numHands by setOptions ≈ 1 s per
    switch (graph rebuild, tracking lost) — hence two models. The FIRST detection of a model stalls ≈ 1.3–1.6 s (shaders): `warm` runs
    it on a blank frame before the app shows (the 1188-ms startup task of LAT1b was this first detection). */
-import { HandLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35";
 import { schedRetry } from './pure/handsched.js';
 
+/* CORE-22 (opt-in): where MediaPipe's files come from. 'cdn' (the default: jsDelivr + Google storage, exactly as before) or 'own' — the very
+   same files (byte for byte, core/vendor/mediapipe/<MP_VER>/README.md) from our own origin, so a page's CSP can name only 'self'. The library
+   is a dynamic import of the chosen address (it was a static import of the CDN's: a static import cannot choose). */
+export const MP_VER='0.10.35';
 export const MP_WASM="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm";
 export const MP_MODEL="https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
+export const MP_SOURCES=Object.freeze({
+  cdn:Object.freeze({ lib:"https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35", wasm:MP_WASM, model:MP_MODEL }),
+  own:Object.freeze({ lib:new URL('./vendor/mediapipe/0.10.35/vision_bundle.mjs', import.meta.url).href, wasm:new URL('./vendor/mediapipe/0.10.35/wasm', import.meta.url).href,
+    model:new URL('./vendor/mediapipe/0.10.35/hand_landmarker.task', import.meta.url).href }) });
+export const mpFilesOf=src=>MP_SOURCES[src==='own' ? 'own' : 'cdn'];
 
 /* plain copy of a result: landmarks [[{x,y,z}]] and handednesses [[{categoryName, score, index, displayName}]] */
 export function plainResult(r){
@@ -24,12 +32,12 @@ export const EMPTY_RESULT=Object.freeze({ landmarks:[], handednesses:[] });
    loader with a script tag or importScripts; in a module worker the second model could not start). */
 /* CORE-18 (opt-in; NIGHT-11 part 2, audit W9): the model file with its progress (progress(frac 0…1, or NaN without a known size, bytes)) and a stall
    timeout — no byte for stallMs fails it (an Error with modelKind 'stall' | 'net', for the app's words and «Try again») */
-async function modelFetch(progress, stallMs, fresh=false){
+async function modelFetch(url, progress, stallMs, fresh=false){
   const ac=typeof AbortController!=='undefined' ? new AbortController() : null; let tm=0;
   const arm=()=>{ clearTimeout(tm); if(ac && stallMs>0) tm=setTimeout(()=>ac.abort(), stallMs); };
   arm();
   try{
-    const r=await fetch(MP_MODEL, { ...(ac ? { signal:ac.signal } : {}), ...(fresh ? { cache:'reload' } : {}) }); if(!r.ok) throw new Error('the hand model answered '+r.status);   // CORE-20: a retry never takes a failed preloaded copy
+    const r=await fetch(url, { ...(ac ? { signal:ac.signal } : {}), ...(fresh ? { cache:'reload' } : {}) }); if(!r.ok) throw new Error('the hand model answered '+r.status);   // CORE-20: a retry never takes a failed preloaded copy
     const total=+(r.headers.get('content-length')||0);
     if(!r.body || !r.body.getReader){ const b=new Uint8Array(await r.arrayBuffer()); progress(1, b.length); return b; }
     const rd=r.body.getReader(), parts=[]; let got=0;
@@ -41,12 +49,13 @@ async function modelFetch(progress, stallMs, fresh=false){
   } finally { clearTimeout(tm); }
 }
 /* CORE-20 (opt-in): fresh — a RETRY after a failed start: the model with cache 'reload' and MediaPipe's loader and binary with «?retry», so nothing
-   preloaded by the page that failed is taken again (absent: exactly as before) */
-export async function createDetector({ delegate='GPU', blank=null, step=null, progress=null, stallMs=0, fresh=false }={}){
-  const files=await FilesetResolver.forVisionTasks(MP_WASM);
+   preloaded by the page that failed is taken again (absent: exactly as before). CORE-22 (opt-in): files 'own' — MediaPipe from our origin (mpFilesOf) */
+export async function createDetector({ delegate='GPU', blank=null, step=null, progress=null, stallMs=0, fresh=false, files:src='cdn' }={}){
+  const at=mpFilesOf(src), { HandLandmarker, FilesetResolver }=await import(at.lib);
+  const files=await FilesetResolver.forVisionTasks(at.wasm);
   if(fresh){ files.wasmLoaderPath+='?retry'; files.wasmBinaryPath+='?retry'; }
   if(step) await step('model');
-  const buf= progress ? await modelFetch(progress, stallMs, fresh) : new Uint8Array(await (await fetch(MP_MODEL, fresh ? { cache:'reload' } : undefined)).arrayBuffer());   // the model file once, for both models (CORE-18: with its progress when asked)
+  const buf= progress ? await modelFetch(at.model, progress, stallMs, fresh) : new Uint8Array(await (await fetch(at.model, fresh ? { cache:'reload' } : undefined)).arrayBuffer());   // the model file once, for both models (CORE-18: with its progress when asked)
   const mk=n=>HandLandmarker.createFromOptions(files,{ baseOptions:{ modelAssetBuffer:buf.slice(), delegate },
     runningMode:'VIDEO', numHands:n, minHandDetectionConfidence:0.5, minTrackingConfidence:0.5 });
   const L2=await mk(2), L1=await mk(1);

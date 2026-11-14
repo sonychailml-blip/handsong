@@ -20,8 +20,9 @@
    UI checks with trusted input after the seed (section rename by double click / double tap / §✎, with its control; a bend point dragged
    with the mouse); --no-ui skips them.
    PRIV1: every Content-Security-Policy violation of the session fails the run; CONTROL — a fetch to https://example.com must be refused
-   by connect-src (every session). LAT2: every request of the session — the page's and its workers' (a worker has no page CSP of its own)
-   — must go to the own origin or the MediaPipe paths of the register; anything else fails the run.
+   by connect-src (every session); CORE-22 CONTROL — MediaPipe's old hosts (the model by fetch, the library by import) must be refused too.
+   LAT2: every request of the session — the page's and its workers' (a worker has no page CSP of its own) — must go to the own origin
+   (CORE-22: MediaPipe's files included); anything else fails the run.
    CORE-11: the storage census — every localStorage key and IndexedDB name the page touches; Night only its own names and two device facts,
    Full its names as before (each with a control); anything else fails the run.
    ⛳ УСТРОЙСТВО (почему так):
@@ -36,6 +37,7 @@
    ⚠️ Нужен интернет: MediaPipe грузится с CDN (как у приложения). */
 import http from 'node:http';
 import { readFile, mkdir, writeFile, appendFile, readdir, rm } from 'node:fs/promises';
+import { readFileSync, existsSync } from 'node:fs';   // CORE-22 / NIGHT-14: vercel.json's rules and the measured tree's sw.js, read once
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -174,7 +176,10 @@ process.on('unhandledRejection', e=>bail(1,'unhandled rejection: '+(e&&e.stack||
 
 /* ---------- статический сервер ---------- */
 const MIME={ '.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.mjs':'text/javascript; charset=utf-8', '.json':'application/json; charset=utf-8',
-  '.css':'text/css; charset=utf-8', '.png':'image/png', '.svg':'image/svg+xml', '.ico':'image/x-icon', '.webmanifest':'application/manifest+json', '.md':'text/plain; charset=utf-8', '.mp3':'audio/mpeg' };
+  '.css':'text/css; charset=utf-8', '.png':'image/png', '.svg':'image/svg+xml', '.ico':'image/x-icon', '.webmanifest':'application/manifest+json', '.md':'text/plain; charset=utf-8', '.mp3':'audio/mpeg', '.wasm':'application/wasm' };   // CORE-22: MediaPipe's binary from our origin
+/* CORE-22: --measure-start answers with vercel.json's Cache-Control rules (source «/a/:path*» → a prefix), so the measured tree is cached as on Vercel */
+const VERCEL_RULES=(()=>{ try{ return (JSON.parse(readFileSync(path.join(ROOT,'vercel.json'),'utf8')).headers||[]).map(h=>({ re:new RegExp('^'+h.source.replace(/[.+?^${}()|[\]\\]/g,'\\$&').replace(/:path\*/g,'.*')+'$'), cc:(h.headers.find(x=>/^cache-control$/i.test(x.key))||{}).value })).filter(h=>h.cc); }catch(e){ return []; } })();
+const VERCEL_CC=p=>{ const h=VERCEL_RULES.find(x=>x.re.test(p)); return h ? h.cc : null; };
 function serve(){
   const srv=http.createServer(async (q,r)=>{
     try{
@@ -184,8 +189,9 @@ function serve(){
       /* the measured page: its probes tag out (only what a visitor loads is counted); &nomp also takes out the build's modulepreload links (no routes: they turn the HTTP cache off) */
       if(MEASURE && /\/index\.html$/.test(p) && !p.startsWith('/tools/')){ let h=b.toString('utf8').replace(/<link rel="handsong-probes"[^>]*>\r?\n?/, ''); if(u.searchParams.has('nomp')) h=h.replace(/<link rel="modulepreload"[^>]*>\r?\n?/g, ''); b=Buffer.from(h, 'utf8'); }
       if(MEASURE){ const tag='"'+createHash('sha1').update(b).digest('hex').slice(0,16)+'"';   // CORE-20 --measure-start: revalidated like a static host (Vercel: max-age=0, must-revalidate, ETag)
-        if(q.headers['if-none-match']===tag){ r.writeHead(304,{ etag:tag, 'cache-control':'public, max-age=0, must-revalidate' }); r.end(); return; }
-        r.writeHead(200,{ 'content-type':MIME[path.extname(f).toLowerCase()]||'application/octet-stream', 'cache-control':'public, max-age=0, must-revalidate', etag:tag }); r.end(b); return; }
+        const cc=VERCEL_CC(p)||'public, max-age=0, must-revalidate';   // CORE-22: vercel.json's own header rules (the year-long immutable MediaPipe files)
+        if(q.headers['if-none-match']===tag){ r.writeHead(304,{ etag:tag, 'cache-control':cc }); r.end(); return; }
+        r.writeHead(200,{ 'content-type':MIME[path.extname(f).toLowerCase()]||'application/octet-stream', 'cache-control':cc, etag:tag }); r.end(b); return; }
       r.writeHead(200,{ 'content-type':MIME[path.extname(f).toLowerCase()]||'application/octet-stream', 'cache-control':'no-store' }); r.end(b);
     }catch(e){ r.writeHead(404); r.end(); }
   });
@@ -664,7 +670,7 @@ async function uiNightCamera(page, label){
    (E) the hand model's progress on the start card (a percent), no failure message after a good start; (F) the model held back with a 2.5-s stall
        limit: «did not finish loading» and Try again; released, Try again starts the app. CONTROL: with the default 20-s limit nothing is said in 6 s. */
 const AWV_IG='Mozilla/5.0 (Linux; Android 14; 22111317PG; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/126.0.0.0 Mobile Safari/537.36 Instagram 300.0.0.0 Android';
-const MODEL_RE=/storage\.googleapis\.com\/mediapipe-models\//;
+const MODEL_RE=/\/core\/vendor\/mediapipe\/[^/]+\/hand_landmarker\.task/;   // CORE-22: the model from our own origin
 async function freshPage(page, o={}){
   const ctx=await page.context().browser().newContext({ viewport:{ width:1280, height:800 }, ...(o.ua ? { userAgent:o.ua } : {}), ...(o.locale ? { locale:o.locale } : {}), ...(o.ctxOpt||{}) }), origin=new URL(page.url()).origin;   // DESIGN-1: ctxOpt (reduced motion)
   await ctx.grantPermissions(['camera','microphone','clipboard-read','clipboard-write'], { origin }); if(CDN_CACHE) await cdnCache(ctx);
@@ -1271,7 +1277,7 @@ async function session(port, plan, label){
     await ctx.grantPermissions(['camera','microphone'],{ origin });
     if(CDN_CACHE) await cdnCache(ctx);
     /* LAT2 / PRIV1: every request of the session, the workers' included (Chromium reports a dedicated worker's requests too) */
-    const NET_OK=[origin+'/', 'https://cdn.jsdelivr.net/npm/@mediapipe/', 'https://storage.googleapis.com/mediapipe-models/'];
+    const NET_OK=[origin+'/'];   // CORE-22: our own origin only — MediaPipe's files are served from it; a request to its old hosts fails this row
     res.net={ n:0, workers:0, bad:[], workerUrls:[] };
     ctx.on('request', q=>{ const u=q.url(); if(/^(data|blob):/.test(u)) return; res.net.n++;
       if(!NET_OK.some(p=>u.startsWith(p)) && !/handsong-csp-control/.test(u)) res.net.bad.push(u); });
@@ -1397,9 +1403,14 @@ async function session(port, plan, label){
     res.csp=await within(page.evaluate(async ()=>{
       const meta=!!document.querySelector('meta[http-equiv="Content-Security-Policy"]'), before=window.__csp.slice();
       let blocked=false, err=''; try{ await fetch('https://example.com/handsong-csp-control'); }catch(e){ blocked=true; err=String(e&&e.message||e); }
+      /* CORE-22 CONTROL: MediaPipe's OLD hosts are refused too — the model by connect-src, the library by script-src (nothing leaves) */
+      /* the addresses carry the control's mark (the network row sets marked requests aside: a refused import still shows as a request); the CSP refuses by host, so the old paths' hosts are what is tested */
+      let oldModel=false, oldLib=false; try{ await fetch('https://storage.googleapis.com/mediapipe-models/hand_landmarker/handsong-csp-control.task'); }catch(e){ oldModel=true; }
+      try{ await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/handsong-csp-control.mjs'); }catch(e){ oldLib=true; }
       await new Promise(r=>setTimeout(r,300));
       const v=window.__csp.slice(before.length);
-      return { meta, list:before, blocked, err, ctl:v.some(x=>/connect-src/.test(x.dir)&&/example\.com/.test(x.uri)) };
+      const old=oldModel && oldLib && v.some(x=>/connect-src/.test(x.dir)&&/storage\.googleapis\.com/.test(x.uri)) && v.some(x=>/script-src/.test(x.dir)&&/cdn\.jsdelivr\.net/.test(x.uri));
+      return { meta, list:before, blocked, err, ctl:v.some(x=>/connect-src/.test(x.dir)&&/example\.com/.test(x.uri)) && old, old };
     }), 30e3, 'the CSP check');
     /* CORE-11: THE STORAGE CENSUS, judged — Night touches only its own names: the namespace («handsong.night.…», «….night»), its own
        «handsong.night…» keys and the old ones migrate.js moves, the scene level, its calibration scopes, and the two device facts shared on purpose
@@ -1422,9 +1433,9 @@ async function session(port, plan, label){
       const k=res.net.bad.indexOf(CTL); res.net.ctl=k>=0; if(k>=0) res.net.bad.splice(k,1);
       await rm(f,{ force:true }); }
     { const N=res.net; N.pass=!N.bad.length && N.n>0 && N.ctl;
-      out(`[${label}] network (PRIV1, LAT2): ${N.n} request(s) of the page and its workers (${N.workers} worker(s) started${N.workerUrls.length?': '+[...new Set(N.workerUrls)].join(', '):''}) — ${N.bad.length?N.bad.length+' OUTSIDE the own origin and the MediaPipe paths: '+N.bad.slice(0,5).join(', '):'all to the own origin or the MediaPipe paths'} · control (a worker asking an unlisted host) ${N.ctl?'caught':'NOT CAUGHT'} → ${N.pass?'PASS':'NOT A PASS'}`); }
+      out(`[${label}] network (PRIV1, LAT2): ${N.n} request(s) of the page and its workers (${N.workers} worker(s) started${N.workerUrls.length?': '+[...new Set(N.workerUrls)].join(', '):''}) — ${N.bad.length?N.bad.length+' OUTSIDE the own origin: '+N.bad.slice(0,5).join(', '):'all to the own origin (MediaPipe files included)'} · control (a worker asking an unlisted host) ${N.ctl?'caught':'NOT CAUGHT'} → ${N.pass?'PASS':'NOT A PASS'}`); }
     { const C=res.csp; C.pass=C.meta && !C.list.length && C.blocked && C.ctl;
-      out(`[${label}] CSP (PRIV1): policy ${C.meta?'present':'MISSING'} · ${C.list.length} violation(s) during the run${C.list.length?' — '+C.list.slice(0,5).map(x=>`${x.dir} ${x.uri} (${x.src}:${x.line})`).join('; '):''} · control fetch to https://example.com ${C.blocked&&C.ctl?'refused by connect-src':'NOT REFUSED ('+(C.err||'it went out')+')'} → ${C.pass?'PASS':'NOT A PASS'}`); }
+      out(`[${label}] CSP (PRIV1): policy ${C.meta?'present':'MISSING'} · ${C.list.length} violation(s) during the run${C.list.length?' — '+C.list.slice(0,5).map(x=>`${x.dir} ${x.uri} (${x.src}:${x.line})`).join('; '):''} · control fetch to https://example.com ${C.blocked&&C.ctl?'refused by connect-src':'NOT REFUSED ('+(C.err||'it went out')+')'} · CONTROL MediaPipe's old hosts (the model, the library) ${C.old?'refused':'NOT REFUSED'} → ${C.pass?'PASS':'NOT A PASS'}`); }
     if(NIGHT_PAGE && !DUMP && !(EVAL && THROTTLE)){   // CORE-20: not after a throttled --eval (its page runs 4× slower); NIGHT-7b: stale saved values → the start card still fully labelled (it reloads the page)
       /* each: [name, check, time limit, in --ui-only]; DESIGN-1: --ui-only keeps the start, cards, settings, coaching and texts checks — not the music, full
          screen, camera choice or the start timeline (timing: CLAUDE.md «Check levels») */
@@ -1500,11 +1511,12 @@ await writeFile(LOG, `probe-browser ${argv.join(' ')}\n`);
    download twice); CONTROL: a second, uncached model download must be counted. --measure-reps N (2): the ways alternate N times (a cold browser
    favours whoever comes second; a first warm-up visit is shown, not compared). */
 const MEASURE=has('--measure-start');
-const MP_RE=/^https:\/\/(cdn\.jsdelivr\.net\/npm\/@mediapipe|storage\.googleapis\.com\/mediapipe-models)\//;
+const PRECACHED=MEASURE && SERVE_ROOT!==ROOT && existsSync(path.join(SERVE_ROOT,'sw.js')) && /^const PRECACHE=\{/m.test(readFileSync(path.join(SERVE_ROOT,'sw.js'),'utf8'));   // NIGHT-14: a built Night tree with its precache list
+const MP_RE=/\/core\/vendor\/mediapipe\/|^https:\/\/(cdn\.jsdelivr\.net\/npm\/@mediapipe|storage\.googleapis\.com\/mediapipe-models)\//;   // CORE-22: our copy (the old hosts kept for measuring a before tree)
 async function measureVisit(ctx, p, cdp, url, origin){
   const req=new Map(), t0={ v:null };
   const onReq=e=>{ if(/^(data|blob):/.test(e.request.url)) return; if(t0.v==null && e.type==='Document') t0.v=e.timestamp; if(!req.has(e.requestId)) req.set(e.requestId, { url:e.request.url, t:e.timestamp, bytes:0, done:null, status:0 }); };
-  const onResp=e=>{ const r=req.get(e.requestId); if(r) r.status=e.response.status; };
+  const onResp=e=>{ const r=req.get(e.requestId); if(r){ r.status=e.response.status; r.sw=!!e.response.fromServiceWorker; } };   // NIGHT-14: answered by the precache
   const onFin=e=>{ const r=req.get(e.requestId); if(r){ r.bytes=e.encodedDataLength||0; r.done=e.timestamp; } };
   cdp.on('Network.requestWillBeSent', onReq); cdp.on('Network.responseReceived', onResp); cdp.on('Network.loadingFinished', onFin);
   try{
@@ -1519,11 +1531,11 @@ async function measureVisit(ctx, p, cdp, url, origin){
     const frame=await p.evaluate(()=>window.__frameAt);
     if(!got || frame==null){ const why=await p.evaluate(()=>({ msg:(document.getElementById('loadmsg')||{}).textContent||'', retry:!document.getElementById('camRetry').hidden, start:document.getElementById('start').classList.contains('on') })); throw new Error('no camera frame after the tap: '+JSON.stringify(why)); }
     await p.waitForTimeout(500);
-    const all=[...req.values()], ready=t0.v+readyMs/1000, before=all.filter(x=>x.t<=ready), own=x=>x.url.startsWith(origin), mp=x=>MP_RE.test(x.url);
+    const all=[...req.values()], ready=t0.v+readyMs/1000, before=all.filter(x=>x.t<=ready), mp=x=>MP_RE.test(x.url), own=x=>x.url.startsWith(origin) && !mp(x);
     const sum=(L, f)=>L.filter(f).reduce((n,x)=>n+((x.done!=null && x.done<=ready) ? x.bytes : 0), 0);
     const perMp={}, kbMpFile={}; for(const x of all) if(mp(x)){ const k=x.url.replace(/^.*\//, ''); perMp[k]=(perMp[k]||0)+1; kbMpFile[k]=(kbMpFile[k]||0)+Math.round(x.bytes/1024); }
     return { readyMs:Math.round(readyMs), tapToFrame:frame-tap, nOwn:before.filter(own).length, n304:before.filter(x=>own(x) && x.status===304).length, kbOwn:Math.round(sum(before, own)/1024),
-      nMp:before.filter(mp).length, kbMp:Math.round(sum(before, mp)/1024), scale:before.filter(x=>/\/core\/data\/(modes|tunings|palettes|chordmodes)\//.test(x.url)).length, perMp, kbMpFile };
+      nSw:all.filter(x=>x.sw).length, nNet:all.filter(x=>!x.sw && x.url.startsWith(origin)).length, kbAll:Math.round(all.filter(x=>!x.sw).reduce((n,x)=>n+x.bytes,0)/1024), nMp:before.filter(mp).length, kbMp:Math.round(sum(before, mp)/1024), scale:before.filter(x=>/\/core\/data\/(modes|tunings|palettes|chordmodes)\//.test(x.url)).length, perMp, kbMpFile };
   } finally { cdp.off('Network.requestWillBeSent', onReq); cdp.off('Network.responseReceived', onResp); cdp.off('Network.loadingFinished', onFin); }
 }
 const MEASURE_INIT=()=>{ document.addEventListener('DOMContentLoaded', ()=>{ const b=document.body, done=()=>{ if(window.__readyAt==null && !b.classList.contains('night-loading')) window.__readyAt=Math.round(performance.now()); };
@@ -1542,17 +1554,20 @@ async function measureStart(port){
       const ctx=await browser.newContext({ viewport:{ width:1280, height:800 } }); await ctx.grantPermissions(['camera','microphone'], { origin });
       try{
         await ctx.addInitScript(MEASURE_INIT);   // no routes: Playwright turns the HTTP cache off when a context routes anything
-        if(ctl) await ctx.addInitScript(()=>{ document.addEventListener('DOMContentLoaded', ()=>{ fetch('https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task', { cache:'no-store' }).catch(()=>{}); }); });
+        if(ctl) await ctx.addInitScript(()=>{ document.addEventListener('DOMContentLoaded', ()=>{ fetch('/core/vendor/mediapipe/0.10.35/hand_landmarker.task', { cache:'no-store' }).catch(()=>{}); }); });
         const p=await ctx.newPage(), cdp=await ctx.newCDPSession(p); await cdp.send('Network.enable'); p.on('console', m=>{ log(`[${way} #${k}] [${m.type()}] ${m.text()}`).catch(()=>{}); });
         if(THROTTLE){ await cdp.send('Network.emulateNetworkConditions', { offline:false, latency:150, downloadThroughput:1.25e6, uploadThroughput:4e5 }); await cdp.send('Emulation.setCPUThrottlingRate', { rate:4 }); }
         const url=origin+page+'?probe'+q;
         for(const v of (ctl || way==='warm-up') ? ['fresh'] : ['fresh', 'second']){
+          /* NIGHT-14: a tree whose sw.js carries a precache list — the second visit comes once the precache is in control (a later visit; at most 300 s, else NOT A PASS) */
+          if(v==='second' && PRECACHED){ const t0=Date.now(); let ok=false; while(Date.now()-t0<300e3){ ok=await p.evaluate(async ()=>!!navigator.serviceWorker.controller && (await caches.keys()).some(k=>k.startsWith('handsong-night-precache-'))).catch(()=>false); if(ok) break; await new Promise(r=>setTimeout(r,500)); }
+            if(ok) lines.push(`${way} #${k}: the precache in control ${((Date.now()-t0)/1000).toFixed(1)} s after the fresh visit's first frame`); else bad.push(`${way} #${k}: the precache was not in control within 300 s of the fresh visit`); }
           const m=await within(measureVisit(ctx, p, cdp, url, origin), THROTTLE ? 1500e3 : 400e3, `${way} ${v}`), tag=`${way} #${k}, ${v} visit`;
           if(ctl){ const base=(seen['now fresh']||{})['hand_landmarker.task']||0, got=m.perMp['hand_landmarker.task']||0;
             if(!(got>base)) bad.push(`CONTROL: a second, uncached model download was not counted (${got} vs ${base}) — the «no extra request» check cannot fail`); else lines.push(`CONTROL: a second, uncached model download is counted (${got} model requests vs ${base}) — the check can fail`); continue; }
           if(way==='warm-up'){ lines.push(`warm-up (a cold browser, not compared): Begin works at ${(m.readyMs/1000).toFixed(2)} s; tap → first camera frame ${(m.tapToFrame/1000).toFixed(2)} s`); continue; }
           if(v==='fresh'){ const key=`${way==='now without modulepreload' ? 'now' : way} fresh`; if(!seen[key]) seen[key]=m.perMp; }
-          lines.push(`${tag}: before Begin works ${m.nOwn} own requests (${m.n304} answered 304, ${m.scale} scale files), ${m.kbOwn} KB; MediaPipe ${m.nMp} requests started, ${m.kbMp} KB arrived; Begin works at ${(m.readyMs/1000).toFixed(2)} s; tap → first camera frame ${(m.tapToFrame/1000).toFixed(2)} s; MediaPipe requests ${JSON.stringify(m.perMp)}, KB over the wire ${JSON.stringify(m.kbMpFile)}`);
+          lines.push(`${tag}: before Begin works ${m.nOwn} own requests (${m.n304} answered 304, ${m.scale} scale files), ${m.kbOwn} KB; MediaPipe ${m.nMp} requests started, ${m.kbMp} KB arrived; Begin works at ${(m.readyMs/1000).toFixed(2)} s; tap → first camera frame ${(m.tapToFrame/1000).toFixed(2)} s; MediaPipe requests ${JSON.stringify(m.perMp)}, KB over the wire ${JSON.stringify(m.kbMpFile)}; up to the first frame: ${m.nNet} own requests to the network, ${m.nSw} answered by the service worker, ${m.kbAll} KB over the wire`);
         }
       } finally { await ctx.close().catch(()=>{}); }
     }
@@ -1592,8 +1607,8 @@ for(const s of sessions){
   if(UI_ONLY && !s.stale && !s.error) pass=false;   // DESIGN-1: a --ui-only run that ran no UI check is no pass
   if(s.ui){ out(`[${s.label}] UI checks (section rename, bend drag, song file, autosave): ${s.ui.pass?'PASS':'NOT A PASS'}`); if(!s.ui.pass) pass=false; }
   if(s.stale){ out(`[${s.label}] NIGHT stale saved values, music from Begin, full screen, first frames, camera choice, honest start, how to play, settings tabs, reveal, start timeline, first contact order (NIGHT-7b, 7c, 8b, 10, 11, 12, DESIGN-1): ${s.stale.pass?'PASS':'NOT A PASS'}`); if(!s.stale.pass) pass=false; }
-  if(!s.error){ out(`[${s.label}] CSP (PRIV1): ${s.csp&&s.csp.pass?'PASS — no violation, the control fetch refused':'NOT A PASS'}`); if(!(s.csp&&s.csp.pass)) pass=false;
-    out(`[${s.label}] network (PRIV1, LAT2): ${s.net&&s.net.pass?`PASS — ${s.net.n} requests, all to the own origin or the MediaPipe paths`:'NOT A PASS'}`); if(!(s.net&&s.net.pass)) pass=false;
+  if(!s.error){ out(`[${s.label}] CSP (PRIV1): ${s.csp&&s.csp.pass?'PASS — no violation, the control fetch and the old MediaPipe hosts refused':'NOT A PASS'}`); if(!(s.csp&&s.csp.pass)) pass=false;
+    out(`[${s.label}] network (PRIV1, LAT2): ${s.net&&s.net.pass?`PASS — ${s.net.n} requests, all to the own origin (MediaPipe's files included)`:'NOT A PASS'}`); if(!(s.net&&s.net.pass)) pass=false;
     out(`[${s.label}] storage (CORE-11): ${s.store&&s.store.pass?`PASS — ${s.store.list.length} names, ${NIGHT_PAGE?'all of this app or device facts':'the Full names as before'}, the control seen`:'NOT A PASS'}`); if(!(s.store&&s.store.pass)) pass=false; }
   if(EVAL && !(s.evalResult&&s.evalResult.ok)) pass=false;
   if(LEAK){ if(!s.leakPass) pass=false; const L=s.leak; out(`[${s.label}] --leak: ${L&&L.ok?`${L.pass?'PASS':'NOT A PASS'} — ${L.n} renders: +${L.fixMB} MB with the fix (margin ${LEAK_MARGIN_MB} MB), control +${L.ctrlMB} MB`:'ERROR '+(L&&L.why)}`); }

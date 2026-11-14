@@ -239,7 +239,8 @@ fails.push(...undeclared);
    also refused by the browser itself (the CSP in index.html). Read from text without comments and strings. */
 const NET_KINDS={ fetch:/(?<![\w$])fetch\s*\(/g, xhr:/\bXMLHttpRequest\b/g, websocket:/\bWebSocket\b/g, eventsource:/\bEventSource\b/g,
   beacon:/\bsendBeacon\s*\(/g, rtc:/\bRTCPeerConnection\b/g, worker:/\bnew\s+(?:Shared)?Worker\s*\(/g, importScripts:/\bimportScripts\s*\(/g,
-  addModule:/\baddModule\s*\(/g, share:/\bnavigator\s*\.\s*share\s*\(/g, open:/\bwindow\s*\.\s*open\s*\(/g, swRegister:/\bserviceWorker\s*\.\s*register\s*\(/g };
+  addModule:/\baddModule\s*\(/g, share:/\bnavigator\s*\.\s*share\s*\(/g, open:/\bwindow\s*\.\s*open\s*\(/g, swRegister:/\bserviceWorker\s*\.\s*register\s*\(/g,
+  importVar:/\bimport\s*\((?!\s*['"`])/g };   // CORE-22: a dynamic import whose address is not written out (a literal one is followed as an import, or counted «external»)
 const NET_LISTED={
   'core/scaleload.js':  { fetch:[1,'reads the data/ files (tunings, modes, palettes) from the app\'s own origin'] },
   'tools/probes/core/files.js': { fetch:[1,'probe only (?probe): reads tools/prints/scales.before.json from the own origin'] },
@@ -265,12 +266,15 @@ const NET_LISTED={
   'tools/probes/night/stream.js': { addModule:[1,'probe only (?probe): loads our own apps/night/worklets/nature-worklet.js into the offline contexts of the row «NIGHT stream, water and ground» (NIGHT-8)'] },
   'apps/night/roomswitch.js': { fetch:[1,'reads the forest stream recording (apps/night/rooms/forest/sound/stream.mp3, own origin; register entry stream-recording) once per session, when the nature sound is first built (NIGHT-8b)'], addModule:[1,'loads our own apps/night/worklets/nature-worklet.js (own origin; it imports apps/night/pure/brook.js) into the live audio context once, when the nature sound is first built (NIGHT-8, the stream)'] },
   'apps/night/bed2.js': { addModule:[1,'loads our own apps/night/worklets/bed-worklet.js (own origin) into an audio context once: the live one when the music bed v2 first plays, an offline one for the probes (NIGHT-4)'] },
-  'core/render.js':     { addModule:[1,'track renders: lets the engine copy load only the worklets the track needs (own origin) into its offline context'] },
+  'core/render.js':     { addModule:[1,'track renders: lets the engine copy load only the worklets the track needs (own origin) into its offline context'], importVar:[1,'the engine copy core/audio.js?render (ENG_SPEC: own origin, a module of ours)'] },
+  'core/legacy-ui/boot.js': { importVar:[1,'?probe only: the probe facade the page itself names in <link rel="handsong-probes"> (own origin; production pages carry no such tag)'] },
+  'apps/night/sw.js':   { fetch:[2,'NIGHT-14 precache: the listed files of this build from the own origin (install, each checked against its hash), and a listed file the cache lost (the same request, passed on)'] },
   'core/clip.js':       { share:[1,'hands the person\'s own clip to the system share sheet — only on their tap (explicit action)'] },
   'core/legacy-ui/ui.js': { swRegister:[1,'registers sw.js (own origin, cache-free) so the app is installable'] },
+  'apps/night/update.js': { swRegister:[1,'NIGHT-14: registers its own sw.js (own origin; the precache in a build, none in the repository) — the registration in ui.js on the load event comes too late on a built page'] },
   'core/vision.js':     { worker:[1,'starts our own core/hand-worker.js (own origin, CSP worker-src self): hand detection off the main thread (LAT2b)'] },
-  'core/handdet.js':    { external:[1,'imports MediaPipe Tasks Vision from jsDelivr (register entry mediapipe-tasks-vision; it loads its WASM — CSP script-src/connect-src); in the worker too'],
-                     fetch:[2,'downloads the hand model once (register entry mediapipe-hand-landmarker, storage.googleapis.com/mediapipe-models — CSP connect-src) for both models (L1, L2); CORE-18: the same file streamed with its progress when the app asks (one of the two runs)'] },
+  'core/handdet.js':    { importVar:[1,'imports MediaPipe Tasks Vision — CORE-22: from our own copy (core/vendor/mediapipe/, both apps opt in) or, by default, from jsDelivr (register entry mediapipe-tasks-vision; it loads its WASM from the same place — CSP script-src/connect-src); in the worker too'],
+                     fetch:[2,'downloads the hand model once (register entry mediapipe-hand-landmarker: CORE-22 our own copy, or by default storage.googleapis.com/mediapipe-models — CSP connect-src) for both models (L1, L2); CORE-18: the same file streamed with its progress when the app asks (one of the two runs)'] },
 };
 function netSites(m){   // kind → count for one module (external = static import from an http(s) address)
   const n={}; for(const [k,re] of Object.entries(NET_KINDS)){ const c=(m.bare.match(re)||[]).length; if(c) n[k]=c; }
@@ -287,12 +291,14 @@ function netCheck(modsIn){
   for(const f of Object.keys(NET_LISTED)) if(!modsIn[f]) bad.push(`NET_LISTED names ${f}, which is not a module`);
   return { bad, total };
 }
-const NET=netCheck(mods);
+/* NIGHT-14: the service workers are classic scripts, not modules of ours — but Night's now fetches (its precache): both join the guard */
+const NET_MODS={ ...mods }; for(const f of ['apps/full/sw.js','apps/night/sw.js']) NET_MODS[f]={ bare:lex(readFileSync(join(SRC,f),'utf8')).bare, imports:[], dyn:[] };
+const NET=netCheck(NET_MODS);
 fails.push(...NET.bad);
-{ /* CONTROL: an unlisted beacon in a listed module and a fetch in a new module must both be caught */
-  const fake={ ...mods, 'core/legacy-ui/ui.js':{ ...mods['core/legacy-ui/ui.js'], bare:mods['core/legacy-ui/ui.js'].bare+'\nnavigator.sendBeacon(u, d);' }, 'probe-net.js':{ bare:'fetch(x)', imports:[], dyn:[] } };
+{ /* CONTROL: an unlisted beacon in a listed module, a fetch in a new module and (CORE-22) an import of an address held in a variable must each be caught; a literal import must not count */
+  const fake={ ...NET_MODS, 'core/legacy-ui/ui.js':{ ...mods['core/legacy-ui/ui.js'], bare:mods['core/legacy-ui/ui.js'].bare+'\nnavigator.sendBeacon(u, d);' }, 'probe-net.js':{ bare:"fetch(x); import(u); import( '   ')", imports:[], dyn:[] } };
   const c=netCheck(fake);
-  if(!(c.bad.some(x=>/ui\.js: 1 .*«beacon»/.test(x)) && c.bad.some(x=>/probe-net\.js: .*«fetch»/.test(x)))) fails.push('network guard CONTROL: an unlisted sendBeacon / fetch was not caught — the guard cannot fail');
+  if(!(c.bad.some(x=>/ui\.js: 1 .*«beacon»/.test(x)) && c.bad.some(x=>/probe-net\.js: .*«fetch»/.test(x)) && c.bad.some(x=>/probe-net\.js: 1 .*«importVar»/.test(x)))) fails.push('network guard CONTROL: an unlisted sendBeacon / fetch / import of a variable address was not caught (or a literal import counted) — the guard cannot fail');
 }
 /* 9) REC1 — FOLDERS AND IMPORT CYCLES. The static import graph (import … from and export … from; dynamic imports are not edges — they
    resolve after evaluation). Strongly connected groups (Tarjan) are the import cycles: today's are printed as information (each one is a

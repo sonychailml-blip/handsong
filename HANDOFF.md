@@ -4,9 +4,9 @@ Two apps, one engine. Rules: `CLAUDE.md`. Every run belongs to one track: `CORE-
 
 | Track | Folder | Read | Where it stands |
 |---|---|---|---|
-| **CORE** | `core/` | `docs/core/HANDOFF.md`, `BACKLOG.md`, `WORK-LOG.md` | Stage 3 foundation and `CORE-1`…`CORE-21` done, all opt-in (latest: only the modes a page plays; Night's hand view and its «all points»). |
+| **CORE** | `core/` | `docs/core/HANDOFF.md`, `BACKLOG.md`, `WORK-LOG.md` | Stage 3 foundation and `CORE-1`…`CORE-22` done, all opt-in (latest: MediaPipe from our own origin, both apps). |
 | **FULL** | `apps/full/` | `docs/full/HANDOFF.md`, `BACKLOG.md`, `WORK-LOG.md`, `UI-MAP.md`, `UX-INVENTORY.md` | Waits for the first release. Next: stage 5 (saving, export, audio take, mixer) and the calibration screen. |
-| **NIGHT** | `apps/night/` | `docs/night/HANDOFF.md`, `BACKLOG.md`, `WORK-LOG.md`, `STAGE4-NIGHT-plan.md`, `QUALITY.md` | The first public release. RUN 9 done. `NIGHT-1` stages 1–3 done. `NIGHT-2` calibration screens built (stage 3), waiting for step 129 (five checks, laptop + Poco). `NIGHT-3` (rooms): stages 2–4 and 5 part 1 done. `NIGHT-4`, `NIGHT-5`, stage 5 part 2 and `NIGHT-6` (forest polish) accepted. `NIGHT-7`–`7c` wait for step 145, `NIGHT-8`…`8c` for 146–150, `NIGHT-11` for 151, `NIGHT-12` for 152, `DESIGN-1` (colour roles, settings tabs, start still) for 153, `NIGHT-13`, `13b` (polish) for 154, 155. `RAIN-0` (room «Rain», dev only) for 156. Then steps 120–124, C8 rest, C9, C10, C12. |
+| **NIGHT** | `apps/night/` | `docs/night/HANDOFF.md`, `BACKLOG.md`, `WORK-LOG.md`, `STAGE4-NIGHT-plan.md`, `QUALITY.md` | The first public release. Waiting for the user's steps: 129 (`NIGHT-2`), 145 (`NIGHT-7`–`7c`), 146–150 (`NIGHT-8`…`8c`), 151–152 (`NIGHT-11`, `12`), 153 (`DESIGN-1`), 154–155 (`NIGHT-13`, `13b`), 156 (`RAIN-0`, dev only), 157 (`NIGHT-14`: a second visit with no network). Then steps 120–124, C8 rest, C10, C12. |
 | **SITE** | `apps/site/` | `docs/site/HANDOFF.md`, `WORK-LOG.md` | handsong.app, the brand site: `SITE-1` built; waits for its Vercel project and DNS. |
 
 **Handsong** is a gesture synthesizer and tuning tutorial in the browser: camera → MediaPipe → pinches → Web Audio, with a multitrack recorder, piano roll and lessons. **Handsong Night** (code id `night`) is the quiet one: a night forest played with the hands, free, nothing leaves the device.

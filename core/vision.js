@@ -162,6 +162,11 @@ function camInfo(){
 const W_READY_MS=90000, EMPTY=Object.freeze({ landmarks:[], handednesses:[] });
 const path={ runs:null, why:'', warmMs:null };
 let det=null, detGen=0, workerFailDbg=false;
+/* CORE-22 (opt-in): where MediaPipe's files come from, for every detector built from here on (handdet mpFilesOf): 'cdn' (default, as before) or 'own';
+   set by initDetector's o.files, read by both paths and the probes that build a detector themselves */
+let detFiles='cdn';
+const handFilesOf=()=>detFiles;
+const filesOpt=()=>detFiles==='cdn' ? {} : { files:detFiles };
 const nextPaint=()=>new Promise(r=>requestAnimationFrame(()=>setTimeout(r,0)));   // let a message paint before the main thread blocks
 function workerDet(step){
   return new Promise((resolve, reject)=>{
@@ -190,14 +195,14 @@ function workerDet(step){
       setDelegate(d){ return new Promise((res, rej)=>{ delegP={ resolve:res, reject:rej }; w.postMessage({ type:'delegate', d }); }); },
       dbg(o){ w.postMessage({ type:'dbg', o }); },
       close(){ ready=false; w.terminate(); for(const [,p] of pend) p.reject(new Error('closed')); pend.clear(); } });
-    w.postMessage({ type:'init', delegate:opts.delegate, w:640, h:480, failInit:workerFailDbg });
+    w.postMessage({ type:'init', delegate:opts.delegate, w:640, h:480, failInit:workerFailDbg, ...filesOpt() });
   });
 }
 async function mainDet(step, dl=null){
   const H=await import('./handdet.js');
   const blank=()=>{ const c=typeof OffscreenCanvas!=='undefined' ? new OffscreenCanvas(640,480) : Object.assign(document.createElement('canvas'),{ width:640, height:480 });
     const g=c.getContext('2d'); g.fillStyle='#000'; g.fillRect(0,0,640,480); return c; };
-  const D=await H.createDetector({ delegate:opts.delegate, blank, step:async s=>{ if(step) step(s); await nextPaint(); }, ...(dl ? { progress:dl.progress, stallMs:dl.stallMs } : {}), ...(dl && dl.fresh ? { fresh:true } : {}) });   // CORE-18: the download's progress only when asked; CORE-20: a fresh retry
+  const D=await H.createDetector({ delegate:opts.delegate, blank, step:async s=>{ if(step) step(s); await nextPaint(); }, ...filesOpt(), ...(dl ? { progress:dl.progress, stallMs:dl.stallMs } : {}), ...(dl && dl.fresh ? { fresh:true } : {}) });   // CORE-18: the download's progress only when asked; CORE-20: a fresh retry
   return { kind:'main', warmMs:D.warmMs,
     run(job){ try{ const w0=performance.now(), r=D.run(job.bmp, job.t, job.action, job.policy); return Promise.resolve({ ...r, w0, w1:performance.now(), bmp:job.bmp }); }
               catch(e){ return Promise.reject(e); } },
@@ -294,6 +299,7 @@ function setHandsSink(fn, paused){ sink=fn; isPaused=paused||(()=>false); }
 const MODEL_STALL_MS=20000;
 let detTries=0;
 async function initDetector(msg, o={}){
+  if(o.files==='own' || o.files==='cdn') detFiles=o.files;   // CORE-22
   const fresh=detTries++>0 && !!o.freshRetry;
   const say=o.say || (k=>msg(t(k)));
   say('load.model');
@@ -520,7 +526,7 @@ function pumpDbg(o={}){
 }
 
 /* Экспорт: детектор живёт здесь; кадры и результаты отдаются стоку (main.js). */
-export { video, canvas, ctx, initVision, initDetector, startCamera, switchCamera, setHandsSink, pollFrame,
+export { video, canvas, ctx, initVision, initDetector, handFilesOf, startCamera, switchCamera, setHandsSink, pollFrame,
   camInfo, camLabel, modelInfo, visionOpts, VISION_DEF, setHandsTracked, setModelDelegate, setCamFps, setDetectPath, setLowLight, lowInfo,
   pathInfo, pumpStats, pumpDbg, pumpStepDbg, detRunDbg, lowDbg, camSimDbg, camOpenDbg, camStats, camStatsDbg, setCameraPick, cameraSwitch, cameraList, cameraPickInfo,
   cameraWatch, cameraWatchRetry, cameraWatchDbg };

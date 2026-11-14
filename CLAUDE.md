@@ -15,8 +15,8 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
 **arrangements** (harmony/rhythm/bass as backing tracks), a **track editor** (piano roll + automation lane, own undo/redo), an
 **expression hand**, a **looper hand**, and a **six-lesson tutorial** inside the live app.
 - ES modules, loaded by `<script type="module" src="main.js">` in each `apps/<app>/index.html`. No build for development, no app dependencies, no unit tests.
-  A page holds markup only; `core/legacy-ui/style.css` + `core/tokens.css` (+ `apps/night/night.css`) all CSS; the only external dependency is `@mediapipe/tasks-vision` from a CDN
-  (`core/vision.js`). Each app has its own `manifest.json` + `sw.js` (PWA pair) and declares its profile and probes (`<link rel="handsong-profile">`, `<link rel="handsong-probes">`); root `index.html` is a redirect.
+  A page holds markup only; `core/legacy-ui/style.css` + `core/tokens.css` (+ `apps/night/night.css`) all CSS; the only external dependency is `@mediapipe/tasks-vision` + its hand model
+  (CORE-22: pinned copies served from our own origin, `core/vendor/mediapipe/<version>/`, loaded by `core/handdet.js`; both apps opt in). Each app has its own `manifest.json` + `sw.js` (PWA pair) and declares its profile and probes (`<link rel="handsong-profile">`, `<link rel="handsong-probes">`); root `index.html` is a redirect.
   Dev tools only: `tools/` (`package.json` with `playwright-core`, `tools/node_modules/` git-ignored).
 - **One control model.** One role fills the screen (`phoneInstr`, role button). In **landscape** an optional **split**
   (`splitOn`) shows two roles side by side. Role is decided by ZONE (which half a hand pinches in); work inside a half is by
@@ -28,8 +28,8 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
 ## Running / developing
 - Serve over HTTPS or `localhost` (camera + wakeLock need a secure context; `file://` fails). Team default: VS Code Live Server at the repo root:
   `http://127.0.0.1:5500/apps/full/`, `http://127.0.0.1:5500/apps/night/`. Phone: a Vercel preview, or `npx cloudflared tunnel --url http://localhost:5500`, cache bust `?v=N`.
-- Scale data are JSON files in `core/data/`, fetched at start. MediaPipe model/WASM/library come from CDNs — internet required. ⚠️ The apps
-  do not work offline at all (SW caches nothing on purpose). Needs a webcam + WebGL. Audio starts only on the "▶ Play" click.
+- Scale data are JSON files in `core/data/`, fetched at start. MediaPipe model/WASM/library come from our own origin (CORE-22). ⚠️ Full
+  does not work offline (its SW caches nothing); Night's BUILDS precache their files (NIGHT-14, `tools/precache.mjs`; the repo tree caches nothing). Needs a webcam + WebGL. Audio starts only on the "▶ Play" click.
 - `?probe` in the address loads the app's probes (`window.P`, guarded) and the render/ear tools (`window.R`) and user files (`window.U`). `P.all`/`P.quick` on Full, `P.night` on Night.
 - ⛳ **Build and deploy** (SPLIT-2): `HANDSONG_APP=full|night node tools/build.mjs` writes one app into `dist/` (no other app, no tools). Previews (`VERCEL_ENV=preview` or `--probes`) keep `?probe`; production has no probes. `HANDSONG_EDITION=release` hides the development items. `vercel.json` is shared by two Vercel projects (`HANDSONG_APP=full`, `=night`); previews from `dev`. ⛳ Production branches differ (user, 2026-11-02): Full's project builds `main` (handsong.vercel.app); `handsong-night` builds `night-release`, which carries Night's test build for the first testers (the user pushes it; NIGHT-7). ⛳ Night's test build lives at https://night.handsong.app (user, NIGHT-12, 2026-11-12; `handsong-night.vercel.app` still works). So merging `dev` into `main` updates only Full's production; `main` stays the old public version until the new Full is ready. Whenever a page, path or build changes: `node tools/smoke-paths.mjs` (`--build`: also the built trees). ⛳ **The brand site handsong.app** (SITE-1, 2026-11-13): `apps/site/` — plain static pages (EN at `/`, RU at `/ru/`), no build; its own Vercel project (Root Directory `apps/site`, framework Other, no build command, production branch `dev`; `apps/site/vercel.json` holds its headers, clean URLs and the Ignored Build Step, so it deploys only when `apps/site/` changes). Pages are generated from `tools/site/texts.mjs` by `node tools/site-pages.mjs --write`; pictures by `node tools/site-images.mjs`. It imports nothing from `core/` or the apps; Full and Night never reference it.
 
@@ -321,10 +321,10 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
     the Night release through UI1's design tokens and icon component).
 33. ⛳ **Privacy — images, sound and hand data never leave the device** (user, Q15, 2026-10-14; PRIV1). Frames are processed by the hand
     model inside the browser; the app sends no image, video, landmark stream, microphone sound or recording anywhere. Its own network use
-    is limited to: loading itself and its assets (own origin; the pinned MediaPipe files of the register); links the person opens (feedback,
+    is limited to: loading itself and its assets (own origin, the pinned MediaPipe files included — CORE-22); links the person opens (feedback,
     donate); the named page-view counter of the Vercel deployment (Q14); a clip handed to the system share sheet by the person's tap; later,
     only by the person's explicit action, account sync and a numbers-only diagnostic report shown before sending (Q16). Enforcement: (a) the
-    Content-Security-Policy `<meta>` first in each page (`apps/<app>/index.html`, the same line, static check 16) — `connect-src`/`script-src` list only our origin and the MediaPipe paths, no
+    Content-Security-Policy `<meta>` first in each page (`apps/<app>/index.html`, the same line, static check 16) — `connect-src`/`script-src` list only our origin (`'self'`, CORE-22), no
     inline script (`core/va-stub.js`), `'wasm-unsafe-eval'` for the model, no `'unsafe-eval'`; a new host needs the user's decision, a
     register entry (LIC1 checks every CSP host lies over one) and the CSP line; (b) the static check's NETWORK GUARD (`NET_LISTED` in
     `tools/check-static.mjs`): every fetch / XHR / WebSocket / EventSource / sendBeacon / RTCPeerConnection / Worker / importScripts /

@@ -22,7 +22,7 @@ self.onmessage=async e=>{
       const [{ createDetector }, { MP_LINE }]=await Promise.all([import('./handdet.js'), import('./pure/latency.js')]);
       tapConsole(MP_LINE);
       const blank=()=>{ const c=new OffscreenCanvas(m.w||640, m.h||480), g=c.getContext('2d'); g.fillStyle='#000'; g.fillRect(0,0,c.width,c.height); return c; };
-      D=await createDetector({ delegate:m.delegate, blank, step:s=>postMessage({ type:'step', step:s }) });
+      D=await createDetector({ delegate:m.delegate, blank, step:s=>postMessage({ type:'step', step:s }), ...(m.files ? { files:m.files } : {}) });   // CORE-22: MediaPipe's files from the page's choice
       postMessage({ type:'ready', warmMs:D.warmMs });
     }catch(err){ postMessage({ type:'fail', msg:String(err&&err.message||err) }); }
   }
