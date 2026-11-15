@@ -390,3 +390,6 @@ html[data-still="full"] .night-still{ background-image:var(--night-still-veil), 
 .night-start-head .emblem-glow.night-dot-out{ opacity:0; }
 @media (prefers-reduced-motion: reduce){ .night-still.breathe{ animation:none; } }
 a.night-lnk{ text-decoration:none; }   /* NIGHT-15: the «Licences» link reads as the other links */
+
+/* FOREST-2: the development label «level · forest» (apps/night/forestlabel.js), only with ?forest=… in the address */
+.forest-label{position:fixed;left:var(--night-gap);bottom:var(--night-gap);z-index:var(--z-diag);padding:var(--night-gap-sm) var(--night-gap);border-radius:var(--night-r-pill);background:var(--night-raised);color:var(--night-ink-dim);font-size:var(--night-fs-small);line-height:var(--night-lh);pointer-events:none;white-space:nowrap}

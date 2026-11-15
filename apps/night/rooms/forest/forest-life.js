@@ -167,7 +167,7 @@ export function buildLife(ctx){
   const ground=ringsNew(RINGS.ground.n), water=ringsNew(RINGS.water.n);
   /* mushrooms and flowers */
   /* NIGHT-6 slice 5: the mushrooms on the wood (ctx.woodShrooms) come after today's, which keep their places and the music bed's clusters */
-  const today=lifePlaces(lv.shrooms, lv.blooms), places=today.concat((ctx.woodShrooms||[]).map(p=>({ kind:'shroom', x:p.x, y:p.y, z:p.z, s:p.s, ph:p.ph, rot:p.rot, wood:true }))), N=places.length, pulse=new Float32Array(N), glow=new Float32Array(N);
+  const today=lifePlaces(lv.shrooms, lv.blooms), places0=today.concat((ctx.woodShrooms||[]).map(p=>({ kind:'shroom', x:p.x, y:p.y, z:p.z, s:p.s, ph:p.ph, rot:p.rot, wood:true }))), places=ctx.fix ? ctx.fix(places0) : places0, N=places.length, pulse=new Float32Array(N), glow=new Float32Array(N);
   const SHROOMS=places.map((p,i)=>i).filter(i=>places[i].kind==='shroom'), clusters=bedClusters(today), bedG=new Float32Array(N), bedEv=[];   // NIGHT-6 slice 1
   const NEAR=places.map((p,i)=>[i, streamNear(p.x, p.z).d]).filter(x=>x[1]<2.2).sort((a,b)=>a[1]-b[1]).map(x=>x[0]); let glFrame=0, glFirst=true, glPick=[], glD=new Float32Array(0), glNext=0;   // NIGHT-8: what the water may reflect
   const d=new T.Object3D(), shrooms=places.filter(p=>p.kind==='shroom'), blooms=places.filter(p=>p.kind==='bloom');
@@ -258,5 +258,5 @@ export function buildLife(ctx){
   const resize=scale=>{ gm.uniforms.uScale.value=scale; };
   /* NIGHT-8: the rocks that stand in the water ([{ x, z, s }]): white water and ripples round each (at most WATER_RK, the largest first) */
   function waterRocks(list){ const L=list.slice().sort((a,b)=>b.s-a.s).slice(0, WATER_RK); WU.uRk.value.forEach((v,i)=>{ const r=L[i]; if(r) v.set(r.x, r.z, r.s*1.05, 0); else v.set(0,0,0,0); }); return L.length; }
-  return { U, update, glint, echo, noteRing, wake, bedChord, bedLoop, state, resize, stream, glowMat:gm, waterRocks, WU };   // glowMat: NIGHT-6 slice 9 (the night flowers' glow shares it); WU: probes
+  return { U, update, glint, echo, noteRing, wake, bedChord, bedLoop, state, resize, stream, glowMat:gm, waterRocks, WU, parts:{ caps, stems, petals } };   // FOREST-2: parts — probes only (the plants' coverage)   // glowMat: NIGHT-6 slice 9 (the night flowers' glow shares it); WU: probes
 }

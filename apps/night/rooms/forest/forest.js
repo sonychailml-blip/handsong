@@ -21,11 +21,11 @@ import { buildMirror } from './forest-mirror.js';   // NIGHT-9: the water's mirr
 import { buildAnswers } from './forest-answers.js';   // NIGHT-6 slice 1: dew and webs
 import { buildFloor } from './forest-floor.js';   // NIGHT-6 slice 3: the herb layer and the fine fern
 import { buildStream } from './forest-stream.js';   // NIGHT-6 slice 4: rocks, pebbles, drifting leaves, the mist over the water
-import { STREAM, STREAM_LINE, streamNear, bankGround } from './pure/forestlife.js';
+import { STREAM, STREAM_LINE, streamNear, bankGround, lifePlaces } from './pure/forestlife.js';
 import { outOfWater } from './pure/stream.js';
 import { ANSWERS, swellAt } from './pure/answers.js';
 import { FOREST_SEED, ROCKS_TODAY, forestTrunks } from './pure/layout.js';   // NIGHT-6 slice 5: the seed and today's rocks, shared with the bake tool
-import { woodPlaces } from './pure/wood.js';
+import { woodPlaces, WOOD } from './pure/wood.js';
 import { buildWood, patchBark, patchShade, trunkGeo, woodUniforms, barkAttrs } from './forest-wood.js';
 import { barkMoss, barkUv } from './pure/wood.js';   // NIGHT-8b: every trunk its own moss; NIGHT-8c: its own bark mapping
 import { groundRoots, groundOcclusion } from './pure/relief.js';   // NIGHT-9: the ground's root bulges and occlusion
@@ -37,6 +37,9 @@ import { breathAt } from './pure/paint.js';   // NIGHT-6 slice 5: moss, roots, f
 import { handLightK, HANDLIGHT_GLOW_OLD } from '../../pure/handlight.js';   // NIGHT-13: the hand's light brighter as its finger closes
 import { patchGroundMacro, patchGroundNight } from './forest-ground.js';   // NIGHT-8: the bare ground's large scale
 import { litterPlaces } from './pure/ground.js';   // NIGHT-8: leaves, pebbles and twigs on the ground
+import { naturalAssets, naturalHas, naturalTextures, NAT_UNI } from './forest-natural.js';   // FOREST-2: the objects made natural (?forest=new only)
+import { NATURAL, rootsOrganic, solidsOf, clearSpot, growersOn, keepSize, solids3Of, fernSpot, frondPoints, inSolid3, spraysClear, shroomsFree, rootTopAt, sightBlock } from './pure/natural.js';
+import { streamRocks } from './pure/stream.js';
 
 export { FOREST_SEED };
 export const FOREST_LEVELS=FOREST_ROOM.levels;   // NIGHT-3: what each level draws lives in the record
@@ -72,6 +75,15 @@ const SCAN_KEYS=['litter','litterN','litterA'], BAKED_KEYS=['ground','groundN'];
 let groundOver=null; try{ if(typeof window!=='undefined' && (window.__groundSet==='scan' || window.__groundSet==='baked')) groundOver=window.__groundSet; }catch(e){}   // captures only (tools/ui-snap.mjs --ground)
 export const forestGroundDbg=v=>{ groundOver= v==='scan' || v==='baked' ? v : null; return groundOver; };
 const scanOf=level=> groundOver ? groundOver==='scan' : !!(FOREST_LEVELS[level]||FOREST_LEVELS.full).groundScan;
+/* FOREST-2: THE SWITCHES — the address word ?forest=<words> (development and release editions alike), one word per change, combinable (?forest=rocks,bark
+   or ?forest=rocks&forest=bark): rocks, roots, bark, moss (the cushions and the sprouts on the logs), stumps (stumps and snags), clear (the plants clear of
+   solids); ?forest=new = all of them. Without any the forest is today's, to the bit (browser row «FOREST switch off = today»). forestNewDbg(v): probes and
+   captures only — true / 'new' all, false none, a list or 'a,b' those; no argument reads it (false, or the list) */
+export const FOREST_PARTS=Object.freeze(['rocks', 'roots', 'bark', 'moss', 'stumps', 'clear']);
+const partsOf=v=>{ const S=new Set(); if(v===true) v='new'; if(!v) return S; for(const w of (Array.isArray(v) ? v : String(v).split(','))){ const x=String(w).trim(); if(x==='new') FOREST_PARTS.forEach(k=>S.add(k)); else if(FOREST_PARTS.includes(x)) S.add(x); } return S; };
+let PARTS=new Set(); try{ if(typeof location!=='undefined') PARTS=partsOf(new URLSearchParams(location.search).getAll('forest').join(',')); }catch(e){}
+export const forestNewDbg=v=>{ if(v!==undefined && v!==null) PARTS=partsOf(v); return PARTS.size ? FOREST_PARTS.filter(k=>PARTS.has(k)) : false; };
+export const forestNewAssets=level=>naturalAssets(level);
 const WOOD_MEMO=new Map(), LITTER_MEMO=new Map();   // NIGHT-8: + the litter's places per counts   // NIGHT-6 slice 5: the wood's places per counts (pure, seeded): worked out once per session
 const IMG={}, LOADING={}, assetErr=[];
 async function fileImage(url){ const r=await fetch(url); if(!r.ok) throw new Error(r.status+' '+url.pathname);
@@ -80,13 +92,18 @@ const levelFiles=level=>{ const all=FOREST_TEX[level]||FOREST_TEX.full, skip=sca
 /* the files of `level` ('full' | 'reduced'), once per session → a promise of the loaded images by name. NIGHT-14c: a failed file is forgotten, so a
    later call fetches it again (it may be in the precache by then) */
 export function forestAssets(level='full'){
-  return Promise.all(levelFiles(level).map(n=>LOADING[n] || (LOADING[n]=fileImage(TEX[n]).then(img=>{ IMG[n]=img; }, e=>{ delete LOADING[n]; assetErr.push(n+': '+String(e&&e.message||e)); })))).then(()=>IMG); }
+  const all=Promise.all(levelFiles(level).map(n=>LOADING[n] || (LOADING[n]=fileImage(TEX[n]).then(img=>{ IMG[n]=img; }, e=>{ delete LOADING[n]; assetErr.push(n+': '+String(e&&e.message||e)); })))).then(()=>IMG);
+  return PARTS.has('rocks') || PARTS.has('bark') ? all.then(()=>naturalAssets(level)).then(()=>IMG) : all; }   // FOREST-2: the new files only with the switch
 /* NIGHT-14c: are `level`'s files here without asking the network? Under a precache (a worker in control) each must be in its cache; with no worker
-   (the repository, Live Server) the network serves them as before → true */
+   (the repository, Live Server) the network serves them as before → true. FOREST-2 (the founder's Detailed shown as Standard on Live Server): the
+   repository's worker controls the page too but keeps NO precache (sw.js PRECACHE null) — no precache of this app at all means the network serves
+   every file → true (a build's worker always has one) */
+export const NIGHT_PRECACHE_PREFIX='handsong-night-precache-';   // sw.js PREFIX
 export async function forestHas(level='full'){
   if(typeof navigator==='undefined' || !navigator.serviceWorker || !navigator.serviceWorker.controller || typeof caches==='undefined') return true;
+  if(!(await caches.keys()).some(k=>k.startsWith(NIGHT_PRECACHE_PREFIX))) return true;
   for(const n of levelFiles(level)) if(!IMG[n] && !(await caches.match(TEX[n].href))) return false;
-  return true; }
+  return PARTS.has('rocks') || PARTS.has('bark') ? naturalHas(level) : true; }
 /* probes only: the prepared files loaded so far (the prefetch's proof) */
 export const forestAssetsDbg=()=>Object.keys(IMG).sort();
 /* colour helpers: a token's text → [r, g, b, a]; jittered variants in HSL (texture painting only) */
@@ -108,6 +125,7 @@ float a=exp(-r2*7.)+.4*exp(-r2*2.)*(1.-r2);gl_FragColor=vec4(uColor,a*vA);}`;
 
 /* T — the THREE namespace; opt: { C (palette.cv), level 'full' | 'reduced', w, h (canvas CSS pixels), reduce (reduced motion) } */
 export function buildForest(T, opt){
+  const NP=new Set(PARTS), nat=NP.size>0, has=k=>NP.has(k);   // FOREST-2: this build's switches (read once: a later toggle waits for the next opening)
   const C=opt.C, Lv={ ...(FOREST_LEVELS[opt.level]||FOREST_LEVELS.full), ...(opt.lv||{}) },   // RUN 9: opt.lv — measurement overrides only
     reduce=!!opt.reduce, R=seeded(FOREST_SEED), V=(x,y,z)=>new T.Vector3(x,y,z);
   const col=n=>new T.Color(C('forest-'+n));
@@ -159,7 +177,8 @@ export function buildForest(T, opt){
       for(const c of [k,kk]){ c.beginPath(); for(let y=0;y<=512;y+=16){ const xx=x+dx+Math.sin(y*Math.PI/128+ph)*4; if(y) c.lineTo(xx,y); else c.moveTo(xx,y); } c.stroke(); } } }   // NIGHT-8c: two whole waves per tile — the tile joins itself (no ring every 3.2 m)
   const barkM=new T.MeshStandardMaterial({ map:tex(kc,true,2,5), bumpMap:tex(kb,false,2,5), bumpScale:0.035, roughness:0.95 }); own.push(barkM);
   const FU=foxUniforms(T, C, Lv.foxfire|0);   // NIGHT-6 slice 9: the foxfire's trail, shared by the bark and the wood
-  if(Lv.barkMoss) patchBark(barkM, { ...woodUniforms(T, C), ...FU });   // NIGHT-6 slice 5: moss low on the trunk (NIGHT-8b: each its own), lichen higher, darker at the foot
+  const NT= has('rocks') || has('bark') ? naturalTextures(T, opt.level, own) : null, NU= has('bark') && NT && NT.barkA ? NAT_UNI(NT) : null;   // FOREST-2: the new files' textures, the bark's relief uniforms
+  if(Lv.barkMoss) patchBark(barkM, NU ? { ...woodUniforms(T, C), ...FU, ...NU } : { ...woodUniforms(T, C), ...FU });   // NIGHT-6 slice 5: moss low on the trunk (NIGHT-8b: each its own), lichen higher, darker at the foot
   const spots=[[-2.1,-2.2,0.34],[2.5,-4.6,0.42],[-1.3,-8.2,0.3],[3.6,0.4,0.28],[-4.2,-5,0.5],[1.1,-11.5,0.36],[-3.3,1.2,0.22],[4.6,-9,0.46]];
   while(spots.length<95){ const x=(R()*2-1)*22, z=4-R()*44; if(Math.hypot(x,z-5.5)<3.2 || (Math.abs(x)<1.1 && z>-7)) continue; spots.push([x,z,0.14+R()*0.42]); }
   for(const sp of spots){ const [x,z]=outOfWater(sp[0], sp[1], STREAM.half+sp[2]+0.35); sp[0]=x; sp[1]=z; }   // NIGHT-6 slice 4: none stands in the new stream (no random draw changes)
@@ -184,9 +203,26 @@ export function buildForest(T, opt){
   const frondG=new T.PlaneGeometry(0.42,1.15); frondG.translate(0,0.575,0); own.push(frondG);
   const ferns=[]; while(ferns.length<80){ const x=(R()*2-1)*12, z=4-R()*26; if(Math.hypot(x,z-5.5)<2.2) continue; ferns.push([x,z,0.6+R()*0.9]); }
   for(const f of ferns){ const [x,z]=outOfWater(f[0], f[1], STREAM.half+0.3+f[2]*0.25); f[0]=x; f[1]=z; }   // NIGHT-6 slice 4: out of the water
+  const fernsToday=nat ? ferns.map(f=>f.slice()) : null;   // FOREST-2: today's ferns (the herb layer is placed round them, then moved)
+  /* FOREST-2: the solids every plant keeps clear of (pure/natural.js; no random draw: everything after stays as seeded) */
+  const wkey0=JSON.stringify(['roots','logs','stumps','snags','twigs','moss','ivy','woodShrooms'].map(k=>Lv[k]||0)), wkeyN=wkey0+(has('roots') ? '.organic' : ''); let SOL=null, clr=null; const movedN={ ferns:0, plants:0, shrooms:[] };
+  if(nat && !WOOD_MEMO.has(wkeyN)) WOOD_MEMO.set(wkeyN, has('roots') ? woodPlaces(Lv, spots, undefined, { roots:(t, p, Rr, nt, tr)=>rootsOrganic(t, p, Rr, nt, tr, lifePlaces(Lv.shrooms, Lv.blooms).filter(q=>q.kind==='shroom').map(q=>[q.x, q.z]).concat((WOOD_MEMO.get(wkey0)||woodPlaces(Lv, spots)).shrooms.map(q=>[q.x, q.z]))), rootTop:rootTopAt }) : woodPlaces(Lv, spots));   // without «roots» the very places of today
+  if(has('clear')){
+    SOL=solidsOf({ trunks:spots, wood:WOOD_MEMO.get(wkeyN), rocks:streamRocks(Math.max(0, Lv.rocks|0)), aisle:ROCKS_TODAY });
+    const blocks=sightBlock(lifePlaces(Lv.shrooms, Lv.blooms).filter(q=>q.kind==='shroom').concat(WOOD_MEMO.get(wkeyN).shrooms));   // the mushrooms' lines of sight: kept free
+    clr=(x, z, reach, o={})=>{ const r=clearSpot(x, z, reach, SOL, { ...o, avoid:blocks }); if(!r[2]) return [x, z, 1]; movedN.plants++; return [r[0], r[1], keepSize(x, z, r[0], r[1], reach, SOL, o.low==null ? reach : o.low)]; };   // → [x, z, size factor]
+  }
   const frondM=new T.MeshStandardMaterial({ map:fernT, alphaTest:0.45, side:T.DoubleSide, roughness:0.85 }), frondD=new T.MeshDistanceMaterial({ map:fernT, alphaTest:0.45, side:T.DoubleSide });
   const fronds=new T.InstancedMesh(frondG, frondM, ferns.length*7); fronds.customDistanceMaterial=frondD; own.push(frondM, frondD);
-  let fi=0; for(const [x,z,sc] of ferns){ const a0=R()*6.28; for(let j=0;j<7;j++){ d.position.set(x,gy(x,z)-0.02,z); d.rotation.set(0.75+R()*0.5,a0+j*0.9+R()*0.3,0,'YXZ'); d.scale.set(sc,sc*(0.8+R()*0.4),sc); d.updateMatrix(); fronds.setMatrixAt(fi++,d.matrix); } }
+  const clrAvoid= has('clear') ? sightBlock(lifePlaces(Lv.shrooms, Lv.blooms).filter(q=>q.kind==='shroom').concat(WOOD_MEMO.get(wkeyN).shrooms)) : null;
+  let S3=null; if(has('clear')){ S3=solids3Of({ trunks:spots, wood:WOOD_MEMO.get(wkeyN), rocks:streamRocks(Math.max(0, Lv.rocks|0)), aisle:ROCKS_TODAY, ground:gy });   // FOREST-2: each fern against its own fronds in 3D (the same draws as today, in the same order)
+    let fi=0; for(const f of ferns){ const sc=f[2], a0=R()*6.28, fr=[]; for(let j=0;j<7;j++){ const tilt=0.75+R()*0.5, yaw=a0+j*0.9+R()*0.3; fr.push({ tilt, yaw, sx:sc, sy:sc*(0.8+R()*0.4) }); }
+      { const r=fernSpot(f[0], f[1], fr, S3, gy, { eye:2.2, water:0.3+sc*0.25, box:[-12, 12, -22, 4], avoid:clrAvoid, reach:0.9*sc, height:0.85*sc });
+        if(r[2]){ const E=NATURAL.clear.eye, k=Math.hypot(r[0]-E[0], r[1]-E[1])/Math.max(0.5, Math.hypot(f[0]-E[0], f[1]-E[1])), big=fr.map(q=>({ ...q, sx:q.sx*k, sy:q.sy*k }));   // a moved fern keeps its size on screen while it stays clear
+          if(k>1 && !frondPoints(r[0], gy(r[0], r[1])-0.02, r[1], big).some(p=>inSolid3(p[0], p[1], p[2], S3))) fr.splice(0, fr.length, ...big);
+          f[0]=r[0]; f[1]=r[1]; movedN.ferns++; } }
+      for(const q of fr){ d.position.set(f[0], gy(f[0], f[1])-0.02, f[1]); d.rotation.set(q.tilt, q.yaw, 0, 'YXZ'); d.scale.set(q.sx, q.sy, q.sx); d.updateMatrix(); fronds.setMatrixAt(fi++, d.matrix); } } }
+  else { let fi=0; for(const [x,z,sc] of ferns){ const a0=R()*6.28; for(let j=0;j<7;j++){ d.position.set(x,gy(x,z)-0.02,z); d.rotation.set(0.75+R()*0.5,a0+j*0.9+R()*0.3,0,'YXZ'); d.scale.set(sc,sc*(0.8+R()*0.4),sc); d.updateMatrix(); fronds.setMatrixAt(fi++,d.matrix); } } }
   fronds.castShadow=fronds.receiveShadow=true; s.add(fronds);
   /* today's aisle rocks: NIGHT-8 drawn with the stream's rounded stones (buildStream, ctx.aisle); each still takes its one draw of the seeded
      stream here, so everything drawn after keeps its look */
@@ -233,21 +269,25 @@ export function buildForest(T, opt){
   /* RUN 9 (slice 2): THE LIFE — ground waves, mushrooms and flowers, the stream (Echo's rings), the ferns' sway / Wave's shimmer
      (./forest-life.js); the wild fireflies GATHER to the playing light while notes come (call) and scatter slowly when they stop */
   /* NIGHT-6 slice 5: the wood's places (its mushrooms join today's in the life's draw) */
-  const wkey=JSON.stringify(['roots','logs','stumps','snags','twigs','moss','ivy','woodShrooms'].map(k=>Lv[k]||0)); if(!WOOD_MEMO.has(wkey)) WOOD_MEMO.set(wkey, woodPlaces(Lv, spots)); const WP=WOOD_MEMO.get(wkey);
-  const life=buildLife({ T, s, C, pal, own, canvas2, tex, lv:Lv, woodShrooms:WP.shrooms }); patchGroundWaves(groundM, life.U); patchWetGround(groundM);   // NIGHT-6 slice 4: wet banks
+  const wkey=JSON.stringify(['roots','logs','stumps','snags','twigs','moss','ivy','woodShrooms'].map(k=>Lv[k]||0)); if(!WOOD_MEMO.has(wkey) && !nat) WOOD_MEMO.set(wkey, woodPlaces(Lv, spots)); const WP=WOOD_MEMO.get(nat ? wkeyN : wkey);   // FOREST-2: the organic roots
+  const GR= has('roots') || has('moss') ? growersOn(WP, NATURAL.growers[opt.level]||NATURAL.growers.full, undefined, spots, sightBlock(lifePlaces(Lv.shrooms, Lv.blooms).filter(q=>q.kind==='shroom').concat(WP.shrooms))) : null;   // FOREST-2: mushrooms at the roots' bases (roots), sprouts on the logs (moss)
+  const WT= has('roots') || has('stumps') ? WOOD_MEMO.get(wkey)||woodPlaces(Lv, spots) : null;   // today's wood (a mushroom buried by a new shape is found against it)
+  const fixShrooms= WT ? P0=>shroomsFree(P0, { roots:WP.roots, stumps:has('stumps') ? WP.stumps : null }, { roots:WT.roots }, gy, movedN.shrooms) : null;   // FOREST-2: every mushroom kept visible
+  const life= nat ? buildLife({ T, s, C, pal, own, canvas2, tex, lv:Lv, woodShrooms:has('roots') ? WP.shrooms.concat(GR.shrooms) : WP.shrooms, fix:fixShrooms }) : buildLife({ T, s, C, pal, own, canvas2, tex, lv:Lv, woodShrooms:WP.shrooms }); patchGroundWaves(groundM, life.U); patchWetGround(groundM);   // NIGHT-6 slice 4: wet banks
   patchSway(frondM, life.U); patchSway(frondD, life.U);   // NIGHT-6 slice 5: restored (slice 4 had left these two behind a comment)
   const soft=!!Lv.softEdges && opt.gl2!==false; if(soft){ patchSoftEdges(frondM); fronds.renderOrder=-0.5; }   // NIGHT-6: soft cut-out edges (the level's switch; WebGL2)
   const detail=buildDetail({ T, s, C, pal, own, canvas2, tex, lv:Lv, U:life.U, fernT, reduce, soft });   // RUN 9 (slice 3)
   /* NIGHT-6 slice 3: the forest floor — the herb layer and the fine fern, placed around today's trunks and ferns */
   let floorTex=null; if(files.floor && Object.keys(Lv).some(k=>['sorrel','forb','bilberry','anemone','nettle','sedge','fern2'].includes(k) && Lv[k]>0)){
     floorTex=new T.Texture(files.floor); floorTex.encoding=T.sRGBEncoding; floorTex.anisotropy=4; floorTex.needsUpdate=true; own.push(floorTex); }
-  const floor=buildFloor({ T, s, own, lv:Lv, trunks:spots, ferns, tex:floorTex, U:life.U, soft });
-  const stream=buildStream({ T, s, C, pal, own, lv:Lv, floorMat:floorTex ? floor.parts.material : null, aisle, litter });   // NIGHT-6 slice 4; NIGHT-8 today's aisle rocks join its stones, the litter's leaves and pebbles its draws
+  const floor= has('clear') || has('moss') ? buildFloor({ T, s, own, lv:Lv, trunks:spots, ferns, tex:floorTex, U:life.U, soft, clear:clr||undefined, avoid:clrAvoid||undefined, fernsToday:fernsToday||undefined, extra:has('moss') ? GR.sprouts : undefined, S3:S3||undefined }) : buildFloor({ T, s, own, lv:Lv, trunks:spots, ferns, tex:floorTex, U:life.U, soft });
+  const stream= has('rocks') || has('moss') ? buildStream({ T, s, C, pal, own, lv:Lv, floorMat:floorTex ? floor.parts.material : null, aisle, litter, rockC:has('rocks') ? NT.rockC||null : null, rockN:has('rocks') ? NT.rockN||null : null, rockL:NT ? NT.rockL : 0.044, mossDetail:has('moss') }) : buildStream({ T, s, C, pal, own, lv:Lv, floorMat:floorTex ? floor.parts.material : null, aisle, litter });   // FOREST-2: the rocks' CC0 detail   // NIGHT-6 slice 4; NIGHT-8 today's aisle rocks join its stones, the litter's leaves and pebbles its draws
   life.waterRocks(stream.inWater);   // NIGHT-8: white water round the rocks in the stream
-  const wood=buildWood({ T, s, C, own, P:WP, barkMap:barkM.map, bumpMap:barkM.bumpMap, rockMat:stream.parts.rockMat, floorMat:floorTex ? floor.parts.material : null, cast:false, FU });   // NIGHT-6 slice 5; the wood stays out of the light's shadow pass (the user, 2026-11-10: high made cheaper)
+  const wood= has('bark') || has('roots') || has('moss') || has('stumps') ? buildWood({ T, s, C, own, P:WP, barkMap:barkM.map, bumpMap:barkM.bumpMap, rockMat:stream.parts.rockMat, floorMat:floorTex ? floor.parts.material : null, cast:false, FU:NU ? { ...FU, ...NU } : FU, nat:{ ground:bankGround, light:!!Lv.softEdges, roots:has('roots'), stumps:has('stumps'), moss:has('moss'), shrooms:WP.shrooms } })
+    : buildWood({ T, s, C, own, P:WP, barkMap:barkM.map, bumpMap:barkM.bumpMap, rockMat:stream.parts.rockMat, floorMat:floorTex ? floor.parts.material : null, cast:false, FU });   // NIGHT-6 slice 5; the wood stays out of the light's shadow pass (the user, 2026-11-10: high made cheaper)
   /* NIGHT-6 slice 7: the canopy (crowns, the understorey, the stars) and the dappled moonlight on the ground */
   let crownTex=null; if(files.crown && Lv.crowns){ crownTex=new T.Texture(files.crown); crownTex.encoding=T.sRGBEncoding; crownTex.anisotropy=4; crownTex.needsUpdate=true; own.push(crownTex); }
-  const canopy=buildCanopy({ T, s, C, own, lv:Lv, trunks:spots, U:life.U, crownTex, woodMat:wood.parts.material, soft });
+  const canopy= has('clear') ? buildCanopy({ T, s, C, own, lv:Lv, trunks:spots, U:life.U, crownTex, woodMat:wood.parts.material, soft, clear:clr, reach:NATURAL.reach, tall:NATURAL.tall, sprays:q=>spraysClear(q, spots.map(([x, z, r])=>({ x, z, r, y0:gy(x, z)+WOOD.trunk.foot })).concat(WP.snags.map(S=>({ x:S.x, z:S.z, r:S.s, y0:S.y+WOOD.trunk.foot })))), clearKey:opt.level+(Lv.rocks|0) }) : buildCanopy({ T, s, C, own, lv:Lv, trunks:spots, U:life.U, crownTex, woodMat:wood.parts.material, soft });
   let dapTex=null; const DU={ uDap:{ value:null }, uDapK:{ value:0 }, uDapT:{ value:0 }, uDapCol:{ value:pal.moonhalo } };
   if(files.dapple && Lv.dapple){ dapTex=new T.Texture(files.dapple); dapTex.wrapS=dapTex.wrapT=T.RepeatWrapping; dapTex.format= opt.gl2!==false ? T.RedFormat : T.RGBAFormat; dapTex.needsUpdate=true; own.push(dapTex); DU.uDap.value=dapTex; patchDapple(groundM, DU); }
   const gust=buildGust({ T, s, own, lv:Lv, U:life.U, floorMat:floorTex ? floor.parts.material : null, life, reduce });   // NIGHT-6 slice 6
@@ -432,7 +472,7 @@ export function buildForest(T, opt){
   const mirror=buildMirror({ T, s, camera, lv:Lv, y:waterY, WU:life.WU, paint, silhouettes:[trunks, branches, canopy.parts.wood, canopy.parts.leaves, canopy.parts.stars, moonS, moonD, ...clouds], own, skyCol:pal.sky });
   const render=r=>{ mirror.render(r, now*1000); paint.render(r, now); };   // NIGHT-9: the mirror first, when due by the room's own clock (one frame drawn twice stays one picture)   // the room's own frame time: one frame drawn twice is the same picture (the grain too)
   resize(W,H);
-  return { id:FOREST_ROOM.id, scene:s, camera, update, resize, place, glint, project, state, dispose, lightsOf, lifeDbg:life, detailDbg:detail, bed, texBytes, answersDbg:answers, floorDbg:floor, streamDbg:stream, woodDbg:wood, gustDbg:gust, canopyDbg:canopy, dappleDbg:DU, render, paintDbg:paint, mirrorDbg:mirror, hiddenDbg:hidden, foxDbg:FU, fernsDbg:{ fronds, frondM, frondD }, groundDbg:{ U:macroU, branches, brs:brs.length, litter },   // NIGHT-8: probes
+  return { id:FOREST_ROOM.id, scene:s, camera, update, resize, place, glint, project, state, dispose, lightsOf, lifeDbg:life, detailDbg:detail, bed, texBytes, answersDbg:answers, floorDbg:floor, streamDbg:stream, woodDbg:wood, gustDbg:gust, canopyDbg:canopy, dappleDbg:DU, render, paintDbg:paint, mirrorDbg:mirror, hiddenDbg:hidden, foxDbg:FU, fernsDbg:{ fronds, frondM, frondD }, woodPlacesDbg:WP, vegDbg:()=>[wood.parts.moss, wood.parts.ivy, life.parts.caps, life.parts.stems, life.parts.petals].filter(m=>m && m.parent), natDbg:()=>({ on:nat, parts:[...NP], moved:{ ...movedN }, solids:SOL ? SOL.length : 0, files:!!NT && !!NT.barkA && !!NT.rockC }), groundDbg:{ U:macroU, branches, brs:brs.length, litter },   // NIGHT-8: probes   // FOREST-2: probes
     held:sec=>{ heldNow= sec>0 ? sec : 0; rare.held(sec); }, rareDbg:kind=>rare.force(kind, now, { light:rigs[0].cur, flies }), viewDbg:o=>{ const lens=v=>!!(v && (v.fov || v.rest)), had=lens(viewOver); viewOver=o||null; if(had || lens(viewOver)) resize(W, H, pxH); else aimCamera(); return viewOver; },
     rest:on=>{ const was=restOn; restOn=!!on; if(restOn && !was){ goalOf(camLook, camGoal); camOff.copy(camGoal); motionK=0; aimCamera(); } return restOn; },   // NIGHT-13: the camera at rest (host sceneRest)
     flyAt, flyPick, flyLand:i=>{ if(flies[i]) lands.push({ i, t0:null }); return !!flies[i]; },   // NIGHT-13: the start's dot becomes one of the fireflies; 13b: its landing swell

@@ -63,27 +63,30 @@ function floorFree(x, z, trunks, gap, items, water=0.4){ if(streamNear(x,z).d<ST
 /* counts: { crowns (0 | 1), crownShare (0…1: the share of each crown's sprays), young, shrubs, saplings, stars } → { limbs (every crown's and
    the understorey's wood), sprays (leaf cards: { x, y, z, s, yaw, tilt, k (variant 0…3), of: 'crown'|'young'|'shrub'|'sapling' }), stems
    (the understorey's trunks and stems as limbs), young, shrubs, saplings (their places), stars ([x, y, z, size, phase]) } — no spray in the gap */
-export function canopyPlaces(counts, trunks, seed=CANOPY.seed, noGap=false){   // noGap: probes only (the CONTROL that a leaf can block the moon)
+export function canopyPlaces(counts, trunks, seed=CANOPY.seed, noGap=false, clear=null){   // noGap: probes only (the CONTROL that a leaf can block the moon); FOREST-2: clear(x, z, kind) → [x, z] — the understorey kept clear of solids (?forest=new; no random draw)
   const limbs=[], sprays=[], keep=s=>noGap || !inGap(s.x, s.y, s.z), share=clamp(counts.crownShare==null ? 1 : counts.crownShare, 0, 1);
   if(counts.crowns){ trunks.forEach(([x,z,r],i)=>{ const R=seeded(seed+101*i), c=crownOf(x, z, r, 16, R); limbs.push(...c.limbs);
     c.sprays.forEach((s,j)=>{ if((s.first || (j*0.618)%1<share) && keep(s)) sprays.push({ ...s, of:'crown' }); }); }); }
   const R=seeded(seed+7), items=[], young=[], shrubs=[], saplings=[], stems=[];
-  { const Y=CANOPY.young; for(let g=0; young.length<(counts.young|0) && g<6000; g++){ const x=(R()*2-1)*16, z=2-R()*28; if(!outOfReach(x,z) || lightAt(x,z)<Y.light || !floorFree(x, z, trunks, Y.gap, items)) continue;
-      const H=Y.H[0]+R()*(Y.H[1]-Y.H[0]), r=Y.r[0]+R()*(Y.r[1]-Y.r[0]), gy=bankGround(x,z); items.push([x, z, 1.8]); young.push({ x, z, H, r });
+  { const Y=CANOPY.young; for(let g=0; young.length<(counts.young|0) && g<6000; g++){ let x=(R()*2-1)*16, z=2-R()*28; if(!outOfReach(x,z) || lightAt(x,z)<Y.light || !floorFree(x, z, trunks, Y.gap, items)) continue;
+      const H=Y.H[0]+R()*(Y.H[1]-Y.H[0]), r=Y.r[0]+R()*(Y.r[1]-Y.r[0]); items.push([x, z, 1.8]); const from=[x, z]; if(clear) [x, z]=clear(x, z, 'young'); const gy=bankGround(x,z); young.push(clear ? { x, z, H, r, from } : { x, z, H, r });   // FOREST-2: today's place decides the rest (items), the plant stands at its clear place
       stems.push([x, gy-0.1, z, x+(R()-0.5)*0.2, gy+H*0.7, z+(R()-0.5)*0.2, r, r*0.45]);
-      const c=crownOf(x, z, r*3, H, seeded(seed+5000+young.length)); stems.push(...c.limbs.map(l=>[l[0], l[1], l[2], l[3], l[4], l[5], l[6]*0.45, l[7]*0.45]));
-      c.sprays.forEach((s,j)=>{ if((s.first || (j*0.618)%1<share) && keep(s)) sprays.push({ ...s, s:s.s*0.85, of:'young' }); }); } }
-  { const S=CANOPY.shrubs; for(let g=0; shrubs.length<(counts.shrubs|0) && g<6000; g++){ const x=(R()*2-1)*14, z=3-R()*26, m=moistAt(x,z); if(!outOfReach(x,z) || R()>0.05+0.95*smooth(S.moist[0], S.moist[1], m) || inGap(x, 1.2, z) || !floorFree(x, z, trunks, 0.8, items, 0.6)) continue;   // damper is likelier; never in the view down the stream
-      const gy=bankGround(x,z), n=S.stems[0]+Math.floor(R()*(S.stems[1]-S.stems[0]+1)), H=S.H[0]+R()*(S.H[1]-S.H[0]); items.push([x, z, 1.6]); shrubs.push({ x, z, H, n });
+      if(clear && young.length && young[young.length-1].from){ const Y0=young[young.length-1], dx=x-Y0.from[0], dz=z-Y0.from[1], dy=gy-bankGround(Y0.from[0], Y0.from[1]);   // FOREST-2: the crown grown at today's place (today's sprays kept), carried whole
+        const c=crownOf(Y0.from[0], Y0.from[1], r*3, H, seeded(seed+5000+young.length)); stems.push(...c.limbs.map(l=>[l[0]+dx, l[1]+dy, l[2]+dz, l[3]+dx, l[4]+dy, l[5]+dz, l[6]*0.45, l[7]*0.45]));
+        c.sprays.forEach((s,j)=>{ if((s.first || (j*0.618)%1<share) && keep(s)) sprays.push({ ...s, x:s.x+dx, y:s.y+dy, z:s.z+dz, s:s.s*0.85, of:'young' }); }); }
+      else { const c=crownOf(x, z, r*3, H, seeded(seed+5000+young.length)); stems.push(...c.limbs.map(l=>[l[0], l[1], l[2], l[3], l[4], l[5], l[6]*0.45, l[7]*0.45]));
+      c.sprays.forEach((s,j)=>{ if((s.first || (j*0.618)%1<share) && keep(s)) sprays.push({ ...s, s:s.s*0.85, of:'young' }); }); } } }
+  { const S=CANOPY.shrubs; for(let g=0; shrubs.length<(counts.shrubs|0) && g<6000; g++){ let x=(R()*2-1)*14, z=3-R()*26; const m=moistAt(x,z); if(!outOfReach(x,z) || R()>0.05+0.95*smooth(S.moist[0], S.moist[1], m) || inGap(x, 1.2, z) || !floorFree(x, z, trunks, 0.8, items, 0.6)) continue;   // damper is likelier; never in the view down the stream
+      items.push([x, z, 1.6]); const x0=x, z0=z; if(clear) [x, z]=clear(x, z, 'shrub'); const gy=bankGround(x,z), dgy= clear ? gy-bankGround(x0, z0) : 0, n=S.stems[0]+Math.floor(R()*(S.stems[1]-S.stems[0]+1)), H=S.H[0]+R()*(S.H[1]-S.H[0]); shrubs.push({ x, z, H, n });
       for(let k=0;k<n;k++){ const a=R()*TAU, out=0.4+R()*0.9, ox=Math.cos(a)*out, oz=Math.sin(a)*out, h=H*(0.7+R()*0.4);
         stems.push([x, gy-0.05, z, x+ox*0.5, gy+h*0.7, z+oz*0.5, 0.025, 0.016], [x+ox*0.5, gy+h*0.7, z+oz*0.5, x+ox, gy+h, z+oz, 0.016, 0.008]);
         for(let j=0;j<3;j++){ const t=0.45+j*0.25, sx=x+ox*t, sy=gy+h*(0.5+0.5*t), sz=z+oz*t, sp={ x:sx, y:sy, z:sz, s:0.55+R()*0.35, yaw:R()*TAU, tilt:(R()-0.5)*1.2, k:Math.floor(R()*4), of:'shrub' };
-          if((j===0 || (j*0.618)%1<share) && keep(sp)) sprays.push(sp); } } } }
-  { const S=CANOPY.saplings, E=CANOPY.eye; for(let g=0; saplings.length<(counts.saplings|0) && g<6000; g++){ const a=-Math.PI/2+(R()-0.5)*2.4, rr=S.eye[0]+R()*(S.eye[1]-S.eye[0]), x=E[0]+Math.cos(a)*rr, z=E[2]+Math.sin(a)*rr;
+          if((j===0 || (j*0.618)%1<share) && keep(clear ? { ...sp, x:sp.x-(x-x0), y:sp.y-dgy, z:sp.z-(z-z0) } : sp)) sprays.push(sp); } } } }   // FOREST-2: kept or not as at today's place
+  { const S=CANOPY.saplings, E=CANOPY.eye; for(let g=0; saplings.length<(counts.saplings|0) && g<6000; g++){ const a=-Math.PI/2+(R()-0.5)*2.4, rr=S.eye[0]+R()*(S.eye[1]-S.eye[0]); let x=E[0]+Math.cos(a)*rr, z=E[2]+Math.sin(a)*rr;
       if(Math.abs(x)<CANOPY.reach.sapX || lightAt(x,z)<S.light || !floorFree(x, z, trunks, 0.9, items)) continue;
-      const gy=bankGround(x,z), H=S.H[0]+R()*(S.H[1]-S.H[0]); items.push([x, z, 1.1]); saplings.push({ x, z, H });
+      items.push([x, z, 1.1]); const x0=x, z0=z; if(clear) [x, z]=clear(x, z, 'sapling'); const gy=bankGround(x,z), dgy= clear ? gy-bankGround(x0, z0) : 0, H=S.H[0]+R()*(S.H[1]-S.H[0]); saplings.push({ x, z, H });
       stems.push([x, gy-0.05, z, x+(R()-0.5)*0.15, gy+H, z+(R()-0.5)*0.15, 0.02, 0.006]);
-      for(let j=0;j<4+Math.floor(R()*4);j++){ const t=0.45+R()*0.55, sp={ x:x+(R()-0.5)*0.5, y:gy+H*t, z:z+(R()-0.5)*0.5, s:0.35+R()*0.25, yaw:R()*TAU, tilt:(R()-0.5)*1.0, k:Math.floor(R()*4), of:'sapling' }; if(keep(sp)) sprays.push(sp); } } }
+      for(let j=0;j<4+Math.floor(R()*4);j++){ const t=0.45+R()*0.55, sp={ x:x+(R()-0.5)*0.5, y:gy+H*t, z:z+(R()-0.5)*0.5, s:0.35+R()*0.25, yaw:R()*TAU, tilt:(R()-0.5)*1.0, k:Math.floor(R()*4), of:'sapling' }; if(keep(clear ? { ...sp, x:sp.x-(x-x0), y:sp.y-dgy, z:sp.z-(z-z0) } : sp)) sprays.push(sp); } } }
   const stars=[]; { const S=CANOPY.stars, Rs=seeded(seed+9), E=CANOPY.eye; for(let i=0;i<(counts.stars|0);i++){ const az=(S.az[0]+Rs()*(S.az[1]-S.az[0]))/D, el=Math.asin(lerp(Math.sin(S.el[0]/D), Math.sin(S.el[1]/D), Rs()));
       stars.push([E[0]+Math.sin(az)*Math.cos(el)*S.r, E[1]+Math.sin(el)*S.r, E[2]-Math.cos(az)*Math.cos(el)*S.r, 0.6+Math.pow(Rs(),3)*1.8, Rs()*TAU]); } }
   return { limbs, stems, sprays, young, shrubs, saplings, stars };

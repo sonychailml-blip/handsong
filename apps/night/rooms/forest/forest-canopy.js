@@ -7,7 +7,7 @@
    - DAPPLED MOONLIGHT on the ground: two drifting copies of the prepared dapple pattern (tex/dapple-*.png) add the moon's light in patches,
      dimmed by the clouds (patchDapple). The moon's face itself is a prepared file too (tex/moon-*.png; forest.js puts it on the disc).
    Colours: tokens (--cv-forest-star; the moon's colour for the dapple). */
-import { canopyPlaces, crownCellUv } from './pure/canopy.js';
+import { canopyPlaces, crownCellUv, CANOPY } from './pure/canopy.js';
 import { plantMaterial } from './forest-floor.js';
 import { limbGeo } from './forest-wood.js';
 import { seeded } from '../../../../core/pure/dsp.js';
@@ -21,7 +21,8 @@ const MEMO=new Map();
    wood's material), soft } → { update(dt, t, F), resize(scale), state(), parts } */
 export function buildCanopy(ctx){
   const { T, s, C, own, lv, trunks, U }=ctx, counts={ crowns:lv.crowns ? 1 : 0, crownShare:lv.crownShare==null ? 1 : lv.crownShare, young:lv.young|0, shrubs:lv.shrubs|0, saplings:lv.saplings|0, stars:lv.stars|0 };
-  const key=JSON.stringify(counts); if(!MEMO.has(key)) MEMO.set(key, canopyPlaces(counts, trunks)); const P=MEMO.get(key), d=new T.Object3D(), c=new T.Color(), R=seeded(0x43414E31);
+  const cl=ctx.clear ? (x, z, k)=>ctx.clear(x, z, ctx.reach[k], { tall:ctx.tall[k], eye:3.4, aisle: k==='sapling' ? [CANOPY.reach.sapX, -1e9] : [CANOPY.aisle, -8] }).slice(0, 2) : null;   // FOREST-2: the understorey clear of solids (?forest=new)
+  const key=JSON.stringify(counts)+(cl ? '.nat'+ctx.clearKey : ''); if(!MEMO.has(key)) MEMO.set(key, cl ? (q=>({ ...q, sprays:ctx.sprays(q.sprays) }))(canopyPlaces(counts, trunks, undefined, false, cl)) : canopyPlaces(counts, trunks)); const P=MEMO.get(key), d=new T.Object3D(), c=new T.Color(), R=seeded(0x43414E31);   // FOREST-2: ctx.sprays — the understorey's sprays pushed off the trunks
   /* limbs and stems: the wood's material, no shadow */
   const wg=limbGeo(T, P.limbs.concat(P.stems), [0, 0, 0.3]), wood= wg ? new T.Mesh(wg, ctx.woodMat) : null; if(wood){ own.push(wg); wood.receiveShadow=true; s.add(wood); }
   /* the leaf sprays */

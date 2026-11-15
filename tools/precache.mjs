@@ -15,7 +15,7 @@ export const NEVER=[/^tools\//, /^apps\/night\/rooms\/rain\//, /^sw\.js$/, /\.md
 /* files a build carries that no player's start fetches, so not precached (fetched from the network if ever asked): the forest's BAKED floor (ground,
    groundn — every level draws the scanned one, FOREST_LEVELS groundScan) and the scan's 2048 copies (no level's FOREST_TEX set names them); both are
    kept for the captures' comparisons. Data row «NIGHT precache list (app)» proves no level's file is skipped and every skipped file is one no level fetches. */
-export const NIGHT_SKIP=Object.freeze([/^apps\/night\/rooms\/forest\/tex\/groundn?-\d+\.png$/, /^apps\/night\/rooms\/forest\/scan\/litter-(col|nor)-2048\.jpg$/]);
+export const NIGHT_SKIP=Object.freeze([/^apps\/night\/rooms\/forest\/tex\/groundn?-\d+\.png$/, /^apps\/night\/rooms\/forest\/scan\/litter-(col|nor)-2048\.jpg$/, /^apps\/night\/rooms\/forest\/new\//]);   // FOREST-2: the new forest's files (?forest=new only)
 /* NIGHT-14b: files Night does not need to START — the Detailed level's own pictures (Standard, the default, draws the smaller ones) and the install
    icons: the worker installs them after the start set, so a short first visit already starts offline next time; a player who chose Detailed gets
    Standard until they are in (NIGHT-14c, scene/host.js). NIGHT-14c: every level's still is a START file (the start screen shows the chosen level's

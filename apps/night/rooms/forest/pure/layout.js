@@ -22,3 +22,16 @@ export function forestTrunks(){
 }
 export const ROCKS_TODAY=Object.freeze([[-1.6,-1,0.5],[1.9,-2.8,0.35],[-2.8,-6.5,0.7],[2.2,-8,0.45],[0.6,-5.4,0.25],[-0.8,-12,0.6],[3.4,-12.5,0.5]]
   .map(([x0,z0,sz])=>{ const [x,z]=outOfWater(x0, z0, STREAM.half+sz*1.1); return Object.freeze([x, z, sz]); }));
+/* FOREST-2 (FOREST-1's law, kept): each trunk's turn about its axis (radians, three.js rotation.y) — forest.js draws it right after the trunks' places,
+   then that trunk's old branches (0…2: a draw for the loop's test each time, three for each branch, only for trunks nearer than z −24); this replays exactly
+   that. The organic roots grow out of the flare's lobes, which turn with the trunk (world angle = the lobe's own angle − the turn) */
+let YAWS=null;
+export function forestTrunkYaws(){
+  if(YAWS) return YAWS.slice();
+  const R=seeded(FOREST_SEED); for(let i=0;i<PAINT_DRAWS;i++) R();
+  const spots=[[-2.1,-2.2,0.34],[2.5,-4.6,0.42],[-1.3,-8.2,0.3],[3.6,0.4,0.28],[-4.2,-5,0.5],[1.1,-11.5,0.36],[-3.3,1.2,0.22],[4.6,-9,0.46]];
+  while(spots.length<95){ const x=(R()*2-1)*22, z=4-R()*44; if(Math.hypot(x,z-5.5)<3.2 || (Math.abs(x)<1.1 && z>-7)) continue; spots.push([x,z,0.14+R()*0.42]); }
+  for(const sp of spots){ const [x,z]=outOfWater(sp[0], sp[1], STREAM.half+sp[2]+0.35); sp[0]=x; sp[1]=z; }
+  YAWS=spots.map(([, z])=>{ R(); const yaw=R()*6.28; R(); if(z>-24) for(let b=0; b<(R()*3|0); b++){ R(); R(); R(); } return yaw; });
+  return YAWS.slice();
+}

@@ -498,6 +498,31 @@
         "https://www.tiktok.com/@handsongapp"
       ],
       "notes": "SITE-1: plain links in the site's footer; no embed, no widget, nothing loaded from these hosts."
+    },
+    {
+      "id": "forest-natural",
+      "name": "The night forest's natural objects (FOREST-2, the address word ?forest=new only): the rocks' colour and normal detail, two barks' relief (luminance standardised, normal x/y) side by side",
+      "class": "image",
+      "use": "shipped",
+      "version": "FOREST-2, 2026-11-15 (tools/forest-natural.mjs)",
+      "licence": "CC0-1.0",
+      "source": "Composed by our own tool tools/forest-natural.mjs from Poly Haven textures, every one CC0 1.0 (https://polyhaven.com/license): «Lichen Rock» (https://polyhaven.com/a/lichen_rock), «Pine Bark» (https://polyhaven.com/a/pine_bark, Dimitrios Savva), «Bark Brown 02» (https://polyhaven.com/a/bark_brown_02, Rob Tuytel). Resized and repacked; the sources (register entry forest-natural-sources) are proved by their SHA-1s. Fetched only with ?forest=new, never in a player's start set (tools/precache.mjs NIGHT_SKIP).",
+      "files": [
+        "apps/night/rooms/forest/new/bark-1024x512.jpg",
+        "apps/night/rooms/forest/new/rock-col-512.jpg",
+        "apps/night/rooms/forest/new/rock-nor-512.jpg"
+      ],
+      "replace": "kept — CC0 photo material composed by us (FOREST-2: the founder asked for natural objects; the rocks are FOREST-1's, which he liked)"
+    },
+    {
+      "id": "forest-natural-sources",
+      "name": "The night forest's CC0 sources for FOREST-2's detail files: Poly Haven «Lichen Rock», «Pine Bark» and «Bark Brown 02» (colour and OpenGL normal, 1k JPG)",
+      "class": "image",
+      "use": "dev-only",
+      "version": "Poly Haven, 1k JPG; lichen_rock downloaded 2026-11-15 (FOREST-1, kept from the archive), pine_bark and bark_brown_02 downloaded 2026-11-15",
+      "licence": "CC0-1.0",
+      "source": "Poly Haven, every asset CC0 1.0 (https://polyhaven.com/license): https://polyhaven.com/a/lichen_rock, https://polyhaven.com/a/pine_bark (Dimitrios Savva), https://polyhaven.com/a/bark_brown_02 (Rob Tuytel). Stored unchanged in the design sources tools/design/forest/cc0/ (never fetched at run time, never shipped). SHA-1: lichen_rock_diff_1k 9646bf5e4168b70afbd5ae419f8a42dfc8880687, lichen_rock_nor_gl_1k 6411cd091ed3bd38e1c5745ed8298a6d9dcb6c93, pine_bark_diff_1k 067cffd1e73ca9ae025d08724dc494efb1db2c1f, pine_bark_nor_gl_1k 734efab3daa5e48457ee9396d11de1179c610a0d, bark_brown_02_diff_1k faf104e8dc4f71875c15a9a035b0dae36454d5a5, bark_brown_02_nor_gl_1k 3c233391ee5d446a7aebd6a203643d8cb4920c78 (tools/forest-natural.mjs checks them).",
+      "replace": "kept — CC0 sources of our composed detail files"
     }
   ],
   "glyphs": [

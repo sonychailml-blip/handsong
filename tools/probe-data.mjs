@@ -2473,6 +2473,68 @@ async function forestBarkMoss(){
    mapping rows (none shared with a trunk, the lists long enough); CONTROL the limbs' list is not the wood's. (4) The look's source: moss and
    lichen read the piece's own numbers on both paths (no bark-only branch), no world-angle coordinate, the lichen from vp8; CONTROL the old
    lichen line fails that judgement. */
+/* FOREST-2: row «FOREST natural (app)» — the laws of ?forest=new (apps/night/rooms/forest/pure/natural.js) and its files: (1) the organic roots keep today's
+   main count per near tree (forks extra, every point out of the water, seeded: two draws equal); CONTROL a law giving one root more per tree is caught. (2) clearSpot
+   never returns a place a solid touches, never moves a clear plant, draws nothing random (the same answer twice), keeps out of the water and the aisle;
+   CONTROL a solid laid on a clear plant moves it. (3) fernSpot: a fern whose fronds cut a rock moves to where none does; CONTROL the same fern without the rock
+   stays. (4) spraysClear: no understorey spray within its reach of a trunk at its height, crowns untouched; CONTROL the unpushed list fails. (5) growersOn:
+   the counts asked, mushrooms beside the roots, sprouts on the logs' tops. (6) the files: tools/forest-natural.mjs --check's laws (sources' SHA-1s, files there);
+   none in a player's start set (tools/precache.mjs NIGHT_SKIP skips them; CONTROL a path outside is not skipped). */
+async function forestNatural(){
+  const d=[], notes=[]; let n=0; const miss=s=>d.push(s), base='../apps/night/rooms/forest/pure/', I=f=>import(new URL(base+f, import.meta.url).href);
+  const N=await I('natural.js'), W=await I('wood.js'), Lo=await I('layout.js'), St=await I('stream.js'), FR=(await I('room.js')).FOREST_ROOM, FL=await I('forestlife.js'), Ff=await I('fireflies.js');
+  const T=Lo.forestTrunks();
+  for(const lvn of ['reduced', 'full']){ const lv=FR.levels[lvn], old=W.woodPlaces(lv, T), nw=W.woodPlaces(lv, T, undefined, { roots:N.rootsOrganic });
+    /* (1) roots */
+    const per=P=>{ const m={}; for(const r of P.roots) if(!r.fork) m[r.tree]=(m[r.tree]||0)+1; return m; }, a=per(old), b=per(nw);
+    const same=(x, y)=>[...new Set([...Object.keys(x), ...Object.keys(y)])].every(k=>(x[k]||0)===(y[k]||0));
+    n++; if(!same(a, b)) miss(`${lvn}: the organic roots' count per tree differs from today's (${JSON.stringify(b)} / ${JSON.stringify(a)})`);
+    /* each shaped root follows its own root of today: every point on today's path (within 1 mm), in today's order; the forks after every main root */
+    const onPath=(q, P)=>{ let best=Infinity; for(let k=1;k<P.length;k++){ const A=P[k-1], B=P[k], vx=B[0]-A[0], vz=B[2]-A[2], t=Math.max(0, Math.min(1, ((q[0]-A[0])*vx+(q[2]-A[2])*vz)/(vx*vx+vz*vz||1))); best=Math.min(best, Math.hypot(q[0]-A[0]-vx*t, q[2]-A[2]-vz*t)); } return best; };
+    const mains=nw.roots.filter(x=>!x.fork), offPath=(L, T0)=>L.reduce((m, rt, i)=>Math.max(m, ...rt.pts.map(q=>onPath(q, T0[i].pts))), 0);
+    n+=2; { const dev=offPath(mains, old.roots); if(!(dev<0.001)) miss(`${lvn}: a shaped root leaves today's path by ${dev.toFixed(4)} m`); }
+    if(nw.roots.findIndex(x=>x.fork)>=0 && nw.roots.slice(nw.roots.findIndex(x=>x.fork)).some(x=>!x.fork)) miss(`${lvn}: a main root comes after a fork`);
+    n++; { const shifted=mains.map(rt=>({ ...rt, pts:rt.pts.map(q=>[q[0]+0.1, q[1], q[2], q[3]]) })); if(offPath(shifted, old.roots)<0.001) miss(`CONTROL ${lvn}: a root moved 10 cm stayed on today's path`); }
+    /* inside today's outline (FOREST-2: a shaped root hides nothing today's did not): its ridge no higher, its half width no wider than today's root there */
+    { const outOf=L=>{ let worst=0; L.forEach((rt, i)=>{ const T0=old.roots[i].pts; rt.pts.forEach((q, j)=>{ let best=null, bd=Infinity; for(let k=1;k<T0.length;k++){ const A=T0[k-1], B=T0[k], vx=B[0]-A[0], vz=B[2]-A[2], L2=vx*vx+vz*vz||1, t=Math.max(0, Math.min(1, ((q[0]-A[0])*vx+(q[2]-A[2])*vz)/L2)), dd=Math.hypot(q[0]-A[0]-vx*t, q[2]-A[2]-vz*t); if(dd<bd){ bd=dd; best=[A[1]+A[3]+(B[1]+B[3]-A[1]-A[3])*t, A[3]+(B[3]-A[3])*t]; } }
+        worst=Math.max(worst, rt.top[j]-best[0]-0.011, q[3]-best[1]-1e-9); }); }); return worst; };
+      n+=2; const w=outOf(mains); if(w>0) miss(`${lvn}: a shaped root leaves today's outline by ${w.toFixed(4)} m`);
+      if(outOf(mains.map(rt=>({ ...rt, pts:rt.pts.map(q=>[q[0], q[1], q[2], q[3]*1.1]) })))<=0) miss(`CONTROL ${lvn}: a root 10 % wider stayed inside today's outline`); }
+    const forks=nw.roots.filter(r=>r.fork).length; notes.push(`${lvn}: roots today ${old.roots.length}, organic ${nw.roots.length-forks} + ${forks} forks`);
+    n++; if(nw.roots.some(r=>r.pts.some(p=>FL.streamNear(p[0], p[2]).d<FL.STREAM.half+0.1))) miss(`${lvn}: an organic root lies in the water`);
+    n++; if(JSON.stringify(W.woodPlaces(lv, T, undefined, { roots:N.rootsOrganic }).roots)!==JSON.stringify(nw.roots)) miss(`${lvn}: two draws of the organic roots differ`);
+    n++; { const plus=(t, p, R, near, today)=>{ const r=N.rootsOrganic(t, p, R, near, today); return r.concat(r.filter(x=>!x.fork).slice(0, 1).map(x=>({ ...x }))); };
+      if(same(a, per(W.woodPlaces(lv, T, undefined, { roots:plus })))) miss(`CONTROL ${lvn}: one root more was not seen by the count`); }
+    /* (2) clearSpot */
+    const sol=N.solidsOf({ trunks:T, wood:nw, rocks:St.streamRocks(lv.rocks), aisle:Lo.ROCKS_TODAY }); let bad=0, still=0, k=0; const Rq=(()=>{ let s=12345; return ()=>((s=(s*1103515245+12345)>>>0)/4294967296); })();
+    for(let i=0;i<400;i++){ const x=(Rq()*2-1)*10, z=2-Rq()*18, reach=0.1+Rq()*0.5; if(FL.streamNear(x, z).d<FL.STREAM.half+0.2 || Math.hypot(x, z-5.5)<2.6) continue; k++;
+      const r=N.clearSpot(x, z, reach, sol, {}); if(r[2] && N.solidHit(r[0], r[1], reach, sol)) bad++; if(!N.solidHit(x, z, reach, sol) && r[2]) still++;
+      if(r[2] && (FL.streamNear(r[0], r[1]).d<FL.STREAM.half+0.2 || Math.hypot(r[0], r[1]-5.5)<2.6)) bad++;
+      const r2=N.clearSpot(x, z, reach, sol, {}); if(r2[0]!==r[0] || r2[1]!==r[1]) bad++; }
+    n+=3; if(bad) miss(`${lvn}: clearSpot gave ${bad} place(s) touched by a solid, in the water, under the eye, or not repeatable`); if(still) miss(`${lvn}: clearSpot moved ${still} clear plant(s)`); notes.push(`${lvn}: clearSpot over ${k} random plants, ${sol.length} solids`);
+    n++; { const q=[0.3, -9.7], s2=[{ kind:'rock', x:q[0], z:q[1], r:0.5 }], r=N.clearSpot(q[0], q[1], 0.3, s2, { water:-99 }); if(!r[2]) miss(`CONTROL ${lvn}: a rock laid on a clear plant did not move it`); }
+    /* (4) spraysClear */
+    const stems=T.map(([x, z, r])=>({ x, z, r, y0:Ff.forestGround(x, z)+W.WOOD.trunk.foot })), raw=[{ of:'young', x:T[0][0]+0.05, y:Ff.forestGround(T[0][0], T[0][1])+3, z:T[0][1], s:0.6 }, { of:'crown', x:T[0][0], y:Ff.forestGround(T[0][0], T[0][1])+9, z:T[0][1], s:0.6 }];
+    const cut=L=>L.some(p=>p.of!=='crown' && stems.some(t=>{ const hb=p.y-t.y0; return hb>=0 && hb<16 && Math.hypot(p.x-t.x, p.z-t.z)<W.trunkRadius(t.r, hb)+0.62*p.s; }));
+    const cl=N.spraysClear(raw, stems); n+=3; if(cut(cl)) miss(`${lvn}: a pushed spray still cuts a trunk`); if(cl[1]!==raw[1]) miss(`${lvn}: a crown's spray was moved`); if(!cut(raw)) miss(`CONTROL ${lvn}: the unpushed spray did not cut the trunk`);
+    /* (5) growers */
+    const G=N.growersOn(nw, N.NATURAL.growers[lvn], undefined, T); n+=4;
+    if(G.shrooms.some(p=>N.rootHit(p.x, p.y+p.s, p.z, nw.roots) || N.rootHit(p.x, p.y+p.s*2.2, p.z, nw.roots))) miss(`${lvn}: an added mushroom is inside a root`);
+    if(G.shrooms.length>N.NATURAL.growers[lvn].shrooms || G.sprouts.length>N.NATURAL.growers[lvn].sprouts || G.sprouts.some(sp=>nw.shrooms.some(q=>q.on==='log' && Math.hypot(q.x-sp.x, q.z-sp.z)<0.45))) miss(`${lvn}: growers ${G.shrooms.length} mushrooms / ${G.sprouts.length} sprouts, asked ${JSON.stringify(N.NATURAL.growers[lvn])}`);
+    if(G.sprouts.some(p=>!nw.logs.some(L=>{ const vx=L.b[0]-L.a[0], vz=L.b[2]-L.a[2], t=Math.max(0, Math.min(1, ((p.x-L.a[0])*vx+(p.z-L.a[2])*vz)/(vx*vx+vz*vz))); return Math.hypot(p.x-L.a[0]-vx*t, p.z-L.a[2]-vz*t)<Math.max(L.r0, L.r1)+0.01 && p.y>L.a[1]+(L.b[1]-L.a[1])*t; }))) miss(`${lvn}: a sprout is not on a log's top`);
+    if(G.shrooms.some(p=>!nw.roots.some(r=>r.pts.some(q=>Math.hypot(q[0]-p.x, q[2]-p.z)<q[3]+0.2)))) miss(`${lvn}: a mushroom is not beside a root`);
+    notes.push(`${lvn}: growers ${G.shrooms.length} mushrooms at root bases, ${G.sprouts.length} sprouts on the logs`); }
+  /* (3) fernSpot */
+  { const g=(x, z)=>0, rock=N.solids3Of({ rocks:[{ x:0.2, z:-10, s:0.4, y:0 }], ground:g }), none=N.solids3Of({ ground:g }), fr=Array.from({ length:7 }, (_,j)=>({ tilt:1.0, yaw:j*0.9, sx:1, sy:1 }));
+    const r=N.fernSpot(0, -10, fr, rock, g, { water:-99, eye:0 }); n+=3; if(!r[2]) miss('fernSpot: a fern in a rock did not move'); else if(N.frondPoints(r[0], -0.02, r[1], fr).some(p=>N.inSolid3(p[0], p[1], p[2], rock))) miss('fernSpot: the moved fern still cuts the rock');
+    if(N.fernSpot(0, -10, fr, none, g, { water:-99, eye:0 })[2]) miss('CONTROL: fernSpot moved a fern with no solid near'); }
+  /* (6) files */
+  { const FN=await import(new URL('./forest-natural.mjs', import.meta.url).href), r=FN.naturalCheck(); n+=r.cases; for(const x of r.differences) miss('files: '+x);
+    const PC=await import(new URL('./precache.mjs', import.meta.url).href); n+=2; for(const f of FN.NATURAL_FILES) if(!PC.NIGHT_SKIP.some(q=>q.test('apps/night/rooms/forest/new/'+f))) miss(`apps/night/rooms/forest/new/${f} would be in a player's start set`);
+    if(PC.NIGHT_SKIP.some(q=>q.test('apps/night/rooms/forest/tex/floor-1024.png'))) miss('CONTROL: the skip list skips a start file of the forest');
+    const { statSync }=await import('node:fs'), sz=FN.NATURAL_FILES.reduce((a, f)=>a+statSync(new URL('../apps/night/rooms/forest/new/'+f, import.meta.url)).size, 0); notes.push(`the new forest's files: ${(sz/1024).toFixed(0)} KB (only with ?forest=new; the start set unchanged)`); }
+  return { cases:n, total:d.length, differences:d, notes };
+}
 async function forestBarkLayouts(){
   const d=[], notes=[]; let n=0; const miss=s=>d.push(s), W=await import(new URL('../apps/night/rooms/forest/pure/wood.js', import.meta.url).href), Lo=await import(new URL('../apps/night/rooms/forest/pure/layout.js', import.meta.url).href);
   const FW=await import(new URL('../apps/night/rooms/forest/forest-wood.js', import.meta.url).href), FR=(await import(new URL('../apps/night/rooms/forest/pure/room.js', import.meta.url).href)).FOREST_ROOM;
@@ -2782,6 +2844,7 @@ const ROWS=[
   ['FOREST wood (app)',         ()=>forestWoodCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 5
   ['FOREST bark moss (app)',    ()=>forestBarkMoss(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-8b
   ['FOREST bark layouts (app)', ()=>forestBarkLayouts(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-8c
+  ['FOREST natural (app)',     ()=>forestNatural(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // FOREST-2
   ['FOREST fireflies visit the light (app)', ()=>forestFliesVisit(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-8b
   ['NIGHT stream recording (app)', ()=>nightStreamRec(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-8b
   ['NIGHT full-screen icons (app)', ()=>nightFsIcons(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-8b

@@ -71,6 +71,7 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   - **Timing** (start times, frame costs, `--measure-start`, `--throttle`, `--repeat`): only when the run is about speed, on an idle machine; real
     phones decide. The founder says the laptop is busy → no timing runs. A timing row that fails on a busy machine is rerun ONCE, then reported as
     load noise — ⛔ never «fixed» by widening it.
+  - ⛳ **Iteration mode** (founder, 2026-11-15): while we iterate, run ONLY quick checks — `node tools/check-static.mjs`, `node tools/probe-data.mjs` and the one or two rows touched (`--eval`). NO full suites, no `--ui-only`, nothing that runs for many minutes: the founder checks by eye. A full run (the Night suite, and Full when the core is touched, with `--limit-min 30`) only before a publish to `night-release`, or when the founder writes «full check». This wins over the probe budget's «Every slice» line and over Levels 1–3 while iterating.
   - **Every check that waits for an event keeps an upper time limit and FAILS when it is reached** (never waits forever, never reads on as if
     the event came).
 - ⛳ **Code comments** (user's rule, DOCS-EN): English, short — one or two lines of "why". No mass translation of existing

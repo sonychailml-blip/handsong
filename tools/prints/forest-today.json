@@ -1,0 +1,57 @@
+{
+ "made": "2026-11-15",
+ "what": "the forest before FOREST-2 (forest-approved-2026-11-15), no switch",
+ "levels": {
+  "reduced": {
+   "geo": {
+    "hash": "5e7b7319",
+    "objects": 85,
+    "kinds": {
+     "MeshStandardMaterial": 15,
+     "MeshBasicMaterial": 20,
+     "SpriteMaterial": 38,
+     "ShaderMaterial": 10,
+     "MeshLambertMaterial": 2
+    }
+   },
+   "prog": {
+    "hash": "094e54c6",
+    "programs": 26
+   },
+   "views": {
+    "phone": {
+     "hash": "21aefd79"
+    },
+    "laptop": {
+     "hash": "dadda2bd"
+    }
+   }
+  },
+  "full": {
+   "geo": {
+    "hash": "3d40d3ac",
+    "objects": 103,
+    "kinds": {
+     "MeshStandardMaterial": 15,
+     "MeshBasicMaterial": 22,
+     "SpriteMaterial": 54,
+     "ShaderMaterial": 10,
+     "MeshLambertMaterial": 2
+    }
+   },
+   "prog": {
+    "hash": "02be3a96",
+    "programs": 26
+   },
+   "views": {
+    "phone": {
+     "hash": "05936ca4"
+    },
+    "laptop": {
+     "hash": "dccdc9b8"
+    }
+   }
+  }
+ },
+ "renderer": "ANGLE (Intel, Intel(R) HD Graphics 4000 (0x00000166) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+}

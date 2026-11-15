@@ -11,6 +11,7 @@ import { STREAM_LIFE, streamRocks, streamPebbles, floatersInit, floatAt, mistStr
 import { STREAM, streamNear } from './pure/forestlife.js';
 import { cellUv, FLOOR_ATLAS } from './pure/floor.js';
 import { seeded } from '../../../../core/pure/dsp.js';
+import { natRock } from './forest-natural.js';   // FOREST-2: the rocks' CC0 detail (?forest=new only)
 
 const NOISE=`float h21(vec2 p){ p=fract(p*vec2(123.34,456.21)); p+=dot(p,p+45.32); return fract(p.x*p.y); }
 float vn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(h21(i),h21(i+vec2(1.0,0.0)),f.x), mix(h21(i+vec2(0.0,1.0)),h21(i+vec2(1.0,1.0)),f.x), f.y); }`;
@@ -41,6 +42,7 @@ export function buildStream(ctx){
      buried; darker and glossier where wet — below the water's level and in the splash band of a rock at the edge) */
   const rockM=new T.MeshStandardMaterial({ color:0xffffff, roughness:0.8 }), moss={ value:new T.Color(C('forest-moss')) },
     RU={ uMoss:moss, uRockG:{ value:new T.Color(C('forest-rock-grey')) }, uRockW:{ value:new T.Color(C('forest-rock-warm')) }, uRockL:{ value:new T.Color(C('forest-rock-lichen')) }, uRock0:{ value:new T.Color(C('forest-rock')) } };
+  const det=!!(ctx.rockC && ctx.rockN), mossD=!!ctx.mossDetail; if(det){ RU.uRkC={ value:ctx.rockC }; RU.uRkN={ value:ctx.rockN }; RU.uRkL={ value:ctx.rockL||0.044 }; }   // FOREST-2: rocks — the CC0 detail; moss — the cushions' lobes and clumps   // FOREST-2: the CC0 detail (?forest=new)
   rockM.onBeforeCompile=sh=>{ Object.assign(sh.uniforms, RU);
     sh.vertexShader='attribute float aWater;\nattribute float aMoss;\nvarying float vWater;\nvarying float vMoss;\nvarying vec3 vWP5;\nvarying vec3 vWN5;\n'+ROCK_V+'\n'+sh.vertexShader
       .replace('#include <beginnormal_vertex>', `vec3 rkN=normalize(normal), rkG; float rkr=rkR(rkN, aRock, rkG); vec3 objectNormal=normalize(rkr*rkN-(rkG-dot(rkG,rkN)*rkN)); vRock=aRock;`)
@@ -58,8 +60,8 @@ export function buildStream(ctx){
   st=mix(st, uRockL*(0.75+0.5*vn(vWP5.xz*80.0+vWP5.y*60.0)), li*0.65);
   vec3 mc=uMoss*(0.7+0.6*vn(vWP5.xz*20.0))*mix(1.0, (0.65+0.6*vn(vWP5.xz*5.0+vWP5.y*3.0))*(0.75+0.5*vn(vWP5.xz*55.0+vWP5.y*40.0))*0.42, vMoss);   // darker: night moss
   diffuseColor.rgb=mix(st, mc, mt); diffuseColor.rgb*=mix(1.0, 0.58, wet);`)
-      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  roughnessFactor=mix(mix(roughnessFactor, 0.42, wet), 1.0, max(vMoss, mt*0.85));'); };
-  rockM.customProgramCacheKey=()=>'handsong.streamRock3'; own.push(rockM);   // 3: the shape per instance, the stones' colours (NIGHT-8)
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  roughnessFactor=mix(mix(roughnessFactor, 0.42, wet), 1.0, max(vMoss, mt*0.85));'); if(det || mossD) natRock(sh, { rocks:det, moss:mossD }); };
+  rockM.customProgramCacheKey=()=>'handsong.streamRock3'+(det || mossD ? '.detail'+(det ? 'r' : '')+(mossD ? 'm' : '') : ''); own.push(rockM); if(det || mossD) rockM.extensions={ derivatives:true };   // FOREST-2: the moss's clumps take the screen's derivatives (WebGL1)   // 3: the shape per instance, the stones' colours (NIGHT-8)
   /* list: [{ x, y, z, s (or sx, sy, sz), rot, water, wet }]; amt: how far each departs from a sphere; bury: how much deeper it may sit (of its height) */
   const stones=(list, geo, amt, bury)=>{ const N=Math.max(1, list.length), m=new T.InstancedMesh(geo, rockM, N), w=new Float32Array(N), k=new Float32Array(N*4);
     list.forEach((r,i)=>{ const sx=r.sx||r.s*1.25, sy=r.sy||r.s*0.75, sz=r.sz||r.s; d.position.set(r.x, r.y-sy*bury*R(), r.z); d.rotation.set((R()-0.5)*0.35, r.rot, (R()-0.5)*0.35);

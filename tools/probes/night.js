@@ -33,6 +33,7 @@ export { checkNightBed } from './night/bed.js';   // NIGHT-3 stage 4: the music 
 export { checkNightRoomSwitch } from './night/roomswitch.js';   // NIGHT-3 stage 5 part 2: the switching machinery
 export { checkRainRoom } from './night/rainroom.js';   // RAIN-0: the rain room (a development room)
 export { checkRainNature } from './night/rainnature.js';   // RAIN-3: its layered recordings, rendered offline
+export { checkForestToday, checkForestFull, checkForestClear, checkForestLost, checkForestLevels } from './night/forest2.js';   // FOREST-2: the switch ?forest=new
 export { checkNightStream } from './night/stream.js';
 export { checkNightLife, checkNightContextLost } from './night/life.js';   // NIGHT-11 part 1
 export { checkNightPixels, checkNightDetailedGuard } from './night/pixels.js';   // NIGHT-11 part 5   // NIGHT-8: the stream's sound, the water, the rocks, the ground

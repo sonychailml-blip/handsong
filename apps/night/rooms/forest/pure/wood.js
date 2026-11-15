@@ -122,9 +122,9 @@ export function twigShape(k){ const R=seeded(0x54574730+k), L=1+R()*0.9, out=[],
   return out; }
 
 /* counts: { roots (per near tree), logs (0 | 2), stumps, snags, twigs, moss, ivy (trees), woodShrooms } → every place (see the head) */
-export function woodPlaces(counts, trunks, seed=WOOD.seed){
+export function woodPlaces(counts, trunks, seed=WOOD.seed, o={}){   // FOREST-2: o.roots(trunks, per, R, nearTrees) — another roots law (pure/natural.js rootsOrganic, ?forest=new only)
   const R=seeded(seed), M=WOOD.max, c=k=>clamp(Math.floor(counts[k]||0), 0, M[k]);
-  const roots= counts.roots>0 ? rootsOf(trunks, Math.floor(counts.roots), seeded(seed+1)) : [];
+  const rootsToday= counts.roots>0 ? rootsOf(trunks, Math.floor(counts.roots), seeded(seed+1)) : [], roots= o.roots && rootsToday.length ? o.roots(trunks, Math.floor(counts.roots), seeded(seed+0x52), nearTrees, rootsToday) : rootsToday;   // FOREST-2: today's roots shaped (their own paths)
   const logs= counts.logs>0 ? logsOf(trunks) : [], items=[];
   /* stumps and snags (drawn at their maximum, the level takes the beginning) */
   const stumpsAll=[]; { const S=WOOD.stumps; for(let g=0; stumpsAll.length<M.stumps && g<4000; g++){ const x=(R()*2-1)*S.x, z=S.z[0]+R()*(S.z[1]-S.z[0]), r=S.r[0]+R()*(S.r[1]-S.r[0]), h=S.h[0]+R()*(S.h[1]-S.h[0]), tilt=(R()-0.5)*0.3, rot=R()*TAU;
@@ -138,7 +138,7 @@ export function woodPlaces(counts, trunks, seed=WOOD.seed){
   /* moss cushions: at the near trees' feet, on roots, on today's rocks, along the bank — shuffled, the level takes the beginning */
   const mossAll=[]; { const Rm=seeded(seed+3), put=(x,y,z,s,h)=>{ if(eyeD(x,z)>=2.6 && streamNear(x,z).d>=STREAM.half+0.1) mossAll.push({ x, y, z, s, h, rot:Rm()*TAU, sq:0.7+Rm()*0.5 }); };
     for(const i of nearTrees(trunks)){ const [tx,tz,r]=trunks[i]; for(let k=0;k<5;k++){ const a=Rm()*TAU, dd=trunkOuter(r,0.2)*(0.92+Rm()*0.3), s=0.16+Rm()*0.16, h=0.07+Rm()*0.07, x=tx+Math.cos(a)*dd, z=tz+Math.sin(a)*dd; put(x, bankGround(x,z)-h*0.3, z, s, h); } }
-    for(const rt of roots) if(Rm()<0.5){ const p=rt.pts[2+Math.floor(Rm()*Math.min(3, rt.pts.length-2))]||rt.pts[rt.pts.length-1]; const s=0.08+Rm()*0.08, h=0.04+Rm()*0.03; put(p[0], p[1]+p[3]*0.4, p[2], s, h); }
+    for(const rt of rootsToday) if(Rm()<0.5){ const p=rt.pts[2+Math.floor(Rm()*Math.min(3, rt.pts.length-2))]||rt.pts[rt.pts.length-1]; const s=0.08+Rm()*0.08, h=0.04+Rm()*0.03, y=p[1]+p[3]*0.4, lift= o.roots && o.rootTop ? o.rootTop(p[0], p[2], roots) : null; put(p[0], lift==null ? y : Math.max(y, lift-h*0.45), p[2], s, h); }   // FOREST-2: the shaped root's moss sits on its ridge, where today's sat
     for(const [x,z,sz] of ROCKS_TODAY) for(let k=0;k<2;k++){ const ox=(Rm()-0.5)*sz*0.6, oz=(Rm()-0.5)*sz*0.5, h=sz*(0.12+Rm()*0.08); put(x+ox, forestGround(x,z)+sz*0.12+sz*0.6*0.95-h*0.4, z+oz, sz*(0.4+Rm()*0.3), h); }
     for(let g=0; mossAll.length<M.moss && g<8000; g++){ const u=0.3+Rm()*0.67, side=Rm()<0.5 ? -1 : 1, o=STREAM.half+0.6+Rm()*0.9, p=streamAt(u), x=p.x-p.tz*side*o, z=p.z+p.tx*side*o, s=0.12+Rm()*0.16, h=0.05+Rm()*0.06;
       if(trunks.some(([tx,tz,r])=>Math.hypot(x-tx,z-tz)<trunkOuter(r,0.2)*0.9)) continue; put(x, bankGround(x,z)-h*0.3, z, s, h); }

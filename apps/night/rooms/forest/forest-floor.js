@@ -7,6 +7,7 @@ import { HERBS, FLOOR_ATLAS, cellUv, floorPlaces } from './pure/floor.js';
 import { bankGround } from './pure/forestlife.js';   // NIGHT-6 slice 4: the carved bed (the sedges stand on the bank)
 import { patchSway, patchSoftEdges } from './forest-life.js';
 import { seeded } from '../../../../core/pure/dsp.js';
+import { cardSpot, fineFrondPoints, herbPoints, inSolid3 } from './pure/natural.js';   // FOREST-2 (?forest=new only)
 
 const MEMO=new Map();   // the places per counts: pure and seeded, so worked out once per session
 /* two crossed unit cards standing on y 0 (normals tilted up so both faces light evenly) */
@@ -31,19 +32,30 @@ export function plantMaterial(T, tex, U, soft){
 export function buildFloor(ctx){
   const { T, s, own, lv, trunks, ferns, tex, U }=ctx, counts={};
   for(const k of [...HERBS, 'fern2']) counts[k]=Math.max(0, lv[k]|0);
-  const key=JSON.stringify(counts); if(!MEMO.has(key)) MEMO.set(key, floorPlaces(counts, trunks, ferns)); const P=MEMO.get(key);
+  const key=JSON.stringify(counts); if(!MEMO.has(key)) MEMO.set(key, floorPlaces(counts, trunks, ctx.fernsToday||ferns)); let P=MEMO.get(key);   // FOREST-2: today's plants (placed round today's ferns), each then moved clear
+  if(ctx.clear) P=P.map(p=>{ if(p.sp==='fern2' && ctx.S3) return p;   /* FOREST-2: moved plants keep out of the mushrooms' sight (ctx.avoid) */
+    if(ctx.S3){ const W=FLOOR_ATLAS.world[p.sp], pts=(px, pz)=>herbPoints(px, bankGround(px, pz)-0.02, pz, p.rot, W.w*p.s, W.h*p.s*1.15), r=cardSpot(p.x, p.z, pts, ctx.S3, { water:p.sp==='sedge' ? -0.05 : 0.2, eye:3, box:[-12, 12, -18, 3.4], avoid:ctx.avoid, reach:W.w*p.s*0.5, height:W.h*p.s*1.15 });
+      if(r[2]){ const E=[0, 5.5], k=Math.hypot(r[0]-E[0], r[1]-E[1])/Math.max(0.5, Math.hypot(p.x-E[0], p.z-E[1]));   // a moved herb keeps its size on screen while it stays clear
+        const big= k>1 && !herbPoints(r[0], bankGround(r[0], r[1])-0.02, r[1], p.rot, W.w*p.s*k, W.h*p.s*1.15*k).some(q=>inSolid3(q[0], q[1], q[2], ctx.S3)); return { ...p, x:r[0], z:r[1], s: big ? p.s*k : p.s }; }
+      if(pts(p.x, p.z).some(q=>inSolid3(q[0], q[1], q[2], ctx.S3))) for(const hs of [0.85, 0.7, 0.55]) if(!herbPoints(p.x, bankGround(p.x, p.z)-0.02, p.z, p.rot, W.w*p.s, W.h*p.s*1.15*hs).some(q=>inSolid3(q[0], q[1], q[2], ctx.S3))) return { ...p, hs };   // no free place within reach: it stays, a little shorter (under a log)
+      return p; } const W=FLOOR_ATLAS.world[p.sp], f2=p.sp==='fern2', [x, z, k]=ctx.clear(p.x, p.z, f2 ? W.h*p.s*0.9 : W.w*p.s*0.5, { water:p.sp==='sedge' ? -0.05 : 0.2, eye:3, box:[-12, 12, -18, 3.4] }); return x===p.x && z===p.z ? p : { ...p, x, z, s:p.s*k }; });   // a moved plant keeps its size on screen   // FOREST-2: clear of solids (?forest=new)   // FOREST-2: a herb by its own two cards in 3D
+  if(ctx.extra) P=P.concat(ctx.extra);   // FOREST-2: sprouts on the logs (their own height, never moved)
   const herbs=P.filter(p=>p.sp!=='fern2'), fern2=P.filter(p=>p.sp==='fern2'), R=seeded(0x464C5232), d=new T.Object3D(), c=new T.Color();
   const mat=plantMaterial(T, tex, U, ctx.soft); own.push(mat);
   const cells=(n, sp)=>{ const a=new Float32Array(Math.max(1,n)*4); for(let i=0;i<n;i++) a.set(cellUv(typeof sp==='function' ? sp(i) : sp), i*4); return new T.InstancedBufferAttribute(a, 4); };
   /* the herbs */
   const hg=crossGeo(T); hg.setAttribute('aCell', cells(herbs.length, i=>herbs[i].sp)); own.push(hg);
   const hm=new T.InstancedMesh(hg, mat, Math.max(1, herbs.length));
-  herbs.forEach((p,i)=>{ const W=FLOOR_ATLAS.world[p.sp], j=0.85+R()*0.3; d.position.set(p.x, bankGround(p.x,p.z)-0.02, p.z); d.rotation.set((R()-0.5)*0.15, p.rot, (R()-0.5)*0.15);
-    d.scale.set(W.w*p.s, W.h*p.s*j, W.w*p.s); d.updateMatrix(); hm.setMatrixAt(i, d.matrix); hm.setColorAt(i, c.setScalar(0.78+R()*0.32)); });
+  const nB=herbs.length-(ctx.extra ? ctx.extra.length : 0), R2=seeded(0x53505254);   // FOREST-2: the sprouts draw from their own seed (every other plant's draws stay)
+  const herbOf=(p, i, R)=>{ const W=FLOOR_ATLAS.world[p.sp], j=0.85+R()*0.3; if(p.y!=null) d.position.set(p.x, p.y-0.02, p.z); else d.position.set(p.x, bankGround(p.x,p.z)-0.02, p.z); d.rotation.set((R()-0.5)*0.15, p.rot, (R()-0.5)*0.15);
+    d.scale.set(W.w*p.s, W.h*p.s*j*(p.hs||1), W.w*p.s); d.updateMatrix(); hm.setMatrixAt(i, d.matrix); hm.setColorAt(i, c.setScalar(0.78+R()*0.32)); };
+  herbs.forEach((p,i)=>herbOf(p, i, i<nB ? R : R2));
   hm.count=herbs.length; hm.receiveShadow=true; hm.frustumCulled=false;
   /* the fine fern: 5–7 fronds a rosette */
   const fronds=[]; for(const p of fern2){ const n=5+Math.floor(R()*3), a0=R()*6.283; for(let k=0;k<n;k++) fronds.push({ x:p.x, z:p.z, a:a0+k*(6.283/n)+R()*0.3, tilt:0.95+R()*0.4, s:p.s*(0.75+R()*0.4) }); }
   const W2=FLOOR_ATLAS.world.fern2, fg=frondGeo(T, W2.w, W2.h); fg.setAttribute('aCell', cells(fronds.length, 'fern2')); own.push(fg);
+  if(ctx.S3){ let k=0; for(const p of fern2){ const g=[]; while(k<fronds.length && fronds[k].x===p.x && fronds[k].z===p.z) g.push(fronds[k++]);   // FOREST-2: each fine fern against its own bent fronds in 3D (the same draws as today)
+      const r=cardSpot(p.x, p.z, (px, pz)=>fineFrondPoints(px, bankGround(px, pz)-0.03, pz, g, W2.w, W2.h), ctx.S3, { water:0.25, eye:3, box:[-12, 12, -18, 3.4], avoid:ctx.avoid, reach:W2.h*p.s*0.9, height:W2.h*p.s*0.6 }); if(r[2]) for(const f of g){ f.x=r[0]; f.z=r[1]; } } }
   const fm=new T.InstancedMesh(fg, mat, Math.max(1, fronds.length));
   fronds.forEach((f,i)=>{ d.position.set(f.x, bankGround(f.x,f.z)-0.03, f.z); d.rotation.set(f.tilt, f.a, 0, 'YXZ'); d.scale.set(f.s, f.s, f.s); d.updateMatrix(); fm.setMatrixAt(i, d.matrix); fm.setColorAt(i, c.setScalar(0.8+R()*0.3)); });
   fm.count=fronds.length; fm.receiveShadow=true; fm.frustumCulled=false;

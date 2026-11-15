@@ -60,6 +60,10 @@ CORE-20 (audit P1) — MEDIAPIPE'S BINARY EARLY, NEVER AGAINST THE PAGE'S OWN FI
 NIGHT-7b — NIGHT'S EDITION: the build's (core/edition.js: 'release' in a players' build) or, on any page, «?release» in the address — so the players' settings can be checked on Live Server without …
 - const (2): `NIGHT_EDITION`, `devItems`
 
+## apps/night/forestlabel.js
+FOREST-2 (the founder: «so I can see what is drawn»): a small label in the corner, ONLY when the address carries a forest switch (?forest=…) — «level: Detailed · forest: roots», the level the room …
+- fn (1): `forestLabelWire`
+
 ## apps/night/fullscreen.js
 NIGHT-7c — FULL SCREEN on computers and Android (Chrome, Edge, Firefox; iPadOS Safari through its prefixed door).
 - const (10): `fsApi`, `fsOn`, `fsStandalone`, `FS_RETRIES`, `fsStarted`, `fsOnChange`, `fsAsking`, `fsCanToggle`, `fsDbg`, `fsAskAlwaysDbg`
@@ -234,6 +238,11 @@ NIGHT-9 — THE WATER'S MIRROR (a part of the night forest room; forest.js build
 - const (2): `MIRROR_LAYER`, `MIRROR_LOOK`
 - fn (1): `buildMirror`
 
+## apps/night/rooms/forest/forest-natural.js
+FOREST-2 — THE FOREST'S OBJECTS MADE NATURAL (parts of the night forest room, only with the address word ?forest=new; forest.js NEW).
+- const (7): `NATURAL_TEX`, `naturalFilesDbg`, `NAT_UNI`, `NAT_HEAD`, `NAT_PRE`, `NAT_SPOTS`, `NAT_NORMAL`
+- fn (8): `naturalAssets`, `naturalHas`, `naturalTextures`, `cushionGeo2`, `cushionRock`, `natStump`, `natSnag`, `natRock`
+
 ## apps/night/rooms/forest/forest-paint.js
 NIGHT-6 slice 8 — THE PAINTED DISTANCE AND THE FILM (the night forest room's picture pass; forest.js builds it; the numbers are ./pure/paint.js).
 - fn (1): `buildPaint`
@@ -254,7 +263,7 @@ NIGHT-6 slice 5 — MOSS, ROOTS AND FALLEN WOOD (parts of the night forest room;
 
 ## apps/night/rooms/forest/forest.js
 VIS1c (RUN 6, Night plan §3) — THE NIGHT FOREST ROOM's picture: a scene module built with three.js r128 (vendored, loaded by the scene host apps/night/scene/host.js).
-- const (6): `FOREST_LEVELS`, `FOREST_BOUNDS`, `GROUND_ALBEDO`, `FOREST_TEX`, `forestGroundDbg`, `forestAssetsDbg`
+- const (10): `FOREST_LEVELS`, `FOREST_BOUNDS`, `GROUND_ALBEDO`, `FOREST_TEX`, `forestGroundDbg`, `FOREST_PARTS`, `forestNewDbg`, `forestNewAssets`, `NIGHT_PRECACHE_PREFIX`, `forestAssetsDbg`
 - fn (3): `forestAssets`, `forestHas`, `buildForest`
 - → ./pure/layout.js (1): `FOREST_SEED`
 
@@ -301,7 +310,12 @@ NIGHT-6 slice 9 — HIDDEN THINGS THE LIGHT FINDS, as numbers.
 ## apps/night/rooms/forest/pure/layout.js
 NIGHT-6 slice 5 — TODAY'S FOREST'S PLACES, as numbers (pure, rule #36), for whoever needs them outside the room: the bake tool paints the contact shadows under the trunks and rocks (tools/forest-ba…
 - const (3): `FOREST_SEED`, `PAINT_DRAWS`, `ROCKS_TODAY`
-- fn (1): `forestTrunks`
+- fn (2): `forestTrunks`, `forestTrunkYaws`
+
+## apps/night/rooms/forest/pure/natural.js
+FOREST-2 — THE FOREST'S OBJECTS MADE NATURAL, as numbers (pure, rule #36; data row «FOREST natural (app)», browser row «FOREST plants clear of solids»).
+- const (7): `NATURAL`, `GROWERS`, `flareLobes`, `stumpShape`, `stumpRadius`, `EYE_Y`, `fernSpot`
+- fn (19): `rootGround`, `rootsOrganic`, `rootTopAt`, `solidsOf`, `solidHit`, `clearSpot`, `rootHit`, `stumpHit`, `shroomsFree`, `growersOn`, `sightBlock`, `keepSize`, `solids3Of`, `inSolid3`, `frondPoints`, `fineFrondPoints`, `herbPoints`, `cardSpot`, `spraysClear`
 
 ## apps/night/rooms/forest/pure/paint.js
 NIGHT-6 slice 8 — THE PAINTED DISTANCE AND THE FILM, as numbers.
@@ -1293,6 +1307,7 @@ SPLIT-2: the probe entry of the Night page: its own rows and the core rows flagg
 - → ./night/calib.js (1): `checkNightCalib`
 - → ./night/cards.js (1): `checkNightCards`
 - → ./night/forest.js (2): `checkForestRoom`, `checkBackgrounds`
+- → ./night/forest2.js (5): `checkForestToday`, `checkForestFull`, `checkForestClear`, `checkForestLost`, `checkForestLevels`
 - → ./night/lean.js (2): `checkNightLean`, `checkQuietFloor`
 - → ./night/life.js (2): `checkNightLife`, `checkNightContextLost`
 - → ./night/night.js (1): `checkSoloFirefly`
@@ -1326,6 +1341,11 @@ NIGHT-7: row «NIGHT first cards» — the four first cards: they open, each has
 ## tools/probes/night/forest.js
 VIS1c (RUN 6, Night plan §10, review 2026-10-17): two rows (quick and all).
 - fn (19): `checkForestRoom`, `checkBackgrounds`, `checkForestPicture`, `checkNightCycle`, `checkForestResponse`, `checkForestDetail`, `checkForestRare`, `checkForestLevels`, `checkForestAnswers`, `checkForestMelody`, `checkForestFloor`, `checkForestStream`, `checkForestWood`, `checkForestFlies`, `checkForestGust`, `checkForestCanopy`, `checkForestPaint`, `checkForestHidden`, `checkForestGroundWater`
+
+## tools/probes/night/forest2.js
+FOREST-2 — the forest's objects made natural behind the address word ?forest=new.
+- const (6): `FOREST2_VIEWS`, `FULL_RULE`, `MOVE`, `VIS_RULE`, `VARIANTS`, `forestCensusDbg`
+- fn (17): `geoPrint`, `progPrint`, `vegCover`, `groundDetail`, `vegMeshes`, `forestFrames`, `forestShared`, `dumpForestToday`, `checkForestToday`, `forest1Ferns`, `checkForestFull`, `plantCuts`, `checkForestClear`, `forestCensus`, `censusCompare`, `checkForestLost`, `checkForestLevels`
 
 ## tools/probes/night/headroom-calc.js
 NIGHT-1: the headroom page's sums, pure (runs in node: tools/probe-data.mjs, row «NIGHT-1 headroom sums»).
@@ -1400,7 +1420,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 - const (5): `TEST_ROOM_ID`, `TEST_ROOM`, `testRoomMode`, `testRoomInfo`, `testRoomFreeLeaks`
 - fn (2): `testRoomInstall`, `testRoomRemove`
 
-_277 modules, 2872 exported names._
+_281 modules, 2947 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

@@ -13,6 +13,7 @@ import { bankGround } from './pure/forestlife.js';
 import { cellUv, FLOOR_ATLAS } from './pure/floor.js';
 import { seeded } from '../../../../core/pure/dsp.js';
 import { RELIEF } from './pure/fireflies.js';   // NIGHT-9: the ground's relief (gnd7 copies forestGround)
+import { NAT_HEAD, NAT_PRE, NAT_SPOTS, NAT_NORMAL, natStump, natSnag, cushionGeo2, cushionRock } from './forest-natural.js';   // FOREST-2 (?forest=new only)
 const f=v=>Number(v).toFixed(4);
 
 const TAU=2*Math.PI, lerp=(a,b,t)=>a+(b-a)*t;
@@ -89,7 +90,7 @@ const FOX=(n, L)=>`{ vec3 wp=vWP7; float above=wp.y-gnd7(wp.xz);
       totalEmissiveRadiance+=uFoxCol*(uFoxK*where*act*(vein*0.6+0.02)*(0.75+0.25*sin(uFoxT*1.3+wp.x*3.0+wp.z*2.0))); } } }`;   // the veins and a faint glow round them
 /* mat → the wood's look (NIGHT-7: the bark's shader leaves out what only the merged wood uses — end grain, fungi, moss on top — so it compiles faster). attrs: true = per-vertex (aW7, aCap7: the merged wood), false = today's bark (instanced, no moss on top). WU.uFox
    present: + foxfire (WU.foxLaw: { hold, fade, r }) */
-function patchLook(mat, WU, attrs, key){ const fox=WU.uFox ? WU.uFox.value.length : 0, law=WU.foxLaw, U={ ...WU }; delete U.foxLaw;
+function patchLook(mat, WU, attrs, key){ const fox=WU.uFox ? WU.uFox.value.length : 0, law=WU.foxLaw, nat=!!WU.uNatA, U={ ...WU }; delete U.foxLaw;   // FOREST-2: uNatA given — the bark's relief and lichen spots (?forest=new)
   mat.onBeforeCompile=sh=>{ Object.assign(sh.uniforms, U);
     const VAR='varying vec4 vBk7;\nvarying vec2 vBk7b;\nvarying vec3 vMU7;\nvarying vec3 vWP7;\nvarying vec3 vWN7;\nvarying vec3 vW7;\nvarying vec2 vCap7;\n';
     /* NIGHT-8c: every piece's moss numbers (per instance for the bark, per vertex for the merged wood) and its surface coordinates vMU7: the bark's
@@ -108,10 +109,13 @@ function patchLook(mat, WU, attrs, key){ const fox=WU.uFox ? WU.uFox.value.lengt
     { float k7=clamp(floor(6.2832*length(instanceMatrix[0].xyz)/1.25+0.5), 1.0, 4.0); vUv=(uvTransform*vec3((uv.x+aBark7c.x+aBark7c.w*uv.y)*k7*0.5, uv.y*aBark7c.z+aBark7c.y*0.2, 1.0)).xy; }
   #endif`);
     sh.vertexShader=vs;
+    if(nat) sh.fragmentShader=(attrs ? '#define WOOD7_KINDS\n' : '')+'#define WOOD7_NAT\n'+VAR+GLSL+'\n'+NAT_HEAD+sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n'+NAT_PRE+LOOK.replace('    c=mix(c, mc, mm*0.88); }', NAT_SPOTS+'    c=mix(c, mc, mm*0.88); }'))
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  if(vW7.y>1.5) roughnessFactor=0.7;').replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n'+NAT_NORMAL);   // FOREST-2
+    else
     sh.fragmentShader=(attrs ? '#define WOOD7_KINDS\n' : '')+VAR+GLSL+'\n'+sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n'+LOOK)
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  if(vW7.y>1.5) roughnessFactor=0.7;');
     if(fox) sh.fragmentShader=`uniform vec4 uFox[${fox}];\nuniform vec3 uFoxCol;\nuniform float uFoxK, uFoxT;\n`+sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n'+FOX(fox, law)); };
-  mat.customProgramCacheKey=()=>key+(fox ? '.fox'+fox : ''); return mat; }
+  mat.customProgramCacheKey=()=>key+(nat ? '.nat' : '')+(fox ? '.fox'+fox : ''); return mat; }   // FOREST-2: .nat before the foxfire's count (rows read the key's end)
 /* today's bark (trunks, branches): moss low on the trunk, lichen, darker at the foot. NIGHT-8b: each instance's moss from its attributes
    aBark7 (h, side, cover, patch) and aBark7b (off, tint); NIGHT-8c: + aBark7c (turn, lift, scale, spiral: its bark mapping) — barkAttrs puts
    barkMoss's and barkUv's numbers on an instanced geometry */
@@ -135,11 +139,14 @@ function builder(PM){ const pos=[], uv=[], w=[], cap=[], idx=[], bk=[], bkb=[]; 
   /* a tube along pts [[x,y,z,rad]…] (rad may be a function (i, θ) → radius), `sides` round; uv: the bark's density (today's trunk: v 1 per 16 m,
      u 1 per 2.2 m round). ring(i, θ) may move a vertex (a broken top) */
   function tube(pts, sides, W, o={}){ const base=n, len=[0]; for(let i=1;i<pts.length;i++) len.push(len[i-1]+Math.hypot(pts[i][0]-pts[i-1][0], pts[i][1]-pts[i-1][1], pts[i][2]-pts[i-1][2]));
-    for(let i=0;i<pts.length;i++){ const a=pts[Math.max(0,i-1)], b=pts[Math.min(pts.length-1,i+1)]; let tx=b[0]-a[0], ty=b[1]-a[1], tz=b[2]-a[2]; const tl=Math.hypot(tx,ty,tz)||1; tx/=tl; ty/=tl; tz/=tl;
+    for(let i=0;i<pts.length;i++){ const a=pts[Math.max(0,i-1)], b=pts[Math.min(pts.length-1,i+1)]; let tx=b[0]-a[0], ty=b[1]-a[1], tz=b[2]-a[2]; if(o.sec) ty=0; const tl=Math.hypot(tx,ty,tz)||1; tx/=tl; ty/=tl; tz/=tl;
       let rx=0, ry=1, rz=0; if(Math.abs(ty)>0.9){ rx=1; ry=0; }
       let nx=ry*tz-rz*ty, ny=rz*tx-rx*tz, nz=rx*ty-ry*tx; const nl=Math.hypot(nx,ny,nz)||1; nx/=nl; ny/=nl; nz/=nl; const bx=ty*nz-tz*ny, by=tz*nx-tx*nz, bz=tx*ny-ty*nx;
-      for(let k=0;k<=sides;k++){ const th=k/sides*TAU, rad=typeof o.rad==='function' ? o.rad(i, th) : pts[i][3], c=Math.cos(th), s=Math.sin(th);
-        let x=pts[i][0]+(nx*c+bx*s)*rad, y=pts[i][1]+(ny*c+by*s)*rad, z=pts[i][2]+(nz*c+bz*s)*rad; if(o.ring) [x,y,z]=o.ring(i, k, x, y, z);
+      const sec=o.sec ? o.sec[i] : null;   // FOREST-2: an elliptical section [half width, half height, centre lift] (an organic root), upright across its heading
+      for(let k=0;k<=sides;k++){ const th=k/sides*TAU, rad= sec ? (sec[0]+sec[1])/2 : typeof o.rad==='function' ? o.rad(i, th) : pts[i][3], c=Math.cos(th), s=Math.sin(th);
+        let x, y, z; if(sec){ x=pts[i][0]+nx*c*sec[0]+bx*s*sec[1]; y=pts[i][1]+ny*c*sec[0]+by*s*sec[1]+sec[2]; z=pts[i][2]+nz*c*sec[0]+bz*s*sec[1]; }
+        else { x=pts[i][0]+(nx*c+bx*s)*rad; y=pts[i][1]+(ny*c+by*s)*rad; z=pts[i][2]+(nz*c+bz*s)*rad; }
+        if(o.ring) [x,y,z]=o.ring(i, k, x, y, z);
         const Cu=Math.max(0.12, TAU*rad/2.2), v=len[i]/16; vert(x, y, z, (k/sides+cu[0]+cu[3]*v)*Cu, v*cu[2]+cu[1]*0.2, W); } }   // NIGHT-8c: the piece's own turn, spiral, scale, lift
     for(let i=0;i<pts.length-1;i++) for(let k=0;k<sides;k++){ const a=base+i*(sides+1)+k, b=a+sides+1; idx.push(a, a+1, b, a+1, b+1, b); }   // outward (the ring turns from N to B, right-handed about the tangent)
     return base; }
@@ -159,16 +166,20 @@ function builder(PM){ const pos=[], uv=[], w=[], cap=[], idx=[], bk=[], bkb=[]; 
   return { tube, capOver, shelf, geo, piece, count:()=>n, pieces:()=>pc+1 };
 }
 /* places (pure/wood.js woodPlaces) → the merged wood geometry */
-function woodGeo(T, P){ const B=builder(woodPieces('wood'));
-  for(const rt of P.roots){ B.piece(); B.tube(rt.pts, 6, [0, 0, 0.6]); }   // roots: live bark, moss on top
+function woodGeo(T, P, nat=null){ const B=builder(woodPieces('wood'));   // FOREST-2: nat { ground(x, z) } — organic roots' sections, natural stumps and snags
+  for(const rt of P.roots){ B.piece(); if(nat && rt.sec) B.tube(rt.pts, 10, [0, 0, 0.85], { sec:rt.sec }); else B.tube(rt.pts, 6, [0, 0, 0.6]); }   // roots: live bark, moss on top (FOREST-2: a fin at the trunk, flat along the ground, more moss on top)
   for(const L of P.logs){ B.piece(); const S=16, pts=[], l=Math.hypot(L.b[0]-L.a[0], L.b[1]-L.a[1], L.b[2]-L.a[2]);
     for(let i=0;i<=14;i++){ const t=i/14; pts.push([lerp(L.a[0],L.b[0],t), lerp(L.a[1],L.b[1],t), lerp(L.a[2],L.b[2],t), lerp(L.r0,L.r1,t)*(1+0.06*Math.sin(t*l*2.1)+0.04*Math.sin(t*l*5.3))]); }
     const W=[0.3, 0, 1], first=B.tube(pts, S, W); B.capOver(first, S, ...L.a, [0.3, 1, 1], -1); B.capOver(first+14*(S+1), S, ...L.b, [0.3, 1, 1], 1); }
-  for(const St of P.stumps){ B.piece(); const S=18, pts=[], tl=Math.tan(St.tilt);
+  for(const St of P.stumps){ B.piece(); if(nat && nat.stumps){ natStump(B, St, nat.ground, nat.shrooms); continue; } const S=18, pts=[], tl=Math.tan(St.tilt);
     for(let i=0;i<=5;i++){ const t=i/5, hb=lerp(-0.1, St.h, t); pts.push([St.x, St.y+hb, St.z, St.r*(1+0.25*Math.exp(-(hb+0.1)*5))]); }
     const ring=(i, k, x, y, z)=>[x, i===5 ? y+((x-St.x)*Math.cos(St.rot)+(z-St.z)*Math.sin(St.rot))*tl : y, z], first=B.tube(pts, S, [0.3, 0, 0.4], { ring });
     B.capOver(first+5*(S+1), S, St.x, St.y+St.h, St.z, [0.3, 1, 0.4], 1); }
-  for(const Sn of P.snags){ B.piece(); const S=16, NR=12, Rn=seeded(Sn.seed), jag=Array.from({ length:S+1 }, ()=>Rn()*0.7), pts=[];
+  for(const Sn of P.snags){ B.piece(); if(nat && nat.stumps){ const Rn=natSnag(B, Sn, WOOD.trunk.foot);
+      for(let k=0;k<5;k++){ const a=Rn()*TAU, hy=1.5+Rn()*(Sn.H-2.5), r0=trunkRadius(Sn.s, hy)*0.92, dx=Math.cos(a), dz=Math.sin(a), up=0.15+Rn()*0.35, l=0.35+Rn()*0.9, ox=Sn.x+Sn.lean*hy+dx*r0, oy=Sn.y+hy, oz=Sn.z+dz*r0, bend=(Rn()-0.5)*0.3;
+        B.tube([[ox, oy, oz, 0.075], [ox+dx*l*0.4-dz*bend*l*0.4, oy+up*l*0.4, oz+dz*l*0.4+dx*bend*l*0.4, 0.05], [ox+dx*l-dz*bend*l, oy+up*l-0.05*l, oz+dz*l+dx*bend*l, 0.018]], 6, [1, 0, 0]); }   // FOREST-2: broken branch stubs, bent
+      continue; }
+    const S=16, NR=12, Rn=seeded(Sn.seed), jag=Array.from({ length:S+1 }, ()=>Rn()*0.7), pts=[];
     for(let i=0;i<=NR;i++){ const hb=lerp(0, Sn.H+0.2, i/NR); pts.push([Sn.x+Sn.lean*hb, Sn.y+hb+WOOD.trunk.foot, Sn.z, 0]); }
     const rad=(i, th)=>trunkRadius(Sn.s, lerp(0, Sn.H+0.2, i/NR), th+Sn.rot)*(1-0.25*i/NR), ring=(i, k, x, y, z)=>[x, i===NR ? y-jag[k%S] : y, z];
     const first=B.tube(pts, S, [1, 0, 0], { rad, ring }), top=pts[NR]; B.capOver(first+NR*(S+1), S, top[0], top[1]-0.45, top[2], [1, 1, 0], 1);
@@ -192,11 +203,11 @@ function cushionGeo(T){ const g=new T.SphereGeometry(1, 10, 4, 0, TAU, 0, Math.P
 export function buildWood(ctx){
   const { T, s, C, own, P, rockMat, floorMat }=ctx, WU={ ...woodUniforms(T, C), ...(ctx.FU||{}) }, d=new T.Object3D(), R=seeded(0x57444231);   // FU: the foxfire's uniforms (slice 9)
   /* the wood */
-  const wg=woodGeo(T, P), woodM=patchLook(new T.MeshStandardMaterial({ map:ctx.barkMap||null, bumpMap:ctx.bumpMap||null, bumpScale:0.035, roughness:0.93 }), WU, true, 'handsong.wood7');
+  const wg=woodGeo(T, P, ctx.nat||null), woodM=patchLook(new T.MeshStandardMaterial({ map:ctx.barkMap||null, bumpMap:ctx.bumpMap||null, bumpScale:0.035, roughness:0.93 }), WU, true, 'handsong.wood7');
   const wood=wg ? new T.Mesh(wg, woodM) : null; own.push(woodM); if(wood){ own.push(wg); wood.castShadow=!!ctx.cast; wood.receiveShadow=true; s.add(wood); }
   /* moss cushions (the stream rocks' material: all moss) */
-  const mg=cushionGeo(T), n=P.moss.length, mo=new T.InstancedMesh(mg, rockMat, Math.max(1, n));
-  mg.setAttribute('aWater', new T.InstancedBufferAttribute(new Float32Array(Math.max(1,n)).fill(-9), 1)); mg.setAttribute('aMoss', new T.InstancedBufferAttribute(new Float32Array(Math.max(1,n)).fill(1), 1)); mg.setAttribute('aRock', new T.InstancedBufferAttribute(new Float32Array(Math.max(1,n)*4), 4)); own.push(mg);   // NIGHT-8: aRock 0 — the cushion keeps its own shape
+  const mg= ctx.nat && ctx.nat.moss ? cushionGeo2(T, !ctx.nat.light) : cushionGeo(T), n=P.moss.length, mo=new T.InstancedMesh(mg, rockMat, Math.max(1, n));   // FOREST-2: a finer lumpy dome, each cushion its own lobes
+  mg.setAttribute('aWater', new T.InstancedBufferAttribute(new Float32Array(Math.max(1,n)).fill(-9), 1)); mg.setAttribute('aMoss', new T.InstancedBufferAttribute(new Float32Array(Math.max(1,n)).fill(1), 1)); mg.setAttribute('aRock', new T.InstancedBufferAttribute(ctx.nat && ctx.nat.moss ? cushionRock(n) : new Float32Array(Math.max(1,n)*4), 4)); own.push(mg);   // NIGHT-8: aRock 0 — the cushion keeps its own shape
   P.moss.forEach((m,i)=>{ d.position.set(m.x, m.y, m.z); d.rotation.set(0, m.rot, 0); d.scale.set(m.s, m.h, m.s*m.sq); d.updateMatrix(); mo.setMatrixAt(i, d.matrix); });
   mo.count=n; mo.receiveShadow=true; mo.frustumCulled=false; if(n) s.add(mo);
   /* ivy (the floor's material and its sheet's ivy cell) */
