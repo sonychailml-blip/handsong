@@ -34,7 +34,7 @@ const MF=`uniform vec3 uColor;varying float vA;void main(){ vec2 c=gl_PointCoord
 /* ctx: { T, s, C, pal, own, canvas2, tex, lv ({ grass, leaves, moths, beams }), U (forest-life's shared uniforms), fernT (the fern texture),
    reduce } → { update(dt, t, F), resize(W, H, camera, uScale), state() } */
 export function buildDetail(ctx){
-  const { T, s, C, pal, own, canvas2, tex, lv, U, fernT }=ctx, R=seeded(DETAIL.seed), d=new T.Object3D();
+  const { T, s, C, pal, own, canvas2, tex, lv, U, fernT }=ctx, R=seeded(DETAIL.seed), d=new T.Object3D(), Rg=seeded((DETAIL.seed^0x47525353)>>>0);   // Rg: FOREST-2b grass only
   /* grass: one instanced draw */
   const gg=new T.BufferGeometry(), seg=[0,0.3,0.62,1], gp=[], gi=[];
   seg.forEach((h,i)=>{ const w=0.02*Math.pow(1-h,0.8)+0.001; gp.push(-w,h,0, w,h,0); if(i) gi.push(i*2-2,i*2-1,i*2, i*2-1,i*2+1,i*2); });
@@ -46,6 +46,7 @@ export function buildDetail(ctx){
     for(let j=0;j<k && gn<lv.grass;j++){ const x=cx+(R()-0.5)*1.4, z=cz+(R()-0.5)*1.4;
       const qd=streamNear(x,z).d; if(qd<STREAM.half+0.08 || Math.hypot(x, z-5.5)<3.2) continue;
       const sc=0.16+R()*0.26; d.position.set(x, bankGround(x,z,qd)-0.01, z);   // NIGHT-6 slice 4: on the carved bank d.rotation.set((R()-0.5)*0.35, R()*6.283, (R()-0.5)*0.35); d.scale.set(1, sc, 1); d.updateMatrix(); grass.setMatrixAt(gn, d.matrix);
+      if(ctx.grass){ let gx=x, gz=z; if(ctx.grass.fix) [gx, gz]=ctx.grass.fix(x, z, sc); d.position.set(gx, bankGround(gx, gz)-0.01, gz); d.rotation.set((Rg()-0.5)*0.35, Rg()*6.283, (Rg()-0.5)*0.35); d.scale.set(1, sc, 1); d.updateMatrix(); grass.setMatrixAt(gn, d.matrix); }   // FOREST-2b «grass»: the placement the comment above swallowed since NIGHT-6 slice 4 (its own draws: nothing else moves)
       gc.copy(G1).lerp(G2, R()*0.6).multiplyScalar(0.75+R()*0.5); grass.setColorAt(gn, gc); gn++; } }
   grass.count=gn; if(grass.instanceColor) grass.instanceColor.needsUpdate=true; s.add(grass);
   /* falling leaves */

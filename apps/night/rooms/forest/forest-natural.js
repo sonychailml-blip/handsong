@@ -15,24 +15,27 @@ import { seeded } from '../../../../core/pure/dsp.js';
 
 const TAU=2*Math.PI, lerp=(a,b,t)=>a+(b-a)*t;
 /* the files: name → url; per level which ones (the same at both: 512² detail) */
-const NTEX=Object.freeze({ 'rock-col-512':new URL('./new/rock-col-512.jpg', import.meta.url), 'rock-nor-512':new URL('./new/rock-nor-512.jpg', import.meta.url), 'bark-1024x512':new URL('./new/bark-1024x512.jpg', import.meta.url) });
-export const NATURAL_TEX=Object.freeze({ full:Object.freeze({ rockC:'rock-col-512', rockN:'rock-nor-512', bark:'bark-1024x512' }), reduced:Object.freeze({ rockC:'rock-col-512', rockN:'rock-nor-512', bark:'bark-1024x512' }) });
+const NTEX=Object.freeze({ 'rock-col-512':new URL('./new/rock-col-512.jpg', import.meta.url), 'rock-nor-512':new URL('./new/rock-nor-512.jpg', import.meta.url), 'bark-1024x512':new URL('./new/bark-1024x512.jpg', import.meta.url),
+  'foliage-1024':new URL('./new/foliage-1024.png', import.meta.url), 'foliage-512':new URL('./new/foliage-512.png', import.meta.url) });   // FOREST-2b: FOREST-1's CC0 foliage sheet (the young spruces)
+export const NATURAL_TEX=Object.freeze({ full:Object.freeze({ rockC:'rock-col-512', rockN:'rock-nor-512', bark:'bark-1024x512', foliage:'foliage-1024' }), reduced:Object.freeze({ rockC:'rock-col-512', rockN:'rock-nor-512', bark:'bark-1024x512', foliage:'foliage-512' }) });
+export const NATURAL_NEED=Object.freeze({ rockC:'rocks', rockN:'rocks', bark:'bark', foliage:'spruce' });   // FOREST-2b: each file only for its part (rocks are the default: their two files are in the start set)
 const IMG={}, LOADING={}, ERR=[];
 async function fileImage(url){ const r=await fetch(url); if(!r.ok) throw new Error(r.status+' '+url.pathname);
   const u=URL.createObjectURL(await r.blob()), img=new Image(); try{ img.src=u; await img.decode(); } finally { URL.revokeObjectURL(u); } return img; }
-const filesOf=level=>Object.values(NATURAL_TEX[level]||NATURAL_TEX.full);
+const filesOf=(level, parts=null)=>Object.entries(NATURAL_TEX[level]||NATURAL_TEX.full).filter(([k])=>!parts || parts.has(NATURAL_NEED[k])).map(([, n])=>n);
 /* the new files of `level`, once per session (a failed one is forgotten: a later call asks again) → the images by name */
-export function naturalAssets(level='full'){ return Promise.all(filesOf(level).map(n=>LOADING[n] || (LOADING[n]=fileImage(NTEX[n]).then(img=>{ IMG[n]=img; }, e=>{ delete LOADING[n]; ERR.push(n+': '+String(e&&e.message||e)); })))).then(()=>IMG); }
-export async function naturalHas(level='full'){ if(typeof navigator==='undefined' || !navigator.serviceWorker || !navigator.serviceWorker.controller || typeof caches==='undefined') return true;
+export function naturalAssets(level='full', parts=null){ return Promise.all(filesOf(level, parts).map(n=>LOADING[n] || (LOADING[n]=fileImage(NTEX[n]).then(img=>{ IMG[n]=img; }, e=>{ delete LOADING[n]; ERR.push(n+': '+String(e&&e.message||e)); })))).then(()=>IMG); }
+export async function naturalHas(level='full', parts=null){ if(typeof navigator==='undefined' || !navigator.serviceWorker || !navigator.serviceWorker.controller || typeof caches==='undefined') return true;
   if(!(await caches.keys()).some(k=>k.startsWith('handsong-night-precache-'))) return true;   // no precache of this app (the repository's worker): the network serves
-  for(const n of filesOf(level)) if(!IMG[n] && !(await caches.match(NTEX[n].href))) return false; return true; }
+  for(const n of filesOf(level, parts)) if(!IMG[n] && !(await caches.match(NTEX[n].href))) return false; return true; }
 export const naturalFilesDbg=()=>({ loaded:Object.keys(IMG).sort(), errors:ERR.slice() });
 /* the level's images → { rockC, rockN, barkA, barkB } as three.js textures (the bark atlas cut into its two halves so each can repeat) */
-export function naturalTextures(T, level, own){ const P=NATURAL_TEX[level]||NATURAL_TEX.full, out={};
+export function naturalTextures(T, level, own, parts=null){ const P=NATURAL_TEX[level]||NATURAL_TEX.full, out={};
   const tx=(img, srgb)=>{ const t=new T.Texture(img); t.wrapS=t.wrapT=T.RepeatWrapping; t.anisotropy=4; if(srgb) t.encoding=T.sRGBEncoding; t.needsUpdate=true; own.push(t); return t; };
   if(IMG[P.rockC]) out.rockC=tx(IMG[P.rockC], true); if(IMG[P.rockN]) out.rockN=tx(IMG[P.rockN], false);
   out.rockL=IMG[P.rockC] && typeof document!=='undefined' ? meanLum(IMG[P.rockC]) : 0.044;   // the stone's own mean (linear): the detail keeps today's brightness on average
   const B=IMG[P.bark]; if(B && typeof document!=='undefined'){ const half=k=>{ const c=document.createElement('canvas'); c.width=c.height=B.height; c.getContext('2d').drawImage(B, k*B.height, 0, B.height, B.height, 0, 0, B.height, B.height); return tx(c, false); }; out.barkA=half(0); out.barkB=half(1); }
+  if(IMG[P.foliage]){ const t=new T.Texture(IMG[P.foliage]); t.encoding=T.sRGBEncoding; t.anisotropy=4; t.needsUpdate=true; own.push(t); out.foliage=t; }   // FOREST-2b: the spruces' sheet
   return out; }
 
 /* an image's mean luminance in linear light (its 16 × 16 copy averaged; sRGB decoded) */
@@ -48,7 +51,7 @@ export const NAT_PRE=`#ifdef WOOD7_NAT
     float P7=vMU7.z, N7= P7>0.0 ? max(1.0, floor(P7/sz+0.5)) : 0.0;
     vec2 q7=vec2(P7>0.0 ? vMU7.x*N7/P7 : vMU7.x/sz, vMU7.y/(sz*1.6)+of7*0.173);
     float r7=mix(texture2D(uNatA, q7).r, texture2D(uNatB, q7).r, pick); natH=(r7-0.5)*kk*(1.0-0.45*vW7.x);   // dead wood: a smoother, weathered relief
-    diffuseColor.rgb*=clamp(1.0+natH*0.95, 0.45, 1.45); }
+    diffuseColor.rgb*=clamp(1.0+natH*(natH<0.0 ? 0.28 : 0.55), 0.82, 1.3); }   // FOREST-2b: the grooves only a little darker — under the hand's light they brighten with the rest
 #endif
 `;
 /* inside the look's bark branch, just before the moss is laid (its locals: q, fm, side, mh, mm, above, dead, of, lf, band): the moss creeps into the
@@ -69,15 +72,15 @@ export const NAT_SPOTS=`#ifdef WOOD7_NAT
 `;
 /* after the normal maps: the relief lit by its own slope (a height in metres; the screen-space derivative method — no tangents) */
 export const NAT_NORMAL=`#ifdef WOOD7_NAT
-  { vec3 dpx=dFdx(-vViewPosition), dpy=dFdy(-vViewPosition), R1=cross(dpy, normal), R2=cross(normal, dpx); float det=dot(dpx, R1); vec2 dH=vec2(dFdx(natH), dFdy(natH))*0.03;
+  { vec3 dpx=dFdx(-vViewPosition), dpy=dFdy(-vViewPosition), R1=cross(dpy, normal), R2=cross(normal, dpx); float det=dot(dpx, R1); vec2 dH=vec2(dFdx(natH), dFdy(natH))*0.01;   // FOREST-2b: a shallow relief: no dark lines in the light
     normal=normalize(abs(det)*normal-sign(det)*(dH.x*R1+dH.y*R2)); }
 #endif
 `;
 
 /* ---------- moss cushions ---------- */
 /* a finer lumpy half dome (the rock shader then gives each its own lobes) */
-export function cushionGeo2(T, fine=true){ const g=new T.SphereGeometry(0.86, fine ? 18 : 16, fine ? 7 : 6, 0, TAU, 0, Math.PI/2), p=g.attributes.position;   // 0.86: with its lobes no wider than today's cushion (the mushrooms at the feet stay seen)   // Detailed 18 × 7, Standard 16 × 6
-  for(let i=0;i<p.count;i++){ const x=p.getX(i), y=p.getY(i), z=p.getZ(i), k=1+0.16*Math.sin(x*5.1+z*3.3)+0.11*Math.sin(x*11+z*9+y*4)+0.07*Math.sin(x*23+z*19+y*7)+0.04*Math.sin(x*41-z*37+y*11); p.setXYZ(i, x*k, y*k*(0.62+0.3*y), z*k); }
+export function cushionGeo2(T, fine=true){ const g=new T.SphereGeometry(1, fine ? 18 : 16, fine ? 7 : 6, 0, TAU, 0, Math.PI/2), p=g.attributes.position;   // FOREST-2b: today's cushion (radius 1, its lumps, its height) on a finer mesh   // Detailed 18 × 7, Standard 16 × 6
+  for(let i=0;i<p.count;i++){ const x=p.getX(i), y=p.getY(i), z=p.getZ(i), k0=1+0.2*Math.sin(x*5.1+z*3.3)+0.12*Math.sin(x*11+z*9+y*4)+0.06*Math.sin(x*23+z*19+y*7), k=k0*(1-0.05*(1+Math.sin(x*41-z*37+y*11))-0.03*(1+Math.sin(x*67+z*59-y*13))); p.setXYZ(i, x*k, y*k*(0.75+0.25*y), z*k); }   // the fine clumps only cut in: never outside today's cushion (the mushrooms at the feet stay seen)
   g.computeVertexNormals(); return g; }
 /* each cushion's [seed, 0, 0, −w] — negative: the rock shader's lobes without the worn faces (ROCK_DETAIL) */
 export function cushionRock(n){ const a=new Float32Array(Math.max(1, n)*4), R=seeded(0x4D4F5332); for(let i=0;i<n;i++) a.set([R(), 0, 0, -(0.12+0.1*R())], i*4); return a; }
@@ -96,10 +99,10 @@ export function natStump(B, St, ground, shrooms=[]){ const sh=stumpShape(St), R=
   const first=B.tube(pts, S, [0.3, 0, 0.2], { rad, ring });
   B.capOver(first+NR*(S+1), S, St.x, St.y+St.h, St.z, [0.3, 1, 0.4], 1);
   const angd=(a, b)=>Math.abs(((a-b)%TAU+TAU*1.5)%TAU-TAU/2);
-  for(let k=0, n=2+Math.floor(R()*3);k<n;k++){ const a=(Math.round(R()*sh.nl)*TAU-sh.ph)/sh.nl, L=St.r*(0.9+R()*0.8), d0=St.r*0.85, P=[];   // root stubs out of the lobes, sinking
+  for(let k=0, n=2+Math.floor(R()*3);k<n;k++){ const a=(Math.round(R()*sh.nl)*TAU-sh.ph)/sh.nl, L=St.r*(0.9+R()*0.8), d0=St.r*0.6, P=[];   // root stubs out of the lobes, sinking (FOREST-2b: round, smooth, out of the foot)
     if(mine.some(m=>angd(m, a)<0.5)) continue;   // never over a mushroom
-    for(let j=0;j<=5;j++){ const t=j/5, x=St.x+Math.cos(a)*(d0+L*t), z=St.z+Math.sin(a)*(d0+L*t); P.push([x, ground(x, z)+St.r*0.16*(1-t)-0.05*t*t, z, St.r*0.24*(1-0.7*t)+0.012]); }
-    B.tube(P, 8, [0.3, 0, 0.25]); } }
+    for(let j=0;j<=12;j++){ const t=j/12, x=St.x+Math.cos(a)*(d0+L*t), z=St.z+Math.sin(a)*(d0+L*t); P.push([x, ground(x, z)+St.r*0.13*Math.pow(1-t, 1.5)-0.06*t*t, z, St.r*0.2*(1-0.75*Math.pow(t, 0.8))+0.012]); }
+    B.tube(P, 14, [0.3, 0, 0.25]); } }   // 14 sides, 13 rings: a round stub tapering smoothly into the soil
 /* a snag: today's lobed trunk (trunkRadius) with an uneven, cracked bark and a higher, splintered break */
 export function natSnag(B, Sn, foot){ const S=20, NR=16, Rn=seeded(Sn.seed^0x5A5A), jag=Array.from({ length:S+1 }, (_,k)=>0.15+Rn()*1.1*(0.6+0.4*Math.sin(k/S*TAU*2+Sn.rot))), pts=[]; jag[S]=jag[0];
   for(let i=0;i<=NR;i++){ const hb=lerp(0, Sn.H+0.2, i/NR); pts.push([Sn.x+Sn.lean*hb, Sn.y+hb+foot, Sn.z, 0]); }
@@ -127,14 +130,14 @@ export function natRock(sh, o={ rocks:true, moss:true }){ const RK=!!o.rocks, MS
     mc*=0.75+0.25*lum; }
 `;
   const mossF=`  if(vMoss>0.5){ mossH=vn(vWP5.xz*70.0+vWP5.y*50.0)*0.55+vn(vWP5.xz*190.0-vWP5.y*140.0)*0.3+vn(vWP5.xz*18.0+vWP5.y*9.0)*0.15;   // FOREST-2: the clumps of a cushion — lighter tips, dark gaps
-    mc*=0.88+0.5*mossH; mc=mix(mc, mc*vec3(1.18, 1.12, 0.8), smoothstep(0.6, 0.9, mossH)*0.6); }   // never darker than the cushion of today on average (the founder: nothing darkened)
+    mc*=0.9+0.7*mossH; mc=mix(mc, mc*vec3(1.25, 1.35, 0.75), smoothstep(0.55, 0.85, mossH)*0.75); }   // never darker than the cushion of today on average (the founder: nothing darkened)   // FOREST-2b: clumps with lit, yellow-green tips
 `;
   sh.fragmentShader='#define ROCK_DETAIL\n'+(RK ? 'uniform sampler2D uRkC, uRkN;\nuniform float uRkL;\n' : '')+'float mossH=0.0;\n'+sh.fragmentShader
     .replace('  diffuseColor.rgb=mix(st, mc, mt); diffuseColor.rgb*=mix(1.0, 0.58, wet);', (RK ? rockF : '')+(MS ? mossF : '')+'  diffuseColor.rgb=mix(st, mc, mt); diffuseColor.rgb*=mix(1.0, 0.58, wet);')
     .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n'+(RK ? `  if(vMoss<0.5){ vec3 tw=pow(abs(vWN5), vec3(4.0)); tw/=tw.x+tw.y+tw.z; vec3 q=vWP5*1.6+vRock.x*7.0;
     vec3 a=texture2D(uRkN, q.zy).xyz*2.0-1.0, b=texture2D(uRkN, q.xz).xyz*2.0-1.0, c=texture2D(uRkN, q.xy).xyz*2.0-1.0;
     vec3 nw=normalize(vWN5+(vec3(0.0, a.y, a.x)*tw.x+vec3(b.x, 0.0, b.y)*tw.y+vec3(c.x, c.y, 0.0)*tw.z)*0.9); normal=normalize((viewMatrix*vec4(nw, 0.0)).xyz); }
-` : '')+(MS ? `  if(vMoss>0.5){ vec3 dpx=dFdx(-vViewPosition), dpy=dFdy(-vViewPosition), R1=cross(dpy, normal), R2=cross(normal, dpx); float det=dot(dpx, R1); vec2 dH=vec2(dFdx(mossH), dFdy(mossH))*0.006;
+` : '')+(MS ? `  if(vMoss>0.5){ vec3 dpx=dFdx(-vViewPosition), dpy=dFdy(-vViewPosition), R1=cross(dpy, normal), R2=cross(normal, dpx); float det=dot(dpx, R1); vec2 dH=vec2(dFdx(mossH), dFdy(mossH))*0.016;
     normal=normalize(abs(det)*normal-sign(det)*(dH.x*R1+dH.y*R2)); }
 ` : ''));
 }

@@ -2492,9 +2492,9 @@ async function forestNatural(){
     /* each shaped root follows its own root of today: every point on today's path (within 1 mm), in today's order; the forks after every main root */
     const onPath=(q, P)=>{ let best=Infinity; for(let k=1;k<P.length;k++){ const A=P[k-1], B=P[k], vx=B[0]-A[0], vz=B[2]-A[2], t=Math.max(0, Math.min(1, ((q[0]-A[0])*vx+(q[2]-A[2])*vz)/(vx*vx+vz*vz||1))); best=Math.min(best, Math.hypot(q[0]-A[0]-vx*t, q[2]-A[2]-vz*t)); } return best; };
     const mains=nw.roots.filter(x=>!x.fork), offPath=(L, T0)=>L.reduce((m, rt, i)=>Math.max(m, ...rt.pts.map(q=>onPath(q, T0[i].pts))), 0);
-    n+=2; { const dev=offPath(mains, old.roots); if(!(dev<0.001)) miss(`${lvn}: a shaped root leaves today's path by ${dev.toFixed(4)} m`); }
+    n+=2; { const dev=offPath(mains, old.roots); if(!(dev<0.03)) miss(`${lvn}: a smooth root leaves today's path by ${dev.toFixed(4)} m (3 cm allowed: the curve through today's points, the founder's FOREST-2b)`); }
     if(nw.roots.findIndex(x=>x.fork)>=0 && nw.roots.slice(nw.roots.findIndex(x=>x.fork)).some(x=>!x.fork)) miss(`${lvn}: a main root comes after a fork`);
-    n++; { const shifted=mains.map(rt=>({ ...rt, pts:rt.pts.map(q=>[q[0]+0.1, q[1], q[2], q[3]]) })); if(offPath(shifted, old.roots)<0.001) miss(`CONTROL ${lvn}: a root moved 10 cm stayed on today's path`); }
+    n++; { const shifted=mains.map(rt=>({ ...rt, pts:rt.pts.map(q=>[q[0]+0.1, q[1], q[2], q[3]]) })); if(offPath(shifted, old.roots)<0.03) miss(`CONTROL ${lvn}: a root moved 10 cm stayed on today's path`); }
     /* inside today's outline (FOREST-2: a shaped root hides nothing today's did not): its ridge no higher, its half width no wider than today's root there */
     { const outOf=L=>{ let worst=0; L.forEach((rt, i)=>{ const T0=old.roots[i].pts; rt.pts.forEach((q, j)=>{ let best=null, bd=Infinity; for(let k=1;k<T0.length;k++){ const A=T0[k-1], B=T0[k], vx=B[0]-A[0], vz=B[2]-A[2], L2=vx*vx+vz*vz||1, t=Math.max(0, Math.min(1, ((q[0]-A[0])*vx+(q[2]-A[2])*vz)/L2)), dd=Math.hypot(q[0]-A[0]-vx*t, q[2]-A[2]-vz*t); if(dd<bd){ bd=dd; best=[A[1]+A[3]+(B[1]+B[3]-A[1]-A[3])*t, A[3]+(B[3]-A[3])*t]; } }
         worst=Math.max(worst, rt.top[j]-best[0]-0.011, q[3]-best[1]-1e-9); }); }); return worst; };
@@ -2530,7 +2530,8 @@ async function forestNatural(){
     if(N.fernSpot(0, -10, fr, none, g, { water:-99, eye:0 })[2]) miss('CONTROL: fernSpot moved a fern with no solid near'); }
   /* (6) files */
   { const FN=await import(new URL('./forest-natural.mjs', import.meta.url).href), r=FN.naturalCheck(); n+=r.cases; for(const x of r.differences) miss('files: '+x);
-    const PC=await import(new URL('./precache.mjs', import.meta.url).href); n+=2; for(const f of FN.NATURAL_FILES) if(!PC.NIGHT_SKIP.some(q=>q.test('apps/night/rooms/forest/new/'+f))) miss(`apps/night/rooms/forest/new/${f} would be in a player's start set`);
+    const PC=await import(new URL('./precache.mjs', import.meta.url).href); n+=3; for(const f of FN.NATURAL_FILES){ const skip=PC.NIGHT_SKIP.some(q=>q.test('apps/night/rooms/forest/new/'+f)), rock=/^rock-/.test(f); if(rock && skip) miss(`apps/night/rooms/forest/new/${f}: the rocks are the default (FOREST-2b) — it must be in the start set`); if(!rock && !skip) miss(`apps/night/rooms/forest/new/${f} would be in a player's start set`); }
+    if(!PC.NIGHT_SKIP.some(q=>q.test('apps/night/rooms/forest/new/foliage-1024.png'))) miss('the sheet of the spruces would be in a start set');
     if(PC.NIGHT_SKIP.some(q=>q.test('apps/night/rooms/forest/tex/floor-1024.png'))) miss('CONTROL: the skip list skips a start file of the forest');
     const { statSync }=await import('node:fs'), sz=FN.NATURAL_FILES.reduce((a, f)=>a+statSync(new URL('../apps/night/rooms/forest/new/'+f, import.meta.url)).size, 0); notes.push(`the new forest's files: ${(sz/1024).toFixed(0)} KB (only with ?forest=new; the start set unchanged)`); }
   return { cases:n, total:d.length, differences:d, notes };

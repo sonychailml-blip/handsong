@@ -69,6 +69,7 @@ THERE in full and here as one index entry):
   164 The room «Rain»'s baked city: the boulevard, the moods' life, windows lit with their lives, the cars heard as they pass (RAIN-1)
   165 The room «Rain»'s city made real: houses of their own, plane trees, the bake's light, defocused windows in perspective, cars steady through Wave (RAIN-2)
   166 The forest's objects made natural behind six switches (?forest=rocks, roots, bark, moss, stumps, clear; new = all): nothing lost (the census), plants clear of solids, as full as today (FOREST-2)
+  167 The forest after the founder's verdict: rocks and clear by default; bark, moss, stumps, roots, spruce, grass behind their words; ?forest=old the old forest (FOREST-2b)
   163 Fixes after the backlog audit: an in-app browser's refusal, the Lighter stream, the rain room's sound on Dark, Licences, keeping the files (NIGHT-15, CORE-23)
 
 ## Moved to `archive/CLAUDE-history.md` at DOC1 (grep by title; read only what the slice needs)

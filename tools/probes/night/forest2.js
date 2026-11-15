@@ -48,10 +48,10 @@ export function groundDetail(px, w, h, rule=FULL_RULE){ const rows=Math.floor(h*
 
 /* the plants: today's ferns, the grass, the herb layer and fine ferns, the crowns' and understorey's leaf cards, the gust's leaves; with the switch
    also whatever the room lists as its own (vegDbg) */
-export function vegMeshes(room){ const S=room.state(), out=new Set(), add=m=>{ if(m && m.isObject3D) out.add(m); };
+export function vegMeshes(room, noGrass=false){ const S=room.state(), out=new Set(), add=m=>{ if(m && m.isObject3D) out.add(m); };   // noGrass: FOREST-2b — the grass judged apart (today's blades stand in one tuft at the origin: the grass switch spreads them)
   add(room.fernsDbg && room.fernsDbg.fronds); const F=room.floorDbg && room.floorDbg.parts; if(F){ add(F.herbs); add(F.fronds); }
-  const C=room.canopyDbg && room.canopyDbg.parts; if(C) add(C.leaves); const G=room.gustDbg && room.gustDbg.parts; if(G) add(G.leaves);
-  room.scene.traverse(o=>{ if(o.isInstancedMesh && S.detail && o.count===S.detail.grass && !out.has(o) && o.geometry && o.geometry.attributes.position.count<=12) out.add(o); });   // the grass: the detail's one blade draw
+  const C=room.canopyDbg && room.canopyDbg.parts; if(C){ add(C.leaves); add(C.cards); } const G=room.gustDbg && room.gustDbg.parts; if(G) add(G.leaves);   // FOREST-2b: the spruces' needles (C.cards) are plants too
+  if(!noGrass) room.scene.traverse(o=>{ if(o.isInstancedMesh && S.detail && o.count===S.detail.grass && !out.has(o) && o.geometry && o.geometry.attributes.position.count<=12) out.add(o); });   // the grass: the detail's one blade draw
   if(room.vegDbg) for(const m of room.vegDbg()) add(m);
   return [...out]; }
 
@@ -94,7 +94,7 @@ export function forestShared(){ if(SHARED && performance.now()-SHARED_AT<600000)
     for(const lv of ['reduced', 'full']){ let cutOff=null, cutOn=null;
       let cenOff=null, cenOn=null;
       const off=await forestFrames({ level:lv, on:false, vis:true, mutate:async (room, T)=>{ cutOff=await plantCuts(room); cenOff=await todayCensus(room, T); } });
-      const on=await forestFrames({ level:lv, on:true, vis:true, mutate:async (room, T)=>{ cutOn=await plantCuts(room); cenOn=await variantCensus(room, T, 'new', cenOff); } });
+      const on=await forestFrames({ level:lv, on:ALL_BUT_GRASS, vis:true, mutate:async (room, T)=>{ cutOn=await plantCuts(room); cenOn=await variantCensus(room, T, 'new', cenOff); } });
       const c1=await forestFrames({ level:lv, on:false, mutate:forest1Ferns });
       out[lv]={ off, on, c1, cutOff, cutOn, cenOff, cenOn }; }
     return out; })();
@@ -227,7 +227,9 @@ export const MOVE=Object.freeze({ mushroom:0.45, flower:0.45, fern:1.8, 'fine fe
 /* a mushroom counts as less visible when its glow loses more than px pixels AND more than rel of today's (below that the glow's edge flickers with
    the shading behind it: ±1 px with ?forest=bark, which moves no geometry) — FOREST-2's guess, said in the report */
 export const VIS_RULE=Object.freeze({ px:3, rel:0.1 });
-export const VARIANTS=Object.freeze(['rocks', 'roots', 'bark', 'moss', 'stumps', 'clear', 'new']);
+/* the shared «all» build: every switch but the grass (its fix spreads today's one tuft of blades over the forest — judged by eye; its own census and visibility run as ?forest=grass) */
+export const ALL_BUT_GRASS=Object.freeze(['rocks', 'roots', 'bark', 'moss', 'stumps', 'clear', 'spruce']);
+export const VARIANTS=Object.freeze(['default', 'roots', 'bark', 'moss', 'stumps', 'spruce', 'grass', 'new']);   // FOREST-2b: the default (rocks + clear), each switch on top of it, all
 async function forestRoom(level, parts, fn){ const { T, CV, F }=await kit(), was=F.forestNewDbg(); F.forestNewDbg(parts||false); let room=null;
   try{ await Promise.race([F.forestAssets(level), new Promise((_, no)=>setTimeout(()=>no(new Error('the forest files did not arrive in 60 s')), 60000))]);
     room=F.buildForest(T, { C:CV, level, w:390, h:844, reduce:false, mood:null, shadow:false, gl2:true }); return await fn(room, T); }
@@ -242,6 +244,7 @@ export function forestCensus(room, T){ const m=new T.Matrix4(), p=new T.Vector3(
   const S=room.state(); room.scene.traverse(o=>{ if(o.isInstancedMesh && S.detail && o.count===S.detail.grass && o.geometry.attributes.position.count<=12) inst('grass', o); });
   const CP=room.canopyDbg.places; for(const q of CP.saplings) add('sapling', q.x, 0, q.z); for(const q of CP.shrubs) add('bush', q.x, 0, q.z); for(const q of CP.young) add('young tree', q.x, 0, q.z);
   for(const q of CP.sprays) if(q.of!=='crown') add('understorey spray', q.x, q.y, q.z);
+  if(room.canopyDbg.spruces) for(const q of room.canopyDbg.spruces.places) add('young spruce', q.x, 0, q.z);
   const SP=room.streamDbg.parts; inst('rock', SP.rocks); inst('pebble', SP.pebbles);
   const W=room.woodPlacesDbg; for(const q of W.logs) add('log', (q.a[0]+q.b[0])/2, (q.a[1]+q.b[1])/2, (q.a[2]+q.b[2])/2); for(const q of W.stumps) add('stump', q.x, q.y, q.z); for(const q of W.snags) add('snag', q.x, q.y, q.z);
   for(const q of W.brackets) add('bracket fungus', q.x, q.y, q.z); for(const q of W.twigs) add('fallen branch', q.x, q.y, q.z);
@@ -257,8 +260,8 @@ async function buriedOf(room, parts){ const N=await import('../../../apps/night/
     return null; }; }
 const capsOf=(room, T)=>{ const m=new T.Matrix4(), p=new T.Vector3(), out=[], c=room.lifeDbg.parts.caps; for(let i=0;i<c.count;i++){ c.getMatrixAt(i, m); p.setFromMatrixPosition(m); out.push([p.x, p.y, p.z]); } return out; };
 /* today's census vs a variant's → { lost: [names], moved: [names], added: {kind: n}, buried: [names] } */
-export function censusCompare(A, B){ const lost=[], moved=[], added={};
-  for(const [k, list] of Object.entries(A.kinds)){ const pool=(B.kinds[k]||[]).map(q=>({ q, used:false })), lim=MOVE[k]==null ? 0.001 : MOVE[k];
+export function censusCompare(A, B, declared={}){ const lost=[], moved=[], added={};   // declared: { kind: m } a switch's own declared moves (grass: every blade placed at last)
+  for(const [k, list] of Object.entries(A.kinds)){ const pool=(B.kinds[k]||[]).map(q=>({ q, used:false })), lim=declared[k]!=null ? declared[k] : MOVE[k]==null ? 0.001 : MOVE[k];
     const byIndex=pool.length>=list.length;   // the same law, the same order: each one is itself at its own index (additions come after)
     list.forEach((a, i)=>{ let best=null, bd=Infinity; if(byIndex){ best=pool[i]; bd=Math.hypot(best.q[0]-a[0], best.q[2]-a[2]); } else for(const c of pool){ if(c.used) continue; const d=Math.hypot(c.q[0]-a[0], c.q[2]-a[2]); if(d<bd){ bd=d; best=c; } }
       if(best && bd<=lim+1e-6){ best.used=true; if(bd>0.005) moved.push(`${k} #${i} (${a[0].toFixed(2)}, ${a[2].toFixed(2)}) moved ${bd.toFixed(2)} m`); }
@@ -267,7 +270,8 @@ export function censusCompare(A, B){ const lost=[], moved=[], added={};
   for(const [t, n] of Object.entries(A.roots)) if((B.roots[t]||0)!==n) lost.push(`the roots of tree ${t}: ${B.roots[t]||0}, today ${n}`);
   return { lost, moved, added }; }
 async function todayCensus(room, T){ const c=forestCensus(room, T), bur=await buriedOf(room, false); c.buried=capsOf(room, T).map(q=>bur(q[0], q[1], q[2])); return c; }
-async function variantCensus(room, T, v, A){ const B=forestCensus(room, T), res=censusCompare(A, B), bur=await buriedOf(room, v), caps=capsOf(room, T), buried=[];
+const declOf=v=>(v==='grass' || v==='new') ? { grass:Infinity } : {};
+async function variantCensus(room, T, v, A){ const B=forestCensus(room, T), res=censusCompare(A, B, declOf(v)), bur=await buriedOf(room, v), caps=capsOf(room, T), buried=[];
   A.kinds.mushroom.forEach((a, i)=>{ let bd=Infinity, bq=null; for(const q of caps){ const dd=Math.hypot(q[0]-a[0], q[2]-a[2]); if(dd<bd){ bd=dd; bq=q; } } if(!bq || bd>MOVE.mushroom) return;
     const w=bur(bq[0], bq[1], bq[2]); if(w && !A.buried[i]) buried.push(`mushroom #${i} (${a[0].toFixed(2)}, ${a[2].toFixed(2)}) inside a ${w}`); });
   const nat=room.natDbg ? room.natDbg() : null; return { ...res, buried, shroomMoves:nat && nat.moved ? nat.moved.shrooms : [] }; }
@@ -314,9 +318,9 @@ export async function checkForestLevels(){
   try{
     const A=await open(false, 'full'); ok('the forest of today did not open at Detailed through the host', A.okOpen && A.level==='full' && !A.held);
     notes.push(`today at Detailed through the host: ${Object.entries(A.census.kinds).map(([k, L])=>k+' '+L.length).join(', ')}`);
-    for(const v of VARIANTS){ const B=await open(v, 'full'), want=v==='new' ? F.FOREST_PARTS.slice() : [v], res=censusCompare(A.census, B.census);
+    for(const v of VARIANTS){ const B=await open(v, 'full'), want=v==='new' ? F.FOREST_PARTS.slice() : F.FOREST_PARTS.filter(k=>F.FOREST_DEFAULT.includes(k) || k===v), res=censusCompare(A.census, B.census, declOf(v));
       ok(`?forest=${v}: opened at ${B.level}${B.held ? ' (Detailed held back)' : ''}, chosen Detailed`, B.okOpen && B.level==='full' && !B.held);
-      ok(`?forest=${v}: the room was built with ${JSON.stringify(B.built)}, wanted ${JSON.stringify(want)}`, JSON.stringify(B.built)===JSON.stringify(want));
+      ok(`?forest=${v}: the room was built with ${JSON.stringify(B.built)}, wanted ${JSON.stringify(want)}`, JSON.stringify((B.built||[]).slice().sort())===JSON.stringify(want.slice().sort()));
       ok(`?forest=${v} at Detailed: ${res.lost.length} of today's lost — ${res.lost.slice(0, 4).join('; ')}`, res.lost.length===0);
       notes.push(`?forest=${v}: level ${B.level}, built ${JSON.stringify(B.built)}, moved ${res.moved.length}, added ${JSON.stringify(res.added)}`); }
     { const C=await open('roots', 'reduced'), res=censusCompare(A.census, C.census), caught=C.level!=='full' && res.lost.length>0;

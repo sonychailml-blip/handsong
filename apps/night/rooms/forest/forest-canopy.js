@@ -8,6 +8,7 @@
      dimmed by the clouds (patchDapple). The moon's face itself is a prepared file too (tex/moon-*.png; forest.js puts it on the disc).
    Colours: tokens (--cv-forest-star; the moon's colour for the dapple). */
 import { canopyPlaces, crownCellUv, CANOPY } from './pure/canopy.js';
+import { youngSpruces, foliageCellUv, FOLIAGE_ATLAS } from './pure/spruce.js';   // FOREST-2b «spruce»
 import { plantMaterial } from './forest-floor.js';
 import { limbGeo } from './forest-wood.js';
 import { seeded } from '../../../../core/pure/dsp.js';
@@ -24,7 +25,9 @@ export function buildCanopy(ctx){
   const cl=ctx.clear ? (x, z, k)=>ctx.clear(x, z, ctx.reach[k], { tall:ctx.tall[k], eye:3.4, aisle: k==='sapling' ? [CANOPY.reach.sapX, -1e9] : [CANOPY.aisle, -8] }).slice(0, 2) : null;   // FOREST-2: the understorey clear of solids (?forest=new)
   const key=JSON.stringify(counts)+(cl ? '.nat'+ctx.clearKey : ''); if(!MEMO.has(key)) MEMO.set(key, cl ? (q=>({ ...q, sprays:ctx.sprays(q.sprays) }))(canopyPlaces(counts, trunks, undefined, false, cl)) : canopyPlaces(counts, trunks)); const P=MEMO.get(key), d=new T.Object3D(), c=new T.Color(), R=seeded(0x43414E31);   // FOREST-2: ctx.sprays — the understorey's sprays pushed off the trunks
   /* limbs and stems: the wood's material, no shadow */
-  const wg=limbGeo(T, P.limbs.concat(P.stems), [0, 0, 0.3]), wood= wg ? new T.Mesh(wg, ctx.woodMat) : null; if(wood){ own.push(wg); wood.receiveShadow=true; s.add(wood); }
+  const SP= ctx.spruce ? youngSpruces(ctx.spruce.n, trunks, [...P.young, ...P.shrubs, ...P.saplings].map(p=>[p.x, p.z, 1.5])) : null;   // FOREST-2b: the young spruces (their own seeded law; nothing above moves)
+  const spSegs= SP ? SP.limbs.flatMap(l=>l.pts.slice(1).map((q, i)=>{ const p=l.pts[i]; return [p[0], p[1], p[2], q[0], q[1], q[2], p[3], q[3]]; })) : [];
+  const wg=limbGeo(T, SP ? P.limbs.concat(P.stems, spSegs) : P.limbs.concat(P.stems), [0, 0, 0.3]), wood= wg ? new T.Mesh(wg, ctx.woodMat) : null; if(wood){ own.push(wg); wood.receiveShadow=true; s.add(wood); }
   /* the leaf sprays */
   const n=P.sprays.length, mat=ctx.crownTex ? plantMaterial(T, ctx.crownTex, U, ctx.soft) : null; if(mat) mat.emissive=new T.Color(C('forest-leafglow'));   // a faint moonlit glow: the leaves against the sky never go black (a value, not a new program)
   const pg=new T.PlaneGeometry(1, 1), cells=new Float32Array(Math.max(1,n)*4);
@@ -33,6 +36,12 @@ export function buildCanopy(ctx){
   P.sprays.forEach((p,i)=>{ d.position.set(p.x, p.y, p.z); d.rotation.set(p.tilt, p.yaw, 0, 'YXZ'); d.scale.set(p.s, p.s, p.s); d.updateMatrix(); leaves.setMatrixAt(i, d.matrix);
     leaves.setColorAt(i, c.setScalar((p.of==='crown' ? 1.25 : 1.05)+R()*0.45)); });   // lighter than the floor's plants: seen from below against the sky
   leaves.count=n; leaves.frustumCulled=false; leaves.receiveShadow=true; if(ctx.soft) leaves.renderOrder=-0.5; if(mat && n) s.add(leaves);
+  /* FOREST-2b: the spruces' needle cards (the CC0 foliage sheet; the crowns' program), each card's base at its point, its plane by its basis */
+  let cards=null; if(SP && ctx.spruce.tex && SP.cards.length){ const nc=SP.cards.length, cmat=plantMaterial(T, ctx.spruce.tex, U, ctx.soft); cmat.emissive=new T.Color(C('forest-leafglow')).multiplyScalar(0.5); own.push(cmat);
+    const cg=new T.PlaneGeometry(1, 1); cg.translate(0, 0.5, 0); const cc=new Float32Array(nc*4); SP.cards.forEach((p, i)=>cc.set(foliageCellUv(p.cell), i*4)); cg.setAttribute('aCell', new T.InstancedBufferAttribute(cc, 4)); own.push(cg);
+    cards=new T.InstancedMesh(cg, cmat, nc); const M=new T.Matrix4(), ax=new T.Vector3(), gv=new T.Vector3(), nv=new T.Vector3();
+    SP.cards.forEach((p, i)=>{ const w=p.s*FOLIAGE_ATLAS.aspect[p.cell], b=p.b; ax.set(b[0], b[1], b[2]).multiplyScalar(w); gv.set(b[3], b[4], b[5]).multiplyScalar(p.s); nv.set(b[6], b[7], b[8]).multiplyScalar(p.s); M.makeBasis(ax, gv, nv); M.setPosition(p.x, p.y, p.z); cards.setMatrixAt(i, M); cards.setColorAt(i, c.setScalar(0.62*(p.tone||1)+R()*0.12)); });
+    cards.frustumCulled=false; cards.receiveShadow=true; if(ctx.soft) cards.renderOrder=-0.5; s.add(cards); }
   /* the stars */
   const ns=P.stars.length, sp=new Float32Array(Math.max(1,ns)*3), sa=new Float32Array(Math.max(1,ns)*2); P.stars.forEach((q,i)=>{ sp.set(q.slice(0,3), i*3); sa.set([q[3], q[4]], i*2); });
   const sg=new T.BufferGeometry(); sg.setAttribute('position', new T.BufferAttribute(sp, 3)); sg.setAttribute('aStar', new T.BufferAttribute(sa, 2));
@@ -43,7 +52,7 @@ export function buildCanopy(ctx){
   function resize(scale){ sm.uniforms.uScale.value=Math.max(0.8, scale/420); }   // the points' scale (pixels at 1 m) → a star's pixels
   const by={}; for(const p of P.sprays) by[p.of]=(by[p.of]||0)+1;
   const state=()=>({ sprays:n, shown: mat ? n : 0, by, limbs:P.limbs.length, stems:P.stems.length, young:P.young.length, shrubs:P.shrubs.length, saplings:P.saplings.length, stars:ns, starK:sm.uniforms.uK.value });
-  return { update, resize, state, places:P, parts:{ wood, leaves, stars, material:mat } };   // places, parts: probes only
+  return { update, resize, state, places:P, spruces:SP, parts:{ wood, leaves, stars, material:mat, cards } };   // places, parts: probes only
 }
 /* the ground gains the DAPPLED MOONLIGHT: two drifting copies of the dapple pattern add uDapCol × the ground's colour × uDapK in patches —
    chained after the ground's other patches. U: { uDap (the texture), uDapK, uDapT (the drift's clock), uDapCol } */

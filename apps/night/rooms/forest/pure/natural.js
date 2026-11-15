@@ -52,20 +52,29 @@ function organicRoot(x0, z0, a, L, hf, lam, rho0, trunks, R, startT=0){ const O=
   if(pts.length<4) return null;
   if(pts.length<n){ const k=pts.length-1, g=rootGround(pts[k][0], pts[k][2], trunks), dy=Math.max(0.05, top[k]-(g-0.3*pts[k][3])); pts[k][1]-=dy; sec[k][2]-=dy/2; sec[k][1]=Math.max(pts[k][3]*0.5, sec[k][1]-dy/2); top[k]-=dy; }   // stopped by the stream: it dives into the bank
   return { pts, sec, top }; }
-/* FOREST-2 «roots»: TODAY'S roots, shaped — each follows its own path of today exactly (nothing at its place moves: the moss on it, the plants round
-   it), only its section changes: a fin out of the flare at the trunk (hf, falling off over lam), elliptical and flatter along the ground, tapering,
-   sinking at its end; half of them fork (an addition, flagged fork, listed after every main root). todayRoots: rootsOf's list (pure/wood.js) */
-export function rootsOrganic(trunks, per, R, nearTrees, todayRoots, keepOff=[]){ const O=NATURAL.organic, out=[], forks=[];   // keepOff [[x, z]…]: the mushrooms — no fork comes within 0.6 m of one (a fork is new: it must hide nothing)
-  for(const tr of todayRoots||[]){ const r=trunks[tr.tree][2], P=tr.pts, seg=[0]; for(let k=1;k<P.length;k++) seg.push(seg[k-1]+Math.hypot(P[k][0]-P[k-1][0], P[k][2]-P[k-1][2]));
-    const L=seg[seg.length-1]||0.01, n=O.rings, hf=(O.hf[0]+R()*(O.hf[1]-O.hf[0]))*(0.55+O.hfR*r), lam=(O.lam[0]+R()*(O.lam[1]-O.lam[0]))*(0.7+r), rho0=P[0][3]*1.1, pts=[], sec=[], top=[];
-    for(let j=0;j<n;j++){ const d=j/(n-1)*L, t=d/L; let k=1; while(k<P.length-1 && seg[k]<d) k++; const u=Math.max(0, Math.min(1, (d-seg[k-1])/((seg[k]-seg[k-1])||1)));
-      const x=P[k-1][0]+(P[k][0]-P[k-1][0])*u, z=P[k-1][2]+(P[k][2]-P[k-1][2])*u, g=rootGround(x, z, trunks), rho=rho0*Math.pow(1-0.92*t, 1.3)+0.006, fin=hf*Math.exp(-d/lam), w=Math.min(P[k-1][3]+(P[k][3]-P[k-1][3])*u, rho*(1+O.wide*Math.exp(-d/lam)));   // never wider than today's root there
-      const topToday=P[k-1][1]+P[k-1][3]+(P[k][1]+P[k][3]-P[k-1][1]-P[k-1][3])*u;   // never above today's root there: it hides nothing new
-      const tp=Math.min(topToday+0.01, g+fin+rho*(O.flat-O.sink*Math.pow(t, 3))-O.dive*Math.pow(t, 4)), bot=g-O.bury-rho*0.6, hh=Math.max(rho*0.5, (tp-bot)/2), yc=(tp+bot)/2; pts.push([x, tp-w, z, w]); sec.push([w, hh, yc-(tp-w)]); top.push(tp); }
-    const me={ tree:tr.tree, pts, sec, top }; out.push(me);
-    if(R()<O.fork[0]){ const tf=O.fork[1]+R()*(O.fork[2]-O.fork[1]), j=Math.min(n-2, Math.round(tf*(n-1))), p=pts[j], side=R()<0.5 ? -1 : 1;
+/* FOREST-2b «roots» (the founder: «they look angular»): TODAY'S roots, smooth — each follows today's path (a Catmull–Rom curve through today's eight
+   points: gentle continuous bends, no kinks), 32 rings of round section (14 sides, smooth normals), its radius today's, eased; never above or wider than
+   today's root at the same place (it hides nothing today's did not); sinking softly into the soil at its end, starting inside the trunk's flare. Half
+   of them fork (round and smooth too; an addition, after every main root; never within 0.6 m of a mushroom). todayRoots: rootsOf's list (pure/wood.js) */
+const cr=(a, b, c, d, t)=>{ const t2=t*t, t3=t2*t; return 0.5*((2*b)+(-a+c)*t+(2*a-5*b+4*c-d)*t2+(-a+3*b-3*c+d)*t3); };
+export const ROOT_RINGS=32;
+function smoothPath(P, n){ const out=[]; for(let j=0;j<n;j++){ const u=j/(n-1)*(P.length-1), k=Math.min(P.length-2, Math.floor(u)), t=u-k, a=P[Math.max(0, k-1)], b=P[k], c=P[k+1], d=P[Math.min(P.length-1, k+2)];
+    out.push([0, 1, 2, 3].map(q=>cr(a[q], b[q], c[q], d[q], t))); } return out; }
+/* today's outline at (x, z): the nearest point of today's polyline → [top, radius] */
+function outlineAt(P, x, z){ let best=null, bd=Infinity; for(let k=1;k<P.length;k++){ const A=P[k-1], B=P[k], vx=B[0]-A[0], vz=B[2]-A[2], L2=vx*vx+vz*vz||1, t=Math.max(0, Math.min(1, ((x-A[0])*vx+(z-A[2])*vz)/L2)), dd=Math.hypot(x-A[0]-vx*t, z-A[2]-vz*t);
+    if(dd<bd){ bd=dd; best=[A[1]+A[3]+(B[1]+B[3]-A[1]-A[3])*t, A[3]+(B[3]-A[3])*t]; } } return best; }
+export function rootsOrganic(trunks, per, R, nearTrees, todayRoots, keepOff=[]){ const O=NATURAL.organic, out=[], forks=[];   // keepOff [[x, z]…]: the mushrooms
+  for(const tr of todayRoots||[]){ const P=tr.pts, S=smoothPath(P, ROOT_RINGS), pts=[], top=[], n=S.length;
+    for(let j=0;j<n;j++){ const t=j/(n-1), [x, y0, z, r0]=S[j], [tTop, tR]=outlineAt(P, x, z), r=Math.max(0.006, Math.min(r0, tR)), g=rootGround(x, z, trunks);
+      const sink=Math.pow(Math.max(0, (t-0.72)/0.28), 2)*r*1.6, y=Math.min(y0, tTop-r)-sink;   // inside today's outline; the end eases under the soil
+      const yy=Math.max(y, Math.min(g-r*1.4, tTop-r)); pts.push([x, yy, z, r]); top.push(yy+r); }   // not deeper than half buried, never above today's
+    out.push({ tree:tr.tree, pts, top, smooth:true });
+    const hf=R(), lam=R(); void hf; void lam;   // today's draws kept in step (the fork below reads the same stream as before)
+    if(R()<O.fork[0]){ const tf=O.fork[1]+R()*(O.fork[2]-O.fork[1]), j=Math.min(n-2, Math.round(tf*(n-1))), p=pts[j], side=R()<0.5 ? -1 : 1, L=Math.hypot(P[P.length-1][0]-P[0][0], P[P.length-1][2]-P[0][2]);
       const pa=Math.atan2(pts[j+1][2]-p[2], pts[j+1][0]-p[0])+side*(O.forkAng[0]+R()*(O.forkAng[1]-O.forkAng[0])), Lf=L*(1-tf)*(O.forkLen[0]+R()*(O.forkLen[1]-O.forkLen[0]));
-      const fk=organicRoot(p[0], p[2], pa, Lf, 0, lam, sec[j][0]*0.75, trunks, R, tf); if(fk && !fk.pts.some(q=>keepOff.some(m=>Math.hypot(m[0]-q[0], m[1]-q[2])<0.6))) forks.push({ tree:tr.tree, fork:true, ...fk }); } else { R(); R(); R(); R(); } }
+      const fk=organicRoot(p[0], p[2], pa, Lf, 0, 0.35, p[3]*0.75, trunks, R, tf);
+      if(fk && !fk.pts.some(q=>keepOff.some(m=>Math.hypot(m[0]-q[0], m[1]-q[2])<0.6))){ const F2=smoothPath(fk.pts.map((q, i)=>[q[0], fk.top[i]-q[3]*0.8, q[2], q[3]*0.8]), 20);
+        forks.push({ tree:tr.tree, fork:true, smooth:true, pts:F2, top:F2.map(q=>q[1]+q[3]) }); } } else { R(); R(); R(); R(); } }
   return out.concat(forks); }
 /* the top of the shaped roots at (x, z) (the highest ridge within its half width), or null */
 export function rootTopAt(x, z, roots){ let best=null; for(const rt of roots||[]) if(rt.top) for(let j=0;j<rt.pts.length;j++){ const p=rt.pts[j]; if(Math.hypot(p[0]-x, p[2]-z)<p[3]*1.2 && (best==null || rt.top[j]>best)) best=rt.top[j]; } return best; }
@@ -92,16 +101,20 @@ const solidC=s=> s.ax==null ? [s.x, s.z] : [(s.ax+s.bx)/2, (s.az+s.bz)/2];
    touched); o: { water (the least distance beyond the stream's half width, may be negative for the bank's sedges), eye (m from the eye's ground point),
    box: [x0, x1, z0, z1] (stay inside), aisle: [half width, z from] (stay out of the view's aisle: |x| < half width beyond z) }. A plant no clear place
    takes stays where it was (counted by the row) */
-export function clearSpot(x, z, reach, solids, o={}){ if(o.avoid){ const r=clearSpot1(x, z, reach, solids, o); return r[2] || !solidHit(x, z, reach, solids, o.low==null ? reach : o.low, o.tall==null ? reach : o.tall) ? r : clearSpot1(x, z, reach, solids, { ...o, avoid:null }); } return clearSpot1(x, z, reach, solids, o); }
+/* how far off the view's middle the eye sees (x, z) (the camera looks along −z) */
+const viewOff=(x, z)=>{ const E=NATURAL.clear.eye; return Math.abs(x-E[0])/Math.max(0.5, E[1]-z); };
+export function clearSpot(x, z, reach, solids, o={}){ if(o.inView){ const v0=viewOff(x, z)+0.02, r=clearSpot(x, z, reach, solids, { ...o, inView:false, hidden:(px, pz)=>viewOff(px, pz)>v0 }); return r[2] || !solidHit(x, z, reach, solids, o.low==null ? reach : o.low, o.tall==null ? reach : o.tall) ? r : clearSpot(x, z, reach, solids, { ...o, inView:false }); }   // FOREST-2b: first a place no further off the view's middle (a plant at the frame's edge never pushed out of it), on any ring
+  if(o.avoid){ const r=clearSpot1(x, z, reach, solids, o); return r[2] || !solidHit(x, z, reach, solids, o.low==null ? reach : o.low, o.tall==null ? reach : o.tall) ? r : clearSpot1(x, z, reach, solids, { ...o, avoid:null }); } return clearSpot1(x, z, reach, solids, o); }
 function clearSpot1(x, z, reach, solids, o={}){ const C=NATURAL.clear, low=o.low==null ? reach : o.low, tall=o.tall==null ? reach : o.tall, hit=solidHit(x, z, reach, solids, low, tall); if(!hit) return [x, z, false];
   const [cx, cz]=solidC(hit), a0=Math.atan2(z-cz, x-cx), water=o.water==null ? 0.2 : o.water, eye=o.eye==null ? 2.6 : o.eye, B=o.box;
-  const view=a=>Math.abs(a[0]-C.eye[0])/Math.max(0.5, C.eye[1]-a[1]), v0=view([x, z])+0.02, eyeD=a=>Math.hypot(a[0]-C.eye[0], a[1]-C.eye[1]);   // how far off the view's middle the eye sees it (the camera looks along −z)
+  const view=a=>viewOff(a[0], a[1]), v0=view([x, z])+0.02, eyeD=a=>Math.hypot(a[0]-C.eye[0], a[1]-C.eye[1]);   // how far off the view's middle the eye sees it (the camera looks along −z)
   const better=(a, b)=>{ const ia=view(a)<=v0, ib=view(b)<=v0; if(ia!==ib) return ia; return ia ? eyeD(a)<eyeD(b) : view(a)<view(b); };   // in view as before → the nearest the eye (as large on screen); else the least off the middle
   for(let k=1;k<=C.rings;k++){ const rr=k*C.step, na=8+4*k; let best=null;
     for(let j=0;j<na;j++){ const a=a0+(j%2 ? 1 : -1)*Math.ceil(j/2)*TAU/na, px=x+Math.cos(a)*rr, pz=z+Math.sin(a)*rr;
       if(B && (px<B[0] || px>B[1] || pz<B[2] || pz>B[3])) continue; if(o.aisle && Math.abs(px)<o.aisle[0] && pz>o.aisle[1]) continue;
       if(Math.hypot(px-C.eye[0], pz-C.eye[1])<eye) continue; if(streamNear(px, pz).d<STREAM.half+water) continue;
       if(o.avoid && o.avoid(px, pz, reach, o.height, x, z)) continue;   // never nearer a mushroom's line of sight than today
+      if(o.hidden && o.hidden(px, pz)) continue;
       if(!solidHit(px, pz, reach, solids, low, tall) && (!best || better([px, pz], best))) best=[px, pz]; }
     if(best) return [best[0], best[1], true]; }   // the nearest ring with a clear place; on it, the place that keeps the plant in view and as large
   return [x, z, false]; }
@@ -144,7 +157,7 @@ export function growersOn(wood, n={ shrooms:12, sprouts:10 }, seed=0x47524F57, t
   const logs=(wood.logs||[]).filter(L=>!L.bridge).concat((wood.logs||[]).filter(L=>L.bridge)), sp=['sorrel', 'forb', 'anemone'];
   const logShrooms=(wood.shrooms||[]).filter(q=>q.on==='log');
   for(let k=0;k<n.sprouts*6 && sprouts.length<n.sprouts && logs.length;k++){ const L=logs[k%logs.length], u=0.15+R()*0.7, r=L.r0+(L.r1-L.r0)*u, th=(R()-0.5)*0.9, dx=L.b[0]-L.a[0], dz=L.b[2]-L.a[2], l=Math.hypot(dx, dz)||1;
-    const sx=L.a[0]+dx*u-dz/l*Math.sin(th)*r, sz=L.a[2]+dz*u+dx/l*Math.sin(th)*r; if(logShrooms.some(q=>Math.hypot(q.x-sx, q.z-sz)<0.45)){ R(); R(); continue; }   // never over a mushroom on the log
+    const sx=L.a[0]+dx*u-dz/l*Math.sin(th)*r, sz=L.a[2]+dz*u+dx/l*Math.sin(th)*r; if(logShrooms.some(q=>Math.hypot(q.x-sx, q.z-sz)<0.45) || (sight && sight(sx, sz, 0.15, 0.25+r))){ R(); R(); continue; }   // never over a mushroom on the log
     sprouts.push({ sp:sp[k%3], x:L.a[0]+dx*u-dz/l*Math.sin(th)*r, y:L.a[1]+(L.b[1]-L.a[1])*u+Math.cos(th)*r*0.92, z:L.a[2]+dz*u+dx/l*Math.sin(th)*r, s:0.45+R()*0.3, rot:R()*TAU, on:'log' }); }
   return { shrooms, sprouts }; }
 /* the mushrooms' lines of sight from the eye (NATURAL.clear.eye, where the fixed views look from): a MOVED plant may not stand between the eye and a

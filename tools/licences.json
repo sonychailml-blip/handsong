@@ -523,6 +523,31 @@
       "licence": "CC0-1.0",
       "source": "Poly Haven, every asset CC0 1.0 (https://polyhaven.com/license): https://polyhaven.com/a/lichen_rock, https://polyhaven.com/a/pine_bark (Dimitrios Savva), https://polyhaven.com/a/bark_brown_02 (Rob Tuytel). Stored unchanged in the design sources tools/design/forest/cc0/ (never fetched at run time, never shipped). SHA-1: lichen_rock_diff_1k 9646bf5e4168b70afbd5ae419f8a42dfc8880687, lichen_rock_nor_gl_1k 6411cd091ed3bd38e1c5745ed8298a6d9dcb6c93, pine_bark_diff_1k 067cffd1e73ca9ae025d08724dc494efb1db2c1f, pine_bark_nor_gl_1k 734efab3daa5e48457ee9396d11de1179c610a0d, bark_brown_02_diff_1k faf104e8dc4f71875c15a9a035b0dae36454d5a5, bark_brown_02_nor_gl_1k 3c233391ee5d446a7aebd6a203643d8cb4920c78 (tools/forest-natural.mjs checks them).",
       "replace": "kept — CC0 sources of our composed detail files"
+    },
+    {
+      "id": "forest-foliage",
+      "name": "The night forest's foliage sheet (FOREST-1, brought back at FOREST-2b for the young spruces, ?forest=spruce): spruce twigs, a dry twig, a broadleaf twig, a leaf rosette, two fern fronds — a master with smaller copies",
+      "class": "image",
+      "use": "shipped",
+      "version": "FOREST-1, 2026-11-15 (tools/forest-foliage.mjs)",
+      "licence": "CC0-1.0",
+      "source": "Composed by our own tool tools/forest-foliage.mjs from Poly Haven assets, every one CC0 1.0 (https://polyhaven.com/license): the twig atlas of «Fir Tree 01» (https://polyhaven.com/a/fir_tree_01), the leaves atlas of «Tree Small 02» (https://polyhaven.com/a/tree_small_02), the fronds of «Fern 02» (https://polyhaven.com/a/fern_02), each with its alpha map; Crops, the leaves placed on our own stems, a dry tint, colour spread under transparent pixels, box-filtered copies; the sources (register entry forest-cc0-sources) are proved by their SHA-1s.",
+      "files": [
+        "apps/night/rooms/forest/new/foliage-2048.png",
+        "apps/night/rooms/forest/new/foliage-1024.png",
+        "apps/night/rooms/forest/new/foliage-512.png"
+      ],
+      "replace": "kept — CC0 photo material composed by us (FOREST-1: the founder asked for CC0 alpha foliage cards)"
+    },
+    {
+      "id": "forest-cc0-sources",
+      "name": "The night forest's CC0 sources of its foliage sheet (FOREST-1, kept at FOREST-2b): Poly Haven leaf atlases with their alpha maps (2k JPG)",
+      "class": "image",
+      "use": "dev-only",
+      "version": "Poly Haven, downloaded 2026-11-15",
+      "licence": "CC0-1.0",
+      "source": "Poly Haven, every asset CC0 1.0 (https://polyhaven.com/license): https://polyhaven.com/a/fir_tree_01, https://polyhaven.com/a/tree_small_02, https://polyhaven.com/a/fern_02, https://polyhaven.com/a/lichen_rock. Stored unchanged in the design sources tools/design/forest/cc0/ (never fetched at run time, never shipped). SHA-1: fir_tree_01_twig_diff_2k 6e27188dd52198bb42ca33ec0e5428372c8d8818, fir_tree_01_twig_alpha_2k 2733fbc513cd25878f3fae26216587b38271abcf, tree_small_02_leaves_diff_2k 135e9e1e0e54c1cdc3d3b32dbaa2af6f52812b84, tree_small_02_leaves_alpha_2k b5ea131f69dd2903d1e83f8328c4a2952cd650b9, fern_02_diff_2k 6ca79d094d8c591ff811a185d51f4f42b41b3e01, fern_02_alpha_2k 40bcf425c08968e8b869dda732f81787912eaefd, lichen_rock_diff_1k 9646bf5e4168b70afbd5ae419f8a42dfc8880687, lichen_rock_nor_gl_1k 6411cd091ed3bd38e1c5745ed8298a6d9dcb6c93 (tools/forest-foliage.mjs checks them).",
+      "replace": "kept — CC0 sources of our composed foliage sheet"
     }
   ],
   "glyphs": [

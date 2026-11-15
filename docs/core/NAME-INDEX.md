@@ -240,7 +240,7 @@ NIGHT-9 — THE WATER'S MIRROR (a part of the night forest room; forest.js build
 
 ## apps/night/rooms/forest/forest-natural.js
 FOREST-2 — THE FOREST'S OBJECTS MADE NATURAL (parts of the night forest room, only with the address word ?forest=new; forest.js NEW).
-- const (7): `NATURAL_TEX`, `naturalFilesDbg`, `NAT_UNI`, `NAT_HEAD`, `NAT_PRE`, `NAT_SPOTS`, `NAT_NORMAL`
+- const (8): `NATURAL_TEX`, `NATURAL_NEED`, `naturalFilesDbg`, `NAT_UNI`, `NAT_HEAD`, `NAT_PRE`, `NAT_SPOTS`, `NAT_NORMAL`
 - fn (8): `naturalAssets`, `naturalHas`, `naturalTextures`, `cushionGeo2`, `cushionRock`, `natStump`, `natSnag`, `natRock`
 
 ## apps/night/rooms/forest/forest-paint.js
@@ -263,7 +263,7 @@ NIGHT-6 slice 5 — MOSS, ROOTS AND FALLEN WOOD (parts of the night forest room;
 
 ## apps/night/rooms/forest/forest.js
 VIS1c (RUN 6, Night plan §3) — THE NIGHT FOREST ROOM's picture: a scene module built with three.js r128 (vendored, loaded by the scene host apps/night/scene/host.js).
-- const (10): `FOREST_LEVELS`, `FOREST_BOUNDS`, `GROUND_ALBEDO`, `FOREST_TEX`, `forestGroundDbg`, `FOREST_PARTS`, `forestNewDbg`, `forestNewAssets`, `NIGHT_PRECACHE_PREFIX`, `forestAssetsDbg`
+- const (11): `FOREST_LEVELS`, `FOREST_BOUNDS`, `GROUND_ALBEDO`, `FOREST_TEX`, `forestGroundDbg`, `FOREST_PARTS`, `FOREST_DEFAULT`, `forestNewDbg`, `forestNewAssets`, `NIGHT_PRECACHE_PREFIX`, `forestAssetsDbg`
 - fn (3): `forestAssets`, `forestHas`, `buildForest`
 - → ./pure/layout.js (1): `FOREST_SEED`
 
@@ -314,7 +314,7 @@ NIGHT-6 slice 5 — TODAY'S FOREST'S PLACES, as numbers (pure, rule #36), for wh
 
 ## apps/night/rooms/forest/pure/natural.js
 FOREST-2 — THE FOREST'S OBJECTS MADE NATURAL, as numbers (pure, rule #36; data row «FOREST natural (app)», browser row «FOREST plants clear of solids»).
-- const (7): `NATURAL`, `GROWERS`, `flareLobes`, `stumpShape`, `stumpRadius`, `EYE_Y`, `fernSpot`
+- const (8): `NATURAL`, `GROWERS`, `flareLobes`, `ROOT_RINGS`, `stumpShape`, `stumpRadius`, `EYE_Y`, `fernSpot`
 - fn (19): `rootGround`, `rootsOrganic`, `rootTopAt`, `solidsOf`, `solidHit`, `clearSpot`, `rootHit`, `stumpHit`, `shroomsFree`, `growersOn`, `sightBlock`, `keepSize`, `solids3Of`, `inSolid3`, `frondPoints`, `fineFrondPoints`, `herbPoints`, `cardSpot`, `spraysClear`
 
 ## apps/night/rooms/forest/pure/paint.js
@@ -335,6 +335,11 @@ NIGHT-3: THE FOREST ROOM'S RECORD — what the room is, as data (pure, rule #36;
 NIGHT-13: THE FOREGROUND SILHOUETTES — dark fronds and a branch held in the corners of the view (pure, rule #36).
 - const (2): `SIL_TALL`, `FOREST_SIL`
 - fn (1): `silScreen`
+
+## apps/night/rooms/forest/pure/spruce.js
+FOREST-2b «spruce» — FOREST-1's YOUNG SPRUCES, brought back (the founder liked them on captures but never saw them in the app: the level bug).
+- const (4): `SPRUCES`, `FOLIAGE_ATLAS`, `LOWER`, `SPRUCE`
+- fn (5): `foliageCellUv`, `viewAt`, `inMiddle`, `cardBasis`, `youngSpruces`
 
 ## apps/night/rooms/forest/pure/stream.js
 NIGHT-6 slice 4 — THE STREAM'S LIFE, as numbers.
@@ -1344,7 +1349,7 @@ VIS1c (RUN 6, Night plan §10, review 2026-10-17): two rows (quick and all).
 
 ## tools/probes/night/forest2.js
 FOREST-2 — the forest's objects made natural behind the address word ?forest=new.
-- const (6): `FOREST2_VIEWS`, `FULL_RULE`, `MOVE`, `VIS_RULE`, `VARIANTS`, `forestCensusDbg`
+- const (7): `FOREST2_VIEWS`, `FULL_RULE`, `MOVE`, `VIS_RULE`, `ALL_BUT_GRASS`, `VARIANTS`, `forestCensusDbg`
 - fn (17): `geoPrint`, `progPrint`, `vegCover`, `groundDetail`, `vegMeshes`, `forestFrames`, `forestShared`, `dumpForestToday`, `checkForestToday`, `forest1Ferns`, `checkForestFull`, `plantCuts`, `checkForestClear`, `forestCensus`, `censusCompare`, `checkForestLost`, `checkForestLevels`
 
 ## tools/probes/night/headroom-calc.js
@@ -1420,7 +1425,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 - const (5): `TEST_ROOM_ID`, `TEST_ROOM`, `testRoomMode`, `testRoomInfo`, `testRoomFreeLeaks`
 - fn (2): `testRoomInstall`, `testRoomRemove`
 
-_281 modules, 2947 exported names._
+_282 modules, 2960 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

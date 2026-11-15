@@ -38,8 +38,9 @@ import { handLightK, HANDLIGHT_GLOW_OLD } from '../../pure/handlight.js';   // N
 import { patchGroundMacro, patchGroundNight } from './forest-ground.js';   // NIGHT-8: the bare ground's large scale
 import { litterPlaces } from './pure/ground.js';   // NIGHT-8: leaves, pebbles and twigs on the ground
 import { naturalAssets, naturalHas, naturalTextures, NAT_UNI } from './forest-natural.js';   // FOREST-2: the objects made natural (?forest=new only)
-import { NATURAL, rootsOrganic, solidsOf, clearSpot, growersOn, keepSize, solids3Of, fernSpot, frondPoints, inSolid3, spraysClear, shroomsFree, rootTopAt, sightBlock } from './pure/natural.js';
+import { NATURAL, rootsOrganic, solidsOf, clearSpot, growersOn, keepSize, solids3Of, fernSpot, frondPoints, inSolid3, spraysClear, shroomsFree, rootTopAt, sightBlock, solidHit } from './pure/natural.js';
 import { streamRocks } from './pure/stream.js';
+import { SPRUCES } from './pure/spruce.js';   // FOREST-2b
 
 export { FOREST_SEED };
 export const FOREST_LEVELS=FOREST_ROOM.levels;   // NIGHT-3: what each level draws lives in the record
@@ -79,11 +80,16 @@ const scanOf=level=> groundOver ? groundOver==='scan' : !!(FOREST_LEVELS[level]|
    or ?forest=rocks&forest=bark): rocks, roots, bark, moss (the cushions and the sprouts on the logs), stumps (stumps and snags), clear (the plants clear of
    solids); ?forest=new = all of them. Without any the forest is today's, to the bit (browser row «FOREST switch off = today»). forestNewDbg(v): probes and
    captures only — true / 'new' all, false none, a list or 'a,b' those; no argument reads it (false, or the list) */
-export const FOREST_PARTS=Object.freeze(['rocks', 'roots', 'bark', 'moss', 'stumps', 'clear']);
-const partsOf=v=>{ const S=new Set(); if(v===true) v='new'; if(!v) return S; for(const w of (Array.isArray(v) ? v : String(v).split(','))){ const x=String(w).trim(); if(x==='new') FOREST_PARTS.forEach(k=>S.add(k)); else if(FOREST_PARTS.includes(x)) S.add(x); } return S; };
-let PARTS=new Set(); try{ if(typeof location!=='undefined') PARTS=partsOf(new URLSearchParams(location.search).getAll('forest').join(',')); }catch(e){}
-export const forestNewDbg=v=>{ if(v!==undefined && v!==null) PARTS=partsOf(v); return PARTS.size ? FOREST_PARTS.filter(k=>PARTS.has(k)) : false; };
-export const forestNewAssets=level=>naturalAssets(level);
+export const FOREST_PARTS=Object.freeze(['rocks', 'roots', 'bark', 'moss', 'stumps', 'clear', 'spruce', 'grass']);
+/* FOREST-2b (the founder's verdict): rocks and clear are the DEFAULT — every player's forest; the other words add to them; «old» = the approved
+   forest before FOREST-2 (no part: equal to the pins, row «FOREST switch off = today»); «new» = every part. A list without «old» = the default + it */
+export const FOREST_DEFAULT=Object.freeze(['rocks', 'clear']);
+const partsOf=v=>{ const S=new Set(); if(v===true) v='new'; if(v===false || v==null) return S; const W=(Array.isArray(v) ? v : String(v).split(',')).map(w=>String(w).trim()).filter(Boolean);
+  if(!W.length) FOREST_DEFAULT.forEach(k=>S.add(k)); else if(!W.includes('old')) FOREST_DEFAULT.forEach(k=>S.add(k));
+  for(const x of W){ if(x==='new') FOREST_PARTS.forEach(k=>S.add(k)); else if(x==='default') FOREST_DEFAULT.forEach(k=>S.add(k)); else if(FOREST_PARTS.includes(x)) S.add(x); } return S; };
+let PARTS=partsOf(''); try{ if(typeof location!=='undefined') PARTS=partsOf(new URLSearchParams(location.search).getAll('forest').join(',')); }catch(e){}
+export const forestNewDbg=v=>{ if(v!==undefined && v!==null) PARTS=partsOf(v); return PARTS.size ? FOREST_PARTS.filter(k=>PARTS.has(k)) : false; };   // false = the old forest; 'default'; a word = the default + it; true / 'new' = all
+export const forestNewAssets=level=>naturalAssets(level, PARTS);
 const WOOD_MEMO=new Map(), LITTER_MEMO=new Map();   // NIGHT-8: + the litter's places per counts   // NIGHT-6 slice 5: the wood's places per counts (pure, seeded): worked out once per session
 const IMG={}, LOADING={}, assetErr=[];
 async function fileImage(url){ const r=await fetch(url); if(!r.ok) throw new Error(r.status+' '+url.pathname);
@@ -93,7 +99,7 @@ const levelFiles=level=>{ const all=FOREST_TEX[level]||FOREST_TEX.full, skip=sca
    later call fetches it again (it may be in the precache by then) */
 export function forestAssets(level='full'){
   const all=Promise.all(levelFiles(level).map(n=>LOADING[n] || (LOADING[n]=fileImage(TEX[n]).then(img=>{ IMG[n]=img; }, e=>{ delete LOADING[n]; assetErr.push(n+': '+String(e&&e.message||e)); })))).then(()=>IMG);
-  return PARTS.has('rocks') || PARTS.has('bark') ? all.then(()=>naturalAssets(level)).then(()=>IMG) : all; }   // FOREST-2: the new files only with the switch
+  return PARTS.has('rocks') || PARTS.has('bark') || PARTS.has('spruce') ? all.then(()=>naturalAssets(level, PARTS)).then(()=>IMG) : all; }   // FOREST-2: the new files only with the switch
 /* NIGHT-14c: are `level`'s files here without asking the network? Under a precache (a worker in control) each must be in its cache; with no worker
    (the repository, Live Server) the network serves them as before → true. FOREST-2 (the founder's Detailed shown as Standard on Live Server): the
    repository's worker controls the page too but keeps NO precache (sw.js PRECACHE null) — no precache of this app at all means the network serves
@@ -103,7 +109,7 @@ export async function forestHas(level='full'){
   if(typeof navigator==='undefined' || !navigator.serviceWorker || !navigator.serviceWorker.controller || typeof caches==='undefined') return true;
   if(!(await caches.keys()).some(k=>k.startsWith(NIGHT_PRECACHE_PREFIX))) return true;
   for(const n of levelFiles(level)) if(!IMG[n] && !(await caches.match(TEX[n].href))) return false;
-  return PARTS.has('rocks') || PARTS.has('bark') ? naturalHas(level) : true; }
+  return PARTS.has('rocks') || PARTS.has('bark') || PARTS.has('spruce') ? naturalHas(level, PARTS) : true; }
 /* probes only: the prepared files loaded so far (the prefetch's proof) */
 export const forestAssetsDbg=()=>Object.keys(IMG).sort();
 /* colour helpers: a token's text → [r, g, b, a]; jittered variants in HSL (texture painting only) */
@@ -177,7 +183,7 @@ export function buildForest(T, opt){
       for(const c of [k,kk]){ c.beginPath(); for(let y=0;y<=512;y+=16){ const xx=x+dx+Math.sin(y*Math.PI/128+ph)*4; if(y) c.lineTo(xx,y); else c.moveTo(xx,y); } c.stroke(); } } }   // NIGHT-8c: two whole waves per tile — the tile joins itself (no ring every 3.2 m)
   const barkM=new T.MeshStandardMaterial({ map:tex(kc,true,2,5), bumpMap:tex(kb,false,2,5), bumpScale:0.035, roughness:0.95 }); own.push(barkM);
   const FU=foxUniforms(T, C, Lv.foxfire|0);   // NIGHT-6 slice 9: the foxfire's trail, shared by the bark and the wood
-  const NT= has('rocks') || has('bark') ? naturalTextures(T, opt.level, own) : null, NU= has('bark') && NT && NT.barkA ? NAT_UNI(NT) : null;   // FOREST-2: the new files' textures, the bark's relief uniforms
+  const NT= has('rocks') || has('bark') || has('spruce') ? naturalTextures(T, opt.level, own, NP) : null, NU0= has('bark') && NT && NT.barkA ? NAT_UNI(NT) : null, NU= NU0 || has('moss') || has('stumps') ? { ...(NU0||{}), ...(has('moss') ? { uMossK:{ value:1.7 } } : {}), ...(has('stumps') ? { uStumpK:{ value:1 } } : {}) } : null;   // FOREST-2: the new files' textures, the bark's relief uniforms
   if(Lv.barkMoss) patchBark(barkM, NU ? { ...woodUniforms(T, C), ...FU, ...NU } : { ...woodUniforms(T, C), ...FU });   // NIGHT-6 slice 5: moss low on the trunk (NIGHT-8b: each its own), lichen higher, darker at the foot
   const spots=[[-2.1,-2.2,0.34],[2.5,-4.6,0.42],[-1.3,-8.2,0.3],[3.6,0.4,0.28],[-4.2,-5,0.5],[1.1,-11.5,0.36],[-3.3,1.2,0.22],[4.6,-9,0.46]];
   while(spots.length<95){ const x=(R()*2-1)*22, z=4-R()*44; if(Math.hypot(x,z-5.5)<3.2 || (Math.abs(x)<1.1 && z>-7)) continue; spots.push([x,z,0.14+R()*0.42]); }
@@ -210,7 +216,7 @@ export function buildForest(T, opt){
   if(has('clear')){
     SOL=solidsOf({ trunks:spots, wood:WOOD_MEMO.get(wkeyN), rocks:streamRocks(Math.max(0, Lv.rocks|0)), aisle:ROCKS_TODAY });
     const blocks=sightBlock(lifePlaces(Lv.shrooms, Lv.blooms).filter(q=>q.kind==='shroom').concat(WOOD_MEMO.get(wkeyN).shrooms));   // the mushrooms' lines of sight: kept free
-    clr=(x, z, reach, o={})=>{ const r=clearSpot(x, z, reach, SOL, { ...o, avoid:blocks }); if(!r[2]) return [x, z, 1]; movedN.plants++; return [r[0], r[1], keepSize(x, z, r[0], r[1], reach, SOL, o.low==null ? reach : o.low)]; };   // → [x, z, size factor]
+    clr=(x, z, reach, o={})=>{ const r=clearSpot(x, z, reach, SOL, { ...o, avoid:blocks, inView:true }); if(!r[2]) return [x, z, 1]; movedN.plants++; return [r[0], r[1], keepSize(x, z, r[0], r[1], reach, SOL, o.low==null ? reach : o.low)]; };   // → [x, z, size factor]
   }
   const frondM=new T.MeshStandardMaterial({ map:fernT, alphaTest:0.45, side:T.DoubleSide, roughness:0.85 }), frondD=new T.MeshDistanceMaterial({ map:fernT, alphaTest:0.45, side:T.DoubleSide });
   const fronds=new T.InstancedMesh(frondG, frondM, ferns.length*7); fronds.customDistanceMaterial=frondD; own.push(frondM, frondD);
@@ -219,7 +225,7 @@ export function buildForest(T, opt){
     let fi=0; for(const f of ferns){ const sc=f[2], a0=R()*6.28, fr=[]; for(let j=0;j<7;j++){ const tilt=0.75+R()*0.5, yaw=a0+j*0.9+R()*0.3; fr.push({ tilt, yaw, sx:sc, sy:sc*(0.8+R()*0.4) }); }
       { const r=fernSpot(f[0], f[1], fr, S3, gy, { eye:2.2, water:0.3+sc*0.25, box:[-12, 12, -22, 4], avoid:clrAvoid, reach:0.9*sc, height:0.85*sc });
         if(r[2]){ const E=NATURAL.clear.eye, k=Math.hypot(r[0]-E[0], r[1]-E[1])/Math.max(0.5, Math.hypot(f[0]-E[0], f[1]-E[1])), big=fr.map(q=>({ ...q, sx:q.sx*k, sy:q.sy*k }));   // a moved fern keeps its size on screen while it stays clear
-          if(k>1 && !frondPoints(r[0], gy(r[0], r[1])-0.02, r[1], big).some(p=>inSolid3(p[0], p[1], p[2], S3))) fr.splice(0, fr.length, ...big);
+          if(k>1) for(const f of [1, 0.75, 0.5, 0.25]){ const kt=1+(k-1)*f, bg=fr.map(q=>({ ...q, sx:q.sx*kt, sy:q.sy*kt })); if(!frondPoints(r[0], gy(r[0], r[1])-0.02, r[1], bg).some(p=>inSolid3(p[0], p[1], p[2], S3))){ fr.splice(0, fr.length, ...bg); break; } }   // the largest step of its size back that fits
           f[0]=r[0]; f[1]=r[1]; movedN.ferns++; } }
       for(const q of fr){ d.position.set(f[0], gy(f[0], f[1])-0.02, f[1]); d.rotation.set(q.tilt, q.yaw, 0, 'YXZ'); d.scale.set(q.sx, q.sy, q.sx); d.updateMatrix(); fronds.setMatrixAt(fi++, d.matrix); } } }
   else { let fi=0; for(const [x,z,sc] of ferns){ const a0=R()*6.28; for(let j=0;j<7;j++){ d.position.set(x,gy(x,z)-0.02,z); d.rotation.set(0.75+R()*0.5,a0+j*0.9+R()*0.3,0,'YXZ'); d.scale.set(sc,sc*(0.8+R()*0.4),sc); d.updateMatrix(); fronds.setMatrixAt(fi++,d.matrix); } } }
@@ -276,7 +282,11 @@ export function buildForest(T, opt){
   const life= nat ? buildLife({ T, s, C, pal, own, canvas2, tex, lv:Lv, woodShrooms:has('roots') ? WP.shrooms.concat(GR.shrooms) : WP.shrooms, fix:fixShrooms }) : buildLife({ T, s, C, pal, own, canvas2, tex, lv:Lv, woodShrooms:WP.shrooms }); patchGroundWaves(groundM, life.U); patchWetGround(groundM);   // NIGHT-6 slice 4: wet banks
   patchSway(frondM, life.U); patchSway(frondD, life.U);   // NIGHT-6 slice 5: restored (slice 4 had left these two behind a comment)
   const soft=!!Lv.softEdges && opt.gl2!==false; if(soft){ patchSoftEdges(frondM); fronds.renderOrder=-0.5; }   // NIGHT-6: soft cut-out edges (the level's switch; WebGL2)
-  const detail=buildDetail({ T, s, C, pal, own, canvas2, tex, lv:Lv, U:life.U, fernT, reduce, soft });   // RUN 9 (slice 3)
+  /* FOREST-2b «grass»: the blades at their own places at last — each kept out of every solid and out of every mushroom's line of sight (moved at most 0.6 m) */
+  const grassFix= has('grass') ? (()=>{ const SG=SOL||solidsOf({ trunks:spots, wood:WP, rocks:streamRocks(Math.max(0, Lv.rocks|0)), aisle:ROCKS_TODAY }), sb=sightBlock(lifePlaces(Lv.shrooms, Lv.blooms).filter(q=>q.kind==='shroom').concat(WP.shrooms));
+    const bad=(px, pz, sc)=>!!solidHit(px, pz, 0.04, SG) || sb(px, pz, 0.04, sc+0.05) || streamNear(px, pz).d<STREAM.half+0.08 || Math.hypot(px, pz-5.5)<3.2;
+    return (x, z, sc)=>{ if(!bad(x, z, sc)) return [x, z]; for(let k=1;k<=12;k++) for(let j=0;j<8+2*k;j++){ const a=j/(8+2*k)*6.2832, px=x+Math.cos(a)*k*0.05, pz=z+Math.sin(a)*k*0.05; if(!bad(px, pz, sc)) return [px, pz]; } return [x, z]; }; })() : null;
+  const detail= grassFix ? buildDetail({ T, s, C, pal, own, canvas2, tex, lv:Lv, U:life.U, fernT, reduce, soft, grass:{ fix:grassFix } }) : buildDetail({ T, s, C, pal, own, canvas2, tex, lv:Lv, U:life.U, fernT, reduce, soft });   // RUN 9 (slice 3)
   /* NIGHT-6 slice 3: the forest floor — the herb layer and the fine fern, placed around today's trunks and ferns */
   let floorTex=null; if(files.floor && Object.keys(Lv).some(k=>['sorrel','forb','bilberry','anemone','nettle','sedge','fern2'].includes(k) && Lv[k]>0)){
     floorTex=new T.Texture(files.floor); floorTex.encoding=T.sRGBEncoding; floorTex.anisotropy=4; floorTex.needsUpdate=true; own.push(floorTex); }
@@ -287,7 +297,8 @@ export function buildForest(T, opt){
     : buildWood({ T, s, C, own, P:WP, barkMap:barkM.map, bumpMap:barkM.bumpMap, rockMat:stream.parts.rockMat, floorMat:floorTex ? floor.parts.material : null, cast:false, FU });   // NIGHT-6 slice 5; the wood stays out of the light's shadow pass (the user, 2026-11-10: high made cheaper)
   /* NIGHT-6 slice 7: the canopy (crowns, the understorey, the stars) and the dappled moonlight on the ground */
   let crownTex=null; if(files.crown && Lv.crowns){ crownTex=new T.Texture(files.crown); crownTex.encoding=T.sRGBEncoding; crownTex.anisotropy=4; crownTex.needsUpdate=true; own.push(crownTex); }
-  const canopy= has('clear') ? buildCanopy({ T, s, C, own, lv:Lv, trunks:spots, U:life.U, crownTex, woodMat:wood.parts.material, soft, clear:clr, reach:NATURAL.reach, tall:NATURAL.tall, sprays:q=>spraysClear(q, spots.map(([x, z, r])=>({ x, z, r, y0:gy(x, z)+WOOD.trunk.foot })).concat(WP.snags.map(S=>({ x:S.x, z:S.z, r:S.s, y0:S.y+WOOD.trunk.foot })))), clearKey:opt.level+(Lv.rocks|0) }) : buildCanopy({ T, s, C, own, lv:Lv, trunks:spots, U:life.U, crownTex, woodMat:wood.parts.material, soft });
+  const spruce= has('spruce') && NT && NT.foliage ? { n:SPRUCES[opt.level]||SPRUCES.full, tex:NT.foliage } : null;   // FOREST-2b
+  const canopy= has('clear') ? buildCanopy({ T, s, C, own, lv:Lv, trunks:spots, U:life.U, crownTex, woodMat:wood.parts.material, soft, clear:clr, reach:NATURAL.reach, tall:NATURAL.tall, sprays:q=>spraysClear(q, spots.map(([x, z, r])=>({ x, z, r, y0:gy(x, z)+WOOD.trunk.foot })).concat(WP.snags.map(S=>({ x:S.x, z:S.z, r:S.s, y0:S.y+WOOD.trunk.foot })))), clearKey:opt.level+(Lv.rocks|0), spruce }) : spruce ? buildCanopy({ T, s, C, own, lv:Lv, trunks:spots, U:life.U, crownTex, woodMat:wood.parts.material, soft, spruce }) : buildCanopy({ T, s, C, own, lv:Lv, trunks:spots, U:life.U, crownTex, woodMat:wood.parts.material, soft });
   let dapTex=null; const DU={ uDap:{ value:null }, uDapK:{ value:0 }, uDapT:{ value:0 }, uDapCol:{ value:pal.moonhalo } };
   if(files.dapple && Lv.dapple){ dapTex=new T.Texture(files.dapple); dapTex.wrapS=dapTex.wrapT=T.RepeatWrapping; dapTex.format= opt.gl2!==false ? T.RedFormat : T.RGBAFormat; dapTex.needsUpdate=true; own.push(dapTex); DU.uDap.value=dapTex; patchDapple(groundM, DU); }
   const gust=buildGust({ T, s, own, lv:Lv, U:life.U, floorMat:floorTex ? floor.parts.material : null, life, reduce });   // NIGHT-6 slice 6

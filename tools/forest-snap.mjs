@@ -18,13 +18,24 @@ const MIME={ '.html':'text/html; charset=utf-8', '.js':'text/javascript; charset
   '.png':'image/png', '.webp':'image/webp', '.jpg':'image/jpeg', '.svg':'image/svg+xml', '.mp3':'audio/mpeg', '.woff2':'font/woff2', '.wasm':'application/wasm', '.task':'application/octet-stream' };
 const DEVICES=[['phone', { width:390, height:844 }, 2.75], ['laptop', { width:1536, height:730 }, 1]], LEVELS=[['reduced', 'Стандартная'], ['full', 'Детальная']];
 /* the switches (forest.js FOREST_PARTS), each alone, and all of them; the close views each switch is judged by */
-const MODES=[['today', 'Сегодня'], ['rocks', '?forest=rocks — камни'], ['roots', '?forest=roots — корни'], ['bark', '?forest=bark — кора'], ['moss', '?forest=moss — мох и ростки'], ['stumps', '?forest=stumps — пни и сухостой'], ['clear', '?forest=clear — растения не сквозь твёрдое'], ['new', '?forest=new — всё вместе']];
-const CLOSE_OF={ today:['rock', 'foot-l', 'foot-r', 'trunk', 'stump', 'snag', 'log'], rocks:['rock'], roots:['foot-l', 'foot-r'], bark:['trunk', 'snag'], moss:['foot-r', 'log'], stumps:['stump', 'snag'], clear:['rock', 'foot-l'], new:['rock', 'foot-l', 'foot-r', 'trunk', 'stump', 'snag', 'log'] };
+const MODES=[['today', 'Старый лес (до FOREST-2, ?forest=old)'], ['default', 'Теперь по умолчанию: камни + растения не сквозь твёрдое'], ['bark', '?forest=bark — кора'], ['moss', '?forest=moss — мох'], ['stumps', '?forest=stumps — пни и сухостой'], ['roots', '?forest=roots — корни'], ['spruce', '?forest=spruce — молодые ели'], ['grass', '?forest=grass — трава'], ['new', '?forest=new — всё вместе']];   // FOREST-2b: the base is the new default
+const CLOSE_OF={ today:['rock', 'foot-l', 'foot-r', 'cushion', 'trunk', 'stump', 'snag', 'log', 'grass'], default:['rock', 'foot-l', 'foot-r', 'cushion', 'root', 'trunk', 'stump', 'snag', 'log', 'spruce', 'grass'], bark:['trunk', 'snag'], moss:['cushion', 'foot-r', 'log'], stumps:['stump', 'snag'], roots:['root', 'foot-r'], spruce:['spruce'], grass:['grass'], new:[] };
+/* FOREST-2b: what is captured — [level, mode, device, close views?]: Detailed on the laptop for every switch (the founder compares at Detailed), Standard on the laptop for today, the default and the spruces */
+const PLAN=[...MODES.map(([m])=>['full', m, 'laptop', true]), ['reduced', 'today', 'laptop', false], ['reduced', 'default', 'laptop', false], ['reduced', 'spruce', 'laptop', false]];
+const URL_OF=m=>m==='today' ? 'old' : m==='default' ? null : m;   // the address word of a mode
 /* close views [name, Russian caption, camera pos, look] — through the room's capture door viewDbg */
 const CLOSE=[['rock', 'Камень у прохода', [0.9, 0.75, 2.2], [1.9, 0.1, -0.6]], ['foot-l', 'Комель ближнего ствола слева: корни, мох, кора', [-0.6, 0.9, 1.4], [-2.1, 0.35, -2.2]],
   ['foot-r', 'Комель ствола справа: корни, мох, кора', [1.2, 0.9, -1.0], [2.5, 0.4, -4.6]], ['trunk', 'Кора ствола на уровне глаз', [-0.4, 1.5, 0.6], [-2.1, 1.4, -2.2]],
-  ['stump', 'Пень', null, null], ['snag', 'Сухостой', null, null], ['log', 'Бревно-мостик над ручьём', [0.6, 1.0, -3.6], [0.0, 0.3, -6.6]]];
+  ['stump', 'Пень', null, null], ['snag', 'Сухостой', null, null], ['log', 'Бревно-мостик над ручьём', [0.6, 1.0, -3.6], [0.0, 0.3, -6.6]],
+  ['cushion', 'Подушки мха (те же самые)', null, null], ['root', 'Корень у комля, сверху-сбоку (тот же самый)', null, null], ['spruce', 'Молодая ель сбоку', null, null], ['grass', 'Трава у ног', [0.4, 0.55, 3.4], [1.6, 0.0, 0.4]]];
 
+/* FOREST-2b: a short Russian word per switch on the page (what it does; for moss and stumps the proposal) */
+const NOTE={ bark:'Кора: рельеф тот же, но бороздки больше не чернеют — в свете руки они светлеют вместе с корой (затемнение в глубине стало в несколько раз мягче).',
+  moss:'Мох — предложение (сделано под этим переключателем): подушки того же размера и на тех же местах, что сегодня, но из мелких комочков; мох зеленее и светлее, ярче на верхушках, куда падает свет руки; на комлях и брёвнах мха больше. Если и этого мало — следующий шаг: короткий ворс по краю подушек.',
+  stumps:'Пни — предложение (сделано под этим переключателем): у основания лапы-корни (не шире сегодняшнего следа — грибы у пня видны), кора неровная; срез серый, выветренный, с кольцами и трещинами от центра, местами голая светлая древесина. Сухостой — трещины и обломки веток. Следующий шаг, если захотите: мох и трутовики на пнях.',
+  roots:'Корни: те же пути и размеры, но сечение круглое и гладкое — много сегментов, мягкие изгибы, плавный вход в ствол и в землю.',
+  spruce:'Молодые ели из FOREST-1: только по краям кадра, никогда в середине; на Детальной 8, на Стандартной 3.',
+  grass:'Трава: сегодня все травинки стояли в одной точке (комментарий проглатывал код их расстановки); теперь они расставлены по земле, не сквозь камни и корни.' };
 async function page(){
   const fig=(f, cap, ph)=>existsSync(path.join(OUT, f)) ? `<figure><img class="${ph ? 'phone' : ''}" src="${f}" alt="" loading="lazy"><figcaption>${cap}</figcaption></figure>` : `<figure><div class="none">нет снимка ${f}</div></figure>`;
   const census=existsSync(path.join(OUT, 'census.json')) ? JSON.parse(await readFile(path.join(OUT, 'census.json'), 'utf8')) : null;
@@ -35,18 +46,20 @@ async function page(){
       for(const [m, name] of MODES.slice(1)){ const V=C.variants[m]; if(!V) continue; const by={}; for(const x of V.moved){ const k=x.split(' #')[0]; (by[k]=by[k]||[]).push(x); }
         body+=`<details><summary>${esc(name)}: потеряно 0, сдвинуто ${V.moved.length}${Object.keys(V.added).length ? ', добавлено '+esc(JSON.stringify(V.added)) : ''}${V.shroomMoves.length ? ', грибов отодвинуто от новых корней '+V.shroomMoves.length : ''}</summary>`+
           Object.entries(by).map(([k, L])=>`<p><b>${esc(k)}</b> (${L.length}): ${L.slice(0, 60).map(esc).join('; ')}${L.length>60 ? ' …' : ''}</p>`).join('')+'</details>'; } } }
-  body+='<h2>Кадр приложения, Стандартная: каждый переключатель отдельно против сегодня (те же точки, то же время, луна)</h2>';
-  for(const [mode, name] of MODES.slice(1)) for(const [dev] of DEVICES){ const ph=dev==='phone';
-    body+=`<div class="pair">${fig(`app-${dev}-reduced-today.png`, `Сегодня — ${ph ? 'телефон вертикально' : 'ноутбук'}`, ph)}${fig(`app-${dev}-reduced-${mode}.png`, `${name} — ${ph ? 'телефон вертикально' : 'ноутбук'}`, ph)}</div>`; }
-  body+='<h2>Детальная: сегодня и всё вместе</h2>';
-  for(const [dev] of DEVICES){ const ph=dev==='phone'; body+=`<div class="pair">${fig(`app-${dev}-full-today.png`, 'Сегодня', ph)}${fig(`app-${dev}-full-new.png`, '?forest=new', ph)}</div>`; }
-  body+='<h2>Крупно (ноутбук, Стандартная, свет руки рядом): каждый переключатель — свой предмет</h2>';
-  for(const [mode, name] of MODES.slice(1)) for(const [v, cap] of CLOSE) if(CLOSE_OF[mode].includes(v)) body+=`<div class="pair crop">${fig(`close-reduced-${v}-today.png`, `Сегодня — ${cap}`)}${fig(`close-reduced-${v}-${mode}.png`, `${name} — ${cap}`)}</div>`;
+  const pair=(a, ca, b, cb)=>`<div class="pair">${fig(a, ca)}${fig(b, cb)}</div>`, D=MODES.find(m=>m[0]==='default')[1];
+  body+='<h2>Что изменилось по умолчанию (ноутбук)</h2>';
+  for(const lv of ['full', 'reduced']) body+=pair(`app-laptop-${lv}-today.png`, `Старый лес — ${lv==='full' ? 'Детальная' : 'Стандартная'}`, `app-laptop-${lv}-default.png`, `${D} — ${lv==='full' ? 'Детальная' : 'Стандартная'}`);
+  body+='<h2>Каждый переключатель против нового «по умолчанию» (Детальная, ноутбук, те же точки, то же время, луна)</h2>';
+  for(const [mode, name] of MODES.slice(2)) body+=pair('app-laptop-full-default.png', 'По умолчанию', `app-laptop-full-${mode}.png`, name);
+  body+=pair('app-laptop-reduced-default.png', 'По умолчанию — Стандартная', 'app-laptop-reduced-spruce.png', '?forest=spruce — Стандартная (часть елей)');
+  body+='<h2>Крупно (Детальная, ноутбук, свет руки рядом): тот же предмет с переключателем и без</h2>';
+  for(const [mode, name] of MODES.slice(2)){ if(NOTE[mode]) body+=`<p class="note">${NOTE[mode]}</p>`;
+    for(const [v, cap] of CLOSE) if(CLOSE_OF[mode].includes(v)) body+=pair(`close-full-${v}-default.png`, `По умолчанию — ${cap}`, `close-full-${v}-${mode}.png`, `${name} — ${cap}`); }
   const html=`<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>FOREST-2 по переключателям</title>
 <style>:root{--bg:#0d1210;--fg:#dfe8e2;--mut:#93a39a}body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,sans-serif}h1{font-size:20px}h2{font-size:17px;margin:28px 0 10px}h3{font-size:15px}
 .pair{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:0 0 18px}figure{margin:0}img{width:100%;height:auto;border-radius:6px;display:block}img.phone{max-height:80vh;width:auto;max-width:100%;margin:auto}
-figcaption{color:var(--mut);font-size:13px;margin-top:4px}.none{color:var(--mut);padding:30px;border:1px dashed #33433a;border-radius:6px}details{margin:6px 0}summary{cursor:pointer}details p{font-size:13px;color:var(--mut)}@media(max-width:700px){.pair{grid-template-columns:1fr}}</style></head>
-<body><h1>FOREST-2: каждый переключатель отдельно</h1><p>Адреса: <code>?forest=rocks</code>, <code>roots</code>, <code>bark</code>, <code>moss</code>, <code>stumps</code>, <code>clear</code>; можно вместе через запятую (<code>?forest=rocks,bark</code>); <code>?forest=new</code> — всё сразу. Без переключателя — сегодняшний лес, бит в бит.</p>${body}</body></html>`;
+figcaption{color:var(--mut);font-size:13px;margin-top:4px}.note{background:#16201b;border-left:3px solid #4f7a62;padding:8px 12px;border-radius:4px;max-width:900px}.none{color:var(--mut);padding:30px;border:1px dashed #33433a;border-radius:6px}details{margin:6px 0}summary{cursor:pointer}details p{font-size:13px;color:var(--mut)}@media(max-width:700px){.pair{grid-template-columns:1fr}}</style></head>
+<body><h1>FOREST-2b: лес по переключателям</h1><p>Без переключателя теперь: камни-валуны и растения не сквозь твёрдое. Адреса: <code>?forest=bark</code>, <code>moss</code>, <code>stumps</code>, <code>roots</code>, <code>spruce</code>, <code>grass</code>; можно вместе через запятую (<code>?forest=moss,stumps</code>); <code>?forest=new</code> — всё сразу; <code>?forest=old</code> — старый лес, бит в бит.</p>${body}</body></html>`;
   await mkdir(OUT, { recursive:true }); await writeFile(path.join(OUT, 'index.html'), html); console.log('[forest-snap] page → tools/.ui-snap/forest2/index.html');
 }
 if(argv.includes('--page')){ await page(); process.exit(0); }
@@ -64,7 +77,7 @@ async function open(vp, level, dpr=1, fresh=false, begin=true){
   await ctx.grantPermissions(['camera', 'microphone'], { origin:`http://127.0.0.1:${port}` });
   await ctx.addInitScript(l=>{ try{ localStorage.setItem('handsong.nightBg', 'forest'); localStorage.setItem('handsong.sceneLevel', l); localStorage.setItem('handsong.night.lang', 'en'); }catch(e){} }, level);
   const p=await ctx.newPage(), errs=[]; p.on('pageerror', e=>errs.push(String(e))); p.on('console', m=>{ if(m.type()==='error') errs.push('console: '+m.text().slice(0, 300)); }); p.on('response', r=>{ if(r.status()===404) errs.push('404 '+new URL(r.url()).pathname); });
-  await p.goto(`http://127.0.0.1:${port}/apps/night/index.html?probe${fresh && fresh!=='today' ? '&forest='+fresh : ''}`);
+  await p.goto(`http://127.0.0.1:${port}/apps/night/index.html?probe${fresh && URL_OF(fresh) ? '&forest='+URL_OF(fresh) : ''}`);
   try{ await p.waitForFunction(()=>window.P && window.__nightBoot && window.__nightBoot.state().done, null, { timeout:120e3 }); }catch(e){ console.log('[forest-snap] the page did not boot:', errs.slice(0, 6)); throw e; }
   if(begin){ await p.click('#nightBegin'); await p.waitForFunction(()=>!document.getElementById('start').classList.contains('on'), null, { timeout:180e3 });
     await p.evaluate(async ()=>{ window.__H=await import('/apps/night/scene/host.js'); window.__G=await import('/core/gestures.js'); window.__PO=await import('/core/gestures/pose.js'); window.__V=await import('/core/vision.js'); const Q=await import('/core/frzqueue.js'); Q.afPause('runner', true); const SH=await import('/apps/night/shell.js'); SH.nightMusicHoldDbg(true); window.__H.sceneClockDbg(60); });
@@ -87,14 +100,19 @@ try{
     console.log(JSON.stringify(res, null, 1)); if(errs.length) console.log('[forest-snap] page errors:', errs.slice(0, 8)); await ctx.close();
   }
   if(argv.includes('--snap')){ await mkdir(OUT, { recursive:true });
-    for(const [lv] of LEVELS) for(const [mode] of MODES){ if(val('--lv') && val('--lv')!==lv) continue; if(lv==='full' && mode!=='today' && mode!=='new') continue;   // Detailed: today and all of them
-      for(const [dev, vp, dpr] of DEVICES){ if(val('--dev') && val('--dev')!==dev) continue; const { ctx, p, errs }=await open(vp, lv, dpr, mode);
+    for(const [lv, mode, dev, closes] of PLAN){ if(val('--lv') && val('--lv')!==lv || val('--mode') && val('--mode')!==mode) continue; const [, vp, dpr]=DEVICES.find(d=>d[0]===dev);
+      { const { ctx, p, errs }=await open(vp, lv, dpr, mode);
         await save(`app-${dev}-${lv}-${mode}.png`, await p.evaluate(()=>window.__H.sceneShotDbg()));
         await p.screenshot({ path:path.join(OUT, `screen-${dev}-${lv}-${mode}.png`) });
-        if(dev==='laptop'){ const S=await p.evaluate(()=>{ const W=window.__H.sceneRoomDbg().woodPlacesDbg||{}; return { stumps:W.stumps, snags:W.snags }; });
-          for(const [v, , pos, look] of CLOSE){ if(!CLOSE_OF[mode].includes(v)) continue; let P=pos, L=look;
+        if(closes){ const S=await p.evaluate(()=>{ const R=window.__H.sceneRoomDbg(), W=R.woodPlacesDbg||{}, SP=R.canopyDbg && R.canopyDbg.spruces; return { stumps:W.stumps, snags:W.snags, moss:W.moss, spruce:SP && SP.places, roots:(W.roots||[]).map(r=>r.pts.map(q=>q.slice(0, 3))) }; });
+          for(const [v, , pos, look] of CLOSE){ if(!CLOSE_OF[mode].includes(v)) continue; let P=pos, L=look, L2=null;
             if(!P && S.stumps && v==='stump' && S.stumps[0]){ const q=S.stumps[0]; P=[q.x+0.9, q.y+0.8, q.z+1.1]; L=[q.x, q.y+0.2, q.z]; }
             if(!P && S.snags && v==='snag' && S.snags[0]){ const q=S.snags[0]; P=[q.x+1.6, q.y+1.4, q.z+2.2]; L=[q.x, q.y+1.2, q.z]; }
+            if(!P && v==='cushion' && S.moss){ const q=S.moss.filter(m=>m.z<4 && m.z>-4 && Math.abs(m.x)<5).sort((a, b)=>b.s-a.s)[0]; if(q){ P=[q.x+0.7, q.y+0.75, q.z+1.0]; L=[q.x, q.y+0.05, q.z]; } }   // the largest cushion near the path: the same one in every mode
+            if(!P && v==='spruce' && S.spruce && S.spruce.length){ const q=S.spruce.slice().sort((a, b)=>Math.hypot(a.x, a.z-5.5)-Math.hypot(b.x, b.z-5.5))[0]; const k=0.55; P=[q.x*k, 1.55+(q.H*0.45-1.55)*k, 5.5+(q.z-5.5)*k]; L=[q.x, q.H*0.45, q.z]; }   // on the eye's own line of sight to it, nearer
+            if(!P && v==='root' && S.roots && S.roots.length){ const E=[0, 5.5], d=r=>Math.hypot(r[0][0]-E[0], r[0][2]-E[1]), q=S.roots.filter(r=>d(r)>3 && r[0][2]<4 && Math.abs(r[0][0])<4).sort((a, b)=>d(a)-d(b))[0]; if(q){ const m=q[Math.floor(q.length/2)], a=q[0], ux=m[0]-a[0], uz=m[2]-a[2], L=Math.hypot(ux, uz)||1; P=[m[0]-uz/L*1.3+ (E[0]-m[0])*0.12, m[1]+1.1, m[2]+ux/L*1.3+(E[1]-m[2])*0.12]; L2=[m[0], m[1], m[2]]; } }   // the nearest root in front: seen from its side, above
+            if(L2) L=L2;
+            { const vf=path.join(OUT, 'views.json'), V=existsSync(vf) ? JSON.parse(await readFile(vf, 'utf8')) : {}; if(mode==='default' && P && !pos){ V[v]=[P, L]; await writeFile(vf, JSON.stringify(V)); } else if(V[v] && !pos){ [P, L]=V[v]; } }   // a computed view: the default's, the same in every word
             if(!P) continue;
             await p.evaluate(([P, L])=>{ const R=window.__H.sceneRoomDbg(); R.viewDbg({ pos:P, look:L }); }, [P, L]);
             for(let k=0;k<8;k++){ await hand(p, 0.5, 0.62, 0.3, 4); await p.waitForTimeout(90); }   // the hand's light held in front, low

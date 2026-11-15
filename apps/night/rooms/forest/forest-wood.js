@@ -73,6 +73,17 @@ const LOOK=`{ vec3 wp=vWP7, wn=normalize(vWN7); float dead=vW7.x, kind=vW7.y, to
     c=mix(c, mc, mm*0.88); }
   c*=mix(0.35, 1.0, smoothstep(-0.15, 0.9, above));   // darker where it meets the ground
   diffuseColor.rgb=c; }`;
+/* FOREST-2b: the look with the parts asked — bark (NAT_SPOTS), moss (more of it, greener, on the roots' and logs' tops too), stumps (dead wood bare where
+   its bark fell off, pale with its grain; the cut tops greyed by years in the rain, cracked, the heart dark) */
+function lookOf(nat, mossK, stumpK){ let L=LOOK;
+  if(nat) L=L.replace('    c=mix(c, mc, mm*0.88); }', NAT_SPOTS+'    c=mix(c, mc, mm*0.88); }');
+  if(mossK) L=L.replace('float dens=clamp(mh*(0.35+0.65*side)*(0.45+0.9*vBk7.z), 0.0, 1.0),', 'float dens=clamp(mh*(0.35+0.65*side)*(0.45+0.9*vBk7.z)*uMossK, 0.0, 1.0),')
+    .replace('float top=smoothstep(0.15, 0.7, wn.y)*topM*(0.55+0.9*fm);', 'float top=smoothstep(0.1, 0.6, wn.y)*min(1.0, topM*uMossK)*(0.7+0.9*fm);')
+    .replace('    c=mix(c, mc, mm*0.88); }', '    mc=mix(mc, mc*vec3(1.05, 1.22, 0.85), 0.55)*(0.9+0.35*fm);\n    c=mix(c, mc, mm*0.88); }');
+  if(stumpK) L=L.replace('g=mix(g, uGrainDark*0.45, crack); g=mix(g, uDead*0.9, dead*0.45); c=mix(g, c, smoothstep(0.88, 0.97, rho)); }',
+      'g=mix(g, uGrainDark*0.45, crack); g=mix(g, uDead*0.9, dead*0.45);\n    g=mix(g, uDead*vec3(0.66, 0.62, 0.56), 0.72*uStumpK)*(0.62+0.38*vn7(vCap7*6.0+3.7));\n    g=mix(g, uGrainDark*0.32, (1.0-smoothstep(0.0, 0.42, rho))*0.7*uStumpK*(0.55+0.45*vn7(vCap7*4.0)));\n    g=mix(g, uGrainDark*0.25, smoothstep(0.86, 0.95, vn7(vec2(atan(vCap7.y, vCap7.x)*5.0, rho*1.5)))*smoothstep(0.1, 0.4, rho)*uStumpK);\n    c=mix(g, c, smoothstep(0.88, 0.97, rho)); }')
+    .replace('    c=mix(c, mc, mm*0.88); }', '    if(dead>0.25){ float bare=smoothstep(0.52, 0.6, vp8(q*vec2(0.8, 0.45)+vec2(3.3, 1.9), N0))*uStumpK; vec3 wd=uDead*vec3(1.25, 1.18, 1.05)*(0.8+0.4*vp8(vec2(q.x*9.0, q.y*0.6), 9.0*N0));\n      c=mix(c, wd, bare); mm*=1.0-0.8*bare; }\n    c=mix(c, mc, mm*0.88); }');
+  return L; }
 /* NIGHT-8c probes: the look's source (data row «FOREST bark layouts (app)» reads what the moss and the lichen are made of) */
 export const lookSrc=()=>LOOK;
 /* the colour uniforms (tokens) */
@@ -90,7 +101,7 @@ const FOX=(n, L)=>`{ vec3 wp=vWP7; float above=wp.y-gnd7(wp.xz);
       totalEmissiveRadiance+=uFoxCol*(uFoxK*where*act*(vein*0.6+0.02)*(0.75+0.25*sin(uFoxT*1.3+wp.x*3.0+wp.z*2.0))); } } }`;   // the veins and a faint glow round them
 /* mat → the wood's look (NIGHT-7: the bark's shader leaves out what only the merged wood uses — end grain, fungi, moss on top — so it compiles faster). attrs: true = per-vertex (aW7, aCap7: the merged wood), false = today's bark (instanced, no moss on top). WU.uFox
    present: + foxfire (WU.foxLaw: { hold, fade, r }) */
-function patchLook(mat, WU, attrs, key){ const fox=WU.uFox ? WU.uFox.value.length : 0, law=WU.foxLaw, nat=!!WU.uNatA, U={ ...WU }; delete U.foxLaw;   // FOREST-2: uNatA given — the bark's relief and lichen spots (?forest=new)
+function patchLook(mat, WU, attrs, key){ const fox=WU.uFox ? WU.uFox.value.length : 0, law=WU.foxLaw, nat=!!WU.uNatA, mossK=!!WU.uMossK, stumpK=!!WU.uStumpK, U={ ...WU }; delete U.foxLaw;   // FOREST-2b: uMossK more and greener moss (moss); uStumpK bare wood and weathered tops (stumps)   // FOREST-2: uNatA given — the bark's relief and lichen spots (?forest=new)
   mat.onBeforeCompile=sh=>{ Object.assign(sh.uniforms, U);
     const VAR='varying vec4 vBk7;\nvarying vec2 vBk7b;\nvarying vec3 vMU7;\nvarying vec3 vWP7;\nvarying vec3 vWN7;\nvarying vec3 vW7;\nvarying vec2 vCap7;\n';
     /* NIGHT-8c: every piece's moss numbers (per instance for the bark, per vertex for the merged wood) and its surface coordinates vMU7: the bark's
@@ -109,13 +120,13 @@ function patchLook(mat, WU, attrs, key){ const fox=WU.uFox ? WU.uFox.value.lengt
     { float k7=clamp(floor(6.2832*length(instanceMatrix[0].xyz)/1.25+0.5), 1.0, 4.0); vUv=(uvTransform*vec3((uv.x+aBark7c.x+aBark7c.w*uv.y)*k7*0.5, uv.y*aBark7c.z+aBark7c.y*0.2, 1.0)).xy; }
   #endif`);
     sh.vertexShader=vs;
-    if(nat) sh.fragmentShader=(attrs ? '#define WOOD7_KINDS\n' : '')+'#define WOOD7_NAT\n'+VAR+GLSL+'\n'+NAT_HEAD+sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n'+NAT_PRE+LOOK.replace('    c=mix(c, mc, mm*0.88); }', NAT_SPOTS+'    c=mix(c, mc, mm*0.88); }'))
+    if(nat || mossK || stumpK) sh.fragmentShader=(attrs ? '#define WOOD7_KINDS\n' : '')+(nat ? '#define WOOD7_NAT\n' : '')+VAR+GLSL+'\n'+(nat ? NAT_HEAD : 'float natH=0.0;\n')+(mossK ? 'uniform float uMossK;\n' : '')+(stumpK ? 'uniform float uStumpK;\n' : '')+sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n'+(nat ? NAT_PRE : '')+lookOf(nat, mossK, stumpK))
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  if(vW7.y>1.5) roughnessFactor=0.7;').replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n'+NAT_NORMAL);   // FOREST-2
     else
     sh.fragmentShader=(attrs ? '#define WOOD7_KINDS\n' : '')+VAR+GLSL+'\n'+sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n'+LOOK)
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  if(vW7.y>1.5) roughnessFactor=0.7;');
     if(fox) sh.fragmentShader=`uniform vec4 uFox[${fox}];\nuniform vec3 uFoxCol;\nuniform float uFoxK, uFoxT;\n`+sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n'+FOX(fox, law)); };
-  mat.customProgramCacheKey=()=>key+(nat ? '.nat' : '')+(fox ? '.fox'+fox : ''); return mat; }   // FOREST-2: .nat before the foxfire's count (rows read the key's end)
+  mat.customProgramCacheKey=()=>key+(nat ? '.nat' : '')+(mossK ? '.moss' : '')+(stumpK ? '.stumps' : '')+(fox ? '.fox'+fox : ''); return mat; }   // FOREST-2: .nat before the foxfire's count (rows read the key's end)
 /* today's bark (trunks, branches): moss low on the trunk, lichen, darker at the foot. NIGHT-8b: each instance's moss from its attributes
    aBark7 (h, side, cover, patch) and aBark7b (off, tint); NIGHT-8c: + aBark7c (turn, lift, scale, spiral: its bark mapping) — barkAttrs puts
    barkMoss's and barkUv's numbers on an instanced geometry */
@@ -167,7 +178,7 @@ function builder(PM){ const pos=[], uv=[], w=[], cap=[], idx=[], bk=[], bkb=[]; 
 }
 /* places (pure/wood.js woodPlaces) → the merged wood geometry */
 function woodGeo(T, P, nat=null){ const B=builder(woodPieces('wood'));   // FOREST-2: nat { ground(x, z) } — organic roots' sections, natural stumps and snags
-  for(const rt of P.roots){ B.piece(); if(nat && rt.sec) B.tube(rt.pts, 10, [0, 0, 0.85], { sec:rt.sec }); else B.tube(rt.pts, 6, [0, 0, 0.6]); }   // roots: live bark, moss on top (FOREST-2: a fin at the trunk, flat along the ground, more moss on top)
+  for(const rt of P.roots){ B.piece(); if(nat && rt.smooth) B.tube(rt.pts, 14, [0, 0, 0.6]); else if(nat && rt.sec) B.tube(rt.pts, 10, [0, 0, 0.85], { sec:rt.sec }); else B.tube(rt.pts, 6, [0, 0, 0.6]); }   // FOREST-2b: the smooth roots, 14 sides round   // roots: live bark, moss on top (FOREST-2: a fin at the trunk, flat along the ground, more moss on top)
   for(const L of P.logs){ B.piece(); const S=16, pts=[], l=Math.hypot(L.b[0]-L.a[0], L.b[1]-L.a[1], L.b[2]-L.a[2]);
     for(let i=0;i<=14;i++){ const t=i/14; pts.push([lerp(L.a[0],L.b[0],t), lerp(L.a[1],L.b[1],t), lerp(L.a[2],L.b[2],t), lerp(L.r0,L.r1,t)*(1+0.06*Math.sin(t*l*2.1)+0.04*Math.sin(t*l*5.3))]); }
     const W=[0.3, 0, 1], first=B.tube(pts, S, W); B.capOver(first, S, ...L.a, [0.3, 1, 1], -1); B.capOver(first+14*(S+1), S, ...L.b, [0.3, 1, 1], 1); }
