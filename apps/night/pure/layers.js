@@ -16,7 +16,7 @@
      vehicle at the listener — the picture draws the same vehicles from the same law on the same clock. Panned by the vehicle's side, louder the
      nearer its lane, its playback rate by its speed (rate = v / vRef, bounded), into the far output (the street), softer when the focus is near. The
      density (Wave and the mood) comes by message, the same number the picture uses. A room without `passes` computes nothing new. */
-import { passEvents } from './passes.js';   // RAIN-1: the vehicles' law
+import { passEvents, passBook, passBookSet } from './passes.js';   // RAIN-1: the vehicles' law
 export const LAYERS=Object.freeze({ seed:0x4C415952, grain:Object.freeze([5, 9]), fade:1.5, edge:0.25, focusTc:0.08, wake:0.6, slot:0.5, synth:0.12 });   // synth: the fallback's level
 const hash=(a, b)=>{ let h=(Math.imul(a|0, 0x27d4eb2d)^Math.imul(b|0, 0x165667b1))>>>0; h=Math.imul(h^(h>>>15), 0x85ebca77)>>>0; h=Math.imul(h^(h>>>13), 0xc2b2ae3d)>>>0; return ((h^(h>>>16))>>>0)/4294967296; };
 const rng=seed=>{ let s=(seed>>>0)||1; return ()=>{ s^=s<<13; s>>>=0; s^=s>>>17; s^=s<<5; s>>>=0; return s/4294967296; }; };
@@ -57,7 +57,8 @@ export function layersPasses(st, Y, norm=1){
   st.cars={ Y, norm:+norm||1 }; return true;
 }
 /* RAIN-1: the traffic's density (the picture's same number) */
-export function layersDensity(st, d){ st.dens=Math.max(0, +d||0); }
+export function layersDensity(st, d, at=null, now=0){ d=Math.max(0, +d||0); st.dens=d;   // RAIN-2: the density book — at the picture's time (at), or now + the margin (no picture); the first one opens the book
+  if(!st.book || at===-1e9) st.book=passBook(d); else passBookSet(st.book, at==null ? now+0.5 : at, d); }
 /* the focus target (0…1) and on / off (the fade does the rest) */
 export function layersFocus(st, f){ st.f=Math.max(0, Math.min(1, +f||0)); }
 export function layersOn(st, on){ st.on=!!on; if(on) st.sleep=false; }
@@ -98,7 +99,7 @@ export function layersOut(st, t0, nL, nR, fL, fR, o=0, n=nL.length-o){
   /* RAIN-1: the passes — new ones scheduled ahead (their peak on the law's moment), then every sounding one read out (linear interpolation) */
   const PS=P.passes;
   if(PS && st.cars){ const lead=PS.lead||9, from= st.pT==null ? t0 : st.pT, to=t1+lead, rt=st.rate;
-    for(const e of passEvents(PS.traffic, PS.ear, from, to, st.dens)){ const seg=PS.segs[Math.floor(hash(e.lane*977+5, e.slot)*PS.segs.length)], r=Math.max(PS.rate[0], Math.min(PS.rate[1], e.v/PS.vRef));
+    for(const e of passEvents(PS.traffic, PS.ear, from, to, st.book||st.dens)){ const seg=PS.segs[Math.floor(hash(e.lane*977+5, e.slot)*PS.segs.length)], r=Math.max(PS.rate[0], Math.min(PS.rate[1], e.v/PS.vRef));
       st.pv.push({ s:seg[0]*rt, n:seg[1]*rt, at:(e.t-seg[2]/r-t0)*rt, r, k:PS.gain*st.cars.norm*Math.max(0.3, Math.min(1.4, PS.dRef/e.dist)), pl:Math.cos((e.pan+1)*Math.PI/4), pr:Math.sin((e.pan+1)*Math.PI/4) });
       st.passes++; st.passLog.push({ t:e.t, lane:e.lane, slot:e.slot }); if(st.passLog.length>64) st.passLog.shift(); }
     st.pT=to;

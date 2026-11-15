@@ -42,6 +42,7 @@ function checkLayers(L){
     if(!num(P.vRef) || P.vRef<=0 || !Array.isArray(P.rate) || P.rate.length!==2 || !(P.rate[0]>=0.5 && P.rate[0]<=P.rate[1] && P.rate[1]<=2) || !num(P.dRef) || P.dRef<=0 || !num(P.lead) || P.lead<1 || P.lead>30) return '.passes: vRef > 0, rate [lo, hi] in 0.5…2, dRef > 0, lead 1…30 s';
     if(!plain(T) || !Array.isArray(T.lanes) || !T.lanes.length || T.lanes.some(l=>!plain(l) || !num(l.x) || (l.dir!==1 && l.dir!==-1)) || !Array.isArray(T.every) || T.every.length!==T.lanes.length || !T.every.every(v=>num(v) && v>0)
       || !Array.isArray(T.speed) || T.speed.length!==T.lanes.length || !T.speed.every(v=>num(v) && v>0) || !num(T.len) || T.len<=0 || !num(T.p) || T.p<0 || T.p>1) return '.passes.traffic: { lanes [{ x, dir ±1 }], every, speed (one per lane, > 0), len > 0, p 0…1 }';
+    if(T.commit!=null && !(num(T.commit) && T.commit>=P.lead)) return '.passes.traffic.commit: at least the lead (s) — a car decided before its sound is scheduled (RAIN-2)';
     if(!plain(E) || !num(E.x) || !num(E.y) || !num(E.z)) return '.passes.ear: { x, y, z }'; }
   return null;
 }

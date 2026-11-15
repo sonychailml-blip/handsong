@@ -2017,6 +2017,12 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
     3. A short phrase with the hand in the middle or far: windows come on under the light, each with its room when in focus, and fade slowly.
     4. The cars by ear (headphones, the hand far): each car you see passing under the window is heard as it passes, left or right by its lane; Wave up — more cars, more sound; no car heard without one in the picture.
     5. The Poco on the dev alias `…/?room=rain`: smooth at Standard? Then ⓘ → «Measure this device» with the rain room current.
+165. The room «Rain»'s city made real (RAIN-2, development only), five checks; the rest is in the rows «RAIN window quads (app)», «RAIN wave mid-pass (app)», «RAIN city kit (app)», «RAIN files», «RAIN car passes» and P.night «RAIN room». Pictures first: `tools/.ui-snap/rain2/compare.html` (RAIN-1 / RAIN-2 / the reference photos), then `index.html` and `index-full.html`.
+    1. The city (`http://127.0.0.1:5500/apps/night/?room=rain`, Begin, wipe the glass, the hand in the middle): every house its own — heights, widths, set-backs, the four styles, closed roofs, recessed framed windows, cornices, drainpipes, wires, AC units, shop fronts? Say what still reads as a kit.
+    2. The plane trees: branches, autumn crowns as dark masses lit from below by the lamps; on the Poco upright the nearest crowns leave the lower half open.
+    3. The hand near (the city out of focus): each lit window's soft shape keeps its facade's slant along the street — no window turned flat to you.
+    4. The light: soft (the recesses and eaves darker), the wet street's reflections, the haze in the distance, by mood (Evening, Late night, After the rain).
+    5. The cars by ear with Wave moved up and down in the middle of a pass: no car pops into view or vanishes while its sound plays; the Poco smooth at Standard.
 ## Superseded at DOC1 (old lines verbatim, replaced in place above by a later slice)
 - NIGHT-2 stage 3 (2026-11-03, the rule of at most five manual checks) updated this line of CLAUDE.md's report format:
   probe verdict lines and fix rounds; what was left undone; docs found stale; the user's remaining steps (ear, camera, phone).

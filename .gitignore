@@ -14,3 +14,6 @@ tools/.design-lab/
 tools/design/compare/
 tools/.site-src/
 tools/.site-shots/
+report-*.md
+handoff-*.txt
+tools/design/rain/draft/

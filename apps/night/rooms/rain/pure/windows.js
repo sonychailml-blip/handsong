@@ -10,6 +10,14 @@ import { cityWindows, sceneAt, vanishing } from './city.js';
 export const RAIN_SEED=0x5241494E;
 /* every window: { x, y (its centre), hw, hh, depth, side, floor, z, amb (0…1: lit by the city itself when under the mood's share), warm } */
 export const windowsLayout=()=>cityWindows();
+/* RAIN-2: A WINDOW'S PROJECTED QUAD (its four corners in view-angle units, in order round it): the bake's map carries them (q); a window without them
+   (the stand-in) has its rectangle's corners. The room's window shader is drawn on this quad grown by the blur radius (rain-glass.js QUAD_SD) */
+export const winQuad=w=>Array.isArray(w.q) && w.q.length===4 ? w.q.map(p=>[p[0], p[1]]) : [[w.x-w.hw, w.y-w.hh], [w.x+w.hw, w.y-w.hh], [w.x+w.hw, w.y+w.hh], [w.x-w.hw, w.y+w.hh]];
+/* the signed distance from p to the quad q (negative inside): the polygon's exact law, the shader's sdQ edge for edge */
+export function winQuadSd(p, q){ let s=1, m=Infinity; for(const [i, j] of [[0, 3], [1, 0], [2, 1], [3, 2]]){ const v0=q[i], v1=q[j], ex=v1[0]-v0[0], ey=v1[1]-v0[1], wx=p[0]-v0[0], wy=p[1]-v0[1], t=Math.max(0, Math.min(1, (wx*ex+wy*ey)/(ex*ex+ey*ey))), qx=wx-ex*t, qy=wy-ey*t;
+    m=Math.min(m, qx*qx+qy*qy); if((p[1]>=v0[1] && p[1]<v1[1] && ex*wy>ey*wx) || (p[1]<v0[1] && p[1]>=v1[1] && ex*wy<=ey*wx)) s=-s; } return s*Math.sqrt(m); }
+/* the defocused window's cover at p (the shader's disc: 1 inside the quad grown by 0.7·R, 0 beyond R) */
+export const winCover=(p, q, R)=>{ const d=winQuadSd(p, q), a=R, b=R*0.7, t=Math.max(0, Math.min(1, (d-a)/(b-a))); return t*t*(3-2*t); };
 /* the far lights: n of them on the hills and the far roofs → { x, y, k (brightness 0…1), warm, depth }; seeded, each where the law sees hills or roofs */
 export function farLights(n){
   const R=seeded(RAIN_SEED^0x48494C4C), out=[], hor=vanishing().horizon;

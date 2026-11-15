@@ -69,7 +69,7 @@ function natureLayers(E, a, seed){
 function naturePasses(E, a, R){ const P=R.record.nature.layers.passes; if(!P || !a.layers || a.layers.rec.cars) return; a.layers.rec.cars='loading';
   natureRecStereo(E.ac, new URL(P.file, R.base).href).then(([l])=>ambienceLayersRec(E, a, 'cars', l, null, P.norm), e=>{ a.layers.rec.cars='failed'; console.warn('[night] the room\'s car passes did not load — the street plays without them:', e); }); }   // eslint-disable-line no-console
 /* RAIN-1: the traffic's density (the mood's amount × Wave), the picture's own number, for the passes (no layers: nothing) */
-export function natureDensity(d){ if(liveAmb && liveAmb.layers) ambienceLayersDensity(null, liveAmb, d); }
+export function natureDensity(d, at=null){ if(liveAmb && liveAmb.layers) ambienceLayersDensity(null, liveAmb, d, at); }   // RAIN-2: at — the audio time it counts from (null: the audio thread's now + the margin)
 /* RAIN-3: the focus (0 the glass … 1 the far city), the picture's own eased number, for the layers' near / far balance (no layers: nothing) */
 export function natureFocus(f){ if(liveAmb && liveAmb.layers) ambienceLayersFocus(null, liveAmb, f); }
 /* probe: the live layers' node — its counters, its recordings' state and whether it plays → a promise (null without the node) */

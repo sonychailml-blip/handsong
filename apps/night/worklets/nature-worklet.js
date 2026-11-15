@@ -50,7 +50,7 @@ class NightLayers extends AudioWorkletProcessor{
     this.st=layersNew(sampleRate, o.layers||{}, o.seed>>>0 || undefined);
     this.port.onmessage=e=>{ for(const m of (Array.isArray(e.data) ? e.data : [e.data])){
       if(m.k==='rec') this.port.postMessage({ rec:{ which:m.which, ok: m.which==='cars' ? layersPasses(this.st, m.L, m.norm) : layersRec(this.st, m.which, m.L, m.R, m.norm) } });   // RAIN-1: the passes' one-shots
-      else if(m.k==='density') layersDensity(this.st, m.v);
+      else if(m.k==='density') layersDensity(this.st, m.v, m.at, currentTime);   // RAIN-2: booked at its time
       else if(m.k==='focus') layersFocus(this.st, m.v);
       else if(m.k==='on') layersOn(this.st, m.v);
       else if(m.k==='recipe' && m.L) this.st.L=m.L;

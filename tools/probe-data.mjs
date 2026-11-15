@@ -1261,6 +1261,92 @@ async function forestWoodCore(){
   { const a=JSON.stringify(W.woodPlaces(Lv.full, T)), b=JSON.stringify(W.woodPlaces(Lv.full, T)), c=JSON.stringify(W.woodPlaces(Lv.full, T, 7)); n+=2; if(a!==b) miss('one seed gave two sets'); if(a===c) miss('CONTROL: another seed gave the same set'); }
   return { cases:n, total:d.length, differences:d, notes };
 }
+/* RAIN-2: THE DEFOCUSED WINDOW KEEPS ITS QUAD (apps/night/rooms/rain/pure/windows.js winQuad, winQuadSd, winCover; the shader rain-glass.js QUAD_SD).
+   The baked map gives every window its four projected corners, their bounds its rectangle; the law's distance is negative inside, the corners' own
+   distance zero; out of focus (a blur radius R) the cover's height at the quad's left and right ends follows the quad's own edges — a trapezoid along
+   the street — CONTROL the same window as a screen-facing rectangle (the RAIN-1 shape) has equal heights and fails; the shader is built on the quad. */
+async function rainWindowQuads(){
+  const d=[], notes=[]; let n=0; const miss=s=>d.push(s), fs=await import('node:fs');
+  const W=await import(new URL('../apps/night/rooms/rain/pure/windows.js', import.meta.url).href), G=fs.readFileSync(new URL('../apps/night/rooms/rain/rain-glass.js', import.meta.url), 'utf8'), RJ=fs.readFileSync(new URL('../apps/night/rooms/rain/rain.js', import.meta.url), 'utf8');
+  const map=JSON.parse(fs.readFileSync(new URL('../apps/night/rooms/rain/city/windows.json', import.meta.url), 'utf8'));
+  { let noQ=0, off=0; for(const w of map){ if(!Array.isArray(w.q) || w.q.length!==4){ noQ++; continue; } const xs=w.q.map(p=>p[0]), ys=w.q.map(p=>p[1]);
+      if(Math.abs((Math.min(...xs)+Math.max(...xs))/2-w.x)>2e-4 || Math.abs((Math.max(...xs)-Math.min(...xs))/2-w.hw)>2e-4 || Math.abs((Math.max(...ys)-Math.min(...ys))/2-w.hh)>2e-4) off++; }
+    n+=2; if(noQ) miss(noQ+' windows of the baked map without their four corners'); if(off) miss(off+' windows whose corners are not their rectangle\'s bounds'); }
+  { const q=[[0, 0], [1, 0.2], [1, 0.8], [0, 1]]; n+=3; if(!(W.winQuadSd([0.5, 0.5], q)<0)) miss('the centre is not inside'); if(Math.abs(W.winQuadSd([1, 0.2], q))>1e-12) miss('a corner is not on the edge');
+    if(Math.abs(W.winQuadSd([2, 0.5], q)-1)>1e-9) miss('a point 1 out of the right edge is not 1 away: '+W.winQuadSd([2, 0.5], q)); }
+  /* the shape out of focus: the top of the cover at the quad's two ends follows the slant of the quad's own top edge (the facade's perspective along
+     the street: the window's top and bottom run towards the vanishing point) — the radius moves a straight edge's offset line parallel, so the slant
+     stays; a screen-facing rectangle's top is level */
+  /* windows at least 0.008 wide (a few pixels: a sliver seen edge-on has no shape to judge); each blurred by a radius 0.3 × its half width (blur far larger than the window turns any shape into a disc — nothing to judge) */
+  const topAt=(q, x, R)=>{ const ys=q.map(p=>p[1]), y0=Math.min(...ys)-2*R, y1=Math.max(...ys)+2*R; let hi=-Infinity; for(let y=y0;y<=y1;y+=(y1-y0)/1200) if(W.winCover([x, y], q, R)>0.5) hi=y; return hi; };
+  const topEdge=(q, x)=>{ const [p, r]=[q[2], q[3]]; return p[1]+(r[1]-p[1])*(x-p[0])/(r[0]-p[0]); };
+  { const slant=w=>{ const q=w.q, dx=q[3][0]-q[2][0]; return Math.abs(dx)>1e-6 ? (q[3][1]-q[2][1])/dx : 0; };
+    const pers=map.filter(w=>Array.isArray(w.q)).filter(w=>w.hw>=0.008 && Math.abs(slant(w))>0.12).sort((p, r)=>Math.abs(slant(r))-Math.abs(slant(p))).slice(0, 16);
+    let bad=0, badC=0, worst=0; for(const w of pers){ const lo=Math.min(w.q[2][0], w.q[3][0]), hi=Math.max(w.q[2][0], w.q[3][0]), xl=lo+0.3*(hi-lo), xr=hi-0.3*(hi-lo), R=0.3*w.hw;   // along the top edge's own span
+      const want=topEdge(w.q, xl)-topEdge(w.q, xr), got=topAt(w.q, xl, R)-topAt(w.q, xr, R), rect=W.winQuad({ x:w.x, y:w.y, hw:w.hw, hh:w.hh }), gotC=topAt(rect, xl, R)-topAt(rect, xr, R);
+      worst=Math.max(worst, Math.abs(got-want)/Math.abs(want)); if(!(Math.abs(got-want)<=Math.abs(want)*0.25)) bad++; if(Math.abs(gotC-want)<=Math.abs(want)*0.25) badC++; }
+    n+=3; if(pers.length<6) miss('only '+pers.length+' windows with a visible slant in the map'); if(bad) miss(bad+' of '+pers.length+' defocused windows whose top does not follow their quad\'s slant');
+    if(badC) miss(`CONTROL: ${badC} screen-facing rectangles passed as their quads — the check cannot fail`);
+    notes.push(`${map.length} windows, each with its quad; the ${pers.length} most slanted (top edge ${pers.length ? slant(pers[0]).toFixed(2) : '—'} per unit across): out of focus (R = 0.3 × its half width) each top follows its slant (worst ${(worst*100).toFixed(1)} % off); as screen-facing rectangles all ${pers.length} fail`); }
+  n+=2; if(!/sdQ\(vV, vQ0\.xy/.test(G) || !/attribute vec4 aRect, aQ0, aQ1/.test(G)) miss('the window shader is not built on the quad'); if(!/winQuad/.test(RJ) || !/'aQ0'/.test(RJ)) miss('the room does not give the shader the quads');
+  return { cases:n, total:d.length, differences:d, notes };
+}
+/* RAIN-2: A WAVE CHANGE NEVER MAKES A CAR APPEAR OR VANISH WHILE ITS SOUND PLAYS (apps/night/pure/passes.js passBook). 40 minutes, the density changed
+   at random (Wave and the mood) every 3–20 s, booked a margin ahead; the picture draws from the whole book at 30 frames a second; the sound schedules
+   ahead (its lead) knowing only the changes booked so far. Every car the sound scheduled is in the picture under the window at its moment, every car
+   the picture shows passing under the window was scheduled, no car appears mid-road or vanishes before the far end — CONTROL the old law (the
+   density now, a number) fails all three. */
+async function rainWaveMidPass(){
+  const d=[], notes=[]; let n=0; const miss=s=>d.push(s);
+  const PS=await import(new URL('../apps/night/pure/passes.js', import.meta.url).href), C=await import(new URL('../apps/night/rooms/rain/pure/city.js', import.meta.url).href), RR=(await import(new URL('../apps/night/rooms/rain/pure/room.js', import.meta.url).href));
+  const P=C.RAIN_TRAFFIC, E=C.EAR, lead=((RR.RAIN_ROOM.nature.layers||{}).passes||{}).lead||9, margin=C.DENS_MARGIN; n+=2;
+  if(!(P.commit>=lead+margin)) miss(`the commit time ${P.commit} s is shorter than the sound's lead ${lead} s + the margin ${margin} s`); if(!(margin>0)) miss('no margin for the message');
+  /* one run, judged ONLINE as the room runs (the book is read at the present only — it forgets changes older than 10 min): 30 frames a second; the
+     sound schedules every 0.1 s up to its lead ahead from what it knows; a car crossing the listener's z between two frames must have been scheduled
+     at that moment, every scheduled pass must find its car there; a car first seen away from its lane's start appeared, one lost before its end vanished */
+  const sim=old=>{ let seed=12345; const R=()=>{ seed=(Math.imul(seed, 1103515245)+12345)>>>0; return seed/4294967296; };
+    const book=PS.passBook(0.7), known=PS.passBook(0.7), changes=[], heard=new Map(), seen=new Map(), H=2400, dt=1/30; let tNext=5, dens=0.7, ki=0, nextSched=0, unheard=0, phantom=0, popIn=0, popOut=0, passes=0;
+    const densNow=t=>{ let v=0.7; for(let i=changes.length-1;i>=0;i--) if(changes[i][0]<=t){ v=changes[i][1]; break; } return v; };
+    for(let f=0;f*dt<=H;f++){ const t=f*dt;
+      while(t>=tNext){ dens=Math.round((0.3+R()*1.3)*20)/20; changes.push([tNext+margin, dens]); PS.passBookSet(book, tNext+margin, dens); tNext+=3+R()*17; }
+      while(ki<changes.length && changes[ki][0]-margin<=t){ PS.passBookSet(known, changes[ki][0], changes[ki][1]); ki++; }   // the sound knows a change once it is made
+      if(t>=nextSched){ nextSched+=0.1; for(const e of PS.passEvents(P, E, t, t+lead, old ? dens : known)){ const k=e.lane+':'+e.slot; if(!heard.has(k)) heard.set(k, e.t); } }
+      const cars=PS.passTraffic(P, t, old ? densNow(t) : book).filter(c=>c.kind==='car'), here=new Set(), judged=t>60 && t<H-60;
+      for(const c of cars){ const k=c.lane+':'+c.slot; here.add(k); const prev=seen.get(k);
+        if(!prev){ const fromStart= c.dir>0 ? c.z-P.zFrom : P.len-c.z; if(judged && fromStart>c.v*dt*1.5+1e-6) popIn++; }
+        else if((prev.z-E.z)*(c.z-E.z)<=0 && prev.z!==c.z && judged){ passes++; const tp=heard.get(k); if(tp==null || Math.abs(tp-t)>dt*1.5) unheard++; }   // it crossed the listener's z between the frames
+        seen.set(k, { z:c.z, c }); }
+      for(const [k, s] of seen) if(!here.has(k)){ const toEnd= s.c.dir>0 ? P.len-s.z : s.z-P.zFrom; if(judged && toEnd>s.c.v*dt*1.5+1e-6) popOut++; seen.delete(k); }
+      for(const [k, tp] of heard) if(tp<=t && tp>t-dt){ if(!judged) continue; const c=cars.find(q=>q.lane+':'+q.slot===k); if(!c || Math.abs(c.z-E.z)>c.v*dt*1.5) phantom++; } }
+    return { unheard, phantom, popIn, popOut, cars:passes, passes:heard.size, changes:changes.length }; };
+  const A=sim(false), B=sim(true); n+=5;
+  if(A.unheard) miss(A.unheard+' cars passed under the window unheard'); if(A.phantom) miss(A.phantom+' passes heard with no car under the window'); if(A.popIn || A.popOut) miss(`${A.popIn} cars appeared mid-road, ${A.popOut} vanished before the end`);
+  if(!(A.cars>150 && A.changes>100)) miss(`too little traffic or change to judge: ${A.cars} cars, ${A.changes} changes`);
+  if(!(B.phantom+B.unheard>0 && B.popIn+B.popOut>0)) miss('CONTROL: the old law (the density now) shows no mismatch — the check cannot fail: '+JSON.stringify(B));
+  notes.push(`40 min, ${A.changes} density changes: ${A.cars} cars passed under the window, ${A.passes} passes scheduled — ${A.unheard} unheard, ${A.phantom} phantom, ${A.popIn} appeared, ${A.popOut} vanished; the old law: ${B.unheard} unheard, ${B.phantom} phantom, ${B.popIn} appeared, ${B.popOut} vanished`);
+  { const b=PS.passBook(1); n+=3; PS.passBookSet(b, 10, 0.5); if(PS.passBookSet(b, 5, 2)) miss('a change booked back in time was taken'); if(PS.passBookAt(b, 9.99)!==1 || PS.passBookAt(b, 10)!==0.5) miss('the book reads wrong around a change');
+    if(JSON.stringify(PS.passTraffic(P, 100, 1))!==JSON.stringify(PS.passTraffic(P, 100, PS.passBook(1)))) miss('a constant book is not the old law at the same density'); }
+  return { cases:n, total:d.length, differences:d, notes };
+}
+/* RAIN-2: THE CITY'S HOUSES AND TREES (tools/design/rain/bake/city.json, written by the bake): each house its own — every floor count 3…7, all four
+   styles, all three roofs, widths and setbacks varied, no two neighbours alike (style, floors and roof) — CONTROL a row of one house fails; the
+   nearest plane-tree crowns cover at most CROWN_MAX of an upright phone's lower half — CONTROL RAIN-1's sphere crowns, measured in the same bake. */
+const CROWN_MAX=0.15;   // a guess between RAIN-1 (26 %, the founder: «they fill the lower half») and RAIN-2 (7 %)
+async function rainCityKit(){
+  const d=[], notes=[]; let n=0; const miss=s=>d.push(s), fs=await import('node:fs');
+  const J=JSON.parse(fs.readFileSync(new URL('./design/rain/bake/city.json', import.meta.url), 'utf8')), H=J.houses||[];
+  const judge=H=>{ const out=[]; const fl=new Set(H.map(h=>h.floors)), st=new Set(H.map(h=>h.style)), rf=new Set(H.map(h=>h.roof)), ws=H.map(h=>h.z1-h.z0);
+    if(![3, 4, 5, 6, 7].every(k=>fl.has(k))) out.push('floors seen: '+[...fl].sort().join(', ')); if(st.size<4) out.push('styles: '+[...st].join(', ')); if(rf.size<3) out.push('roofs: '+[...rf].join(', '));
+    if(!(Math.max(...ws)-Math.min(...ws)>6)) out.push('widths '+Math.min(...ws).toFixed(1)+'…'+Math.max(...ws).toFixed(1)); if(!(H.filter(h=>h.setback>0).length>=3)) out.push('setbacks: '+H.filter(h=>h.setback>0).length);
+    let same=0; for(let i=1;i<H.length;i++) if(H[i].side===H[i-1].side && H[i].style===H[i-1].style && H[i].floors===H[i-1].floors && H[i].roof===H[i-1].roof) same++; if(same) out.push(same+' neighbours alike');
+    return out; };
+  n+=2; const j=judge(H); d.push(...j.map(s=>'houses: '+s)); if(!judge(H.map(h=>({ ...H[0], side:h.side, z0:h.z0, z1:h.z1 }))).length) miss('CONTROL: a row of one house passes');
+  notes.push(`${H.length} houses: floors ${[3, 4, 5, 6, 7].map(k=>k+'×'+H.filter(h=>h.floors===k).length).join(' ')}, ${[...new Set(H.map(h=>h.style))].map(s=>s+' '+H.filter(h=>h.style===s).length).join(', ')}, roofs ${[...new Set(H.map(h=>h.roof))].map(s=>s+' '+H.filter(h=>h.roof===s).length).join(', ')}, ${H.filter(h=>h.setback>0).length} set back`);
+  const C=J.crowns||{}; n+=2; if(!(C.now>=0 && C.now<=CROWN_MAX)) miss(`the nearest crowns cover ${(C.now*100).toFixed(1)} % of an upright phone's lower half (at most ${CROWN_MAX*100} %)`);
+  if(!(C.old>CROWN_MAX)) miss(`CONTROL: RAIN-1's crowns cover only ${(C.old*100).toFixed(1)} % — the check cannot fail`);
+  notes.push(`an upright phone's lower half: crowns ${(C.now*100).toFixed(1)} % (RAIN-1's ${(C.old*100).toFixed(1)} %)`);
+  return { cases:n, total:d.length, differences:d, notes };
+}
 /* NIGHT-6 slice 6: THE GUST (apps/night/rooms/forest/pure/gust.js). No hand and a still or slow hand: the strength exactly 0 and every bend
    exactly [0, 0]; a sweep: a gust along it, centred near the hand, bending plants along the sweep (and away from its centre), most at the
    centre and at the top, none a radius away or at a plant's foot; it dies away to exactly 0 once the hand stops; it FOLLOWS THE HAND'S PLACE —
@@ -2712,6 +2798,9 @@ const ROWS=[
   ['NIGHT pixel budget law (app)', ()=>nightPixels(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-11 part 5
   ['FOREST gust (app)',         ()=>forestGustCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 6
   ['FOREST canopy (app)',       ()=>forestCanopyCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 7
+  ['RAIN window quads (app)',   ()=>rainWindowQuads(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-2
+  ['RAIN wave mid-pass (app)',  ()=>rainWaveMidPass(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-2
+  ['RAIN city kit (app)',       ()=>rainCityKit(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-2
   ['FOREST paint (app)',        ()=>forestPaintCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 8
   ['FOREST hidden (app)',       ()=>forestHiddenCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 9
   ['NIGHT texts both languages (app)', ()=>nightTextsCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-7

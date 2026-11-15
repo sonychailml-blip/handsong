@@ -21,20 +21,31 @@ void main(){ float r=radAt(texture2D(uDepth, vUv).a);   /* the depth rides in th
   vec3 c0=texture2D(uBase, vUv).rgb, c1=texture2D(uL1, vUv).rgb, c2=texture2D(uL2, vUv).rgb, c3=texture2D(uL3, vUv).rgb, c;
   if(r<uRad.x) c=mix(c0, c1, r/uRad.x); else if(r<uRad.y) c=mix(c1, c2, (r-uRad.x)/(uRad.y-uRad.x)); else c=mix(c2, c3, clamp((r-uRad.y)/(uRad.z-uRad.y), 0., 1.));
   vec2 p=(vUv*2.-1.)*uTan-uLight.xy; c+=uLightCol*uLight.z*0.2*exp(-dot(p, p)/0.012); gl_FragColor=vec4(c, 1.); }`;
+/* RAIN-2: THE WINDOW'S OWN QUAD — aQ0, aQ1 its four projected corners (a trapezoid along the street, the facade's perspective); the signed distance to
+   that quad (exact, the polygon's law: pure/windows.js winQuadSd, the same arithmetic) shapes it in focus and grown by its blur radius out of focus,
+   so a defocused window keeps its perspective, blurred by its depth — never a screen-facing shape. The area for the dimming is the quad's own. */
+const QUAD_SD=`float sdQ(vec2 p, vec2 a, vec2 b, vec2 c, vec2 d){ float s=1., m=1e9; vec2 v0, v1, e, w, q;
+  v0=a; v1=d; e=v1-v0; w=p-v0; q=w-e*clamp(dot(w,e)/dot(e,e), 0., 1.); m=min(m, dot(q,q)); if((p.y>=v0.y && p.y<v1.y && e.x*w.y>e.y*w.x) || (p.y<v0.y && p.y>=v1.y && e.x*w.y<=e.y*w.x)) s=-s;
+  v0=b; v1=a; e=v1-v0; w=p-v0; q=w-e*clamp(dot(w,e)/dot(e,e), 0., 1.); m=min(m, dot(q,q)); if((p.y>=v0.y && p.y<v1.y && e.x*w.y>e.y*w.x) || (p.y<v0.y && p.y>=v1.y && e.x*w.y<=e.y*w.x)) s=-s;
+  v0=c; v1=b; e=v1-v0; w=p-v0; q=w-e*clamp(dot(w,e)/dot(e,e), 0., 1.); m=min(m, dot(q,q)); if((p.y>=v0.y && p.y<v1.y && e.x*w.y>e.y*w.x) || (p.y<v0.y && p.y>=v1.y && e.x*w.y<=e.y*w.x)) s=-s;
+  v0=d; v1=c; e=v1-v0; w=p-v0; q=w-e*clamp(dot(w,e)/dot(e,e), 0., 1.); m=min(m, dot(q,q)); if((p.y>=v0.y && p.y<v1.y && e.x*w.y>e.y*w.x) || (p.y<v0.y && p.y>=v1.y && e.x*w.y<=e.y*w.x)) s=-s;
+  return s*sqrt(m); }`;
 /* A LIT WINDOW (one instance each: aRect its centre and half size, aLit its light, aWarm honey … amber, aDepth its depth). In focus: the pane
    behind a curtain, its bars, a little light spilling on the wall. Out of focus (its own radius by its depth): the same light spread over the
    window grown by that radius into a soft rounded rectangle, dimmer by the area. Premultiplied: the pane covers the dark window, the disc adds. */
-export const WIN_V=`attribute vec4 aRect; attribute float aLit, aWarm, aDepth; uniform vec2 uTan; uniform vec3 uFoc; uniform float uPad;
-varying vec2 vP, vH, vV; varying float vLit, vWarm, vR; ${RAD}
-void main(){ vR=radAt(aDepth); vec2 hs=aRect.zw+vR+uPad*min(1., aRect.w*8.); vP=position.xy*hs; vH=aRect.zw; vLit=aLit; vWarm=aWarm; vV=aRect.xy+vP;
-  gl_Position= aLit>0.004 ? vec4((aRect.xy+vP)/uTan, 0., 1.) : vec4(2., 2., 2., 1.); }`;
-export const WIN_F=`precision highp float; uniform float uPad, uBaked; uniform vec3 uHoney, uAmber; uniform sampler2D uLit; uniform vec2 uExt; varying vec2 vP, vH, vV; varying float vLit, vWarm, vR;
-void main(){ vec2 q=abs(vP)-vH; float d=length(max(q, 0.))+min(max(q.x, q.y), 0.), R=max(vR, 1e-4), k=clamp(vR/(vH.y*0.9+0.002), 0., 1.);
+export const WIN_V=`attribute vec4 aRect, aQ0, aQ1; attribute float aLit, aWarm, aDepth; uniform vec2 uTan; uniform vec3 uFoc; uniform float uPad;
+varying vec2 vP, vH, vV; varying vec4 vQ0, vQ1; varying float vLit, vWarm, vR, vA0, vPer; ${RAD}
+void main(){ vR=radAt(aDepth); vec2 mn=min(min(aQ0.xy, aQ0.zw), min(aQ1.xy, aQ1.zw)), mx=max(max(aQ0.xy, aQ0.zw), max(aQ1.xy, aQ1.zw)), c=(mn+mx)*0.5, hs=(mx-mn)*0.5+vR+uPad*min(1., aRect.w*8.);
+  vV=c+position.xy*hs; vP=vV-aRect.xy; vH=aRect.zw; vLit=aLit; vWarm=aWarm; vQ0=aQ0; vQ1=aQ1;   /* RAIN-2: the quad's bounds grown by the radius */
+  vA0=0.5*abs((aQ0.x*aQ0.w-aQ0.z*aQ0.y)+(aQ0.z*aQ1.y-aQ1.x*aQ0.w)+(aQ1.x*aQ1.w-aQ1.z*aQ1.y)+(aQ1.z*aQ0.y-aQ0.x*aQ1.w)); vPer=distance(aQ0.xy, aQ0.zw)+distance(aQ0.zw, aQ1.xy)+distance(aQ1.xy, aQ1.zw)+distance(aQ1.zw, aQ0.xy);
+  gl_Position= aLit>0.004 ? vec4(vV/uTan, 0., 1.) : vec4(2., 2., 2., 1.); }`;
+export const WIN_F=`precision highp float; uniform float uPad, uBaked; uniform vec3 uHoney, uAmber; uniform sampler2D uLit; uniform vec2 uExt; varying vec2 vP, vH, vV; varying vec4 vQ0, vQ1; varying float vLit, vWarm, vR, vA0, vPer; ${QUAD_SD}
+void main(){ float d=sdQ(vV, vQ0.xy, vQ0.zw, vQ1.xy, vQ1.zw), R=max(vR, 1e-4), k=clamp(vR/(vH.y*0.9+0.002), 0., 1.);   /* RAIN-2: the distance to the window's own quad */
   vec3 warm=mix(uHoney, uAmber, vWarm); vec2 u=vP/vH, lp=u-vec2(0.3*sin(vWarm*40.), -0.4);
   float folds=0.84+0.16*sin(u.x*9.+vWarm*20.), lamp=0.6+0.4*exp(-dot(lp, lp)*1.5);
   float bars=1.-0.7*max(smoothstep(0.08, 0.03, abs(u.x)), smoothstep(0.06, 0.02, abs(u.y-0.4)));
   float e=vH.x*0.08, inA=smoothstep(e, -e, d);
-  float A0=4.*vH.x*vH.y, A1=A0+4.*(vH.x+vH.y)*R+3.1416*R*R, gain=pow(A0/A1, 0.5);
+  float A0=max(vA0, 1e-6), A1=A0+vPer*R+3.1416*R*R, gain=pow(A0/A1, 0.5);   /* the quad's own area grown by the radius */
   float disc=smoothstep(R, R*0.7, d)*(0.86+0.14*smoothstep(R*0.2, R*0.9, d));
   float sp=uPad*min(1., vH.y*8.), spill=exp(-max(d, 0.)/(sp*0.3+1e-5))*0.16*(1.-k)*step(0., d);
   vec3 inner= uBaked>0.5 ? texture2D(uLit, clamp(vV/uExt*0.5+0.5, 0., 1.)).rgb*1.1 : warm*folds*lamp*bars;   /* RAIN-1: in focus, the baked room and its life */

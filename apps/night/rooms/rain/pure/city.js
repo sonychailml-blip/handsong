@@ -96,9 +96,10 @@ export function cityLamps(){
   return out;
 }
 /* the plane trees (RAIN-1): two rows between the road and the promenade — their crowns' centres and radii (world), seeded */
+export const NEAR_TREES=40;   // RAIN-2: plane trees nearer than this (z, m) are pruned: their crowns lower and smaller (the bake's planeTree thins their leaves too)
 export function cityTrees(){
   const R=seeded(RAIN_CITY_SEED^0x54524545), out=[];
-  for(const x of STREET.treeRows) for(let z=4+R()*4;z<STREET.len*0.6;z+=STREET.treeEvery*(0.85+0.3*R())) out.push({ p:[x+(R()-0.5)*0.5, 7.6+R()*1.6, z], r:2.6+R()*0.9 });
+  for(const x of STREET.treeRows) for(let z=4+R()*4;z<STREET.len*0.6;z+=STREET.treeEvery*(0.85+0.3*R())){ const px=x+(R()-0.5)*0.5, h=7.6+R()*1.6, r=2.6+R()*0.9, near=z<NEAR_TREES; out.push({ p:[px, near ? h*0.85 : h, z], r: near ? r*0.6 : r, near }); }   // RAIN-2: the nearest pruned, lower and thinner (an upright phone's lower half stays open)
   return out;
 }
 /* THE TRAFFIC at time t (s): cars on their lanes and the tram on its track, as a seeded schedule — RAIN-1: the shared law (pure/passes.js), which the
@@ -106,10 +107,13 @@ export function cityTrees(){
    'tram', lane, slot, dir, z (front, m), x (m), len (m), v }]. Each lane: one slot every `every` s, a car with chance p × density (Wave and the mood
    set the density), all cars of a lane at one speed (none catches another); they drive from zFrom (behind our house) to the far end, or back. */
 export const TRAFFIC=F({ every:F([10, 12]), p:0.6, speed:F([11.5, 12.5]), carLen:4.4, tram:84, tramP:0.75, tramSpeed:8, tramLen:28, tramTrack:F([9.65, 12.15]) });
-export const RAIN_TRAFFIC=F({ len:STREET.len, zFrom:STREET.zFrom, every:TRAFFIC.every, p:TRAFFIC.p, speed:TRAFFIC.speed, carLen:TRAFFIC.carLen, lanes:STREET.lanes,
+/* RAIN-2: a vehicle's existence is decided by the density booked COMMIT s before it enters (≥ the sound's lead 9 s + the margin); a change is booked
+   DENS_MARGIN s ahead of the picture's audio time, so the audio thread has it before it counts (pure/passes.js passBook) */
+export const DENS_MARGIN=0.5, DENS_COMMIT=10;
+export const RAIN_TRAFFIC=F({ commit:DENS_COMMIT, len:STREET.len, zFrom:STREET.zFrom, every:TRAFFIC.every, p:TRAFFIC.p, speed:TRAFFIC.speed, carLen:TRAFFIC.carLen, lanes:STREET.lanes,
   tram:F({ every:TRAFFIC.tram, p:TRAFFIC.tramP, speed:TRAFFIC.tramSpeed, len:TRAFFIC.tramLen, track:TRAFFIC.tramTrack }) });
 /* the listener: the eye at the window (its right vector for the pan) */
 export const EAR=F({ x:CAM.x, y:CAM.y, z:CAM.z, r:F(camBasis().r) });
-export const trafficAt=(t, density=1)=>passTraffic(RAIN_TRAFFIC, t, density);
+export const trafficAt=(t, density=1)=>passTraffic(RAIN_TRAFFIC, t, density);   // density: a number or a book (RAIN-2)
 /* the density of the traffic: the mood's own amount × (1 + 0.6 × Wave), in steps of 0.05 (the picture and the sound send the same number) */
 export const trafficDensity=(mood, wave)=>Math.round(Math.max(0, mood)*(1+0.6*Math.max(0, Math.min(1, +wave||0)))*20)/20;

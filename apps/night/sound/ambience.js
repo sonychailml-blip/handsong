@@ -168,7 +168,7 @@ function ambienceLayersRec(E, amb, which, L, R, norm){ const b=amb.layers; if(!b
 /* the focus (0 the glass … 1 the far city) — the picture's eased number; sent only when it moved */
 function ambienceLayersFocus(E, amb, f){ const b=amb.layers; if(!b || !(Math.abs(f-b.focus)>0.002)) return; b.focus=f; b.node.port.postMessage([{ k:'focus', v:f }]); }
 /* RAIN-1: the traffic's density for the passes (the picture's same number); sent only when it changed */
-function ambienceLayersDensity(E, amb, d){ const b=amb.layers; if(!b || b.dens===d) return; b.dens=d; b.node.port.postMessage([{ k:'density', v:d }]); }
+function ambienceLayersDensity(E, amb, d, at=null){ const b=amb.layers; if(!b || (b.dens===d && at!==-1e9)) return; b.dens=d; b.node.port.postMessage([{ k:'density', v:d, at }]); }   // RAIN-2: + its time (the book)
 /* the node's counters → a promise (null after ms) */
 function ambienceLayersStats(E, amb, ms=2000){ const b=amb.layers; if(!b) return Promise.resolve(null);
   return new Promise(res=>{ const p=b.node.port, f=e=>{ if(e.data && e.data.stats){ p.removeEventListener('message', f); res(e.data.stats); } };

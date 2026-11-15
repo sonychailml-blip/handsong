@@ -1,0 +1,26 @@
+# HANDOFF — Handsong, the index (read at the start of every session, then your track's handoff)
+
+Two apps, one engine. Rules: `CLAUDE.md`. Every run belongs to one track: `CORE-n`, `FULL-n` or `NIGHT-n`, counted separately (`NIGHT-0` is history, so Night starts at `NIGHT-1`).
+
+| Track | Folder | Read | Where it stands |
+|---|---|---|---|
+| **CORE** | `core/` | `docs/core/HANDOFF.md`, `BACKLOG.md`, `WORK-LOG.md` | Stage 3 foundation and `CORE-1`…`CORE-23` done, all opt-in (latest: a camera hold, Night). |
+| **FULL** | `apps/full/` | `docs/full/HANDOFF.md`, `BACKLOG.md`, `WORK-LOG.md`, `UI-MAP.md`, `UX-INVENTORY.md` | Waits for the first release. Next: stage 5 (saving, export, audio take, mixer) and the calibration screen. |
+| **NIGHT** | `apps/night/` | `docs/night/HANDOFF.md`, `BACKLOG.md`, `WORK-LOG.md`, `STAGE4-NIGHT-plan.md`, `QUALITY.md` | The first public release. Waiting for the user's steps: 129 (`NIGHT-2`), 145 (`NIGHT-7`–`7c`), 146–150 (`NIGHT-8`…`8c`), 151–152 (`NIGHT-11`, `12`), 153 (`DESIGN-1`), 154–155 (`NIGHT-13`, `13b`), 156 (`RAIN-0`, dev only), 157 (`NIGHT-14`: offline), 158 (`NIGHT-14b`: phone), 159 (`NIGHT-14c`: Detailed offline), 160 (`NIGHT-14d`: the update line), 161 (`RAIN-0b`, dev only), 162 (`RAIN-3`, the rain room's sound), 163 (`NIGHT-15`), 164 (`RAIN-1`), 165 (`FOREST-1`). Backlogs audited at `NIGHT-15a`. Then steps 120–124, C8 rest, C10, C12. |
+| **SITE** | `apps/site/` | `docs/site/HANDOFF.md`, `WORK-LOG.md` | handsong.app, the brand site: `SITE-1` built, `SITE-2` Install → Space; waits for its Vercel project and DNS. |
+
+**Handsong** is a gesture synthesizer and tuning tutorial in the browser: camera → MediaPipe → pinches → Web Audio, with a multitrack recorder, piano roll and lessons. **Handsong Night** (code id `night`) is the quiet one: a night forest played with the hands, free, nothing leaves the device.
+
+**Who does what:** the user commits; Claude Code never runs git, not even read-only. A strategist writes the prompts (in Russian); terminal replies in English.
+
+**Deploy** (`CLAUDE.md` «Build and deploy»): Vercel projects per app; `dev` gives previews (with `?probe`). Production: Full builds `main`, Night `night-release` (https://night.handsong.app), the site `dev` (handsong.app, only when `apps/site/` changes). Build: `tools/build.mjs`.
+
+**Local addresses (Live Server):** `http://127.0.0.1:5500/apps/full/`, `http://127.0.0.1:5500/apps/night/`; add `?probe` for `window.P`.
+
+**History:**
+- `archive/HANDOFF-history.md` — every past record; the whole old handoff is its last section.
+- `archive/WORK-LOG-before-split.md` and `archive/NIGHT-RUN-LOG-2026-10.md` — the frozen logs, under the old name.
+- `archive/SPLIT-PLAN.md` and `archive/SPLIT-PROGRESS.md` — how the two apps were split.
+- `archive/CLAUDE-history.md` — the full module map, architecture, known limits and verification steps.
+
+They keep the old paths and name (`docs/core/STALE-NAMES.md` maps them).

@@ -1,40 +1,680 @@
 {
  "renderer": "three.js r128 (MIT), vendored at apps/night/vendor/three-r128/",
- "ms": 27689,
+ "ms": 71477,
  "size": [
   2050,
   1106
  ],
  "counts": {
   "late": {
-   "meshes": 69,
-   "windows": 998
+   "meshes": 227,
+   "windows": 1204
   },
   "evening": {
-   "meshes": 77,
-   "windows": 998
+   "meshes": 233,
+   "windows": 1204
   },
   "after": {
-   "meshes": 73,
-   "windows": 998
+   "meshes": 227,
+   "windows": 1204
   }
  },
- "windows": 138,
+ "windows": 187,
  "sizes": {
   "full": {
-   "late.webp": 248096,
-   "evening.webp": 253110,
-   "lit.webp": 272188,
-   "depth.png": 313007,
-   "after.webp": 250710
+   "late.webp": 314430,
+   "evening.webp": 324478,
+   "lit.webp": 333180,
+   "depth.png": 361530,
+   "after.webp": 316738
   },
   "reduced": {
-   "late.webp": 103284,
-   "evening.webp": 105636,
-   "lit.webp": 113724,
-   "depth.png": 190655,
-   "after.webp": 104454
+   "late.webp": 118638,
+   "evening.webp": 123602,
+   "lit.webp": 126832,
+   "depth.png": 205306,
+   "after.webp": 119744
   }
  },
+ "light": {
+  "late": {
+   "skyN": 16,
+   "skyMs": 12300
+  },
+  "evening": {
+   "skyN": 16,
+   "skyMs": 6352
+  },
+  "after": {
+   "skyN": 16,
+   "skyMs": 5097
+  }
+ },
+ "crowns": {
+  "now": 0.07,
+  "old": 0.2638
+ },
+ "houses": [
+  {
+   "side": "opp",
+   "z0": 12,
+   "z1": 28.5,
+   "floors": 4,
+   "style": "wooden",
+   "roof": "hip",
+   "setback": 0,
+   "top": 17.24
+  },
+  {
+   "side": "opp",
+   "z0": 28.5,
+   "z1": 40,
+   "floors": 4,
+   "style": "classical",
+   "roof": "hip",
+   "setback": 0,
+   "top": 19.11
+  },
+  {
+   "side": "opp",
+   "z0": 40,
+   "z1": 66,
+   "floors": 5,
+   "style": "classical",
+   "roof": "gable",
+   "setback": 0,
+   "top": 21.51
+  },
+  {
+   "side": "opp",
+   "z0": 66,
+   "z1": 78.11,
+   "floors": 5,
+   "style": "brick",
+   "roof": "gable",
+   "setback": 0,
+   "top": 21.83
+  },
+  {
+   "side": "opp",
+   "z0": 78.11,
+   "z1": 98,
+   "floors": 4,
+   "style": "nouveau",
+   "roof": "hip",
+   "setback": 1.27,
+   "top": 18.54
+  },
+  {
+   "side": "opp",
+   "z0": 98,
+   "z1": 109.01,
+   "floors": 4,
+   "style": "brick",
+   "roof": "gable",
+   "setback": 0,
+   "top": 17.45
+  },
+  {
+   "side": "opp",
+   "z0": 109.01,
+   "z1": 129.72,
+   "floors": 4,
+   "style": "wooden",
+   "roof": "hip",
+   "setback": 1.68,
+   "top": 19.01
+  },
+  {
+   "side": "opp",
+   "z0": 129.72,
+   "z1": 138,
+   "floors": 6,
+   "style": "nouveau",
+   "roof": "hip",
+   "setback": 0,
+   "top": 24.21
+  },
+  {
+   "side": "opp",
+   "z0": 138,
+   "z1": 157.48,
+   "floors": 4,
+   "style": "classical",
+   "roof": "gable",
+   "setback": 0,
+   "top": 17.48
+  },
+  {
+   "side": "opp",
+   "z0": 157.48,
+   "z1": 180,
+   "floors": 4,
+   "style": "nouveau",
+   "roof": "mansard",
+   "setback": 1.04,
+   "top": 18.78
+  },
+  {
+   "side": "opp",
+   "z0": 180,
+   "z1": 196.77,
+   "floors": 6,
+   "style": "wooden",
+   "roof": "hip",
+   "setback": 0,
+   "top": 25.53
+  },
+  {
+   "side": "opp",
+   "z0": 196.77,
+   "z1": 211.4,
+   "floors": 5,
+   "style": "nouveau",
+   "roof": "mansard",
+   "setback": 0,
+   "top": 21.4
+  },
+  {
+   "side": "opp",
+   "z0": 211.4,
+   "z1": 220.61,
+   "floors": 6,
+   "style": "brick",
+   "roof": "gable",
+   "setback": 1.69,
+   "top": 25.75
+  },
+  {
+   "side": "opp",
+   "z0": 220.61,
+   "z1": 236,
+   "floors": 5,
+   "style": "brick",
+   "roof": "hip",
+   "setback": 0.96,
+   "top": 22.58
+  },
+  {
+   "side": "opp",
+   "z0": 236,
+   "z1": 257.7,
+   "floors": 5,
+   "style": "nouveau",
+   "roof": "hip",
+   "setback": 0,
+   "top": 21.84
+  },
+  {
+   "side": "opp",
+   "z0": 257.7,
+   "z1": 279.62,
+   "floors": 5,
+   "style": "classical",
+   "roof": "hip",
+   "setback": 0,
+   "top": 21.01
+  },
+  {
+   "side": "opp",
+   "z0": 279.62,
+   "z1": 297.72,
+   "floors": 5,
+   "style": "classical",
+   "roof": "gable",
+   "setback": 1.74,
+   "top": 22.44
+  },
+  {
+   "side": "opp",
+   "z0": 297.72,
+   "z1": 320,
+   "floors": 5,
+   "style": "classical",
+   "roof": "hip",
+   "setback": 0,
+   "top": 21.55
+  },
+  {
+   "side": "opp",
+   "z0": 320,
+   "z1": 332.74,
+   "floors": 5,
+   "style": "nouveau",
+   "roof": "mansard",
+   "setback": 0,
+   "top": 21.34
+  },
+  {
+   "side": "opp",
+   "z0": 332.74,
+   "z1": 346.48,
+   "floors": 7,
+   "style": "classical",
+   "roof": "hip",
+   "setback": 0,
+   "top": 29.31
+  },
+  {
+   "side": "opp",
+   "z0": 346.48,
+   "z1": 360.75,
+   "floors": 6,
+   "style": "wooden",
+   "roof": "hip",
+   "setback": 0.84,
+   "top": 24.2
+  },
+  {
+   "side": "opp",
+   "z0": 360.75,
+   "z1": 381.46,
+   "floors": 7,
+   "style": "brick",
+   "roof": "hip",
+   "setback": 0,
+   "top": 28.84
+  },
+  {
+   "side": "opp",
+   "z0": 381.46,
+   "z1": 394.03,
+   "floors": 5,
+   "style": "nouveau",
+   "roof": "mansard",
+   "setback": 0,
+   "top": 21.85
+  },
+  {
+   "side": "opp",
+   "z0": 394.03,
+   "z1": 407.94,
+   "floors": 4,
+   "style": "nouveau",
+   "roof": "mansard",
+   "setback": 0,
+   "top": 17.79
+  },
+  {
+   "side": "opp",
+   "z0": 407.94,
+   "z1": 421.47,
+   "floors": 4,
+   "style": "brick",
+   "roof": "gable",
+   "setback": 0,
+   "top": 17.72
+  },
+  {
+   "side": "opp",
+   "z0": 421.47,
+   "z1": 431.96,
+   "floors": 4,
+   "style": "classical",
+   "roof": "mansard",
+   "setback": 0,
+   "top": 17.4
+  },
+  {
+   "side": "opp",
+   "z0": 431.96,
+   "z1": 443.71,
+   "floors": 4,
+   "style": "classical",
+   "roof": "gable",
+   "setback": 0,
+   "top": 19.3
+  },
+  {
+   "side": "opp",
+   "z0": 443.71,
+   "z1": 453,
+   "floors": 6,
+   "style": "wooden",
+   "roof": "hip",
+   "setback": 0,
+   "top": 25.87
+  },
+  {
+   "side": "opp",
+   "z0": 453,
+   "z1": 470.3,
+   "floors": 7,
+   "style": "wooden",
+   "roof": "hip",
+   "setback": 0,
+   "top": 27.62
+  },
+  {
+   "side": "opp",
+   "z0": 470.3,
+   "z1": 489.46,
+   "floors": 6,
+   "style": "wooden",
+   "roof": "hip",
+   "setback": 0,
+   "top": 24.94
+  },
+  {
+   "side": "opp",
+   "z0": 489.46,
+   "z1": 505.65,
+   "floors": 5,
+   "style": "brick",
+   "roof": "gable",
+   "setback": 0,
+   "top": 22.86
+  },
+  {
+   "side": "opp",
+   "z0": 505.65,
+   "z1": 520,
+   "floors": 4,
+   "style": "nouveau",
+   "roof": "mansard",
+   "setback": 0,
+   "top": 17.4
+  },
+  {
+   "side": "left",
+   "z0": 16,
+   "z1": 33.11,
+   "floors": 4,
+   "style": "wooden",
+   "roof": "hip",
+   "setback": 1.8,
+   "top": 17.38
+  },
+  {
+   "side": "left",
+   "z0": 33.11,
+   "z1": 42,
+   "floors": 5,
+   "style": "brick",
+   "roof": "hip",
+   "setback": 0,
+   "top": 20.95
+  },
+  {
+   "side": "left",
+   "z0": 42,
+   "z1": 61.19,
+   "floors": 6,
+   "style": "classical",
+   "roof": "hip",
+   "setback": 0,
+   "top": 26.27
+  },
+  {
+   "side": "left",
+   "z0": 61.19,
+   "z1": 70,
+   "floors": 5,
+   "style": "brick",
+   "roof": "gable",
+   "setback": 0,
+   "top": 22.45
+  },
+  {
+   "side": "left",
+   "z0": 70,
+   "z1": 81.49,
+   "floors": 6,
+   "style": "brick",
+   "roof": "hip",
+   "setback": 0,
+   "top": 26.47
+  },
+  {
+   "side": "left",
+   "z0": 81.49,
+   "z1": 98.05,
+   "floors": 7,
+   "style": "wooden",
+   "roof": "hip",
+   "setback": 0,
+   "top": 27.02
+  },
+  {
+   "side": "left",
+   "z0": 98.05,
+   "z1": 112,
+   "floors": 6,
+   "style": "classical",
+   "roof": "mansard",
+   "setback": 0.74,
+   "top": 24.66
+  },
+  {
+   "side": "left",
+   "z0": 112,
+   "z1": 123.19,
+   "floors": 4,
+   "style": "brick",
+   "roof": "hip",
+   "setback": 0.67,
+   "top": 17.28
+  },
+  {
+   "side": "left",
+   "z0": 123.19,
+   "z1": 134.08,
+   "floors": 6,
+   "style": "brick",
+   "roof": "gable",
+   "setback": 0,
+   "top": 26.08
+  },
+  {
+   "side": "left",
+   "z0": 134.08,
+   "z1": 160,
+   "floors": 5,
+   "style": "wooden",
+   "roof": "hip",
+   "setback": 0,
+   "top": 22.85
+  },
+  {
+   "side": "left",
+   "z0": 160,
+   "z1": 178.86,
+   "floors": 4,
+   "style": "classical",
+   "roof": "hip",
+   "setback": 0.63,
+   "top": 18.28
+  },
+  {
+   "side": "left",
+   "z0": 178.86,
+   "z1": 198.67,
+   "floors": 3,
+   "style": "wooden",
+   "roof": "hip",
+   "setback": 0,
+   "top": 14.97
+  },
+  {
+   "side": "left",
+   "z0": 198.67,
+   "z1": 216.42,
+   "floors": 5,
+   "style": "brick",
+   "roof": "gable",
+   "setback": 0,
+   "top": 21.4
+  },
+  {
+   "side": "left",
+   "z0": 216.42,
+   "z1": 230,
+   "floors": 5,
+   "style": "wooden",
+   "roof": "hip",
+   "setback": 0,
+   "top": 22.34
+  },
+  {
+   "side": "left",
+   "z0": 230,
+   "z1": 246.59,
+   "floors": 6,
+   "style": "wooden",
+   "roof": "hip",
+   "setback": 0,
+   "top": 25.94
+  },
+  {
+   "side": "left",
+   "z0": 246.59,
+   "z1": 258.45,
+   "floors": 3,
+   "style": "wooden",
+   "roof": "hip",
+   "setback": 1.85,
+   "top": 14.84
+  },
+  {
+   "side": "left",
+   "z0": 258.45,
+   "z1": 273.72,
+   "floors": 5,
+   "style": "nouveau",
+   "roof": "mansard",
+   "setback": 0,
+   "top": 20.5
+  },
+  {
+   "side": "left",
+   "z0": 273.72,
+   "z1": 295.62,
+   "floors": 3,
+   "style": "classical",
+   "roof": "gable",
+   "setback": 0.71,
+   "top": 15.03
+  },
+  {
+   "side": "left",
+   "z0": 295.62,
+   "z1": 313.2,
+   "floors": 4,
+   "style": "brick",
+   "roof": "hip",
+   "setback": 0,
+   "top": 18.28
+  },
+  {
+   "side": "left",
+   "z0": 313.2,
+   "z1": 332.21,
+   "floors": 5,
+   "style": "classical",
+   "roof": "gable",
+   "setback": 0,
+   "top": 21.9
+  },
+  {
+   "side": "left",
+   "z0": 332.21,
+   "z1": 353.67,
+   "floors": 5,
+   "style": "nouveau",
+   "roof": "mansard",
+   "setback": 0,
+   "top": 22.17
+  },
+  {
+   "side": "left",
+   "z0": 353.67,
+   "z1": 367.3,
+   "floors": 4,
+   "style": "classical",
+   "roof": "gable",
+   "setback": 0,
+   "top": 18.17
+  },
+  {
+   "side": "left",
+   "z0": 367.3,
+   "z1": 386.59,
+   "floors": 5,
+   "style": "nouveau",
+   "roof": "mansard",
+   "setback": 1.48,
+   "top": 21.96
+  },
+  {
+   "side": "left",
+   "z0": 386.59,
+   "z1": 399.4,
+   "floors": 5,
+   "style": "brick",
+   "roof": "gable",
+   "setback": 1.86,
+   "top": 22.34
+  },
+  {
+   "side": "left",
+   "z0": 399.4,
+   "z1": 415.72,
+   "floors": 4,
+   "style": "brick",
+   "roof": "hip",
+   "setback": 0,
+   "top": 19.21
+  },
+  {
+   "side": "left",
+   "z0": 415.72,
+   "z1": 434.87,
+   "floors": 5,
+   "style": "wooden",
+   "roof": "gable",
+   "setback": 1.88,
+   "top": 21.07
+  },
+  {
+   "side": "left",
+   "z0": 434.87,
+   "z1": 451.11,
+   "floors": 4,
+   "style": "brick",
+   "roof": "hip",
+   "setback": 0,
+   "top": 18.39
+  },
+  {
+   "side": "left",
+   "z0": 451.11,
+   "z1": 472.36,
+   "floors": 4,
+   "style": "nouveau",
+   "roof": "mansard",
+   "setback": 0,
+   "top": 18.09
+  },
+  {
+   "side": "left",
+   "z0": 472.36,
+   "z1": 492.43,
+   "floors": 5,
+   "style": "wooden",
+   "roof": "hip",
+   "setback": 1.61,
+   "top": 22.36
+  },
+  {
+   "side": "left",
+   "z0": 492.43,
+   "z1": 520,
+   "floors": 4,
+   "style": "nouveau",
+   "roof": "hip",
+   "setback": 0,
+   "top": 17.58
+  }
+ ],
  "errors": []
 }

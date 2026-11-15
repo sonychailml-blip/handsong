@@ -12,5 +12,5 @@ export const RAIN_FOCUS={ f:FOCUS.rest, heard:0 };
 export function rainHeard(dt, hands, fx, sky){
   const play=(hands||[]).find(h=>h.play);
   RAIN_FOCUS.f=focusStep(RAIN_FOCUS.f, play ? focusTarget(play.d) : FOCUS.rest, dt, !!play); RAIN_FOCUS.heard++;
-  natureFocus(RAIN_FOCUS.f); natureDensity(trafficDensity(roomLook(RAIN_ROOM, sky && sky.mood).traffic, fx && fx.wave)); return RAIN_FOCUS.f;   // RAIN-1: the cars heard as the picture would draw them
+  natureFocus(RAIN_FOCUS.f); natureDensity(trafficDensity(roomLook(RAIN_ROOM, sky && sky.mood).traffic, fx && fx.wave), null);   // RAIN-2: no picture — the audio thread books it at its own time + the margin return RAIN_FOCUS.f;   // RAIN-1: the cars heard as the picture would draw them
 }

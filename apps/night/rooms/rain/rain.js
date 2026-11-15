@@ -21,7 +21,9 @@ import { FOCUS, focusTarget, focusStep, focusBlur, focusDepth, blurAt } from './
 import { RAIN_SEED, windowsLayout, farLights, windowPick, windowLight } from './pure/windows.js';
 import { GLASS, wipeNew, wipeStamp, wipeStroke, wipeStep, wipeAt, wipeCell } from './pure/glass.js';
 import { DROPS, dropsNew, dropsRegion, dropAdd, dropsStep, dropStretch, dropsLedger, laneAt } from './pure/drops.js';
-import { project, cityLamps, trafficAt, trafficDensity, sceneAt, depthOf, BAKE_EXT } from './pure/city.js';
+import { winQuad } from './pure/windows.js';   // RAIN-2: a window's projected quad
+import { project, cityLamps, trafficAt, trafficDensity, sceneAt, depthOf, BAKE_EXT, DENS_MARGIN } from './pure/city.js';
+import { passBook, passBookSet } from '../../pure/passes.js';   // RAIN-2: the density book
 import { QUAD_V, BLUR_F, VIEW_F, WIN_V, WIN_F, LIGHT_V, LIGHT_F, DROP_V, DROP_F, glassShader } from './rain-glass.js';
 import { cityUniforms, CITY_F, BAKED_F } from './rain-city.js';
 
@@ -78,6 +80,7 @@ export function buildRain(T, opt){
   const WIN= BK && Array.isArray(BK.windows) && BK.windows.length ? BK.windows : windowsLayout(), wg=unitQuad();   // RAIN-1: the bake's exact window map
   const lit=new Float32Array(WIN.length), litAt=new Float64Array(WIN.length).fill(-1e9), litAttr=dyn(lit, 1);
   wg.setAttribute('aRect', new T.InstancedBufferAttribute(new Float32Array(WIN.flatMap(w=>[w.x, w.y, w.hw, w.hh])), 4));
+  { const Q=WIN.map(winQuad); wg.setAttribute('aQ0', new T.InstancedBufferAttribute(new Float32Array(Q.flatMap(q=>[q[0][0], q[0][1], q[1][0], q[1][1]])), 4)); wg.setAttribute('aQ1', new T.InstancedBufferAttribute(new Float32Array(Q.flatMap(q=>[q[2][0], q[2][1], q[3][0], q[3][1]])), 4)); }   // RAIN-2: its own projected quad
   wg.setAttribute('aWarm', new T.InstancedBufferAttribute(new Float32Array(WIN.map(w=>w.warm)), 1)); wg.setAttribute('aDepth', new T.InstancedBufferAttribute(new Float32Array(WIN.map(w=>w.depth)), 1));
   wg.setAttribute('aLit', litAttr); wg.instanceCount=WIN.length;
   const winM=mat({ uniforms:{ uTan:{ value:UT }, uFoc:{ value:FOC }, uPad:{ value:BOKEH.pad }, uHoney:{ value:HONEY }, uAmber:{ value:AMBER }, uLit:{ value:litTex }, uExt:{ value:EXT }, uBaked:{ value:BK ? 1 : 0 } }, vertexShader:WIN_V, fragmentShader:WIN_F,
@@ -98,12 +101,12 @@ export function buildRain(T, opt){
   { let i=0; FAR.forEach(q=>{ put(i++, q.x, q.y, 0.0017+0.0012*q.k, 0, HONEY.clone().lerp(AMBER, q.warm), 0.55+0.6*q.k, q.depth, 0); });
     for(const L of LAMPS) i=lightAt(i, L.p, 0.32, LAMP, 1, true); nStatic=i; }
   const EVT=RAIN_ROOM.nature.layers ? RAIN_ROOM.nature.layers.events : null, EVT_SEED=RAIN_ROOM.nature.layers ? ((RAIN_ROOM.nature.layers.seed>>>0) || LAYERS.seed)>>>0 : 0;
-  let clock=null, dripsShown=0, dens=1, tAudio=null, lookOver=null, mistOver=null, depthPx=null;
+  let clock=null, dripsShown=0, dens=1, book=null, tAudio=null, lookOver=null, mistOver=null, depthPx=null;
   /* RAIN-1: the cars are drawn at the moment that is HEARD now (the audio clock, its output latency in it) — the sound plays each car's pass from the
      same law on that clock; without the clock (no sound yet) the room's own time */
   function traffic(t){
     tAudio= clock ? clock.ctx+(performance.now()-clock.perf)/1000 : null;
-    let i=nStatic; const cars=trafficAt(tAudio==null ? t : tAudio, dens); let nc=0;
+    let i=nStatic; const cars=trafficAt(tAudio==null ? t : tAudio, book||dens); let nc=0;   // RAIN-2: the book (every car decided before it enters)
     for(const c of cars){ if(c.kind==='car'){ if(nc++>=CARS_MAX) continue;
         for(const s of [-0.78, 0.78]) i=lightAt(i, [c.x+s, 0.68, c.dir<0 ? c.z : c.z], 0.11, c.dir<0 ? HEAD : TAIL, c.dir<0 ? 1 : 0.8, true); }
       else { for(let k=0;k<6;k++){ const z=c.z-c.dir*(2+k*4.3), q=project([c.x, 2.1, z]); if(q.z<=1) continue; const qw=project([c.x, 2.1, z+1.6]);
@@ -184,7 +187,7 @@ export function buildRain(T, opt){
     now=t; UTIME.value=t;
     if(nin && nin.mood!==undefined && nin.mood!==moodId){ moodId=nin.mood; look=roomLook(RAIN_ROOM, moodId); }
     if(lookOver && RAIN_ROOM.looks[lookOver]) look=RAIN_ROOM.looks[lookOver];   // captures only: a mood held
-    dens=trafficDensity(look.traffic, fx && fx.wave); natureDensity(dens);   // RAIN-1: the mood's traffic × Wave — the picture and the sound the same number
+    { const nd=trafficDensity(look.traffic, fx && fx.wave), at=(tAudio==null ? t : tAudio)+DENS_MARGIN; if(!book){ book=passBook(nd); natureDensity(nd, -1e9); } else if(nd!==dens && passBookSet(book, at, nd)) natureDensity(nd, at); dens=nd; }   // RAIN-2: booked a margin ahead, the same time to the sound   // RAIN-1: the mood's traffic × Wave — the picture and the sound the same number
     if(look!==painted && painted) dirty=true;
     { const a=1-Math.exp(-dt/MOOD_TC); mistK+=(look.mist-mistK)*a; rainK+=(look.rain-rainK)*a; litK+=(look.lit-litK)*a; mistCol.lerp(lookCols(look).mist, a); }
     const play=(hands||[]).find(h=>h.play);

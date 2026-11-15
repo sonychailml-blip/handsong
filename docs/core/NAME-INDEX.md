@@ -166,7 +166,8 @@ RAIN-3: A ROOM's LAYERED RECORDINGS — near and far, crossfaded by the focus �
 
 ## apps/night/pure/passes.js
 RAIN-1: PASSING VEHICLES — one law for the picture and the sound (pure, rule #36; data row «RAIN car passes (app)»).
-- fn (2): `passTraffic`, `passEvents`
+- const (1): `passBook`
+- fn (4): `passBookSet`, `passBookAt`, `passTraffic`, `passEvents`
 
 ## apps/night/pure/persist.js
 NIGHT-15: KEEP NIGHT'S FILES — whether to ask the browser for persistent storage (navigator.storage.persist), so a browser short of space does not drop the precache.
@@ -356,7 +357,7 @@ RAIN-0: THE RAIN ROOM JOINS THE APP — loaded only by the development rooms' do
 
 ## apps/night/rooms/rain/pure/city.js
 RAIN-0b: THE VIEW LAW — the eye on the 8th floor, looking slightly down and diagonally along the boulevard (concept §3), as ONE pure projection used by the painting, the depth map, the lights, the …
-- const (16): `CAM`, `STREET`, `BAKE_EXT`, `BLOCKS`, `FLOOR`, `FAR`, `camBasis`, `vanishing`, `DEPTH`, `hillsAt`, `RAIN_CITY_SEED`, `TRAFFIC`, `RAIN_TRAFFIC`, `EAR`, `trafficAt`, `trafficDensity`
+- const (18): `CAM`, `STREET`, `BAKE_EXT`, `BLOCKS`, `FLOOR`, `FAR`, `camBasis`, `vanishing`, `DEPTH`, `hillsAt`, `RAIN_CITY_SEED`, `NEAR_TREES`, `TRAFFIC`, `DENS_MARGIN`, `RAIN_TRAFFIC`, `EAR`, `trafficAt`, `trafficDensity`
 - fn (7): `project`, `rayOf`, `depthOf`, `sceneAt`, `cityWindows`, `cityLamps`, `cityTrees`
 
 ## apps/night/rooms/rain/pure/drops.js
@@ -380,8 +381,8 @@ RAIN-0: THE RAIN ROOM'S RECORD (docs/night/design/RAIN/CONCEPT.md, PLAN.md) — 
 
 ## apps/night/rooms/rain/pure/windows.js
 RAIN-0: THE WINDOWS — their places, which one a note lights, and how a lit window fades (pure, rule #36; data rows «RAIN window pick (app)», «RAIN window fade (app)»).
-- const (6): `RAIN_SEED`, `windowsLayout`, `PICK_REACH`, `TRACE`, `AMB_LEVEL`, `windowLight`
-- fn (3): `farLights`, `windowPick`, `traceLevel`
+- const (8): `RAIN_SEED`, `windowsLayout`, `winQuad`, `winCover`, `PICK_REACH`, `TRACE`, `AMB_LEVEL`, `windowLight`
+- fn (4): `winQuadSd`, `farLights`, `windowPick`, `traceLevel`
 
 ## apps/night/rooms/rain/rain-city.js
 RAIN-0b: THE STAND-IN CITY's prepared picture and its DEPTH MAP, painted ONCE on the GPU (an opening, a resize, a mood): one ray per pixel through the view law (pure/city.js — this shader is its po…
@@ -1399,7 +1400,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 - const (5): `TEST_ROOM_ID`, `TEST_ROOM`, `testRoomMode`, `testRoomInfo`, `testRoomFreeLeaks`
 - fn (2): `testRoomInstall`, `testRoomRemove`
 
-_277 modules, 2864 exported names._
+_277 modules, 2872 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 
