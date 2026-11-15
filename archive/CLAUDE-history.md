@@ -2003,6 +2003,20 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
     3. The drips from the cornice (a soft falling plip, now left, now right, every few seconds) and the quiet tick in the room (every ten seconds or so): too often, too loud, or right? With the focus near, watch the top of the picture: a drip falls past the window as you hear it.
     4. Room switch rain → forest → rain (in the console of `?probe&room=rain`: `(await import('/apps/night/roomswitch.js')).roomSwitch('room.forest')`, then `…roomSwitch('room.rain')`): the sounds cross over in about two seconds without a click; the forest's sound exactly as before.
     5. The level: the rain room's nature against the music bed and your playing — under the music as the forest's is? Say if it should be lower or higher.
+
+163. Fixes after the backlog audit (NIGHT-15 with CORE-23), five checks by hand; the rest is in the rows «NIGHT honest start» (D2, D3), «NIGHT stream sound (app)», «NIGHT storage persist (app)», «LIC1 licence register» and P.night «RAIN room» (case 6).
+    1. An in-app browser on the Poco: open the dev alias's link from Telegram, Begin: the open-in-browser box comes (not «you said no»), also on a second try right after the page loaded.
+    2. Settings (⚙) → the «Licences» / «Лицензии» link at the bottom: a plain page lists MediaPipe, three.js, the fonts, the forest's recordings and scans (laptop and Poco; Russian and English heading).
+    3. The rain room on Dark (`…/apps/night/?room=rain`, Begin, Background → Dark): hand near — the pane's rain; hand far — the street opens; as with the picture on.
+    4. «Measure this device» (ⓘ, development): its last line says whether the browser keeps Night's files («storage kept: yes/no · asked …»). On the Poco after a first play of 10 s or more.
+    5. The forest captures `tools/.ui-snap/night15/index.html`: answer the four questions there (the direction, spruce, lower branches, roots).
+
+164. The room «Rain»'s baked city (RAIN-1, development only), five checks; the rest is in the rows «RAIN files», «RAIN car passes», «RAIN window pick» and P.night «RAIN room». Pictures first: `tools/.ui-snap/rain1/index.html`.
+    1. The city and the boulevard (`http://127.0.0.1:5500/apps/night/?room=rain`, Begin, wipe the glass with a held pinch near, then the hand in the middle): the houses alive enough (stains, rust, laundry, plants, shutters), the promenade behind the plane trees, the terraces, the people? Say what still looks «like a model».
+    2. The moods (the Mood button): Evening busy, Late night almost empty, After the rain few people and the street shining?
+    3. A short phrase with the hand in the middle or far: windows come on under the light, each with its room when in focus, and fade slowly.
+    4. The cars by ear (headphones, the hand far): each car you see passing under the window is heard as it passes, left or right by its lane; Wave up — more cars, more sound; no car heard without one in the picture.
+    5. The Poco on the dev alias `…/?room=rain`: smooth at Standard? Then ⓘ → «Measure this device» with the rain room current.
 ## Superseded at DOC1 (old lines verbatim, replaced in place above by a later slice)
 - NIGHT-2 stage 3 (2026-11-03, the rule of at most five manual checks) updated this line of CLAUDE.md's report format:
   probe verdict lines and fix rounds; what was left undone; docs found stale; the user's remaining steps (ear, camera, phone).

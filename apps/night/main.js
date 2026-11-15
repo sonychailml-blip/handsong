@@ -17,6 +17,8 @@ import { camRestore } from './camera.js';   // NIGHT-10: the camera kept on this
 import { startWire, startFailText, startSay, START_OLD } from './start.js';
 import { stillWire } from './still.js';   // DESIGN-1 part D: the start still waits for the live room
 import { updateWire } from './update.js';   // NIGHT-14: «A new version is ready» (a build's precache)
+import { QUICK_DENY_MS } from './pure/inapp.js';   // CORE-23: the model's build holds while a camera request is younger than this
+import { persistSoon } from './persist.js';   // NIGHT-15: ask once to keep the files, after the first successful start
 import { fsCamera } from './fullscreen.js';   // NIGHT-11 part 3: full screen when the camera runs, while the Begin tap still counts   // NIGHT-11 part 2: the start's own words
 
 for(const R of ROOMS) sceneRoomAdd(R.record.id, { load:R.load, has:R.has, standIn:R.standIn, three:()=>import('./vendor/three-r128/three.min.js') });   // NIGHT-3: the rooms, by id
@@ -42,7 +44,7 @@ const Q=new URLSearchParams(location.search), probeQ=Q.has('probe');
 boot({ profile:'profile.night', afterDraw:()=>calTick(),
   detectPause:scenePausing,   // CORE-12: no camera frame is taken while a room builds (NIGHT-3 stage 5 part 2)
   failText:startFailText, startSay, modelStallMs:probeQ && +Q.get('modelstall') || 0,
-  parallel:!START_OLD, earlyModel:!START_OLD, onCamera:fsCamera, freshRetry:true, handFiles:'own' });   // CORE-22: MediaPipe's files from our own origin (the CSP names only 'self')   // CORE-20: a retry never takes a failed preload of early.js   // CORE-19: the camera beside the model, the model before the tap   // CORE-18: Night's start words; ?probe&modelstall=MS the runner's short stall
+  parallel:!START_OLD, earlyModel:!START_OLD, onCamera:()=>{ fsCamera(); persistSoon(); }, freshRetry:true, handFiles:'own', camHold:QUICK_DENY_MS });   // CORE-22: MediaPipe's files from our own origin (the CSP names only 'self')   // CORE-20: a retry never takes a failed preload of early.js   // CORE-19: the camera beside the model, the model before the tap   // CORE-18: Night's start words; ?probe&modelstall=MS the runner's short stall
 startWire();
 updateWire();   // NIGHT-14
 /* NIGHT-11 part 2: Begin works from here — the loading look goes (apps/night/guard.js) */

@@ -10,7 +10,7 @@ import { ROOMS, roomById } from './rooms/index.js';
 import { ROOM_IDS } from './pure/room.js';
 import { bedHold, bedResume, bedTakesDrone } from './bed.js';
 import { tintApply } from './tint.js';   // DESIGN-1: the interface takes the room's tint
-import { buildAmbience, ambienceSchedule, ambienceTune, ambienceSet, ambienceRoom, ambienceBrook, ambienceBrookLight, ambienceBrookRec, ambienceLayers, ambienceLayersRec, ambienceLayersFocus, ambienceLayersStats, NATURE_WORKLET } from './sound/ambience.js';
+import { buildAmbience, ambienceSchedule, ambienceTune, ambienceSet, ambienceRoom, ambienceBrook, ambienceBrookLight, ambienceBrookRec, ambienceLayers, ambienceLayersRec, ambienceLayersFocus, ambienceLayersDensity, ambienceLayersStats, NATURE_WORKLET } from './sound/ambience.js';
 
 export const ROOM_KEY='handsong.nightRoom';
 export const ROOM_NAME_MS=1500, ROOM_QUIET_MS=2500;   // the name's time on screen; without the room's picture, the bed waits out the nature crossfade
@@ -63,8 +63,13 @@ function natureLayers(E, a, seed){
   const R=roomById(sceneRoom()); if(!a || a.layers || !R || !R.base || !R.record.nature.layers) return;
   const N=R.record.nature; a.layersWant=a.layersWant||natureLoad(E.ac).then(ok=>{ if(!ok || !ambienceLayers(E, a, N, seed)) return;
     for(const which of ['near', 'far']){ const L=N.layers[which]; a.layers.rec[which]='loading';
-      natureRecStereo(E.ac, new URL(L.file, R.base).href).then(([l, r])=>ambienceLayersRec(E, a, which, l, r, L.norm), e=>{ a.layers.rec[which]='failed'; console.warn('[night] a layer of the room sound did not load — its synthesis plays:', e); }); } });   // eslint-disable-line no-console
+      natureRecStereo(E.ac, new URL(L.file, R.base).href).then(([l, r])=>ambienceLayersRec(E, a, which, l, r, L.norm), e=>{ a.layers.rec[which]='failed'; console.warn('[night] a layer of the room sound did not load — its synthesis plays:', e); }); } naturePasses(E, a, R); });   // eslint-disable-line no-console
 }
+/* RAIN-1: the passes' one-shots (mono) of a room whose layers have `passes`, after its layers (natureLayers calls it) */
+function naturePasses(E, a, R){ const P=R.record.nature.layers.passes; if(!P || !a.layers || a.layers.rec.cars) return; a.layers.rec.cars='loading';
+  natureRecStereo(E.ac, new URL(P.file, R.base).href).then(([l])=>ambienceLayersRec(E, a, 'cars', l, null, P.norm), e=>{ a.layers.rec.cars='failed'; console.warn('[night] the room\'s car passes did not load — the street plays without them:', e); }); }   // eslint-disable-line no-console
+/* RAIN-1: the traffic's density (the mood's amount × Wave), the picture's own number, for the passes (no layers: nothing) */
+export function natureDensity(d){ if(liveAmb && liveAmb.layers) ambienceLayersDensity(null, liveAmb, d); }
 /* RAIN-3: the focus (0 the glass … 1 the far city), the picture's own eased number, for the layers' near / far balance (no layers: nothing) */
 export function natureFocus(f){ if(liveAmb && liveAmb.layers) ambienceLayersFocus(null, liveAmb, f); }
 /* probe: the live layers' node — its counters, its recordings' state and whether it plays → a promise (null without the node) */

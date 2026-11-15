@@ -11,7 +11,8 @@
    note clears a spot (pure/glass.js). Every colour is a token (--cv-rain-*). Seeded: the same picture on every device. No sound, no network. */
 import { seeded } from '../../../../core/pure/dsp.js';
 import { roomFov, roomLook } from '../../pure/room.js';
-import { natureFocus } from '../../roomswitch.js';
+import { natureFocus, natureDensity } from '../../roomswitch.js';
+import { RAIN_FOCUS } from './heard.js';   // NIGHT-15: the last focus, for the sound while the picture is not drawn
 import { layersEvents, LAYERS } from '../../pure/layers.js';
 import { heardMs } from '../../pure/heard.js';
 import { MOOD_TC } from '../../pure/cycle.js';
@@ -20,16 +21,27 @@ import { FOCUS, focusTarget, focusStep, focusBlur, focusDepth, blurAt } from './
 import { RAIN_SEED, windowsLayout, farLights, windowPick, windowLight } from './pure/windows.js';
 import { GLASS, wipeNew, wipeStamp, wipeStroke, wipeStep, wipeAt, wipeCell } from './pure/glass.js';
 import { DROPS, dropsNew, dropsRegion, dropAdd, dropsStep, dropStretch, dropsLedger, laneAt } from './pure/drops.js';
-import { project, cityLamps, trafficAt, sceneAt, depthOf } from './pure/city.js';
+import { project, cityLamps, trafficAt, trafficDensity, sceneAt, depthOf, BAKE_EXT } from './pure/city.js';
 import { QUAD_V, BLUR_F, VIEW_F, WIN_V, WIN_F, LIGHT_V, LIGHT_F, DROP_V, DROP_F, glassShader } from './rain-glass.js';
-import { cityUniforms, CITY_F } from './rain-city.js';
+import { cityUniforms, CITY_F, BAKED_F } from './rain-city.js';
 
 export const RAIN_LEVELS=RAIN_ROOM.levels;
 export const FINGER_GAP=0.25;   // s: a pinch counts as held this long after its last held moment or note-on
 export const BOKEH=Object.freeze({ r:0.06, pad:0.02, lean:Object.freeze([0.03, 0.015]), breath:0.004 });   // the widest blur radius, the spill's reach, the pane's slide (view-angle units)
 const clamp=(v, a, b)=>Math.max(a, Math.min(b, v));
-/* nothing to fetch yet (the baked city's layers come with PLAN.md slice 1); the room's load awaits this as the forest's awaits its files */
-export const rainAssets=()=>Promise.resolve({});
+/* RAIN-1: THE BAKED CITY's files for a level (tools/rain-bake.mjs --city): each mood's colour (windows dark), the lit windows' colour, the depth map,
+   and the window map (shared by the levels) → a promise of { moods: { late, evening, after }, lit, depth, windows } (images), or null when a file
+   failed (the room then paints its stand-in). Once per session and level; a failure is forgotten, so a later opening asks again. */
+const CITY=new Map(), CITY_MOODS=['late', 'evening', 'after'];
+async function fileImage(url){ const r=await fetch(url); if(!r.ok) throw new Error(r.status+' '+url.pathname);
+  const u=URL.createObjectURL(await r.blob()), img=new Image(); try{ img.src=u; await img.decode(); } finally { URL.revokeObjectURL(u); } return img; }
+export function rainAssets(level='full'){
+  const lv= level==='full' ? 'full' : 'reduced'; if(CITY.has(lv)) return CITY.get(lv);
+  const at=f=>new URL(`./city/${f}`, import.meta.url);
+  const p=Promise.all([...CITY_MOODS.map(m=>fileImage(at(`${lv}/${m}.webp`))), fileImage(at(`${lv}/lit.webp`)), fileImage(at(`${lv}/depth.png`)), fetch(at('windows.json')).then(r=>{ if(!r.ok) throw new Error(r.status+' windows.json'); return r.json(); })])
+    .then(([late, evening, after, lit, depth, windows])=>({ moods:{ late, evening, after }, lit, depth, windows }), e=>{ CITY.delete(lv); console.warn('[rain] the baked city did not load — the stand-in paints it:', e); return null; });   // eslint-disable-line no-console
+  CITY.set(lv, p); return p;
+}
 
 /* T — the THREE namespace; opt: { C (palette.cv), level, w, h, reduce, mood, lv (measurement overrides) } */
 export function buildRain(T, opt){
@@ -49,20 +61,26 @@ export function buildRain(T, opt){
   const RT={}; own.push({ dispose:()=>{ for(const k in RT){ RT[k].dispose(); delete RT[k]; } } });
   const FOC=new T.Vector3(0, FOCUS.K, BOKEH.r), UT=new T.Vector2(1, 1), UTIME={ value:0 }, UPX={ value:1 };   // the focus (depth, K, widest radius), the screen's half size, time, px per unit
   const cityU=cityUniforms(T), cityM=mat({ uniforms:cityU, vertexShader:QUAD_V, fragmentShader:CITY_F });
+  /* RAIN-1: the baked city, when its files are here (the host awaited rainAssets): one texture per mood (only the current one on the GPU), the lit
+     windows, the depth map; raw values (the bake wrote the screen's colours), no mipmaps */
+  const BK=opt.city || null, imgTex=(img, lum)=>{ const t=new T.Texture(img); t.minFilter=t.magFilter=T.LinearFilter; t.generateMipmaps=false; t.wrapS=t.wrapT=T.ClampToEdgeWrapping; if(lum) t.format=T.LuminanceFormat; t.needsUpdate=true; own.push(t); return t; };
+  const litTex= BK ? imgTex(BK.lit) : null, depTex= BK ? imgTex(BK.depth, true) : null, EXT=new T.Vector2(BAKE_EXT[0], BAKE_EXT[1]); let moodTex=null, moodKey=null;
+  const bakedM= BK ? mat({ uniforms:{ uCity:{ value:null }, uDepthMap:{ value:depTex }, uTan:{ value:UT }, uExt:{ value:EXT } }, vertexShader:QUAD_V, fragmentShader:BAKED_F }) : null;
+  const moodOfLook=L=>Object.keys(RAIN_ROOM.looks).find(k=>RAIN_ROOM.looks[k]===L)||'late';
   const blurM=mat({ uniforms:{ uTex:{ value:null }, uDir:{ value:new T.Vector2() } }, vertexShader:QUAD_V, fragmentShader:BLUR_F });
   const viewM=mat({ uniforms:{ uBase:{ value:null }, uL1:{ value:null }, uL2:{ value:null }, uL3:{ value:null }, uDepth:{ value:null }, uRad:{ value:new T.Vector3(0.004, 0.012, 0.04) }, uFoc:{ value:FOC },
     uTan:{ value:UT }, uLight:{ value:new T.Vector3() }, uLightCol:{ value:LIGHT } }, vertexShader:QUAD_V, fragmentShader:VIEW_F });
-  const qCity=add(new T.Mesh(quad, cityM), 0), qBlur=add(new T.Mesh(quad, blurM), 0), qView=add(new T.Mesh(quad, viewM), 0);
+  const qCity=add(new T.Mesh(quad, bakedM||cityM), 0), qBlur=add(new T.Mesh(quad, blurM), 0), qView=add(new T.Mesh(quad, viewM), 0);
   const unitQuad=()=>{ const g=new T.InstancedBufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute([-1,-1,0, 1,-1,0, 1,1,0, -1,1,0], 3)); g.setIndex([0,1,2, 0,2,3]); own.push(g); return g; };
   const dyn=(arr, n)=>{ const a=new T.InstancedBufferAttribute(arr, n); a.setUsage(T.DynamicDrawUsage); return a; };
 
   /* the windows: one instance each, each with its depth */
-  const WIN=windowsLayout(), wg=unitQuad();
+  const WIN= BK && Array.isArray(BK.windows) && BK.windows.length ? BK.windows : windowsLayout(), wg=unitQuad();   // RAIN-1: the bake's exact window map
   const lit=new Float32Array(WIN.length), litAt=new Float64Array(WIN.length).fill(-1e9), litAttr=dyn(lit, 1);
   wg.setAttribute('aRect', new T.InstancedBufferAttribute(new Float32Array(WIN.flatMap(w=>[w.x, w.y, w.hw, w.hh])), 4));
   wg.setAttribute('aWarm', new T.InstancedBufferAttribute(new Float32Array(WIN.map(w=>w.warm)), 1)); wg.setAttribute('aDepth', new T.InstancedBufferAttribute(new Float32Array(WIN.map(w=>w.depth)), 1));
   wg.setAttribute('aLit', litAttr); wg.instanceCount=WIN.length;
-  const winM=mat({ uniforms:{ uTan:{ value:UT }, uFoc:{ value:FOC }, uPad:{ value:BOKEH.pad }, uHoney:{ value:HONEY }, uAmber:{ value:AMBER } }, vertexShader:WIN_V, fragmentShader:WIN_F,
+  const winM=mat({ uniforms:{ uTan:{ value:UT }, uFoc:{ value:FOC }, uPad:{ value:BOKEH.pad }, uHoney:{ value:HONEY }, uAmber:{ value:AMBER }, uLit:{ value:litTex }, uExt:{ value:EXT }, uBaked:{ value:BK ? 1 : 0 } }, vertexShader:WIN_V, fragmentShader:WIN_F,
     transparent:true, blending:T.CustomBlending, blendSrc:T.OneFactor, blendDst:T.OneMinusSrcAlphaFactor, blendSrcAlpha:T.OneFactor, blendDstAlpha:T.OneMinusSrcAlphaFactor });
   const wins=add(new T.Mesh(wg, winM), 1);
 
@@ -80,9 +98,12 @@ export function buildRain(T, opt){
   { let i=0; FAR.forEach(q=>{ put(i++, q.x, q.y, 0.0017+0.0012*q.k, 0, HONEY.clone().lerp(AMBER, q.warm), 0.55+0.6*q.k, q.depth, 0); });
     for(const L of LAMPS) i=lightAt(i, L.p, 0.32, LAMP, 1, true); nStatic=i; }
   const EVT=RAIN_ROOM.nature.layers ? RAIN_ROOM.nature.layers.events : null, EVT_SEED=RAIN_ROOM.nature.layers ? ((RAIN_ROOM.nature.layers.seed>>>0) || LAYERS.seed)>>>0 : 0;
-  let clock=null, dripsShown=0;
+  let clock=null, dripsShown=0, dens=1, tAudio=null, lookOver=null, mistOver=null, depthPx=null;
+  /* RAIN-1: the cars are drawn at the moment that is HEARD now (the audio clock, its output latency in it) — the sound plays each car's pass from the
+     same law on that clock; without the clock (no sound yet) the room's own time */
   function traffic(t){
-    let i=nStatic; const cars=trafficAt(t, 1); let nc=0;
+    tAudio= clock ? clock.ctx+(performance.now()-clock.perf)/1000 : null;
+    let i=nStatic; const cars=trafficAt(tAudio==null ? t : tAudio, dens); let nc=0;
     for(const c of cars){ if(c.kind==='car'){ if(nc++>=CARS_MAX) continue;
         for(const s of [-0.78, 0.78]) i=lightAt(i, [c.x+s, 0.68, c.dir<0 ? c.z : c.z], 0.11, c.dir<0 ? HEAD : TAIL, c.dir<0 ? 1 : 0.8, true); }
       else { for(let k=0;k<6;k++){ const z=c.z-c.dir*(2+k*4.3), q=project([c.x, 2.1, z]); if(q.z<=1) continue; const qw=project([c.x, 2.1, z+1.6]);
@@ -129,9 +150,10 @@ export function buildRain(T, opt){
   }
   /* the city painted with its depth, and its three blurred copies: radii (view-angle units) from the blur rounds (σ of a 9-tap pass ≈ 1.5 steps) */
   function paint(r){
+    if(bakedM){ const k=moodOfLook(look); if(k!==moodKey){ if(moodTex) moodTex.dispose(); moodTex=imgTex(BK.moods[k]||BK.moods.late); moodKey=k; } bakedM.uniforms.uCity.value=moodTex; }   // RAIN-1: the mood's baked colour (the last one leaves the GPU)
     const P=lookCols(look), U=cityU; U.uTan.value.copy(UT);
     for(const [u, k] of [['uSky', 'sky'], ['uCloud', 'cloud'], ['uGlow', 'glow'], ['uHaze', 'haze'], ['uStone', 'stone'], ['uPlaster', 'plaster'], ['uAsph', 'asphalt']]) U[u].value.copy(P[k]);
-    U.uPane.value.copy(PANE); U.uLamp.value.copy(LAMP); pass(r, RT.base, qCity);
+    U.uPane.value.copy(PANE); U.uLamp.value.copy(LAMP); pass(r, RT.base, qCity);   // the baked city or, without its files, the stand-in
     const unit=2*th/bh, s1=1.5*2*Math.hypot(1, 2), s2=1.5*4*Math.hypot(1, 2), s3=1.5*8*Math.hypot(1, 2, 3);   // σ in full-size pixels
     blur(r, RT.base.texture, RT.t1, 1/RT.t1.width, 0); blur(r, RT.t1.texture, RT.l1, 0, 1/RT.l1.height); blur(r, RT.l1.texture, RT.t1, 2/RT.t1.width, 0); blur(r, RT.t1.texture, RT.l1, 0, 2/RT.l1.height);
     blur(r, RT.l1.texture, RT.t2, 1/RT.t2.width, 0); blur(r, RT.t2.texture, RT.l2, 0, 1/RT.l2.height); blur(r, RT.l2.texture, RT.t2, 2/RT.t2.width, 0); blur(r, RT.t2.texture, RT.l2, 0, 2/RT.l2.height);
@@ -161,6 +183,8 @@ export function buildRain(T, opt){
   function update(dt, t, hands, fx, nin){
     now=t; UTIME.value=t;
     if(nin && nin.mood!==undefined && nin.mood!==moodId){ moodId=nin.mood; look=roomLook(RAIN_ROOM, moodId); }
+    if(lookOver && RAIN_ROOM.looks[lookOver]) look=RAIN_ROOM.looks[lookOver];   // captures only: a mood held
+    dens=trafficDensity(look.traffic, fx && fx.wave); natureDensity(dens);   // RAIN-1: the mood's traffic × Wave — the picture and the sound the same number
     if(look!==painted && painted) dirty=true;
     { const a=1-Math.exp(-dt/MOOD_TC); mistK+=(look.mist-mistK)*a; rainK+=(look.rain-rainK)*a; litK+=(look.lit-litK)*a; mistCol.lerp(lookCols(look).mist, a); }
     const play=(hands||[]).find(h=>h.play);
@@ -168,7 +192,7 @@ export function buildRain(T, opt){
     light.on+=((play ? 1 : 0)-light.on)*Math.min(1, dt*(play ? 6 : 2.5));
     target= play ? focusTarget(play.d) : FOCUS.rest; focus=focusStep(focus, target, dt, !!play);
     FOC.x=focusDepth(focus);
-    natureFocus(focus);   // RAIN-3: the room's sound takes the same number (near: the pane; far: the street)
+    RAIN_FOCUS.f=focus; natureFocus(focus);   // RAIN-3: the room's sound takes the same number (near: the pane; far: the street)
     /* the pane slides a little against the city as the camera leans towards the light and breathes (none at rest: the start still's pose) */
     { const k=(reduce ? 0.3 : 1)*(Lv.lean ? 1 : 0), gx= restOn || viewOver ? 0 : -clamp(light.x/Math.max(tw, 0.3), -1, 1)*BOKEH.lean[0]*light.on*k+(reduce ? 0 : Math.sin(t*0.19)*BOKEH.breath),
         gy= restOn || viewOver ? 0 : -clamp(light.y/Math.max(th, 0.3), -1, 1)*BOKEH.lean[1]*light.on*k+(reduce ? 0 : Math.sin(t*0.23)*BOKEH.breath), a= restOn ? 1 : 1-Math.exp(-dt*1.6);
@@ -186,7 +210,7 @@ export function buildRain(T, opt){
     litAttr.needsUpdate=true; traffic(t);
     const B=focusBlur(focus);
     viewM.uniforms.uLight.value.set(light.x, light.y, light.on*focus*(0.5+0.5*light.glow));
-    const G=glassM.uniforms; UOFF.set(off.x, off.y); G.uRain.value=rainK; G.uMist.value=mistK; G.uG.value=B.glass; USOFT.value=B.glass; G.uFloor.value.x=GLASS.floor*wipe.floorK;
+    const G=glassM.uniforms; UOFF.set(off.x, off.y); G.uRain.value=rainK; G.uMist.value= mistOver==null ? mistK : mistOver; G.uG.value=B.glass; USOFT.value=B.glass; G.uFloor.value.x=GLASS.floor*wipe.floorK;
     G.uLight.value.set(light.x, light.y); G.uLightK.value=light.on*(1-focus)*(0.5+0.5*light.glow);
   }
   let mapDirty=true;
@@ -200,8 +224,9 @@ export function buildRain(T, opt){
   function flyPick(){ let best=null, bd=Infinity; WIN.forEach((w, i)=>{ const q=windowAt(i); if(!q.inView || lit[i]>0.05) return; const d=Math.hypot(q.x/W-0.6, q.y/H-0.5); if(d<bd){ bd=d; best=i; } }); return best; }
   const state=()=>({ now, focus, target, focusDepth:focusDepth(focus), blur:focusBlur(focus), light:{ ...light }, off:{ ...off }, windows:WIN.length, lit:Array.from(lit), litNow:lit.reduce((n, v)=>n+(v>0.05 ? 1 : 0), 0), lastPick, picks, pickLog:pickLog.slice(), wipes, strokes,
     wipe:{ live:wipe.live, wiped:wipe.wiped, floor:wipe.floorK, max:wipe.a.reduce((a, b)=>Math.max(a, b), 0) }, drops:{ n:SIM.list.length, running:SIM.list.filter(d=>d.mv).length, cap:SIM.cap, ledger:dropsLedger(SIM), t:SIM.t },
-    mood:moodId, look:look.pre, mist:mistK, rain:rainK, share:litK, tan:[tw, th], buffer:[bw, bh], repaints, frames, fine:Lv.fine, far:FAR.length, lights:nLights });
-  function texBytes(){ let b=GLASS.cols*GLASS.rows*2; for(const k in RT) b+=RT[k].width*RT[k].height*4; return b; }
+    mood:moodId, look:look.pre, mist:mistK, rain:rainK, share:litK, tan:[tw, th], buffer:[bw, bh], repaints, frames, fine:Lv.fine, far:FAR.length, lights:nLights,
+    baked:!!BK, cityMood:moodKey, density:dens, tAudio, carsMax:CARS_MAX });
+  function texBytes(){ let b=GLASS.cols*GLASS.rows*2; for(const k in RT) b+=RT[k].width*RT[k].height*4; if(BK) b+=BK.lit.width*BK.lit.height*4+BK.depth.width*BK.depth.height+(moodTex ? BK.lit.width*BK.lit.height*4 : 0); return b; }   // RAIN-1: + the baked city's three textures
   function dispose(){ for(const o of own) try{ o.dispose(); }catch(e){} own.length=0; }
   resize(W, H);
   /* the pane starts wet: drops scattered at once (they merge as they land), the simulation goes on from there */
@@ -216,6 +241,9 @@ export function buildRain(T, opt){
     dropsDbg:()=>SIM.list.map(d=>({ id:d.id, x:d.x, y:d.y, r:d.r, mv:d.mv })), rainDbg:v=>{ rainOver= v==null ? null : clamp(+v, 0, 1); return rainOver; }, freezeDbg:on=>{ simFrozen=!!on; return simFrozen; },
     lawDepthDbg:(x, y)=>sceneAt(x, y).depth, blurAtDbg:d=>blurAt(d, focus),
     /* a render target's pixels at view places ([x, y] view-angle units) → [r, g, b, a] 0…1 each; 'base' holds the city with its depth in a */
+    windowsDbg:()=>WIN, lookDbg:k=>{ lookOver= k||null; return lookOver; }, mistDbg:v=>{ mistOver= v==null ? null : +v; return mistOver; },   // RAIN-1, captures only: a mood held, the pane's mist held
+    bakedDepthDbg:(x, y)=>{ if(!BK) return null; if(!depthPx){ const c=document.createElement('canvas'); c.width=BK.depth.width; c.height=BK.depth.height; const g=c.getContext('2d'); g.drawImage(BK.depth, 0, 0); depthPx={ d:g.getImageData(0, 0, c.width, c.height).data, w:c.width, h:c.height }; }
+      const i=clamp(Math.round((x/BAKE_EXT[0]*0.5+0.5)*depthPx.w-0.5), 0, depthPx.w-1), j=clamp(Math.round((0.5-y/BAKE_EXT[1]*0.5)*depthPx.h-0.5), 0, depthPx.h-1); return depthPx.d[(j*depthPx.w+i)*4]/255; },   // the baked depth map at a view place
     rtReadDbg:(name, pts)=>{ const r=rr, T0=RT[name]; if(!T0 || !r) return null; const px=new Uint8Array(4); return pts.map(([x, y])=>{ const i=Math.round((x/tw*0.5+0.5)*T0.width-0.5), j=Math.round((y/th*0.5+0.5)*T0.height-0.5);
       r.readRenderTargetPixels(T0, clamp(i, 0, T0.width-1), clamp(j, 0, T0.height-1), 1, 1, px); return Array.from(px, v=>v/255); }); },
     radDbg:()=>({ rad:viewM.uniforms.uRad.value.toArray(), foc:FOC.toArray(), buffer:[bw, bh] }) };

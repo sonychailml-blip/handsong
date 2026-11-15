@@ -152,7 +152,7 @@ function ambienceLayers(E, amb, N, seed=0){
   const ac=E.ac, slots=amb.slots.map(sl=>{ const ln=ac.createGain(), lf=ac.createGain(), ls=ac.createGain(), on=sl.A===N || !!sl.A.layers;
     ln.gain.value= on ? 1 : 0; lf.gain.value= on ? 1 : 0; ls.gain.value= on && sl.A.layers ? sl.A.layers.far.send : 0;
     node.connect(ln, 0); node.connect(lf, 1); node.connect(ls, 1); ln.connect(sl.mix); lf.connect(sl.mix); ls.connect(sl.roomIn); return { ln, lf, ls }; });
-  amb.layers={ node, slots, on:false, rec:{ near:null, far:null }, focus:-1 };
+  amb.layers={ node, slots, on:false, rec:{ near:null, far:null }, focus:-1, dens:null };
   layersWake(amb, !!(amb.on && amb.level>0 && amb.A.layers), amb.A); return amb.layers;
 }
 /* the layers' gains in slot n for recipe B (retune's AudioParam setter) */
@@ -167,8 +167,10 @@ function ambienceLayersRec(E, amb, which, L, R, norm){ const b=amb.layers; if(!b
     p.addEventListener('message', f); p.start(); const tr=[L && L.buffer, R && R.buffer!==(L && L.buffer) ? R.buffer : null].filter(Boolean); p.postMessage([{ k:'rec', which, L, R, norm }], tr); }); }
 /* the focus (0 the glass … 1 the far city) — the picture's eased number; sent only when it moved */
 function ambienceLayersFocus(E, amb, f){ const b=amb.layers; if(!b || !(Math.abs(f-b.focus)>0.002)) return; b.focus=f; b.node.port.postMessage([{ k:'focus', v:f }]); }
+/* RAIN-1: the traffic's density for the passes (the picture's same number); sent only when it changed */
+function ambienceLayersDensity(E, amb, d){ const b=amb.layers; if(!b || b.dens===d) return; b.dens=d; b.node.port.postMessage([{ k:'density', v:d }]); }
 /* the node's counters → a promise (null after ms) */
 function ambienceLayersStats(E, amb, ms=2000){ const b=amb.layers; if(!b) return Promise.resolve(null);
   return new Promise(res=>{ const p=b.node.port, f=e=>{ if(e.data && e.data.stats){ p.removeEventListener('message', f); res(e.data.stats); } };
     p.addEventListener('message', f); p.start(); p.postMessage([{ k:'stats' }]); setTimeout(()=>{ p.removeEventListener('message', f); res(null); }, ms); }); }
-export { buildAmbience, ambienceSchedule, ambienceTune, ambienceSet, ambienceRoom, ambienceBrook, ambienceBrookLight, ambienceBrookStats, ambienceBrookRec, ambienceLayers, ambienceLayersRec, ambienceLayersFocus, ambienceLayersStats };
+export { buildAmbience, ambienceSchedule, ambienceTune, ambienceSet, ambienceRoom, ambienceBrook, ambienceBrookLight, ambienceBrookStats, ambienceBrookRec, ambienceLayers, ambienceLayersDensity, ambienceLayersRec, ambienceLayersFocus, ambienceLayersStats };

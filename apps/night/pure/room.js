@@ -29,13 +29,20 @@ export const roomFov=(view, w, h)=> w/h<view.tall ? view.tallFov : view.fov;
    { drips?, tick?: { every > 0 s, gain [0, 1], hz? }, }, seed? } → null, or what is wrong */
 function checkLayers(L){
   if(!plain(L)) return ': { near, far, events?, seed? }';
-  for(const k of Object.keys(L)) if(!['near','far','events','seed'].includes(k)) return `: unknown field «${k}»`;
+  for(const k of Object.keys(L)) if(!['near','far','events','seed','passes'].includes(k)) return `: unknown field «${k}»`;
   for(const w of ['near','far']){ const Y=L[w]; if(!plain(Y) || typeof Y.file!=='string' || !/^[a-z0-9_-]+(\/[a-z0-9_-]+)*\.mp3$/.test(Y.file) || !num(Y.norm) || Y.norm<=0 || Y.norm>64 || !num(Y.gain) || Y.gain<0 || Y.gain>1
       || (Y.synth!=null && (!num(Y.synth) || Y.synth<0 || Y.synth>1)) || (w==='far' ? !num(Y.send) || Y.send<0 || Y.send>1 : Y.send!=null)) return `.${w}: { file «….mp3» in the room folder, norm (0, 64], gain 0…1${w==='far' ? ', send 0…1' : ''} }`; }
   if(L.events!=null){ if(!plain(L.events)) return '.events: { drips?, tick? }';
     for(const [k, E] of Object.entries(L.events)){ if(!['drips','tick'].includes(k)) return `.events: unknown field «${k}»`;
       if(!plain(E) || !num(E.every) || E.every<=0 || !num(E.gain) || E.gain<0 || E.gain>1 || (E.hz!=null && (!num(E.hz) || E.hz<200 || E.hz>12000))) return `.events.${k}: { every > 0 s, gain 0…1, hz? }`; } }
   if(L.seed!=null && !(Number.isInteger(L.seed) && L.seed>=0)) return '.seed: a whole number ≥ 0';
+  if(L.passes!=null){ const P=L.passes, T=P && P.traffic, E=P && P.ear;   // RAIN-1: vehicles passing (pure/passes.js), each a one-shot from one file
+    if(!plain(P) || typeof P.file!=='string' || !/^[a-z0-9_-]+(\/[a-z0-9_-]+)*\.mp3$/.test(P.file) || !num(P.norm) || P.norm<=0 || P.norm>64 || !num(P.gain) || P.gain<0 || P.gain>1) return '.passes: { file «….mp3», norm (0, 64], gain 0…1, … }';
+    if(!Array.isArray(P.segs) || !P.segs.length || P.segs.some(q=>!Array.isArray(q) || q.length!==3 || !q.every(num) || q[0]<0 || !(q[1]>0) || q[2]<0 || q[2]>q[1])) return '.passes.segs: [[start ≥ 0, length > 0, peak 0…length] s, …]';
+    if(!num(P.vRef) || P.vRef<=0 || !Array.isArray(P.rate) || P.rate.length!==2 || !(P.rate[0]>=0.5 && P.rate[0]<=P.rate[1] && P.rate[1]<=2) || !num(P.dRef) || P.dRef<=0 || !num(P.lead) || P.lead<1 || P.lead>30) return '.passes: vRef > 0, rate [lo, hi] in 0.5…2, dRef > 0, lead 1…30 s';
+    if(!plain(T) || !Array.isArray(T.lanes) || !T.lanes.length || T.lanes.some(l=>!plain(l) || !num(l.x) || (l.dir!==1 && l.dir!==-1)) || !Array.isArray(T.every) || T.every.length!==T.lanes.length || !T.every.every(v=>num(v) && v>0)
+      || !Array.isArray(T.speed) || T.speed.length!==T.lanes.length || !T.speed.every(v=>num(v) && v>0) || !num(T.len) || T.len<=0 || !num(T.p) || T.p<0 || T.p>1) return '.passes.traffic: { lanes [{ x, dir ±1 }], every, speed (one per lane, > 0), len > 0, p 0…1 }';
+    if(!plain(E) || !num(E.x) || !num(E.y) || !num(E.z)) return '.passes.ear: { x, y, z }'; }
   return null;
 }
 export function checkRoom(r, known={}){

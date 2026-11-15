@@ -40,7 +40,9 @@ export function brookNew(rate, voices, seed=BROOK.seed, div=BROOK.div){
       pl:Math.cos((v.pan+1)*Math.PI/4), pr:Math.sin((v.pan+1)*Math.PI/4) }; });
   /* the rush is one stereo noise for the whole water (its lows and highs cut): each voice's share of it, by pan and spread, summed once */
   const rl=vs.reduce((a,v)=>a+v.gain*v.rush*v.pl, 0), rr=vs.reduce((a,v)=>a+v.gain*v.rush*v.pr, 0), sw=vs.reduce((a,v)=>a+v.gain*v.rush*v.w, 0)/Math.max(1e-9, vs.reduce((a,v)=>a+v.gain*v.rush, 0));
-  return { fs, div, x:new Float32Array(2048), y:new Float32Array(2048), pl:0, pr:0, r, pool, live:[], free:pool.slice(), vs, light:false, sleep:false, dropped:0, made:0, t:0, kHp:onePole(B.rush.hp, fs), kLp:onePole(B.rush.lp, fs),
+  /* NIGHT-15: the Lighter mode's voices — the BROOK.light.voices loudest (the nearest), in list order; was the first three, which are the farthest */
+  const all=vs.map((v, i)=>i), near=vs.map((v, i)=>[v.gain, i]).sort((p, q)=>q[0]-p[0] || p[1]-q[1]).slice(0, B.light.voices).map(x=>x[1]).sort((p, q)=>p-q);
+  return { fs, div, x:new Float32Array(2048), y:new Float32Array(2048), pl:0, pr:0, r, pool, live:[], free:pool.slice(), vs, all, near, light:false, sleep:false, dropped:0, made:0, t:0, kHp:onePole(B.rush.hp, fs), kLp:onePole(B.rush.lp, fs),
     kAtk:1-Math.exp(-1/(B.bubble.atk*fs)), rush:{ l:rl, r:rr, w:sw, h1:0, h2:0, n1:0, n2:0, flow:1 } };
 }
 /* the flow's drift, once per block: an OU step towards 1 (bounded) */
@@ -60,10 +62,10 @@ function bubble(st, v, vi){
 /* render n frames into L and R (Float32Array, written from index o) */
 export function brookRender(st, L, R, o=0, n=L.length-o){
   if(st.sleep){ for(let i=0;i<n;i++){ L[o+i]=0; R[o+i]=0; } return; }
-  const fs=st.fs, BK=BROOK.block, BU=BROOK.burst, RU=BROOK.rush, vs=st.vs, nv=st.light ? Math.min(BROOK.light.voices, vs.length) : vs.length, rk=st.light ? BROOK.light.rate : 1, live=st.live, U=st.rush, ka=st.kAtk;
+  const fs=st.fs, BK=BROOK.block, BU=BROOK.burst, RU=BROOK.rush, vs=st.vs, ks=st.light ? st.near : st.all, nv=ks.length, rk=st.light ? BROOK.light.rate : 1, live=st.live, U=st.rush, ka=st.kAtk;
   for(let i=0;i<n;i++){
     if((st.t+i)%BK===0){ let f=0; for(const v of vs){ flowStep(st, v); f+=v.flow; } U.flow=f/vs.length; }
-    for(let k=0;k<nv;k++){ const v=vs[k];   // clusters arrive; a cluster lets out its bubbles a few ms apart
+    for(let j=0;j<nv;j++){ const k=ks[j], v=vs[k];   // clusters arrive; a cluster lets out its bubbles a few ms apart
       if(--v.next<=0){ v.left=BU.lo+Math.floor(v.R()*(BU.hi-BU.lo+1)); v.gap=0; const lam=Math.max(0.05, v.rate*rk*Math.pow(v.flow, 1.5)); v.next=Math.max(1, Math.round(-Math.log(1-v.R())/lam*fs)); }
       if(v.left>0 && --v.gap<=0){ bubble(st, v, k); v.left--; v.gap=Math.max(1, Math.round(-Math.log(1-v.R())*BU.gap*fs)); } }
     for(let j=live.length-1;j>=0;j--){ const b=live[j];   // each bubble: a rising, decaying sinusoid (a rotating phasor) with a soft start

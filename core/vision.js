@@ -37,18 +37,27 @@ let camOpenDbgO={}, opening=null;
 const stopStream=s=>{ if(!s) return; if(!camOpenDbgO.noRelease) for(const tr of s.getTracks()) tr.stop(); CS.obtained.delete(s); };
 const camErr=(name, msg)=>Object.assign(new Error(msg), { name });
 async function accessGranted(){ try{ const p=await navigator.permissions.query({ name:'camera' }); return p.state==='granted'; }catch(e){ return false; } }
+/* CORE-23: the camera request in flight (bookkeeping only: { at, done } until it is answered or times out, or found already granted) and the detector's hold over it.
+   camHoldOf(ms) → an async function: while a request is younger than ms it waits for its answer, at most until it is ms old. */
+let camAsk=null; const HOLD={ asks:0, waits:0, heldMs:0 };
+function camHoldOf(ms){ return async ()=>{ HOLD.asks++; const a=camAsk; if(!a) return; const left=ms-(performance.now()-a.at); if(!(left>0)) return;
+  HOLD.waits++; const t0=performance.now(); let tm=0; await Promise.race([a.done, new Promise(r=>{ tm=setTimeout(r, left); })]); clearTimeout(tm); HOLD.heldMs+=performance.now()-t0; }; }
+const camHoldInfo=()=>({ ...HOLD, heldMs:Math.round(HOLD.heldMs), pending:!!camAsk });
 /* one getUserMedia; with a timeout only when access is already granted (a permission prompt may stay open as long as the person likes) */
 async function gumOnce(c){
-  const ms=camOpenDbgO.timeoutMs || (await accessGranted() ? GUM_MS : 0);
+  let askEnd=null; const ask={ at:performance.now(), done:new Promise(r=>{ askEnd=r; }) }; camAsk=ask;   // CORE-23
+  const asked=()=>{ if(camAsk===ask) camAsk=null; askEnd(); };
+  const granted=await accessGranted(), ms=camOpenDbgO.timeoutMs || (granted ? GUM_MS : 0);
+  if(granted) asked();   // CORE-23: access already granted — no prompt and no refusal to time, so nothing to hold for
   return new Promise((resolve, reject)=>{
     let done=false, tm=0; const g0=performance.now();
     CS.calls++; CS.live++; CS.max=Math.max(CS.max, CS.live);
     const p=Promise.resolve().then(()=>(camOpenDbgO.gum || (x=>navigator.mediaDevices.getUserMedia(x)))(c));
     const settled=()=>{ CS.live--; if(CS.pending===p) CS.pending=null; };
     CS.pending=p;
-    p.then(s=>{ settled(); CS.obtained.add(s); if(done){ CS.late++; stopStream(s); return; } done=true; clearTimeout(tm); resolve(s); },
-           e=>{ settled(); if(done) return; done=true; clearTimeout(tm); try{ if(e && typeof e==='object') e.gumMs=performance.now()-g0; }catch(x){} reject(e); });   // CORE-18: how fast the refusal came (none prompted: at once)
-    if(ms) tm=setTimeout(()=>{ if(done) return; done=true; reject(camErr('TimeoutError', `the camera did not answer within ${Math.round(ms/1000)} s`)); }, ms);
+    p.then(s=>{ settled(); asked(); CS.obtained.add(s); if(done){ CS.late++; stopStream(s); return; } done=true; clearTimeout(tm); resolve(s); },
+           e=>{ settled(); if(done){ asked(); return; } done=true; clearTimeout(tm); try{ if(e && typeof e==='object') e.gumMs=performance.now()-g0; }catch(x){} asked(); reject(e); });   // CORE-18: how fast the refusal came (none prompted: at once)
+    if(ms) tm=setTimeout(()=>{ if(done) return; done=true; asked(); reject(camErr('TimeoutError', `the camera did not answer within ${Math.round(ms/1000)} s`)); }, ms);
   });
 }
 const withTimeout=(p, ms, name, msg)=>Promise.race([p, new Promise((_,rej)=>setTimeout(()=>rej(camErr(name, msg)), ms))]);
@@ -198,28 +207,28 @@ function workerDet(step){
     w.postMessage({ type:'init', delegate:opts.delegate, w:640, h:480, failInit:workerFailDbg, ...filesOpt() });
   });
 }
-async function mainDet(step, dl=null){
+async function mainDet(step, dl=null, hold=null){   // CORE-23: hold (opt-in) → createDetector's hold
   const H=await import('./handdet.js');
   const blank=()=>{ const c=typeof OffscreenCanvas!=='undefined' ? new OffscreenCanvas(640,480) : Object.assign(document.createElement('canvas'),{ width:640, height:480 });
     const g=c.getContext('2d'); g.fillStyle='#000'; g.fillRect(0,0,640,480); return c; };
-  const D=await H.createDetector({ delegate:opts.delegate, blank, step:async s=>{ if(step) step(s); await nextPaint(); }, ...filesOpt(), ...(dl ? { progress:dl.progress, stallMs:dl.stallMs } : {}), ...(dl && dl.fresh ? { fresh:true } : {}) });   // CORE-18: the download's progress only when asked; CORE-20: a fresh retry
+  const D=await H.createDetector({ delegate:opts.delegate, blank, step:async s=>{ if(step) step(s); await nextPaint(); }, ...filesOpt(), ...(dl ? { progress:dl.progress, stallMs:dl.stallMs } : {}), ...(dl && dl.fresh ? { fresh:true } : {}), ...(hold ? { hold } : {}) });   // CORE-18: the download's progress only when asked; CORE-20: a fresh retry
   return { kind:'main', warmMs:D.warmMs,
     run(job){ try{ const w0=performance.now(), r=D.run(job.bmp, job.t, job.action, job.policy); return Promise.resolve({ ...r, w0, w1:performance.now(), bmp:job.bmp }); }
               catch(e){ return Promise.reject(e); } },
     setDelegate:d=>D.setDelegate(d), dbg:o=>D.dbg(o), close:()=>D.close() };
 }
-async function buildDet(asked, step, dl=null){
+async function buildDet(asked, step, dl=null, hold=null){   // CORE-23: hold reaches only the main-thread build (a worker's steps never block this thread)
   if(asked==='worker'){
-    if(typeof Worker==='undefined' || typeof OffscreenCanvas==='undefined') return { d:await mainDet(step, dl), runs:'main', why:'no OffscreenCanvas or Worker in this browser' };
+    if(typeof Worker==='undefined' || typeof OffscreenCanvas==='undefined') return { d:await mainDet(step, dl, hold), runs:'main', why:'no OffscreenCanvas or Worker in this browser' };
     try{ return { d:await workerDet(step), runs:'worker', why:'' }; }
     catch(e){ const why=String(e&&e.message||e); console.warn('[vision] hand detection worker unavailable — the main thread detects instead:', why);
-      return { d:await mainDet(step, dl), runs:'main', why }; }
+      return { d:await mainDet(step, dl, hold), runs:'main', why }; }
   }
-  return { d:await mainDet(step, dl), runs:'main', why:'' };
+  return { d:await mainDet(step, dl, hold), runs:'main', why:'' };
 }
 /* (re)build the detection path; the old one keeps working until the new one is ready, then it is closed */
-async function setPath(asked, step, dl=null){
-  const b=await buildDet(asked, step, dl), old=det;
+async function setPath(asked, step, dl=null, hold=null){
+  const b=await buildDet(asked, step, dl, hold), old=det;
   det=b.d; detGen++; path.runs=b.runs; path.why=b.why; path.warmMs=b.d.warmMs;
   sched=schedNew(); if(old) old.close();
 }
@@ -295,7 +304,8 @@ function setHandsSink(fn, paused){ sink=fn; isPaused=paused||(()=>false); }
 /* 0b: the start in two steps — the hand model once, the camera (retried by startCamera) as often as the person presses «Try again» */
 /* CORE-18 (opt-in): o.say(key, frac) speaks instead of msg(t(key)) and hears the model file's progress; o.stallMs — no byte for that long fails the
    download (MODEL_STALL_MS by default when o.say is given). Without o: exactly as before. CORE-20 (opt-in): o.freshRetry — every call after the
-   first builds the model past anything the page preloaded (handdet createDetector fresh) */
+   first builds the model past anything the page preloaded (handdet createDetector fresh). CORE-23 (opt-in): o.camHold (ms) — the main-thread build
+   holds each heavy step while a camera request is younger than that (camHoldOf); absent: no hold */
 const MODEL_STALL_MS=20000;
 let detTries=0;
 async function initDetector(msg, o={}){
@@ -304,7 +314,7 @@ async function initDetector(msg, o={}){
   const say=o.say || (k=>msg(t(k)));
   say('load.model');
   newWindow();
-  await setPath(opts.path, s=>{ if(s==='warm') say('load.warm'); }, o.say ? { progress:f=>o.say('load.model', f), stallMs:o.stallMs>0 ? o.stallMs : MODEL_STALL_MS, ...(fresh ? { fresh:true } : {}) } : null);
+  await setPath(opts.path, s=>{ if(s==='warm') say('load.warm'); }, o.say ? { progress:f=>o.say('load.model', f), stallMs:o.stallMs>0 ? o.stallMs : MODEL_STALL_MS, ...(fresh ? { fresh:true } : {}) } : null, o.camHold>0 ? camHoldOf(o.camHold) : null);
 }
 async function initVision(msg){ await initDetector(msg); msg(t('load.camera')); await startCamera(camFacing); }
 
@@ -526,7 +536,7 @@ function pumpDbg(o={}){
 }
 
 /* Экспорт: детектор живёт здесь; кадры и результаты отдаются стоку (main.js). */
-export { video, canvas, ctx, initVision, initDetector, handFilesOf, startCamera, switchCamera, setHandsSink, pollFrame,
+export { video, canvas, ctx, initVision, initDetector, handFilesOf, camHoldOf, camHoldInfo, startCamera, switchCamera, setHandsSink, pollFrame,
   camInfo, camLabel, modelInfo, visionOpts, VISION_DEF, setHandsTracked, setModelDelegate, setCamFps, setDetectPath, setLowLight, lowInfo,
   pathInfo, pumpStats, pumpDbg, pumpStepDbg, detRunDbg, lowDbg, camSimDbg, camOpenDbg, camStats, camStatsDbg, setCameraPick, cameraSwitch, cameraList, cameraPickInfo,
   cameraWatch, cameraWatchRetry, cameraWatchDbg };

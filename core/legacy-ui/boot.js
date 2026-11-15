@@ -125,11 +125,12 @@ function startFail(err){
 }
 /* CORE-19 (opt-in; NIGHT-11 part 3, audit P1) — THE START IN PARALLEL. opt.parallel: in the tap the audio context is made first (rule #1, the
    synchronous part), then the camera request and the hand model run TOGETHER (the permission prompt appears at once, while the model loads);
+   CORE-23 (opt-in): opt.camHold (ms) rides with handFiles() into every initDetector call — the model's build holds while a camera request is that young.
    opt.earlyModel: the model starts before the tap, when the page has loaded (not with Save-Data on). The first failure ends the start with its
    message as before; the other half goes on and a retry reuses it. opt.onCamera() once the camera runs (both paths). Without the options: the old
    staged order, untouched. */
 let detP=null, detShow=null, detLast='';
-const handFiles=()=>OPT.handFiles ? { files:OPT.handFiles } : {};   // CORE-22 (opt-in): opt.handFiles 'own' — MediaPipe from our origin (absent: the CDN, as before)
+const handFiles=()=>({ ...(OPT.handFiles ? { files:OPT.handFiles } : {}), ...(OPT.camHold>0 ? { camHold:OPT.camHold } : {}) });   // CORE-22 (opt-in): opt.handFiles 'own' — MediaPipe from our origin (absent: the CDN, as before)
 function detStart(){
   if(stage.det) return Promise.resolve();
   if(detP) return detP;

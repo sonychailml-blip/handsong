@@ -10,7 +10,13 @@
    - ON / OFF fade over LAYERS.wake s (no click at a start, a stop or a room's arrival); asleep = zeros, nothing computed.
    - THE FALLBACK: while a layer has no recording (not loaded yet, or failed), the node plays a soft synthesis in its place (seeded filtered noise).
    - EVENTS (`layersEvents`, a pure function of absolute time and the seed, so the picture can show the same drips): drips from the cornice (a short
-     falling ping, panned, louder near) and a quiet tick in the room (a muffled click, now and then), each slot's chance and place from a hash. */
+     falling ping, panned, louder near) and a quiet tick in the room (a muffled click, now and then), each slot's chance and place from a hash.
+   - RAIN-1, PASSES (opt-in `passes`): vehicles passing under the window, each a one-shot cut from a recording (mono, a table of [start, length, peak]
+     seconds), started so that its peak (its closest moment) falls exactly on the moment the shared traffic law (pure/passes.js passEvents) puts the
+     vehicle at the listener — the picture draws the same vehicles from the same law on the same clock. Panned by the vehicle's side, louder the
+     nearer its lane, its playback rate by its speed (rate = v / vRef, bounded), into the far output (the street), softer when the focus is near. The
+     density (Wave and the mood) comes by message, the same number the picture uses. A room without `passes` computes nothing new. */
+import { passEvents } from './passes.js';   // RAIN-1: the vehicles' law
 export const LAYERS=Object.freeze({ seed:0x4C415952, grain:Object.freeze([5, 9]), fade:1.5, edge:0.25, focusTc:0.08, wake:0.6, slot:0.5, synth:0.12 });   // synth: the fallback's level
 const hash=(a, b)=>{ let h=(Math.imul(a|0, 0x27d4eb2d)^Math.imul(b|0, 0x165667b1))>>>0; h=Math.imul(h^(h>>>15), 0x85ebca77)>>>0; h=Math.imul(h^(h>>>13), 0xc2b2ae3d)>>>0; return ((h^(h>>>16))>>>0)/4294967296; };
 const rng=seed=>{ let s=(seed>>>0)||1; return ()=>{ s^=s<<13; s>>>=0; s^=s>>>17; s^=s<<5; s>>>=0; return s/4294967296; }; };
@@ -33,7 +39,7 @@ export function layersNew(rate, L, seed=LAYERS.seed){
     : { b0:(1-c)/2/a0, b1:(1-c)/a0, b2:(1-c)/2/a0, a1:-2*c/a0, a2:(1-al)/a0, x1:0, x2:0, y1:0, y2:0 }; };
   const syn={ R:rng((seed^0x53594E54)>>>0), n:[bq('bp', 2600, 0.5), bq('bp', 2900, 0.5)], f:[bq('lp', 700, 0.6), bq('lp', 640, 0.6)] };
   return { rate, L, seed:seed>>>0, syn, near:null, far:null, f:0, fs:0, kf:1-Math.exp(-1/(LAYERS.focusTc*rate)), on:false, g:0, dg:1/(LAYERS.wake*rate), sleep:true,
-    frames:0, grains:0, voices:[], evT:null, X:Math.round(LAYERS.fade*rate) };
+    frames:0, grains:0, voices:[], evT:null, X:Math.round(LAYERS.fade*rate), cars:null, pv:[], pT:null, dens:1, passes:0, passLog:[] };
 }
 /* a layer's recording: `which` 'near' | 'far', its two channels (Float32Array at the state's rate; one channel is used for both) and level → true, or
    false when it is too short */
@@ -44,6 +50,14 @@ export function layersRec(st, which, L, R, norm=1){
   Y.a=grainOf(st, Y); Y.a.i=Math.floor(rnd()*(Y.a.n-X)); st[which]=Y; return true;
 }
 function grainOf(st, Y){ const n=Math.round((LAYERS.grain[0]+Y.R0()*(LAYERS.grain[1]-LAYERS.grain[0]))*st.rate), e=Math.round(LAYERS.edge*st.rate); st.grains++; return { s:e+Math.floor(Y.R0()*(Y.len-n-2*e)), n, i:0 }; }
+/* RAIN-1: the passes' recording (mono, at the state's rate) and its level → true, or false when it is shorter than its table needs */
+export function layersPasses(st, Y, norm=1){
+  const P=st.L && st.L.passes; if(!P || !(Y instanceof Float32Array)) return false;
+  const need=Math.max(...P.segs.map(([a, n])=>a+n))*st.rate; if(Y.length<need-1) return false;
+  st.cars={ Y, norm:+norm||1 }; return true;
+}
+/* RAIN-1: the traffic's density (the picture's same number) */
+export function layersDensity(st, d){ st.dens=Math.max(0, +d||0); }
 /* the focus target (0…1) and on / off (the fade does the rest) */
 export function layersFocus(st, f){ st.f=Math.max(0, Math.min(1, +f||0)); }
 export function layersOn(st, on){ st.on=!!on; if(on) st.sleep=false; }
@@ -81,8 +95,20 @@ export function layersOut(st, t0, nL, nR, fL, fR, o=0, n=nL.length-o){
         else { const nz=Math.sin(a*12.9898+V.t*78.233)*43758.5453; x=(nz-Math.floor(nz)-0.5)*Math.exp(-tt/0.0025); V.z+=(x-V.z)*0.35; x=V.z; }   // a muffled click
         const k=V.amp*near*g; nL[o+i]+=x*k*pl; nR[o+i]+=x*k*pr; }
       if(V.done || i>=n && V.at+end<=n) st.voices.splice(v, 1); else V.at-=n; } }
+  /* RAIN-1: the passes — new ones scheduled ahead (their peak on the law's moment), then every sounding one read out (linear interpolation) */
+  const PS=P.passes;
+  if(PS && st.cars){ const lead=PS.lead||9, from= st.pT==null ? t0 : st.pT, to=t1+lead, rt=st.rate;
+    for(const e of passEvents(PS.traffic, PS.ear, from, to, st.dens)){ const seg=PS.segs[Math.floor(hash(e.lane*977+5, e.slot)*PS.segs.length)], r=Math.max(PS.rate[0], Math.min(PS.rate[1], e.v/PS.vRef));
+      st.pv.push({ s:seg[0]*rt, n:seg[1]*rt, at:(e.t-seg[2]/r-t0)*rt, r, k:PS.gain*st.cars.norm*Math.max(0.3, Math.min(1.4, PS.dRef/e.dist)), pl:Math.cos((e.pan+1)*Math.PI/4), pr:Math.sin((e.pan+1)*Math.PI/4) });
+      st.passes++; st.passLog.push({ t:e.t, lane:e.lane, slot:e.slot }); if(st.passLog.length>64) st.passLog.shift(); }
+    st.pT=to;
+    const Y=st.cars.Y, sw=0.35+0.65*Math.sin(fs*Math.PI/2);
+    for(let v=st.pv.length-1;v>=0;v--){ const V=st.pv[v]; const i0=Math.max(0, Math.ceil(V.at));
+      for(let i=i0;i<n;i++){ const q=(i-V.at)*V.r; if(q>=V.n-1){ V.done=true; break; } const j=V.s+q, a=Math.floor(j), f=j-a, x=(Y[a]+(Y[a+1]-Y[a])*f)*V.k*g*sw; fL[o+i]+=x*V.pl; fR[o+i]+=x*V.pr; }
+      if(V.done || (n-V.at)*V.r>=V.n-1) st.pv.splice(v, 1); else V.at-=n; } }
   st.frames+=n;
   if(!st.on && g<=0) st.sleep=true;
 }
 /* counters for the worklet and the probes */
-export const layersStats=st=>({ frames:st.frames, grains:st.grains, sleep:st.sleep, on:st.on, focus:st.fs, near:!!st.near, far:!!st.far, voices:st.voices.length });
+export const layersStats=st=>({ frames:st.frames, grains:st.grains, sleep:st.sleep, on:st.on, focus:st.fs, near:!!st.near, far:!!st.far, voices:st.voices.length,
+  cars:!!st.cars, passes:st.passes, sounding:st.pv.length, density:st.dens, passLog:st.passLog.slice(-16) });

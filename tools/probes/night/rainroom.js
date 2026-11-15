@@ -13,6 +13,7 @@
        an event wait with a limit, never a frame count) it glows at the trace law's level. CONTROLS: a far note on the sky lights nothing; a near note
        lights nothing and clears the mist under the light instead.
    RAIN-3: the room's layered sound follows the same focus (the live node near < 0.1, far > 0.9) and both recordings play.
+   NIGHT-15: on Dark (no picture) the sound's focus still follows the hand's depth by the same law; CONTROL the heard step off: frozen.
    (4) RAIN-0b, A FINGER ON THE GLASS: near, a held pinch moved across the pane draws one continuous clear stroke (every point of its path clear).
    (5) OUT: after six switches rain ↔ forest the renderer's programs, geometries and textures and the contexts made and alive are the forest's
        baseline — nothing is left after dispose. CONTROL: inside the rain room the same count differs (the measure sees the room).
@@ -43,7 +44,7 @@ export async function checkRainRoom(){
   try{
     { const why=PR.profileApply('profile.night'); n++; if(why){ miss('Night did not apply: '+why); return { cases:n, total:d.length, differences:d, notes }; } }
     { const why=RV.checkRoom(INS.RAIN.record, { ids:[RAIN] }); n++; if(why){ miss('the rain room\'s record was refused: '+why); return { cases:n, total:d.length, differences:d, notes }; } }
-    if(!had && RI.roomAdd(INS.RAIN)) H.sceneRoomAdd(RAIN, { load:INS.RAIN.load, standIn:INS.RAIN.standIn, three:()=>import('../../../apps/night/vendor/three-r128/three.min.js') });
+    if(!had && RI.roomAdd(INS.RAIN)) H.sceneRoomAdd(RAIN, { load:INS.RAIN.load, standIn:INS.RAIN.standIn, heard:INS.RAIN.heard, three:()=>import('../../../apps/night/vendor/three-r128/three.min.js') });
     if(H.sceneRoom()!==FOREST) await go(FOREST);
     await H.setBackground('forest'); await opened(); await frames(4);
     n++; if(!H.sceneInfo().webgl || H.sceneInfo().id!==FOREST){ miss('the forest did not open (the row needs the room\'s picture): '+JSON.stringify(H.sceneInfo().errors)); return { cases:n, total:d.length, differences:d, notes }; }
@@ -60,13 +61,20 @@ export async function checkRainRoom(){
       n++; if(RS.roomSwitchDbg().stored===RAIN) miss('the rain room was remembered on the device (a development room never is)');
       const inRain=snap(); notes.push(`the rain room: ${I.programs} programs, ${I.calls} draws, opened in ${I.openMs} ms, textures ${(I.texBytes/1048576).toFixed(1)} MB; counts ${JSON.stringify(inRain)} (the forest's ${JSON.stringify(base)})`);
       n++; if(JSON.stringify(inRain)===JSON.stringify(base)) miss('CONTROL: inside the rain room the counts equal the forest\'s — the «nothing left» check cannot see the room');
+      /* (1c) RAIN-1: the car passes' recording is in the live node, and the sound's traffic density is the picture's own number */
+      { const t0=performance.now(); let L=null; while(performance.now()-t0<15000){ L=await RS.natureLayersDbg(); if(L && L.rec && (L.rec.cars==='on' || L.rec.cars==='failed' || L.rec.cars==='refused')) break; await sleep(200); }
+        await frames(3); const dS=st().density; L=await RS.natureLayersDbg(); n+=2;
+        if(!L || !L.rec || L.rec.cars!=='on' || !L.cars) miss('the recording of the car passes is not in the live node: '+JSON.stringify(L && L.rec)); else notes.push(`the car passes' recording is in the live node (${L.passes} passes scheduled so far)`);
+        if(!(L && Math.abs(L.density-dS)<1e-9)) miss(`the sound's traffic density ${L && L.density} is not the picture's ${dS}`); else notes.push(`the sound's traffic density is the picture's: ${dS}`); }
       /* (1b) the misted, wet pane; the painted depth against the law */
       { const S=st(); n+=2; if(S.wipe.wiped || S.wipe.max>0 || !(S.mist>=0.6)) miss(`the pane does not open misted: ${JSON.stringify(S.wipe)}, mist ${S.mist}`);
         if(!(S.drops.n>20 && S.drops.n<=S.drops.cap && Math.abs(S.drops.ledger)<1e-9)) miss('the pane\'s drops: '+JSON.stringify(S.drops));
         notes.push(`opened misted (${S.mist.toFixed(2)}) and wet: ${S.drops.n} drops (${S.drops.running} running) of ${S.drops.cap}`);
-        const [tw, th]=S.tan, at=[[0, -th*0.85], [tw*0.5, -th*0.05], [CT.vanishing().x+0.3, CT.vanishing().horizon+0.02], [0, th*0.9]], got=(room().rtReadDbg('base', at)||[]).map(c=>c[3]), law=at.map(([x, y])=>room().lawDepthDbg(x, y)); n++;
+        /* RAIN-1: the baked city — the painted depth is the baked map's (the street, the house opposite) and the law's where the bake cast the law (the hills, the sky) */
+        n++; if(!S.baked) miss('the baked city did not load (the stand-in paints the city)');
+        const [tw, th]=S.tan, at=[[0, -th*0.85], [tw*0.5, -th*0.05], [CT.vanishing().x+0.3, CT.vanishing().horizon+0.02], [0, th*0.9]], got=(room().rtReadDbg('base', at)||[]).map(c=>c[3]), law=at.map(([x, y], i)=>S.baked && i<2 ? room().bakedDepthDbg(x, y) : room().lawDepthDbg(x, y)); n++;
         const off=at.map((p, i)=>Math.abs((got[i]==null ? -1 : got[i])-law[i])); if(!(got.length===at.length && off.every(e=>e<=3/255+1e-6))) miss(`the painted depth is not the law's: painted ${JSON.stringify(got.map(v=>+(+v).toFixed(3)))}, law ${JSON.stringify(law.map(v=>+v.toFixed(3)))}`);
-        else notes.push('the painted depth equals the law at the street, the house opposite, the hills and the sky: '+law.map(v=>v.toFixed(2)).join(', ')); }
+        else notes.push((S.baked ? 'the painted depth equals the baked map at the street and the house opposite and the law at the hills and the sky: ' : 'the painted depth equals the law at the street, the house opposite, the hills and the sky: ')+law.map(v=>v.toFixed(2)).join(', ')); }
       /* (2) depth is focus, and the sound's closeness */
       G.handsProbe(clk, ()=>true);
       hand(0.5, 0.5, NEAR, false, 45); n+=2; const nearOk=await until(()=>st().focus<0.05, 5000), sn=st(), dn=depth();
@@ -85,9 +93,9 @@ export async function checkRainRoom(){
           if(!(Lf.rec.near==='on' && Lf.rec.far==='on')) miss('the recordings are not playing: '+JSON.stringify(Lf.rec));
           notes.push(`the room's sound follows the focus: ${Ln.focus.toFixed(3)} near, ${Lf.focus.toFixed(3)} far (recordings ${Lf.rec.near} / ${Lf.rec.far}, ${Lf.grains} grains)`); } }
       /* the middle: the hand size whose focus target is nearest the street's depth, then the blurs once the focus has settled there */
-      { let best=null, lo=FAR, hi=NEAR; for(let it=0;it<8;it++){ const s=(lo+hi)/2; hand(0.5, 0.5, s, false, 45); await stepped(3); const t=st().target, fd=FO.focusDepth(t), e=Math.abs(fd-FO.LAYER_DEPTH.street);   /* bisection on the hand's size: larger = nearer */
+      { let best=null, lo=FAR, hi=NEAR; for(let it=0;it<8;it++){ const s=(lo+hi)/2; hand(0.5, 0.5, s, false, 45); for(let k=0;k<3;k++){ hand(0.5, 0.5, s, false, 2); await stepped(1); } const t=st().target,   /* NIGHT/RAIN-1: the hand fed while the room steps (a hand left alone goes stale on a busy machine and the room reads its rest) */ fd=FO.focusDepth(t), e=Math.abs(fd-FO.LAYER_DEPTH.street);   /* bisection on the hand's size: larger = nearer */
           if(!best || e<best.e) best={ s, e, t }; if(fd>FO.LAYER_DEPTH.street) lo=s; else hi=s; }
-        hand(0.5, 0.5, best.s, false, 45); const settled=await until(()=>Math.abs(st().focus-st().target)<0.01, 5000), B=st().blur, f=st().focus; n+=2;
+        hand(0.5, 0.5, best.s, false, 45); const settled=await until(()=>{ hand(0.5, 0.5, best.s, false, 1); return Math.abs(st().focus-st().target)<0.01; }, 5000), B=st().blur, f=st().focus; n+=2;
         if(!settled || best.e>0.08) miss(`the middle: no hand reached the street's focus (best size ${best.s}, focus depth ${FO.focusDepth(best.t).toFixed(2)})`);
         const midOk=b=>b.street<b.glass-0.2 && b.street<b.hills-0.2 && b.streetNear<b.glass && b.streetFar<b.hills;
         if(settled && best.e<=0.08){ if(!midOk(B)) miss('a hand in the middle: the street is not sharper than the glass and the hills: '+JSON.stringify(B));
@@ -97,7 +105,7 @@ export async function checkRainRoom(){
       hand(0.5, 0.5, FAR, false, 45); await until(()=>st().focus>0.95, 5000);
       hand(0.5, 0.5, NEAR, false, 45); await stepped(2); n++; { const f2=st().focus; if(!(f2>0.5)) miss(`the focus jumped: ${f2.toFixed(3)} two room frames after the hand went near (it should glide; limit ${FO.FOCUS.maxRate} a second)`); }
       /* (3) a far note lights the window under the light; CONTROLS: the sky, a near note */
-      const W=Wn.windowsLayout(); let k=-1, at=null;
+      const W=room().windowsDbg(); let k=-1, at=null;   // RAIN-1: the room's own window map (the bake's)
       for(const [x, y] of [[0.75, 0.55], [0.25, 0.55], [0.7, 0.62], [0.3, 0.62], [0.82, 0.5], [0.18, 0.5], [0.6, 0.55], [0.4, 0.55], [0.5, 0.6]]){ hand(x, y, FAR, false, 45); await until(()=>st().focus>0.95, 5000); await sleep(500); const L=st().light, q=Wn.windowPick(W, L.x, L.y);
         if(q>=0 && st().lit[q]<0.05){ k=q; at=[x, y]; break; } }
       n++; if(k<0) miss('no place of the hand points at a dark window (the row cannot play its note)');
@@ -130,9 +138,24 @@ export async function checkRainRoom(){
     if(H.sceneRoom()!==FOREST) await go(FOREST);
     await frames(4); const after=snap(); n+=5; notes.push('after six switches rain ↔ forest: '+JSON.stringify(after));
     for(const q of ['programs', 'geometries', 'textures', 'made', 'live']) if(after[q]!==base[q]) miss(`after the rain room left, ${q} is ${after[q]}, the forest's baseline ${base[q]}`);
+    /* (6) NIGHT-15 (after (5): leaving the picture makes a new WebGL context when it comes back, which (5)'s count must not see): HEARD WITHOUT THE PICTURE — on Dark the room's update stops, so the sound's focus comes from the hand's depth by the same law
+         (rooms/rain/heard.js): near → the live layers' focus < 0.1, far → > 0.9; CONTROL the heard step off: a near hand leaves it far (frozen) */
+    if(H.sceneRoom()!==RAIN) await go(RAIN);
+    G.handsProbe(clk, ()=>true);   // the synthetic hands again (section 4 handed the hands back to the camera)
+    { const LZ=async ()=>(await RS.natureLayersDbg()||{}).focus, untilA=async(f, ms)=>{ const t=performance.now(); while(performance.now()-t<ms){ if(f(await LZ())) return true; await sleep(100); } return f(await LZ()); };
+        await H.setBackground('dark'); await frames(3); n+=4;
+        hand(0.5, 0.5, FAR, false, 45); const darkFar=await untilA(v=>v>0.9, 8000), vf=await LZ();
+        hand(0.5, 0.5, NEAR, false, 45); const darkNear=await untilA(v=>v<0.1, 8000), vn=await LZ();
+        if(!darkFar || !darkNear) miss(`on Dark the room's sound does not follow the hand: far ${vf}, near ${vn}`); else notes.push(`on Dark (no picture) the sound's focus follows the hand: far ${(+vf).toFixed(3)}, near ${(+vn).toFixed(3)}`);
+        hand(0.5, 0.5, FAR, false, 45); await untilA(v=>v>0.9, 8000); H.sceneHeardDbg({ off:true });
+        hand(0.5, 0.5, NEAR, false, 45); await sleep(1500); const vc=await LZ(); H.sceneHeardDbg({ off:false });
+        if(!(vc>0.9)) miss(`CONTROL: with the heard step off the sound still followed the hand (${vc}) — the check cannot fail`); else notes.push(`CONTROL: the heard step off → the focus stays ${(+vc).toFixed(3)} after a near hand (the old frozen balance)`);
+        if(H.sceneInfo().webgl) miss('on Dark the room is still drawn (the case needs no picture)');
+        await H.setBackground('forest'); await opened(); await frames(4); G.handsProbe(null); }
+    if(H.sceneRoom()!==FOREST) await go(FOREST);
   } catch(e){ miss('error: '+(e&&e.stack||e)); }
   finally{
-    try{ G.handsProbe(null); }catch(e){} try{ REC.liveAllOff(); }catch(e){} H.sceneClockDbg(null);
+    try{ G.handsProbe(null); }catch(e){} try{ REC.liveAllOff(); }catch(e){} H.sceneClockDbg(null); H.sceneHeardDbg({ off:false });
     try{ if(H.sceneRoom()!==keep.room && RI.roomById(keep.room)) await RS.roomSwitch(keep.room, { fast:true }); }catch(e){}
     if(!had){ RI.roomRemove(RAIN); H.sceneRoomRemove(RAIN); }
     try{ TN.tintApply(RS.roomCurrent(), { now:true }); }catch(e){}

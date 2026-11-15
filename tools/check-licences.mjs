@@ -17,7 +17,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { lex } from './lex.mjs';
 
 const ROOT=resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const REG_FILE='tools/licences.json', LOCK_FILE='tools/package-lock.json', MD_FILE='THIRD-PARTY-LICENSES.md';
+const REG_FILE='tools/licences.json', LOCK_FILE='tools/package-lock.json', MD_FILE='THIRD-PARTY-LICENSES.md', NIGHT_PAGE='apps/night/licences.html';   // NIGHT-15: Night's «Licences» page, written with the document
 const SKIP_DIRS=new Set(['.git','tools','archive','node_modules','dist']);
 const OWN_EXT=new Set(['.js','.mjs','.json','.html','.css','.md','.txt','.xml','']);   // our code, data and docs (SITE-1: + the site's sitemap.xml)
 const CLASSES=new Set(['code','model','service','link','image','font','glyph','sound','ir']);
@@ -37,15 +37,15 @@ function walk(dir, out=[]){
     if(statSync(join(ROOT,rel)).isDirectory()){ if(!SKIP_DIRS.has(n)) walk(rel,out); } else out.push(rel); }
   return out;
 }
-const PAGE=/(^|\/)index\.html$|^apps\/site\/.+\.html$/, MANIFEST=/(^|\/)manifest\.json$/;   // SITE-1: every page of the brand site (its 404 too)
+const PAGE=/(^|\/)index\.html$|^apps\/night\/licences\.html$|^apps\/site\/.+\.html$/, MANIFEST=/(^|\/)manifest\.json$/;   // SITE-1: every page of the brand site (its 404 too)
 const SITE_DIR='apps/site/';   // SITE-1: served at the root of its own domain — a root-absolute address there means a file of apps/site/
-const isShippedText=f=>/^apps\/site\/.+\.(html|css|js)$/.test(f)||/^(index\.html|apps\/(full|night)\/(index\.html|sw\.js|manifest\.json|night\.css)|core\/legacy-ui\/style\.css|core\/tokens\.css)$/.test(f)||/^(core|apps\/(full|night))\/.+\.js$/.test(f)&&!/\/vendor\//.test(f)||/^(core|apps\/(full|night))\/data\/.+\.json$/.test(f);
+const isShippedText=f=>/^apps\/site\/.+\.(html|css|js)$/.test(f)||/^(index\.html|apps\/(full|night)\/(index\.html|sw\.js|manifest\.json|night\.css)|apps\/night\/licences\.html|core\/legacy-ui\/style\.css|core\/tokens\.css)$/.test(f)||/^(core|apps\/(full|night))\/.+\.js$/.test(f)&&!/\/vendor\//.test(f)||/^(core|apps\/(full|night))\/data\/.+\.json$/.test(f);
 const isRefText=f=>/^docs\/night\/prototypes\/.+\.html$/.test(f);   // RUN 5: reference prototypes — their addresses must be «reference» entries
 export function gather(){
   const files=walk('').sort(), texts={};
   for(const f of files) if(isShippedText(f)||isRefText(f)) texts[f]=readFileSync(join(ROOT,f),'utf8');
   const read=f=>existsSync(join(ROOT,f)) ? readFileSync(join(ROOT,f),'utf8') : null;
-  return { files, texts, reg:JSON.parse(read(REG_FILE)), lock:JSON.parse(read(LOCK_FILE)||'{}'), md:read(MD_FILE) };
+  return { files, texts, reg:JSON.parse(read(REG_FILE)), lock:JSON.parse(read(LOCK_FILE)||'{}'), md:read(MD_FILE), page:read(NIGHT_PAGE) };
 }
 /* comments out: JS through the shared lexer, HTML and CSS comments blanked */
 const visMemo=new Map();   // the controls re-check the same texts: lex each file once
@@ -136,7 +136,10 @@ export function check(inp){
   // (6) the generated document
   const md=renderMd(reg, use); cases++;
   if(inp.md!==md) diff.push(`${MD_FILE} is out of date (or missing) — run: node tools/check-licences.mjs --write`);
-  return { cases, differences:diff, total:diff.length, md, glyphs:use.size, urls:refs.length };
+  // (7) NIGHT-15: Night's «Licences» page, from the same register
+  const page=renderNightLicences(reg); cases++;
+  if(inp.page!==page) diff.push(`${NIGHT_PAGE} is out of date (or missing) — run: node tools/check-licences.mjs --write`);
+  return { cases, differences:diff, total:diff.length, md, page, glyphs:use.size, urls:refs.length };
 }
 
 /* ---------- the human-readable register ---------- */
@@ -172,6 +175,28 @@ export function renderMd(reg, use){
   return L.join('\n');
 }
 
+/* ---------- NIGHT-15: Night's «Licences» page (apps/night/licences.html; the build writes it again at the page's level) ----------
+   Every register entry Night ships that carries a third-party licence: code and models, sounds, pictures and fonts whose files lie under core/
+   or apps/night/ (the brand site's own items and our own work are left out). Plain HTML, no script, no address as a link (the sources as text,
+   without their scheme), the same CSP line as the app's page. */
+export const NIGHT_CSP=`<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">`;
+export function nightLicenceItems(reg, has=()=>true){   // has(file): the build keeps only what its tree holds (a players' build has no development room)
+  const third=it=>!['own-work','AI-generated','n/a'].includes(it.licence), ours=f=>/^(core|apps\/night)\//.test(f) && has(f);
+  return reg.items.filter(it=>it.use==='shipped' && third(it) && ['code','model','sound','image','font','ir'].includes(it.class) && (it.files||[]).some(ours));
+}
+export function renderNightLicences(reg, has){
+  const esc=x=>String(x).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'), bare=x=>esc(String(x).replace(/https?:\/\//g,''));
+  const row=it=>`<li><b>${esc(it.name)}</b><br>${esc(it.version)} · <i>${esc(it.licence)}</i><br><small>${bare(it.source)}</small></li>`;
+  return ['<!doctype html>','<html lang="en">','<head>','<meta charset="utf-8">',NIGHT_CSP,
+    '<meta name="viewport" content="width=device-width, initial-scale=1">','<meta name="color-scheme" content="dark light">','<title>Licences · Лицензии — Handsong Night</title>',
+    '<style>body{ font:16px/1.5 system-ui, sans-serif; max-width:46em; margin:0 auto; padding:16px; } li{ margin:0 0 1em; } small{ opacity:.8; word-break:break-word; }</style>','</head>','<body>',
+    '<!-- Generated from tools/licences.json by node tools/check-licences.mjs --write (and again by tools/build.mjs) — do not edit by hand. -->',
+    '<h1>Licences · Лицензии</h1>',
+    '<p>Handsong Night uses these works by others, each under its own licence. Nothing here is sent anywhere.</p>',
+    '<p lang="ru">Handsong Night использует эти чужие работы, каждую по её лицензии. Отсюда ничего никуда не отправляется.</p>',
+    '<ul>', ...nightLicenceItems(reg, has).map(row), '</ul>','</body>','</html>',''].join(String.fromCharCode(10));
+}
+
 /* ---------- controls: each must make the check fail ---------- */
 const clone=x=>JSON.parse(JSON.stringify(x));
 export function controls(inp, base){
@@ -186,10 +211,11 @@ export function controls(inp, base){
 const probeRef='${it.urls[0]}';`; }, /reference-only address/],
     ['an unlisted address in a site page (SITE-1)', i=>{ i.texts['apps/site/index.html']+='\n<a href="https://tracker.example.org/x">x</a>'; }, /apps\/site\/index\.html: https:\/\/tracker\.example\.org/],
     ['a missing file in a site page (SITE-1)', i=>{ i.texts['apps/site/index.html']+='\n<a href="/no-such-page/">x</a>'; }, /\/no-such-page\/ \(missing site file\)/],
+    ['a stale licences page (NIGHT-15)', i=>{ const it=i.reg.items.find(x=>nightLicenceItems(i.reg).includes(x)); if(it) it.version+=' (changed)'; }, /licences\.html is out of date/],
     ['a package version bump', i=>{ const k=Object.keys(i.lock.packages||{}).find(Boolean); if(k) i.lock.packages[k].version='999.0.0'; }, /999\.0\.0/],
   ];
   const out=[];
-  for(const [name,mut,mark] of C){ const i={ ...clone({ reg:inp.reg, lock:inp.lock, files:inp.files }), texts:{ ...inp.texts }, md:inp.md };
+  for(const [name,mut,mark] of C){ const i={ ...clone({ reg:inp.reg, lock:inp.lock, files:inp.files }), texts:{ ...inp.texts }, md:inp.md, page:inp.page };
     mut(i); const r=check(i); const caught=r.total>base.total && r.differences.some(d=>mark.test(d));
     out.push({ name, caught }); }
   return out;
@@ -203,7 +229,7 @@ export function run(){
 
 /* ---------- command line ---------- */
 if(import.meta.url===pathToFileURL(process.argv[1]||'').href){
-  if(process.argv.includes('--write')){ const inp=gather(), r=check(inp); writeFileSync(join(ROOT,MD_FILE), r.md); console.log(`[check-licences] wrote ${MD_FILE}`); }
+  if(process.argv.includes('--write')){ const inp=gather(), r=check(inp); writeFileSync(join(ROOT,MD_FILE), r.md); writeFileSync(join(ROOT,NIGHT_PAGE), r.page); console.log(`[check-licences] wrote ${MD_FILE} and ${NIGHT_PAGE}`); }
   const r=run();
   for(const d of r.differences) console.log('  ✗ '+d);
   console.log(`[check-licences] controls: ${r.controls.map(c=>`${c.name} ${c.caught?'caught':'NOT CAUGHT'}`).join(' · ')}`);

@@ -5,7 +5,11 @@
                                        floor, cornice, balconies, a piece of street), at a laptop (1280 × 800) and a phone (390 × 844 at 2.75) size,
                                        windows dark and lit → tools/design/rain/looktest/ (WebP colour, PNG depth, windows.json, bake.json with the
                                        times and sizes) and its page index.html (sharp and two blur levels by the room's own depth blur, next to the
-                                       stand-ins). PLAN.md slice 1 adds --city (the whole boulevard into the room's prepared layers). */
+                                       stand-ins).
+     node tools/rain-bake.mjs --city   RAIN-1: THE WHOLE CITY (tools/design/rain/bake/city.js, citybake.js) into the room's prepared layers, in view-angle units
+                                       (one picture for every screen shape): per level apps/night/rooms/rain/city/<full|reduced>/ late.webp, evening.webp,
+                                       after.webp (each mood, windows dark), lit.webp (every window lit by its life), depth.png; city/windows.json (the
+                                       window map); tools/design/rain/bake/city.json (times, sizes, counts). Detailed is the master, Standard its copy. */
 import http from 'node:http';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
@@ -14,7 +18,7 @@ import { chromium } from 'playwright-core';
 
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), OUT=path.join(ROOT, 'tools/design/rain/looktest'), argv=process.argv.slice(2);
 const MIME={ '.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.json':'application/json', '.jpg':'image/jpeg', '.png':'image/png', '.webp':'image/webp' };
-if(!argv.includes('--look')){ console.log('usage: node tools/rain-bake.mjs --look'); process.exit(1); }
+if(!argv.includes('--look') && !argv.includes('--city')){ console.log('usage: node tools/rain-bake.mjs --look | --city'); process.exit(1); }
 const srv=await new Promise(res=>{ const s=http.createServer(async (q, r)=>{ try{ const p=decodeURIComponent(new URL(q.url, 'http://x').pathname), f=path.join(ROOT, p); if(!f.startsWith(ROOT)){ r.writeHead(403); r.end(); return; }
   const b=await readFile(f); r.writeHead(200, { 'content-type':MIME[path.extname(f).toLowerCase()]||'application/octet-stream', 'cache-control':'no-store' }); r.end(b); }catch(e){ r.writeHead(404); r.end(); } }); s.listen(0, '127.0.0.1', ()=>res(s)); });
 /* the look test's page (Russian captions, for the founder): the bake sharp and at two blur levels, dark and lit, phone and laptop, next to the stand-ins */
@@ -36,6 +40,22 @@ function page(info){
 </html>`;
 }
 const browser=await chromium.launch({ channel:'chrome', headless:true, args:['--enable-webgl', '--ignore-gpu-blocklist'] });
+/* RAIN-1: the city's bake → the room's files */
+if(argv.includes('--city')){ const CITY=path.join(ROOT, 'apps/night/rooms/rain/city');
+  try{
+    const p=await (await browser.newContext({ viewport:{ width:800, height:600 } })).newPage(), errs=[]; p.on('pageerror', e=>errs.push(String(e).slice(0, 200))); p.on('console', m=>{ if(m.type()==='error' && !/favicon|status of 404/.test(m.text())) errs.push(m.text().split(String.fromCharCode(10))[0].slice(0, 200)); });
+    await p.goto(`http://127.0.0.1:${srv.address().port}/tools/design/rain/bake/citybake.html`); await p.waitForFunction(()=>window.cityBakeReady, null, { timeout:60e3 });
+    const res=await p.evaluate(o=>window.cityBake(o), { px:+(argv[argv.indexOf('--px')+1])||820, ss:2, small:0.625, moods:['late', 'evening', 'after'], litMood:'evening', lights:10, shadows:3 });
+    if(errs.length) console.log('[rain-bake] page errors:', errs.slice(0, 8));
+    const sizes={ full:{}, reduced:{} }; await mkdir(path.join(CITY, 'full'), { recursive:true }); await mkdir(path.join(CITY, 'reduced'), { recursive:true });
+    for(const [k, url] of Object.entries(res.images)){ const lv=/-s\./.test(k) ? 'reduced' : 'full', f=k.replace('-s.', '.'), buf=Buffer.from(url.split(',')[1], 'base64'); await writeFile(path.join(CITY, lv, f), buf); sizes[lv][f]=buf.length; }
+    await writeFile(path.join(CITY, 'windows.json'), JSON.stringify(res.windows));
+    const info={ renderer:'three.js r128 (MIT), vendored at apps/night/vendor/three-r128/', ms:res.ms, size:res.size, counts:res.counts, windows:res.windows.length, sizes, errors:errs.slice(0, 8) };
+    await writeFile(path.join(ROOT, 'tools/design/rain/bake/city.json'), JSON.stringify(info, null, 1));
+    console.log(`[rain-bake] the city: ${res.ms} ms, ${res.size.join(' × ')} (Standard ×0.625), ${res.windows.length} windows; files ${JSON.stringify(sizes)}`);
+  } finally { await browser.close().catch(()=>{}); srv.close(); }
+  process.exit(0);
+}
 try{
   await mkdir(OUT, { recursive:true });
   const p=await (await browser.newContext({ viewport:{ width:800, height:600 } })).newPage(), errs=[]; p.on('pageerror', e=>errs.push(String(e).slice(0, 160))); p.on('console', m=>{ if(m.type()==='error' && !/favicon|status of 404/.test(m.text())) errs.push(m.text().split(String.fromCharCode(10))[0].slice(0, 160)); });   // the first line only (a shader log would dump its source)

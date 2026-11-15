@@ -263,6 +263,7 @@ const NET_LISTED={
   'core/audio.js':      { addModule:[4,'loads our own worklets (core/engine/worklets/ks-, frz-, dyn-, probe-cap-worklet.js) from the own origin into the audio context'] },
   'tools/probes/night/headroom.js': { addModule:[4,'probe only (?probe&headroom): loads our own dyn-worklet.js and headroom-worklet.js into offline contexts and the live one (NIGHT-1)'] },
   'tools/probes/core/profile.js': { fetch:[1,'probe only (?probe): reads its test record fixture.profile.json from the own origin (C0)'] },
+  'apps/night/rooms/rain/rain.js': { fetch:[2,'RAIN-1: reads the rain room\'s baked city (rooms/rain/city/<level>/*.webp, depth.png, windows.json; own origin; drawn by tools/rain-bake.mjs --city, register entry rain-city-bake) once per session and level — a development room'] },
   'apps/night/rooms/forest/forest.js': { fetch:[1,'reads the forest\'s own prepared files (rooms/forest/tex/*.png, own origin; NIGHT-6, drawn by tools/forest-bake.mjs, register entry forest-files) once per session'] },
   'tools/probes/night/stream.js': { addModule:[1,'probe only (?probe): loads our own apps/night/worklets/nature-worklet.js into the offline contexts of the row «NIGHT stream, water and ground» (NIGHT-8)'] },
   'tools/probes/night/rainnature.js': { addModule:[1,'probe only (?probe): loads our own apps/night/worklets/nature-worklet.js into the offline contexts of the row «RAIN nature» (RAIN-3)'] },

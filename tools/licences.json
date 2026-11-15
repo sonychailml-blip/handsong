@@ -224,7 +224,7 @@
    ],
    "replace": "kept while the user compares it with our baked floor (NIGHT-9); CC0 photo material"
   },
-{
+  {
    "id": "rain-bake-textures",
    "name": "The rain room's baked city: CC0 PBR textures for the offline bake (RAIN-0b look test; slice 1 bakes the whole boulevard) — «Painted Plaster Wall», «Large Sandstone Blocks», «Asphalt 02», «Red Sandstone Pavement»: colour, normal (OpenGL) and AO/roughness/metal maps, 1k",
    "class": "image",
@@ -236,16 +236,39 @@
   },
   {
    "id": "rain-recordings",
-   "name": "The rain room's sound (RAIN-3, development room): rain on a window pane, close (the near layer), and a rainy urban street (the far layer), played in grains by the nature worklet, crossfaded by the focus",
+   "name": "The rain room's sound (development room): rain on a window pane, close (the near layer); a light-rain night street (the far layer) with its car passes cut out as one-shots, each played when a car of the picture passes under the window",
    "class": "sound",
    "use": "shipped",
-   "version": "Freesound #648529 and #238019 (the sites' HQ previews, 2026-11-14)",
+   "version": "Freesound #457153 and #532392 (the sites' HQ previews; RAIN-1, 2026-11-15, the founder's picks near-c and far-c)",
    "licence": "CC0-1.0",
-   "source": "nicoproson, «RAIN on glass window.wav», Freesound https://freesound.org/people/nicoproson/sounds/648529/ (Creative Commons 0; preview SHA-1 ead1afc1260eb9304da340fe5379a09a8b83c733); eaglechopper, «Urban street in rainy weather», Freesound https://freesound.org/people/eaglechopper/sounds/238019/ (Creative Commons 0; preview SHA-1 a3d27eb739626742d8550d0c725accd330314e03). The full-quality originals need a Freesound account; the public HQ previews (MP3, stereo) were used. Our edit (ffmpeg, a dev tool outside the repo): 60-s excerpts (from 30 s and 120 s), rumble below 45 Hz removed, then 45 s each, stereo 48 kHz MP3 96 kbit/s. Chosen by default for the founder's choice by ear (tools/design/rain/sound/listen/index.html).",
+   "source": "ckjzam, «Rain on window», Freesound https://freesound.org/people/ckjzam/sounds/457153/ (Creative Commons 0; preview SHA-1 0f600f267c3f84552e1bb1f47d24acad2a32f088); humi74, «Light rain at night with cars passing by .wav», Freesound https://freesound.org/people/humi74/sounds/532392/ (Creative Commons 0; preview SHA-1 b8c07ecde11f6878c7c8be38f74a027c56d3b8f2). The full-quality originals need a Freesound account; the public HQ previews (MP3, stereo) were used, as the 60-s excerpts in tools/design/rain/sound/ (near-c from 0 s, far-c from 60 s; register entry rain-sound-candidates). Our edit (tools/rain-sound.mjs with ffmpeg, a dev tool outside the repo; CC0 allows it): pane.mp3 = near-c, rumble below 45 Hz removed, 48 kHz stereo MP3 96 kbit/s; street.mp3 = far-c's car-free stretches joined by equal-power crossfades (rain and the city's hum, no car); cars.mp3 = far-c's five car passes, each cut out mono with 0.25-s fades, one after another with 0.5 s of silence (MP3 64 kbit/s), their [start, length, peak] table in the room's recipe and in tools/design/rain/sound/cars.json.",
    "files": [
     "apps/night/rooms/rain/sound/pane.mp3",
-    "apps/night/rooms/rain/sound/street.mp3"
+    "apps/night/rooms/rain/sound/street.mp3",
+    "apps/night/rooms/rain/sound/cars.mp3"
    ]
+  },
+  {
+   "id": "rain-city-bake",
+   "name": "The rain room's baked city (RAIN-1, development room): the whole boulevard built by our own code and rendered once offline — each mood's colour, the lit windows' colour, the depth map",
+   "class": "image",
+   "use": "shipped",
+   "version": "RAIN-1, 2026-11-15 (tools/rain-bake.mjs --city)",
+   "licence": "own-work",
+   "source": "Our own renders (tools/design/rain/bake/city.js, citybake.js; three.js r128, MIT, the vendored copy) of our own procedural model; its materials are CC0 Poly Haven textures (register entry rain-bake-textures, never shipped) and canvases drawn by our code (plaster weathering, abstract graffiti shapes without letters, the rooms' lives). No AI-generated image, no photograph, no real building copied, no text, no brand.",
+   "files": [
+    "apps/night/rooms/rain/city/full/late.webp",
+    "apps/night/rooms/rain/city/full/evening.webp",
+    "apps/night/rooms/rain/city/full/after.webp",
+    "apps/night/rooms/rain/city/full/lit.webp",
+    "apps/night/rooms/rain/city/full/depth.png",
+    "apps/night/rooms/rain/city/reduced/late.webp",
+    "apps/night/rooms/rain/city/reduced/evening.webp",
+    "apps/night/rooms/rain/city/reduced/after.webp",
+    "apps/night/rooms/rain/city/reduced/lit.webp",
+    "apps/night/rooms/rain/city/reduced/depth.png"
+   ],
+   "replace": "to be replaced by the user's own authored design (Q13; the room's look pass, PLAN.md slice 10, works on this bake)"
   },
   {
    "id": "rain-sound-candidates",

@@ -389,3 +389,4 @@ html[data-still="full"] .night-still{ background-image:var(--night-still-veil), 
 .night-dot-trail{ position:fixed; left:0; top:0; width:100vw; height:100vh; z-index:var(--z-night-dot); pointer-events:none; }
 .night-start-head .emblem-glow.night-dot-out{ opacity:0; }
 @media (prefers-reduced-motion: reduce){ .night-still.breathe{ animation:none; } }
+a.night-lnk{ text-decoration:none; }   /* NIGHT-15: the «Licences» link reads as the other links */

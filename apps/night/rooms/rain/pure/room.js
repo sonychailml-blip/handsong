@@ -6,21 +6,23 @@
    - bed, bed2: a quiet recipe of the room's own numbers on today's machinery (slice 7: the three moods' recipes, the new voices);
    - still: the names of the start stills (slice 2 makes the files; until then the start screen shows the first room's);
    - icon: the shared «depth» icon (slice 2 draws the room's own).
-   A look's own amounts: mist (how misted the pane is), rain (0 drizzle … 1 downpour), lit (the share of windows the city lights by itself);
+   A look's own amounts: mist (how misted the pane is), rain (0 drizzle … 1 downpour), lit (the share of windows the city lights by itself), traffic
+   (RAIN-1: the cars' density — Evening busy, Late night almost empty, After the rain few);
    fog and flies are the shared shape's fields, unused here (0). */
+import { RAIN_TRAFFIC, EAR } from './city.js';   // RAIN-1: the vehicles' law and the listener (the passes' sound reads the picture's own)
 const F=Object.freeze;
-const LOOK=(pre, mist, rain, lit)=>F({ pre, fog:0, mist, flies:0, rain, lit,
+const LOOK=(pre, mist, rain, lit, traffic)=>F({ pre, fog:0, mist, flies:0, rain, lit, traffic,
   tokens:F({ sky:pre+'sky', glow:pre+'glow', cloud:pre+'cloud', haze:pre+'haze', stone:pre+'stone', plaster:pre+'plaster', asphalt:pre+'asphalt', mist:pre+'mist' }) });
 export const RAIN_ROOM=F({
   format:'handsong/room', version:1, id:'room.rain', name:F({ en:'Rain', ru:'Дождь' }), icon:'depth', tint:'rain-tint', tokens:'rain-',
   still:F({ full:'still/still-full.webp', reduced:'still/still-reduced.webp', fov:68, aspect:1.85 }),
   view:F({ fov:55, tallFov:68, tall:0.8 }),
   /* what each picture level draws (RAIN-0b): the most simulated drops on the pane, the procedural fine-droplet layers, the far lights, the most cars */
-  levels:F({ full:F({ drops:420, fine:2, farLights:260, cars:24, lean:true }), reduced:F({ drops:260, fine:1, farLights:120, cars:14, lean:true }) }),
+  levels:F({ full:F({ drops:420, fine:2, farLights:260, cars:16, lean:true }), reduced:F({ drops:260, fine:1, farLights:120, cars:16, lean:true }) }),   // RAIN-1: cars ≥ the most the law can put on the road (every car in the picture is heard)
   looks:F({
-    late:LOOK('rain-', 0.95, 0.4, 0.1),            // Late night: drizzle, a few windows
-    evening:LOOK('rain-eve-', 0.7, 0.65, 0.42),    // Evening boulevard: steady rain, many windows
-    after:LOOK('rain-after-', 1.15, 0.14, 0.2),    // After the rain: heavy mist, a few slow drops
+    late:LOOK('rain-', 0.95, 0.4, 0.1, 0.4),       // Late night: drizzle, a few windows, almost no cars
+    evening:LOOK('rain-eve-', 0.7, 0.65, 0.42, 1.15),   // Evening boulevard: steady rain, many windows, busy
+    after:LOOK('rain-after-', 1.15, 0.14, 0.2, 0.7),   // After the rain: heavy mist, a few slow drops, few cars
   }),
   moods:F({ 'major-penta':'late', 'minor-penta':'evening', 'egyptian':'after' }), look:'late',
   nature:F({ id:'ambience.rain',
@@ -30,8 +32,12 @@ export const RAIN_ROOM=F({
     echo:F({ time:0.21, fb:0.3, lp:2200 }),
     /* RAIN-3: the layered recordings (apps/night/pure/layers.js; CC0, register «rain-recordings»): near — rain on the pane, close and dry; far — the wet
        street from above, with more of the echo; crossfaded by the picture's focus. norm: each file levelled to the forest's stream (tools/rain-listen.mjs),
-       × 1.78 (+5 dB: the rain is this room's main nature sound, as the forest's wind and crickets are). Events: drips from the cornice, a quiet tick */
-    layers:F({ near:F({ file:'sound/pane.mp3', norm:1.46, gain:1 }), far:F({ file:'sound/street.mp3', norm:1.5, gain:1, send:0.35 }),
+       × 1.78 (+5 dB: the rain is this room's main nature sound, as the forest's wind and crickets are). Events: drips from the cornice, a quiet tick.
+       RAIN-1 (the founder's picks): near = «Rain on window» (ckjzam), far = «Light rain at night with cars passing by» (humi74) without its cars
+       (tools/rain-sound.mjs); its car passes cut out as one-shots (passes: [start, length, peak] s in cars.mp3), each played when the picture's car
+       passes under the window (pure/passes.js on the audio clock), panned by its side, louder the nearer its lane, its rate by its speed */
+    layers:F({ near:F({ file:'sound/pane.mp3', norm:0.76, gain:1 }), far:F({ file:'sound/street.mp3', norm:0.608, gain:1, send:0.35 }),
+      passes:F({ file:'sound/cars.mp3', norm:0.608, gain:1, segs:F([[0.5, 7.5, 6.9], [8.5, 3.3, 2.4], [12.3, 3, 2.1], [15.8, 2.8, 2], [19.1, 3.2, 2.3]].map(F)), vRef:12, rate:F([0.85, 1.2]), dRef:25, lead:9, traffic:RAIN_TRAFFIC, ear:EAR }),
       events:F({ drips:F({ every:3.5, gain:0.06, hz:2300 }), tick:F({ every:9, gain:0.02 }) }), seed:0x52414933 }),
     level:0.6, master:0.42, ahead:0.35 }),
   acoustic:'fdepth',

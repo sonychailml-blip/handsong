@@ -6,6 +6,10 @@
 import { CAM, camBasis, STREET, BLOCKS, FLOOR, FAR, DEPTH, cityLamps } from './pure/city.js';
 
 const N=8;   // blocks per row the shader holds (BLOCKS has at most 8 per row)
+/* RAIN-1: THE BAKED CITY (tools/rain-bake.mjs --city): its colour for the mood and its depth map, both in view-angle units over ±uExt — the screen's
+   pixel p (view-angle units, ±uTan) reads them at p / uExt; rgb = the colour, a = the depth (as the stand-in writes it) */
+export const BAKED_F=`precision highp float; varying vec2 vUv; uniform sampler2D uCity, uDepthMap; uniform vec2 uTan, uExt;
+void main(){ vec2 q=clamp((vUv*2.-1.)*uTan/uExt*0.5+0.5, 0., 1.); gl_FragColor=vec4(texture2D(uCity, q).rgb, texture2D(uDepthMap, q).r); }`;
 /* the uniforms of the painting (T the THREE namespace); the palette is set per look by the caller */
 export function cityUniforms(T){
   const B=camBasis(), V=a=>new T.Vector3(a[0], a[1], a[2]), rows=side=>Array.from({ length:N }, (_, i)=>{ const b=BLOCKS[side][i]; return b ? new T.Vector4(b[0], b[1], b[2], b[3]) : new T.Vector4(0, 0, 0, 0); });

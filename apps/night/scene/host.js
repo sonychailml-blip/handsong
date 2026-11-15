@@ -24,7 +24,8 @@ export const BACKGROUNDS=Object.freeze(['forest','dark','camera']);
    times — measured: the largest share of the forest's cost to hand detection). */
 const LV={ full:{ scale:0.85, fps:60, shadow:true }, reduced:{ scale:0.6, fps:30, shadow:false }, minimal:{ scale:0, fps:0, shadow:false } };
 let shadowOver=null, optOver=null;   // probe / measurement only: force the shadow on / off at the next opening (null = the level's); optOver { scale, lv } overrides
-/* an app registers its rooms (id → { load() → its build function, standIn(ctx, W, H, hands, cv), three() → the library }); a page with none never loads three.js */
+/* an app registers its rooms (id → { load() → its build function, standIn(ctx, W, H, hands, cv), three() → the library, heard(dt, hands) optional —
+   NIGHT-15: what the room's sound takes from the hands while its picture is not drawn }); a page with none never loads three.js */
 const ROOMS=new Map();
 let threeLoad=null, roomId=null;
 export const sceneRoomAdd=(id, rec)=>{ ROOMS.set(id, rec); threeLoad=rec.three; if(!roomId) roomId=id; };
@@ -258,6 +259,7 @@ stackAdd({ kind:'visual', id:'scene', layer:'scene', cost:{ cls:'heavy', gpu:tru
 /* the BACKDROP (layer «background»): Dark = black; the room = the 2D canvas cleared so the room shows through (or, without WebGL, the room's
    2D stand-in); Camera = nothing here (the camera module draws the picture) */
 function backdrop(t, bus){
+  roomHeard(t, bus);
   if(bg==='camera') return;
   const W=cv2d.width, H=cv2d.height;
   if(bg==='dark'){ ctx.fillStyle=cv('hn-dark'); ctx.fillRect(0,0,W,H); return; }
@@ -268,6 +270,16 @@ function backdrop(t, bus){
   const R=ROOMS.get(roomId); if(R && R.standIn) R.standIn(ctx, W, H, litHands(bus.get('handsView')||[]), cv);
 }
 stackAdd({ kind:'visual', id:'backdrop', layer:'background', cost:{ cls:'light', gpu:false }, frame:backdrop });
+/* NIGHT-15: a room HEARD without its picture (Dark, Camera, the stand-in, an opening, compiling): its optional heard(dt, hands) runs every page
+   frame instead of the room's update, so its sound keeps following the hands (the rain's near / far focus). With the picture drawn: never called. */
+let heardLast=0, heardOff=false;
+function roomHeard(t, bus){
+  const R=ROOMS.get(roomId), drawn= bg==='forest' && renderer && room && room.id===roomId && compiling===0;
+  if(!R || !R.heard || drawn || heardOff){ heardLast=0; return; }
+  const dt= heardLast ? Math.min(0.05, (t-heardLast)/1000) : 1/60; heardLast=t;
+  R.heard(dt, bus.get('handsView')||[], bus.get('nightFx'), bus.get('nightSky'));   // depth and play only: the bus's own view (the lights' placing is visual); RAIN-1: the effects and the mood (the traffic's density)
+}
+export const sceneHeardDbg=(o={})=>{ if('off' in o) heardOff=!!o.off; return { off:heardOff }; };   // probe CONTROL: no heard step
 /* choose the background → a promise of sceneInfo() (the room opens asynchronously: three.js loads once) */
 export function setBackground(mode){
   if(!BACKGROUNDS.includes(mode)) mode='camera';

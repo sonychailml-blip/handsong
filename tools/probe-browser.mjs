@@ -742,6 +742,38 @@ async function uiNightStart(page, label){
       else { if(s.box || s.msg===s.inapp) bad.push('CONTROL: a refusal after 1.2 s was taken for «without asking»'); else if(!s.msg.includes(s.begin) || s.msg.includes('«'+s.start+'»') || /press Start/.test(s.msg)) bad.push('the denied words do not name Night\'s button: '+s.msg);
         else lines.push(`CONTROL: a refusal after 1.2 s gets the denied words naming «${s.begin}», no box`); }
     } finally { await close(c); } }
+  /* (D2) CORE-23: the hold, by itself and exactly — a refusal coming 200 ms after the request, while a «build» of three 700-ms steps runs on
+     this thread. With the hold before each step the refusal is timed at ≈ 200 ms (quick: no prompt shown); CONTROL without it: behind a step
+     (≥ 450 ms, read as a person's no). (D3) the wiring on Night's real page: its build asks the hold before each of its 4 heavy steps;
+     CONTROL: the page's camHold stripped from main.js → no asks. */
+  for(const held of [true, false]){ const c=await freshPage(page);
+    try{
+      await c.p.goto(c.url); await c.p.waitForFunction(()=>window.__nightBoot && window.__nightBoot.state().done, null, { timeout:60e3 });
+      const r=await c.p.evaluate(async held=>{ const V=await import('/core/vision.js'), I=await import('/apps/night/pure/inapp.js');
+        navigator.mediaDevices.getUserMedia=()=>new Promise((_,rej)=>setTimeout(()=>rej(new DOMException('refused', 'NotAllowedError')), 200));
+        const P=navigator.permissions, q=P.query.bind(P); P.query=x=>x && x.name==='camera' ? Promise.resolve({ state:'prompt', addEventListener(){} }) : q(x);   // as (D): not granted yet
+        const hold= held ? V.camHoldOf(I.QUICK_DENY_MS) : async ()=>{}, busy=ms=>{ const t=performance.now(); while(performance.now()-t<ms); };
+        V.camOpenDbg({ noRetry:true });   // one request, one answer (the start's 1-s retry would time a second request)
+        const camP=V.startCamera().then(()=>null, e=>e), t0=performance.now();
+        while(!V.camHoldInfo().pending){ if(performance.now()-t0>3000) return { err:'the camera request never started' }; await new Promise(z=>setTimeout(z, 1)); }
+        for(let i=0;i<3;i++){ await hold(); busy(700); await new Promise(z=>setTimeout(z, 0)); }
+        const e=await Promise.race([camP, new Promise(z=>setTimeout(()=>z({ name:'none' }), 10e3))]);
+        return { name:e && e.name, ms:e && Math.round(e.gumMs), quick:!!e && I.quickDeny(e.name, e.gumMs) }; }, held);
+      if(r.err) bad.push('(D2) '+r.err);
+      else if(held){ if(!r.quick) bad.push(`(D2) with the hold a refusal at 200 ms was timed ${r.ms} ms (${r.name}) — not read as «without asking»`); else lines.push(`(D2) with the hold: a refusal at 200 ms during a 3 × 700-ms build is timed ${r.ms} ms — «without asking»`); }
+      else { if(r.quick) bad.push(`(D2) CONTROL: without the hold the refusal still read quick (${r.ms} ms) — the check cannot fail`); else lines.push(`(D2) CONTROL: without the hold it is timed ${r.ms} ms behind a step — read as a person's no`); }
+    } finally { await close(c); } }
+  for(const strip of [false, true]){ const c=await freshPage(page);
+    try{
+      if(strip) await c.p.route(u=>/\/apps\/night\/main\.js$/.test(u.pathname), async r=>{ const resp=await r.fetch(); await r.fulfill({ response:resp, body:(await resp.text()).replace('camHold:QUICK_DENY_MS', 'camHold:0') }); });
+      await c.p.goto(c.url); await c.p.waitForFunction(()=>window.__nightBoot && window.__nightBoot.state().done, null, { timeout:60e3 });
+      /* the early build (before the tap) ends with path.runs set; read once it has, at most 60 s */
+      let h=null; const t0=Date.now();
+      while(Date.now()-t0<60e3){ h=await c.p.evaluate(async ()=>{ const V=await import('/core/vision.js'); return { ...V.camHoldInfo(), path:V.pathInfo().runs }; }); if(h.path) break; await c.p.waitForTimeout(250); }
+      if(!h || !h.path) bad.push('(D3) the early model build did not finish within 60 s'+(strip ? ' (CONTROL)' : ''));
+      if(!strip){ if(!(h && h.asks>=4)) bad.push('(D3) the model build of Night did not ask the hold before its heavy steps: '+JSON.stringify(h)); else lines.push(`(D3) Night's model build asked the hold ${h.asks} times (both builds, both warm-ups)`); }
+      else { if(h && h.asks>0) bad.push('(D3) CONTROL: with camHold stripped the build still asked the hold — the check cannot fail'); else lines.push(`(D3) CONTROL: camHold stripped → the build asks no hold (${h ? h.asks : 'n/a'})`); }
+    } finally { await close(c); } }
   /* (E) the progress; (F) the stall and Try again; its CONTROL */
   { const c=await freshPage(page, { init:[()=>{ window.__msgs=[]; document.addEventListener('DOMContentLoaded', ()=>{ const m=document.getElementById('loadmsg'); new MutationObserver(()=>{ const x=m.textContent; if(x && window.__msgs[window.__msgs.length-1]!==x) window.__msgs.push(x); }).observe(m, { childList:true, characterData:true, subtree:true }); }); }, null] });
     try{
@@ -1326,11 +1358,14 @@ async function session(port, plan, label){
        snapshot. The runner runs it ONCE here and waits: one already in flight finishes first (the render queue is serial), and the stored result
        stops the timer's later one. settled() is checked, and its CONTROL (nothing stored) must read unsettled. */
     if(!UI_ONLY){ const b=await page.evaluate(async ()=>{ const R=await import('/core/render.js'), E=await import('/core/pure/engclass.js'), t0=performance.now();
-        const r=await R.engBench(); await new Promise(q=>setTimeout(q, 50));
+        const r=await R.engBench();
+        /* NIGHT-15: a proper settle, not a fixed 50 ms — the page's own 20-s benchmark may have queued its render behind ours (it found nothing
+           stored when it looked); that render still has to run before the rows. Wait for the queue to drain, at most 30 s, then judge as before. */
+        const q0=performance.now(); let waited=0; while(R.renderQueue()>0 && performance.now()-q0<30e3){ waited++; await new Promise(q=>setTimeout(q, 50)); }
         const settled=(stored, queued)=>!!E.benchOf(stored, navigator.userAgent) && queued===0;
         let stored=null; try{ stored=localStorage.getItem(E.ENG_BENCH_KEY); }catch(e){}
-        return { ms:Math.round(performance.now()-t0), cached:!!r.cached, ok:settled(stored, R.renderQueue()), control:settled(null, 0) }; });
-      out(`[${label}] engine benchmark settled before the rows: ${b.cached ? 'already stored' : 'measured'} in ${b.ms} ms · control (nothing stored) ${b.control ? 'NOT caught' : 'caught'}`);
+        return { ms:Math.round(performance.now()-t0), cached:!!r.cached, drain:Math.round(performance.now()-q0), waited, ok:settled(stored, R.renderQueue()), control:settled(null, 0) }; });
+      out(`[${label}] engine benchmark settled before the rows: ${b.cached ? 'already stored' : 'measured'} in ${b.ms} ms (the queue drained ${b.waited ? 'after '+b.drain+' ms' : 'at once'}) · control (nothing stored) ${b.control ? 'NOT caught' : 'caught'}`);
       if(!b.ok || b.control) throw new Error(`the engine benchmark did not settle (ok ${b.ok}, control ${b.control}) — a render could run by itself during the rows`); }
     if(!NIGHT_PAGE && !DUMP){
     /* посев: ждём ОКОНЧАНИЯ (его итог — строка «Now run P.all()») */

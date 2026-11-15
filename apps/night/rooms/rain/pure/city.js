@@ -8,14 +8,20 @@
    DEPTH: a place's distance → its focus depth 0 (the glass) … 1 (the sky), by anchors (street near ≈ 0.35, far ≈ 0.65, the facade opposite
    ≈ 0.72, roofs ≈ 0.82, hills ≈ 0.95). This is the stand-in's city (PLAN.md: the baked 3D city replaces the painting, not this law). */
 import { seeded } from '../../../../../core/pure/dsp.js';
+import { passTraffic } from '../../../pure/passes.js';   // RAIN-1: the vehicles' law, shared by the picture and the sound
 
 const F=Object.freeze, D2R=Math.PI/180;
 export const CAM=F({ x:8, y:25, z:0, yaw:14, pitch:-13 });   // 8th floor (25 m), over the boulevard's near road; yaw from +z towards +x, pitch down (degrees)
-/* the boulevard across (x, metres): the left row's facades, its pavement, the left road, the middle alley (plane trees, two tram tracks), the right
-   road, the right pavement, the facade opposite (the right row); the rows begin at `rows` (the crossing in front of our house before it) */
-export const STREET=F({ left:-4, rows:12, kerbA:0, alleyA:12, alleyB:24, kerbB:36, opp:40, tracks:F([16.6, 18.1, 19.9, 21.4]), wire:6.2,
-  lanes:F([F({ x:3.2, dir:-1 }), F({ x:8.6, dir:1 }), F({ x:27.4, dir:-1 }), F({ x:32.8, dir:1 })]),   // dir −1 comes towards us (headlights), +1 goes away (tail lights)
-  len:520, lampEvery:26, treeEvery:9.5 });
+/* the boulevard across (x, metres). RAIN-1 (the founder: «a real boulevard»): the left row's facades and pavement, ONE road (two car lanes and two tram
+   tracks, the wires over them), then the PROMENADE — a double row of plane trees along the road, benches, lamps, a kiosk, and the café terraces in
+   front of the house opposite (the right row). kerbA / kerbB the road's kerbs; alleyA / alleyB the promenade's edges (the stand-in paints it as the
+   alley); treeRows the two rows of plane trees; zFrom: the vehicles drive on past our house (under the window) to here. Rows begin at `rows`. */
+export const STREET=F({ left:-4, rows:12, kerbA:0, kerbB:13, alleyA:13, alleyB:40, opp:40, tracks:F([8.9, 10.4, 11.4, 12.9]), wire:6.2,
+  lanes:F([F({ x:2.6, dir:-1 }), F({ x:6.2, dir:1 })]),   // dir −1 comes towards us (headlights), +1 goes away (tail lights): driving on the right
+  treeRows:F([14.6, 17.6]), terrace:F([34, 40]), len:520, zFrom:-80, lampEvery:24, treeEvery:11 });
+/* RAIN-1: the prepared city's picture covers every screen shape the room's lens law allows: x −BAKE_EXT[0]…BAKE_EXT[0], y −BAKE_EXT[1]…BAKE_EXT[1]
+   (view-angle units: a 2.4 : 1 screen at 55°, an upright phone at 68° — tan 34°) */
+export const BAKE_EXT=F([1.25, 0.6745]);
 /* the houses: blocks along both rows (z from, z to, eaves height, mansard height) */
 export const BLOCKS=F({
   opp:F([F([12, 40, 21, 4]), F([40, 66, 23, 3.5]), F([66, 98, 18, 3.5]), F([98, 138, 23, 4]), F([138, 180, 20, 3]), F([180, 236, 22, 4]), F([236, 320, 19, 3]), F([320, 520, 21, 3])]),
@@ -81,31 +87,29 @@ export function cityWindows(){
   for(const w of all) if(!out.some(o=>Math.abs(o.x-w.x)<o.hw+w.hw && Math.abs(o.y-w.y)<o.hh+w.hh)) out.push(w);
   return out;
 }
-/* THE LAMPS along both kerbs and the alley: their heads (world), for the lights and their reflections */
+/* THE LAMPS (RAIN-1): along the left pavement's kerb, between the two rows of plane trees, and along the promenade before the terraces — their heads
+   (world), for the lights and their reflections; the bake places its lamp heads exactly here */
 export function cityLamps(){
-  const out=[];
-  for(const [x, ph] of [[STREET.kerbA+0.6, 0], [STREET.alleyA+0.5, 0.5], [STREET.alleyB-0.5, 0], [STREET.kerbB-0.6, 0.5]])
-    for(let z=8+ph*STREET.lampEvery;z<STREET.len*0.7;z+=STREET.lampEvery) out.push({ p:[x, 7.2, z], foot:[x, 0, z] });
+  const out=[], T=STREET.treeRows;
+  for(const [x, ph, y] of [[STREET.kerbA+0.6, 0, 7.2], [(T[0]+T[1])/2, 0.5, 5.2], [STREET.terrace[0]-1, 0.25, 4.6]])
+    for(let z=8+ph*STREET.lampEvery;z<STREET.len*0.7;z+=STREET.lampEvery) out.push({ p:[x, y, z], foot:[x, 0, z] });
   return out;
 }
-/* the plane trees of the alley (their crowns' centres and radii, world) */
+/* the plane trees (RAIN-1): two rows between the road and the promenade — their crowns' centres and radii (world), seeded */
 export function cityTrees(){
   const R=seeded(RAIN_CITY_SEED^0x54524545), out=[];
-  for(const x of [STREET.alleyA+1.6, STREET.alleyB-1.6]) for(let z=5+R()*3;z<STREET.len*0.6;z+=STREET.treeEvery*(0.85+0.3*R())) out.push({ p:[x+(R()-0.5)*0.8, 8.5+R()*2, z], r:3.2+R()*1.4 });
+  for(const x of STREET.treeRows) for(let z=4+R()*4;z<STREET.len*0.6;z+=STREET.treeEvery*(0.85+0.3*R())) out.push({ p:[x+(R()-0.5)*0.5, 7.6+R()*1.6, z], r:2.6+R()*0.9 });
   return out;
 }
-/* THE TRAFFIC at time t (s): cars on their lanes and the tram on its track, as a seeded schedule (the picture and the sound read the same) →
-   [{ kind: 'car' | 'tram', lane, dir, z (front, m), x (m), len (m) }]. Each lane: one slot every `every` s, a car in a slot with chance `p`, all
-   cars of a lane at one speed (so none catches another). The tram: one slot every `tram` s. */
-export const TRAFFIC=F({ every:F([7, 11, 8, 13]), p:0.62, speed:F([11, 12.5, 10, 13]), carLen:4.4, tram:84, tramP:0.75, tramSpeed:8, tramLen:28, tramTrack:F([18.85, 20.65]) });
-const hash=(a, b)=>{ let h=(Math.imul(a|0, 0x27d4eb2d)^Math.imul(b|0, 0x165667b1))>>>0; h=Math.imul(h^(h>>>15), 0x85ebca77)>>>0; h=Math.imul(h^(h>>>13), 0xc2b2ae3d)>>>0; return ((h^(h>>>16))>>>0)/4294967296; };
-export function trafficAt(t, density=1){
-  const out=[], L=STREET.len;
-  STREET.lanes.forEach((ln, li)=>{ const P=TRAFFIC.every[li], v=TRAFFIC.speed[li], span=L/v, k1=Math.floor(t/P), k0=Math.floor((t-span)/P)-1;
-    for(let k=k0;k<=k1;k++){ if(hash(li+1, k)>=TRAFFIC.p*density) continue; const T=k*P+hash(li+11, k)*P*0.5, a=t-T; if(a<0 || a>span) continue;
-      out.push({ kind:'car', lane:li, dir:ln.dir, x:ln.x, z: ln.dir>0 ? a*v : L-a*v, len:TRAFFIC.carLen }); } });
-  { const P=TRAFFIC.tram, span=(L+TRAFFIC.tramLen)/TRAFFIC.tramSpeed, k1=Math.floor(t/P), k0=Math.floor((t-span)/P)-1;
-    for(let k=k0;k<=k1;k++){ if(hash(99, k)>=TRAFFIC.tramP*Math.min(1, density)) continue; const dir= hash(98, k)<0.5 ? -1 : 1, T=k*P+hash(97, k)*P*0.4, a=t-T; if(a<0 || a>span) continue;
-      out.push({ kind:'tram', lane:-1, dir, x:TRAFFIC.tramTrack[dir>0 ? 1 : 0], z: dir>0 ? a*TRAFFIC.tramSpeed : L-a*TRAFFIC.tramSpeed, len:TRAFFIC.tramLen }); } }
-  return out;
-}
+/* THE TRAFFIC at time t (s): cars on their lanes and the tram on its track, as a seeded schedule — RAIN-1: the shared law (pure/passes.js), which the
+   room's sound reads too, so every car in the picture is heard as it passes under the window and every pass heard has its car. → [{ kind: 'car' |
+   'tram', lane, slot, dir, z (front, m), x (m), len (m), v }]. Each lane: one slot every `every` s, a car with chance p × density (Wave and the mood
+   set the density), all cars of a lane at one speed (none catches another); they drive from zFrom (behind our house) to the far end, or back. */
+export const TRAFFIC=F({ every:F([10, 12]), p:0.6, speed:F([11.5, 12.5]), carLen:4.4, tram:84, tramP:0.75, tramSpeed:8, tramLen:28, tramTrack:F([9.65, 12.15]) });
+export const RAIN_TRAFFIC=F({ len:STREET.len, zFrom:STREET.zFrom, every:TRAFFIC.every, p:TRAFFIC.p, speed:TRAFFIC.speed, carLen:TRAFFIC.carLen, lanes:STREET.lanes,
+  tram:F({ every:TRAFFIC.tram, p:TRAFFIC.tramP, speed:TRAFFIC.tramSpeed, len:TRAFFIC.tramLen, track:TRAFFIC.tramTrack }) });
+/* the listener: the eye at the window (its right vector for the pan) */
+export const EAR=F({ x:CAM.x, y:CAM.y, z:CAM.z, r:F(camBasis().r) });
+export const trafficAt=(t, density=1)=>passTraffic(RAIN_TRAFFIC, t, density);
+/* the density of the traffic: the mood's own amount × (1 + 0.6 × Wave), in steps of 0.05 (the picture and the sound send the same number) */
+export const trafficDensity=(mood, wave)=>Math.round(Math.max(0, mood)*(1+0.6*Math.max(0, Math.min(1, +wave||0)))*20)/20;

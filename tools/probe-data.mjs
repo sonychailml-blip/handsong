@@ -1097,13 +1097,13 @@ async function forestFloorCore(){
    envelope's normalised autocorrelation stays under 0.5 at every lag 1…20 s — CONTROL a render built by repeating one 6-s stretch shows ≥ 0.9;
    (4) the near water wider than the far: the inter-channel correlation of the nearest voice alone is lower than the farthest's — CONTROL the
    nearest with no spread and in the middle correlates ≥ 0.98; the voices: the nearest loudest and widest, the farthest darkest; (5) the Lighter
-   mode makes ≤ 65 % of the bubbles; asleep, zeros; (6) the voices validator: the forest's pass, damaged ones are refused; (7) the worklet imports
+   mode makes ≤ 65 % of the bubbles and keeps the three nearest voices (NIGHT-15; CONTROL the old first-three pick); asleep, zeros; (6) the voices validator: the forest's pass, damaged ones are refused; (7) the worklet imports
    this very law and registers the name the sound module builds. */
 async function nightStreamSound(){
   const d=[], notes=[]; let n=0; const miss=s=>d.push(s);
   const B=await import(new URL('../apps/night/pure/brook.js', import.meta.url).href), FR=(await import(new URL('../apps/night/rooms/forest/pure/room.js', import.meta.url).href)).FOREST_ROOM, S=await import(new URL('../apps/night/rooms/forest/pure/stream.js', import.meta.url).href);
   const fs=await import('node:fs'), RATE=48000, V=FR.nature.stream.voices;
-  const render=(voices, sec, seed, o={})=>{ const st=B.brookNew(RATE, voices, seed); if(o.light) st.light=true; if(o.sleep) st.sleep=true; const N=Math.round(RATE*sec), L=new Float32Array(N), R=new Float32Array(N);
+  const render=(voices, sec, seed, o={})=>{ const st=B.brookNew(RATE, voices, seed); if(o.light) st.light=true; if(o.old) st.near=[0, 1, 2]; if(o.sleep) st.sleep=true; const N=Math.round(RATE*sec), L=new Float32Array(N), R=new Float32Array(N);
     for(let i=0;i<N;i+=128) B.brookOut(st, L, R, i, Math.min(128, N-i)); return { L, R, st }; };
   const rms=(x, y)=>{ let s=0; for(let i=0;i<x.length;i++) s+=x[i]*x[i]+y[i]*y[i]; return Math.sqrt(s/(2*x.length)); };
   const corr=(x, y)=>{ let a=0, b=0, c=0; for(let i=0;i<x.length;i++){ a+=x[i]*y[i]; b+=x[i]*x[i]; c+=y[i]*y[i]; } return a/Math.sqrt(b*c||1); };
@@ -1125,7 +1125,14 @@ async function nightStreamSound(){
     if(!(V[near].w>=Math.max(...V.map(v=>v.w))-1e-9 && V[far].lp<=Math.min(...V.map(v=>v.lp))+1e-9)) miss('the voices: the nearest is not the widest or the farthest not the darkest '+JSON.stringify(V.map(v=>[v.gain, v.w, v.lp])));
     notes.push(`stereo: correlation near ${cn.toFixed(3)} (CONTROL no spread ${cc.toFixed(3)}), far ${cf.toFixed(3)}; voices pan ${V.map(v=>v.pan).join(' / ')}, gain ${V.map(v=>v.gain).join(' / ')}`); }
   { const Lt=render(V, 10, 3, { light:true }), Nm=render(V, 10, 3), Z=render(V, 1, 3, { sleep:true }); n+=2;
-    if(!(Lt.st.made<=0.65*Nm.st.made)) miss(`the Lighter mode made ${Lt.st.made} bubbles against ${Nm.st.made}`); if(Z.L.some(x=>x!==0) || Z.R.some(x=>x!==0)) miss('asleep, the stream still sounds'); }
+    if(!(Lt.st.made<=0.65*Nm.st.made)) miss(`the Lighter mode made ${Lt.st.made} bubbles against ${Nm.st.made}`); if(Z.L.some(x=>x!==0) || Z.R.some(x=>x!==0)) miss('asleep, the stream still sounds');
+    /* NIGHT-15: the Lighter mode keeps the NEAREST voices — exactly the three highest gains — and so stays within 4 dB of the full stream;
+       CONTROL the old pick (the first three in the list, the farthest) fails both */
+    const top=V.map((v, i)=>[v.gain, i]).sort((p, q)=>q[0]-p[0] || p[1]-q[1]).slice(0, B.BROOK.light.voices).map(x=>x[1]).sort((p, q)=>p-q).join(','), lv=x=>10*Math.log10(Math.pow(rms(x.L, x.R), 2)), Lold=render(V, 10, 3, { light:true, old:true }); n+=4;
+    if(Lt.st.near.join(',')!==top) miss(`the Lighter voices are ${Lt.st.near.join(',')}, the three nearest are ${top}`);
+    if(Lold.st.near.join(',')===top) miss('CONTROL: the old pick (the first three) reads as the nearest — the check cannot fail');
+    const dn=lv(Nm)-lv(Lt), dold=lv(Nm)-lv(Lold); if(!(dn<=4)) miss(`the Lighter stream is ${dn.toFixed(2)} dB under the full one (≤ 4 wanted)`); if(!(dold>4)) miss(`CONTROL: the old pick is only ${dold.toFixed(2)} dB under — the level check cannot fail`);
+    notes.push(`Lighter: voices ${Lt.st.near.join(', ')} (the nearest), ${dn.toFixed(2)} dB under the full stream, ${Lt.st.made} of ${Nm.st.made} bubbles; CONTROL the old pick ${Lold.st.near.join(', ')}: ${dold.toFixed(2)} dB under`); }
   { const bad=[['lp', v=>{ v[0]={ ...v[0], lp:50 }; }], ['f', v=>{ v[1]={ ...v[1], f:[900, 300] }; }], ['pan', v=>{ v[2]={ ...v[2], pan:2 }; }]]; n+=1+bad.length;
     if(B.checkBrookVoices(V)) miss('the forest\'s voices refused: '+B.checkBrookVoices(V));
     for(const [k, f] of bad){ const w=V.slice(); f(w); const why=B.checkBrookVoices(w); if(!why || !why.includes('.'+k)) miss(`a damaged ${k} was not refused by name: ${why}`); }
@@ -1920,8 +1927,17 @@ async function rainView(){
    between two neighbours, the nearer; in the sky, none. RAIN-0b: the windows are the view law's (both rows, projected). CONTROL: a mirrored law. */
 async function rainPick(){
   const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); };
-  const Wn=await import(new URL('../apps/night/rooms/rain/pure/windows.js', import.meta.url).href), W=Wn.windowsLayout();
-  ok('the layout is not seeded (two calls differ)', JSON.stringify(W)===JSON.stringify(Wn.windowsLayout()));
+  const Wn=await import(new URL('../apps/night/rooms/rain/pure/windows.js', import.meta.url).href), fs=await import('node:fs'), CT=await import(new URL('../apps/night/rooms/rain/pure/city.js', import.meta.url).href);
+  /* RAIN-1: the BAKED window map (tools/rain-bake.mjs --city) — the windows the room lights; each inside the facades' depth band and at its own
+     distance's depth, none overlapping, the bake's windows where the law sees the houses */
+  const W=JSON.parse(fs.readFileSync(new URL('../apps/night/rooms/rain/city/windows.json', import.meta.url), 'utf8'));
+  ok(`the baked window map is too small (${W.length} windows; ≥ 100)`, W.length>=100);
+  { const lo=CT.depthOf(15), hi=CT.depthOf(600);   // the facades' band: the nearest house the eye sees (15 m) to the far end of the boulevard
+    let over=0, band=0, law=0, side=0; for(let i=0;i<W.length;i++){ const a=W[i]; if(!(a.depth>=lo && a.depth<=hi) || Math.abs(a.depth-CT.depthOf(a.dist))>0.002) band++; const k=CT.sceneAt(a.x, a.y).kind; if(k===a.side) law++; else if(k==='opp' || k==='left') side++;
+      for(let j=i+1;j<W.length;j++){ const b=W[j]; if(Math.abs(a.x-b.x)<a.hw+b.hw && Math.abs(a.y-b.y)<a.hh+b.hh) over++; } }
+    ok(`${over} pairs of baked windows overlap; ${band} outside the facades' depth band or off their distance's depth`, !over && !band);
+    ok(`only ${law} of ${W.length} baked windows lie where the law sees their own row (≥ 85 %; ${side} on the other row)`, law>=0.85*W.length && side===0);
+    notes.push(`the baked window map: ${W.length} windows (${W.filter(w=>w.side==='opp').length} on the house opposite), ${law} where the law sees their row`); }
   const self=pick=>W.filter((w, i)=>pick(W, w.x, w.y)!==i).length;
   ok(`${self(Wn.windowPick)} windows are not picked at their own centre`, self(Wn.windowPick)===0);
   /* a large window of the house opposite, and its right-hand neighbour on the same floor */
@@ -2024,6 +2040,62 @@ async function rainGlass(){
     ok('a drop in a runner\'s path was not eaten', ate && !S.list.some(q=>q.id===small.id)); ok(`the water of that run is not booked (${DR.dropsLedger(S).toExponential(2)})`, Math.abs(DR.dropsLedger(S))<=1e-15 && A0>0);
     ok(`the runner's lane is not cleared of fine droplets (${DR.laneAt(S, 0, 0.2).toFixed(2)})`, DR.laneAt(S, 0, 0.2)>0.5);
     for(let i=0;i<150;i++) DR.laneStep(S, 1); ok('the fine droplets never grow back into the lane', !S.laneLive && DR.laneAt(S, 0, 0.2)===0); }
+  return { cases:n, total:d.length, differences:d, notes };
+}
+/* RAIN-1 — «RAIN files (app)»: the rain room's files (apps/night/rooms/rain/**: code, sounds, the baked city) stay within the room's budget of 15 MB
+   (PLAN.md §3); prints the size per folder. CONTROL: the same files and 15 MB more fail. */
+async function rainFiles(){
+  const d=[], notes=[]; let n=0; const fs=await import('node:fs'), path=await import('node:path'), root=new URL('../apps/night/rooms/rain/', import.meta.url);
+  const walk=dir=>fs.readdirSync(dir, { withFileTypes:true }).flatMap(e=>e.isDirectory() ? walk(path.join(dir, e.name)) : [path.join(dir, e.name)]), base=path.resolve(decodeURIComponent(root.pathname.replace(/^\/([A-Za-z]:)/, '$1')));
+  const files=walk(base), per={}; let total=0; for(const f of files){ const b=fs.statSync(f).size, k=path.relative(base, f).split(path.sep).slice(0, 2).join('/'); per[k.includes('.') ? path.relative(base, f).split(path.sep)[0] : k]=(per[k.includes('.') ? path.relative(base, f).split(path.sep)[0] : k]||0)+b; total+=b; }
+  const LIMIT=15*1048576, judge=t=>t<=LIMIT; n+=2;
+  if(!judge(total)) d.push(`the rain room's files are ${(total/1048576).toFixed(2)} MB (≤ 15 MB)`);
+  if(judge(total+LIMIT)) d.push('CONTROL: 15 MB more still passed — the budget check cannot fail');
+  notes.push(`${files.length} files, ${(total/1048576).toFixed(2)} MB of 15: `+Object.entries(per).sort((a, b)=>b[1]-a[1]).map(([k, b])=>`${k} ${(b/1048576).toFixed(2)}`).join(', '));
+  { const city=files.filter(f=>/[\\/]city[\\/]/.test(f)); n++; if(!city.some(f=>/windows\.json$/.test(f)) || !['full', 'reduced'].every(lv=>['late.webp', 'evening.webp', 'after.webp', 'lit.webp', 'depth.png'].every(x=>city.some(f=>f.endsWith(path.join(lv, x)))))) d.push('the baked city\'s files are not all there (city/<full|reduced>/<late|evening|after|lit>.webp, depth.png, city/windows.json)'); }
+  return { cases:n, total:d.length, differences:d, notes };
+}
+/* RAIN-1 — «RAIN car passes (app)»: every car the picture draws is heard as it passes and every pass heard has its car (pure/passes.js, read by the
+   picture through city.js trafficAt and by the sound through the room's recipe). (1) The recipe's traffic and listener ARE the picture's (the same
+   objects); (2) over 40 minutes at the moods' and Wave's densities: each heard pass (passEvents) has a car of its lane in the picture within one frame
+   (1/30 s of driving) of the listener, and every car the picture moves past the listener (sampled at 30 frames a second) has its pass within one
+   frame; (3) the sound law itself: the layers' renderer fed one-shots with a click at their peaks puts each click on its pass's moment (± 1 ms);
+   (4) pan by the side, louder for the nearer lane, the rate by the speed; (5) the cars never outnumber the picture's cap. CONTROLS: a free-running car
+   sound (a pass every 9 s on its own clock) fails (2); one-shots whose peak is read wrong fail (3). */
+async function rainPasses(){
+  const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); };
+  const PS=await import(new URL('../apps/night/pure/passes.js', import.meta.url).href), CT=await import(new URL('../apps/night/rooms/rain/pure/city.js', import.meta.url).href), RR=(await import(new URL('../apps/night/rooms/rain/pure/room.js', import.meta.url).href)).RAIN_ROOM;
+  const LY=await import(new URL('../apps/night/pure/layers.js', import.meta.url).href), P=RR.nature.layers.passes, FR=1/30;
+  ok('the sound\'s traffic and listener are not the picture\'s (the same objects)', P && P.traffic===CT.RAIN_TRAFFIC && P.ear===CT.EAR);
+  const judge=(events, dens, T0, T1)=>{ let miss1=0, miss2=0;
+    for(const e of events){ const cars=CT.trafficAt(e.t, dens).filter(c=>c.kind==='car' && c.lane===e.lane); if(!cars.some(c=>Math.abs(c.z-P.ear.z)<=c.v*FR+1e-9)) miss1++; }
+    for(let t=T0;t<T1;t+=FR){ const a=CT.trafficAt(t, dens), b=CT.trafficAt(t+FR, dens);
+      for(const c of a){ if(c.kind!=='car') continue; const c2=b.find(q=>q.kind==='car' && q.lane===c.lane && q.slot===c.slot); if(!c2 || (c.z-P.ear.z)*(c2.z-P.ear.z)>0) continue;
+        const tc=t+Math.abs(c.z-P.ear.z)/c.v; if(!events.some(e=>e.lane===c.lane && Math.abs(e.t-tc)<=FR)) miss2++; } }
+    return { miss1, miss2 }; };
+  for(const dens of [CT.trafficDensity(0.4, 0), CT.trafficDensity(1.15, 0), CT.trafficDensity(1.15, 1)]){ const T0=1000, T1=1000+2400, ev=PS.passEvents(P.traffic, P.ear, T0, T1, dens), j=judge(ev, dens, T0, T1);
+    ok(`density ${dens}: ${j.miss1} of ${ev.length} heard passes have no car at the window within a frame; ${j.miss2} cars pass the window unheard`, ev.length>0 && !j.miss1 && !j.miss2);
+    notes.push(`density ${dens}: ${ev.length} passes in 40 min (one every ${(2400/ev.length).toFixed(1)} s), each with its car within a frame`); }
+  { const T0=1000, T1=1600, fake=Array.from({ length:66 }, (_, k)=>({ t:T0+k*9, lane:k%2 })), j=judge(fake, 1, T0, T1); n++;
+    if(!(j.miss1>0)) d.push('CONTROL: a free-running car sound passed — the check cannot fail'); else notes.push(`CONTROL: a free-running car sound (every 9 s): ${j.miss1} of ${fake.length} passes without a car, ${j.miss2} cars unheard — caught`); }
+  /* (3) the renderer: one-shots with a click at each peak, played through layersOut over 120 s; the clicks found on the far output against the law's moments */
+  const render=(peakShift)=>{ const FS=48000, L={ near:{ gain:0 }, far:{ gain:0 }, passes:{ ...P, rate:[1, 1], vRef:1 } }, st=LY.layersNew(FS, L), len=Math.ceil(Math.max(...P.segs.map(([a, b])=>a+b))*FS)+FS, Y=new Float32Array(len);
+    for(const [a, , pk] of P.segs) Y[Math.round((a+pk+peakShift)*FS)]=1;
+    LY.layersPasses(st, Y, 1); LY.layersOn(st, true); LY.layersFocus(st, 1); st.fs=1; st.g=1; LY.layersDensity(st, 1);
+    const t0=2000, N=FS*120, B=128, fL=new Float32Array(B), fR=new Float32Array(B), nL=new Float32Array(B), nR=new Float32Array(B), hits=[];
+    for(let i=0;i<N;i+=B){ LY.layersOut(st, t0+i/FS, nL, nR, fL, fR, 0, B); for(let k=0;k<B;k++){ const v=Math.abs(fL[k])+Math.abs(fR[k]); if(v>0.05 && (!hits.length || (i+k)/FS+t0-hits[hits.length-1]>0.2)) hits.push(t0+(i+k)/FS); } }
+    const want=PS.passEvents(P.traffic, P.ear, t0+P.lead, t0+120-1, 1).map(e=>e.t); let worst=0, found=0; for(const w of want){ const h=hits.reduce((a, x)=>Math.abs(x-w)<Math.abs(a-w) ? x : a, Infinity); if(Math.abs(h-w)<0.5){ found++; worst=Math.max(worst, Math.abs(h-w)); } }
+    return { want:want.length, found, worst }; };
+  { const r=render(0); ok(`the sound law: ${r.found} of ${r.want} passes have their click, the worst off by ${(r.worst*1000).toFixed(2)} ms (≤ 1 ms)`, r.want>0 && r.found===r.want && r.worst<=0.001);
+    notes.push(`the sound law puts every pass's peak on its car's moment: ${r.found} of ${r.want}, worst ${(r.worst*1000).toFixed(3)} ms`);
+    const c=render(0.12); n++; if(c.found===c.want && c.worst<=0.001) d.push('CONTROL: one-shots read 120 ms off their peak passed — the timing check cannot fail'); else notes.push(`CONTROL: a peak read 120 ms wrong is caught (worst ${(c.worst*1000).toFixed(0)} ms)`); }
+  /* (4) pan, loudness, rate */
+  { const ev=PS.passEvents(P.traffic, P.ear, 0, 3000, 1), byLane=l=>ev.find(e=>e.lane===l), a=byLane(0), b=byLane(1);
+    ok('pan, loudness or rate do not follow the car: '+JSON.stringify({ a, b }), a && b && Math.sign(a.pan)===Math.sign(a.x-P.ear.x) && Math.sign(b.pan)===Math.sign(b.x-P.ear.x) && (a.dist<b.dist)===(Math.abs(a.x-P.ear.x)<Math.abs(b.x-P.ear.x))
+      && P.rate[0]<=a.v/P.vRef && a.v/P.vRef<=P.rate[1]+0.2); }
+  /* (5) the cap: the most cars at once at the highest density never exceeds the picture's */
+  { let most=0; const dmax=CT.trafficDensity(Math.max(...Object.values(RR.looks).map(L=>L.traffic)), 1); for(let t=0;t<7200;t+=0.5) most=Math.max(most, CT.trafficAt(t, dmax).filter(c=>c.kind==='car').length);
+    ok(`up to ${most} cars at once at density ${dmax}, above the picture's cap ${Math.min(RR.levels.full.cars, RR.levels.reduced.cars)}`, most<=Math.min(RR.levels.full.cars, RR.levels.reduced.cars)); notes.push(`the most cars at once: ${most} (cap ${Math.min(RR.levels.full.cars, RR.levels.reduced.cars)})`); }
   return { cases:n, total:d.length, differences:d, notes };
 }
 /* RAIN-3 — «RAIN nature (app)»: a room's layered recordings and event sounds (apps/night/pure/layers.js), the law alone (the browser row «RAIN nature»
@@ -2447,6 +2519,29 @@ async function forestWaterFlow(){
   return { cases:n, total:d.length, differences:d, notes };
 }
 
+/* NIGHT-15: KEEP NIGHT'S FILES (apps/night/pure/persist.js) — asked once, never where it prompts: no API, already kept, asked before and Firefox
+   (desktop and iOS) are skipped; Chrome, Safari and an Android phone are asked; the «Measure this device» line; the wiring (main.js asks after the
+   camera first runs, shell.js prints the line). CONTROL: a law that forgets Firefox asks it. */
+async function nightPersist(){
+  const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); };
+  const P=await import(new URL('../apps/night/pure/persist.js', import.meta.url).href), fs=await import('node:fs');
+  const FF='Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:132.0) Gecko/20100101 Firefox/132.0', FFI='Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) FxiOS/132.0 Mobile/15E148 Safari/605.1.15';
+  const CH='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36', SAF='Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
+  const AND='Mozilla/5.0 (Linux; Android 14; 22111317PG) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36';
+  const base={ api:true, persisted:false, stored:null };
+  for(const ua of [CH, SAF, AND]) ok('a browser that decides by itself is not asked: '+ua.slice(0,40), P.persistPlan({ ...base, ua }).ask===true);
+  for(const ua of [FF, FFI]) ok('Firefox is asked though it would prompt: '+ua.slice(-30), P.persistPlan({ ...base, ua }).ask===false);
+  ok('no API → asked', P.persistPlan({ ...base, api:false, ua:CH }).ask===false);
+  ok('already kept → asked', P.persistPlan({ ...base, persisted:true, ua:CH }).ask===false);
+  ok('asked before → asked again', P.persistPlan({ ...base, stored:{ at:'2026-11-15', ok:false }, ua:CH }).ask===false);
+  ok('the line, granted', P.persistLine(true, { at:'2026-11-15T10:00:00Z', ok:true })==='storage kept: yes · asked 2026-11-15: granted');
+  ok('the line, not asked', P.persistLine(false, null)==='storage kept: no · not asked');
+  { const forgets=env=>(env.api && !env.persisted && !env.stored) ? { ask:true } : { ask:false }; n++; if(forgets({ ...base, ua:FF }).ask!==true) d.push('CONTROL: a law without the prompt rule did not ask Firefox — the Firefox case cannot fail'); else notes.push('CONTROL: a law without the prompt rule asks Firefox — caught by the Firefox cases'); }
+  { const m=fs.readFileSync(new URL('../apps/night/main.js', import.meta.url), 'utf8'), sh=fs.readFileSync(new URL('../apps/night/shell.js', import.meta.url), 'utf8');
+    ok('main.js does not ask after the camera first runs (onCamera → persistSoon)', /onCamera:\(\)=>\{[^}]*persistSoon\(\)/.test(m));
+    ok('«Measure this device» does not print the storage line', /await persistInfo\(\)\]\.join/.test(sh)); }
+  return { cases:n, total:d.length, differences:d, notes };
+}
 /* NIGHT-11 part 2: IN-APP BROWSERS (apps/night/pure/inapp.js) on made-up devices — the messengers' own browsers (named, or a bare web view) are
    recognised, real browsers and the home-screen app are not; the device words (phone or computer); a camera refusal faster than a person could
    answer counts as «refused without asking» (CONTROL: a law that ignores the missing «Safari/» would pass an iOS web view as Safari). */
@@ -2583,6 +2678,8 @@ const ROWS=[
   ["RAIN window pick (app)", ()=>rainPick(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-0
   ["RAIN window fade (app)", ()=>rainFade(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-0
   ["RAIN glass law (app)", ()=>rainGlass(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-0
+  ["RAIN files (app)", ()=>rainFiles(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-1
+  ["RAIN car passes (app)", ()=>rainPasses(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-1
   ["RAIN nature (app)", ()=>rainNature(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-3
   ["RAIN stays out of the players' edition (app)", ()=>rainGate(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-0
   ['NIGHT music bed law (app)', ()=>nightBedLaw(),     r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // NIGHT-3 stage 4
@@ -2609,6 +2706,7 @@ const ROWS=[
   ['FOREST relief (app)',       ()=>forestRelief(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-9
   ['FOREST water flow (app)',   ()=>forestWaterFlow(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-9
   ['NIGHT camera names (app)',  ()=>nightCameraNames(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-10
+  ['NIGHT storage persist (app)', ()=>nightPersist(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-15
   ['NIGHT in-app browsers (app)', ()=>nightInApp(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-11 part 2
   ['NIGHT coaching line (app)', ()=>nightCoachLaw(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-11 part 4
   ['NIGHT pixel budget law (app)', ()=>nightPixels(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-11 part 5

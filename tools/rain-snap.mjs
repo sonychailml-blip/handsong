@@ -4,6 +4,7 @@
                                               Standard — RAIN-0b: the misted start, a finger's stroke, the focus near / middle / far, a phrase far,
                                               drops merging (a short sequence of crops). (RAIN-0's captures stay in tools/.ui-snap/rain0/.)
      node tools/rain-snap.mjs --level full    the same at Detailed (files named …-full)
+     node tools/rain-snap.mjs --rain1         RAIN-1: the baked city → tools/.ui-snap/rain1/ (each mood, the focus near / middle / far, a phrase, before / after)
      node tools/rain-snap.mjs --cost          no captures: per level, the room against Dark (hand detections a second, the forest budget's
                                               method), its frame time, draws, programs, texture memory and opening time, printed as JSON */
 import http from 'node:http';
@@ -52,6 +53,43 @@ try{
   } else if(argv.includes('--row')){   // the browser row «RAIN room» alone (a quick look while working; the judged run is the Night suite's)
     const { ctx, p, errs }=await open({ width:1280, height:800 }, LEVEL);
     console.log(JSON.stringify(await p.evaluate(async ()=>(await import('/tools/probes/night/rainroom.js')).checkRainRoom()), null, 1), errs.slice(0, 5)); await ctx.close();
+  } else if(argv.includes('--rain1')){   /* RAIN-1: the baked city — each mood, the focus near / middle / far, a phrase lighting windows; a before / after page */
+    const O1=path.join(ROOT, 'tools/.ui-snap/rain1'); await mkdir(O1, { recursive:true }); const made1=[], log1={};
+    const RU={ late:'Поздняя ночь', evening:'Вечерний бульвар', after:'После дождя' };
+    for(const [tag, vp, dpr] of [['phone', { width:390, height:844 }, 2.75], ['laptop', { width:1280, height:800 }, 1]]){
+      const { ctx, p, errs }=await open(vp, LEVEL, dpr), shot=async (name, ru)=>{ const f=`${tag}-${name}${SUF}.png`; await p.screenshot({ path:path.join(O1, f) }); log1[f]=await stateOf(p); made1.push([f, ru]); };
+      const R=()=>p.evaluate(()=>window.__H.sceneRoomDbg());
+      await p.evaluate(()=>{ const R=window.__H.sceneRoomDbg(); R.mistDbg(0.12); });   // the pane wiped for the city's captures (the mist is the room's first touch; judged in motion)
+      await hand(p, 0.5, 0.45, 0.2, false, 10);
+      const mid=await p.evaluate(async ()=>{ const FO=await import('/apps/night/rooms/rain/pure/focus.js'), R=window.__H.sceneRoomDbg(); let lo=0.08, hi=0.34, best=0.17;
+        for(let it=0;it<8;it++){ const s=(lo+hi)/2; best=s; const G=window.__G, c=window.__clk; for(let i=0;i<40;i++){ c.t+=1000/30; G.processHandsProbe({ landmarks:[window.__PO.pose({ x:0.5, y:0.45, s, gaps:[1, 1, 1, 1] })], handednesses:[[{ categoryName:'Right' }]] }); }
+          await new Promise(r=>setTimeout(r, 250)); if(FO.focusDepth(R.state().target)>FO.LAYER_DEPTH.street) lo=s; else hi=s; } return best; });
+      for(const mood of ['late', 'evening', 'after']){ await p.evaluate(m=>window.__H.sceneRoomDbg().lookDbg(m), mood); await hand(p, 0.5, 0.45, mid, false, 10); await p.waitForTimeout(3200);
+        await shot(`mood-${mood}`, `${RU[mood]}: фокус на бульваре`); }
+      await p.evaluate(()=>window.__H.sceneRoomDbg().lookDbg('evening'));
+      await hand(p, 0.5, 0.45, 0.32, false, 10); await p.waitForTimeout(2600); await shot('focus-near', 'Фокус близко: капли резкие, город в мягком боке');
+
+      await hand(p, 0.5, 0.45, mid, false, 8); await p.waitForTimeout(2600); await shot('focus-mid', 'Фокус посередине: бульвар резкий, стекло и холмы мягкие');
+      await hand(p, 0.5, 0.45, 0.08, false, 8); await p.waitForTimeout(2600); await shot('focus-far', 'Фокус далеко: дом напротив и холмы резкие');
+      /* a phrase: notes where the light points at windows of the house opposite (the window map's nearest windows on screen) */
+      const pts=await p.evaluate(()=>{ const R=window.__H.sceneRoomDbg(), S=R.state(), out=[]; for(let i=0;i<S.windows && out.length<6;i+=7){ const q=R.windowAt(i); if(q && q.inView && q.r>2) out.push([q.x/innerWidth, q.y/innerHeight]); } return out; });
+      for(const [x, y] of pts) await note(p, x, y, mid);   // the middle focus: the street sharp, the windows readable (a note lights a window from focus 0.45 on)
+      await p.waitForTimeout(900); await shot('phrase', `Фраза: ${pts.length} нот зажгли окна под светом — в каждом своя жизнь`);
+      if(errs.length) log1[tag+'-errors']=errs.slice(0, 8); await ctx.close(); }
+    await writeFile(path.join(O1, `rain1${SUF}.json`), JSON.stringify(log1, null, 1));
+    const fig=(f, cap, ph)=>`<figure><img class="${ph ? 'phone' : ''}" src="${f}" alt=""><figcaption>${cap}</figcaption></figure>`, pair=n=>{ const a=made1.find(m=>m[0]===`phone-${n}${SUF}.png`), b=made1.find(m=>m[0]===`laptop-${n}${SUF}.png`); return `<div class="row">${fig(a[0], a[1]+' (телефон)', 1)}${fig(b[0], b[1]+' (ноутбук)')}</div>`; };
+    const html=`<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>RAIN-1 — запечённый город</title>
+<style>body{background:#101014;color:#e8e4dc;font:16px/1.5 system-ui,sans-serif;margin:0;padding:24px;max-width:1500px} h1,h2{font-weight:500} figure{margin:0 0 30px} img{max-width:100%;height:auto;border-radius:8px;display:block} img.phone{max-height:80vh} figcaption{margin-top:8px;color:#c9c2b6} .row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2.2fr);gap:20px;align-items:start}</style>
+<h1>RAIN-1 — запечённый город (${LEVEL==='full' ? 'Детальная' : 'Стандартная'} картинка)</h1>
+<p>Стекло для этих снимков протёрто (в комнате оно сначала запотевшее — палец рисует по туману). Город построен кодом и запечён заранее (tools/rain-bake.mjs --city).</p>
+<h2>Настроения</h2>${['mood-late', 'mood-evening', 'mood-after'].map(pair).join('')}
+<h2>Фокус</h2>${['focus-near', 'focus-mid', 'focus-far'].map(pair).join('')}
+<h2>Фраза зажигает окна</h2>${pair('phrase')}
+<h2>До и после (RAIN-0b → RAIN-1)</h2>
+<div class="row">${fig('../rain0b/phone-far.png', 'До: заглушка (телефон, фокус далеко)', 1)}${fig('../rain0b/laptop-far.png', 'До: заглушка (ноутбук, фокус далеко)')}</div>
+<div class="row">${fig(`phone-focus-far${SUF}.png`, 'После: запечённый город (телефон)', 1)}${fig(`laptop-focus-far${SUF}.png`, 'После: запечённый город (ноутбук)')}</div>
+</html>`;
+    await writeFile(path.join(O1, `index${SUF}.html`), html); console.log(`[rain-snap] ${made1.length} captures → tools/.ui-snap/rain1/index${SUF}.html`);
   } else if(COST){
     const out={};
     for(const lv of (FOREST ? ['reduced'] : ['reduced', 'full'])){   /* --forest: the same measurement on the forest at Standard, for comparison */ const { ctx, p, errs }=await open({ width:1536, height:730 }, lv);

@@ -49,8 +49,10 @@ async function modelFetch(url, progress, stallMs, fresh=false){
   } finally { clearTimeout(tm); }
 }
 /* CORE-20 (opt-in): fresh — a RETRY after a failed start: the model with cache 'reload' and MediaPipe's loader and binary with «?retry», so nothing
-   preloaded by the page that failed is taken again (absent: exactly as before). CORE-22 (opt-in): files 'own' — MediaPipe from our origin (mpFilesOf) */
-export async function createDetector({ delegate='GPU', blank=null, step=null, progress=null, stallMs=0, fresh=false, files:src='cdn' }={}){
+   preloaded by the page that failed is taken again (absent: exactly as before). CORE-22 (opt-in): files 'own' — MediaPipe from our origin (mpFilesOf).
+   CORE-23 (opt-in): hold — an async function awaited before each heavy step (both builds, both warm-ups), so a young camera request's answer
+   is not timed behind them (absent: no extra await, exactly as before) */
+export async function createDetector({ delegate='GPU', blank=null, step=null, progress=null, stallMs=0, fresh=false, files:src='cdn', hold=null }={}){
   const at=mpFilesOf(src), { HandLandmarker, FilesetResolver }=await import(at.lib);
   const files=await FilesetResolver.forVisionTasks(at.wasm);
   if(fresh){ files.wasmLoaderPath+='?retry'; files.wasmBinaryPath+='?retry'; }
@@ -58,7 +60,10 @@ export async function createDetector({ delegate='GPU', blank=null, step=null, pr
   const buf= progress ? await modelFetch(at.model, progress, stallMs, fresh) : new Uint8Array(await (await fetch(at.model, fresh ? { cache:'reload' } : undefined)).arrayBuffer());   // the model file once, for both models (CORE-18: with its progress when asked)
   const mk=n=>HandLandmarker.createFromOptions(files,{ baseOptions:{ modelAssetBuffer:buf.slice(), delegate },
     runningMode:'VIDEO', numHands:n, minHandDetectionConfidence:0.5, minTrackingConfidence:0.5 });
-  const L2=await mk(2), L1=await mk(1);
+  if(hold) await hold();
+  const L2=await mk(2);
+  if(hold) await hold();
+  const L1=await mk(1);
   let ts=0, slowMs=0, script=null, scriptI=0, fake=false;
   const nextTs=t=>{ ts=Math.max(ts+1, Math.floor(t)); return ts; };   // VIDEO mode: strictly increasing timestamps per model
   const warmMs={};
@@ -66,7 +71,7 @@ export async function createDetector({ delegate='GPU', blank=null, step=null, pr
   const warm=()=>{ warmOne('L2',L2); warmOne('L1',L1); };
   /* at start the two warm-ups are two tasks with a yield between them (the step awaits a paint on the main thread): two shorter
      freezes behind the start card instead of one long one */
-  if(blank){ if(step) await step('warm'); warmOne('L2',L2); if(step) await step('warm2'); warmOne('L1',L1); }
+  if(blank){ if(step) await step('warm'); if(hold) await hold(); warmOne('L2',L2); if(step) await step('warm2'); if(hold) await hold(); warmOne('L1',L1); }
   const model=a=> a==='track1' ? L1 : L2;
   /* one frame: run `action` ('skip' runs nothing); a tracking action that found no hand retries a search (schedRetry). Returns the
      plain result, the action that finally ran and the model time. Probe hooks: slowMs (busy-wait, a detector slower than the camera)

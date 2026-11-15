@@ -92,6 +92,11 @@ NIGHT-11 — ONE NOTICE LINE for what needs the person's tap now: the sound stop
 - const (3): `NOTICE_PRI`, `noticeOf`, `noticeDbg`
 - fn (3): `noticeShow`, `noticeHide`, `noticeWire`
 
+## apps/night/persist.js
+NIGHT-15: ASK ONCE TO KEEP NIGHT'S FILES (pure/persist.js decides).
+- const (1): `persistDbg`
+- fn (3): `persistAsk`, `persistSoon`, `persistInfo`
+
 ## apps/night/pure/ambience.js
 THE AMBIENCE'S SEEDED LAWS (RUN 7, C4c; docs/night/QUALITY.md points 1, 5, 8; Night's own since CORE-7): pure (rule #36), node-tested (data row «NIGHT cricket schedule (app)»).
 - const (1): `NATURE_CRICKETS`
@@ -157,7 +162,16 @@ NIGHT-11 part 2 — LINKS OPENED INSIDE A MESSENGER (audit W4).
 ## apps/night/pure/layers.js
 RAIN-3: A ROOM's LAYERED RECORDINGS — near and far, crossfaded by the focus — and its EVENT SOUNDS on a seeded schedule (pure, rule #36; data row «RAIN nature (app)»), run unchanged by the nature w…
 - const (3): `LAYERS`, `layerMinLen`, `layersStats`
-- fn (6): `layersEvents`, `layersNew`, `layersRec`, `layersFocus`, `layersOn`, `layersOut`
+- fn (8): `layersEvents`, `layersNew`, `layersRec`, `layersPasses`, `layersDensity`, `layersFocus`, `layersOn`, `layersOut`
+
+## apps/night/pure/passes.js
+RAIN-1: PASSING VEHICLES — one law for the picture and the sound (pure, rule #36; data row «RAIN car passes (app)»).
+- fn (2): `passTraffic`, `passEvents`
+
+## apps/night/pure/persist.js
+NIGHT-15: KEEP NIGHT'S FILES — whether to ask the browser for persistent storage (navigator.storage.persist), so a browser short of space does not drop the precache.
+- const (2): `PERSIST_KEY`, `promptsFor`
+- fn (2): `persistPlan`, `persistLine`
 
 ## apps/night/pure/pixels.js
 NIGHT-11 part 5 — THE SCENE'S PIXEL BUDGET (audit P4).
@@ -330,6 +344,11 @@ NIGHT-3: the forest's 2D STAND-IN — the «low» level and the fallback without
 NIGHT-3: THE ROOMS — the order a player meets them (ids, rule #37) and each room's parts: its record (data), its 2D stand-in, and its scene code, loaded only when the room is first opened.
 - const (5): `ROOMS`, `roomsAll`, `roomById`, `roomAdd`, `roomRemove`
 
+## apps/night/rooms/rain/heard.js
+NIGHT-15: THE RAIN ROOM HEARD WITHOUT ITS PICTURE (Dark, Camera, the 2D stand-in, an opening).
+- const (1): `RAIN_FOCUS`
+- fn (1): `rainHeard`
+
 ## apps/night/rooms/rain/install.js
 RAIN-0: THE RAIN ROOM JOINS THE APP — loaded only by the development rooms' door (apps/night/rooms/dev.js: the development edition and «?room=rain» in the address).
 - const (1): `RAIN`
@@ -337,8 +356,8 @@ RAIN-0: THE RAIN ROOM JOINS THE APP — loaded only by the development rooms' do
 
 ## apps/night/rooms/rain/pure/city.js
 RAIN-0b: THE VIEW LAW — the eye on the 8th floor, looking slightly down and diagonally along the boulevard (concept §3), as ONE pure projection used by the painting, the depth map, the lights, the …
-- const (11): `CAM`, `STREET`, `BLOCKS`, `FLOOR`, `FAR`, `camBasis`, `vanishing`, `DEPTH`, `hillsAt`, `RAIN_CITY_SEED`, `TRAFFIC`
-- fn (8): `project`, `rayOf`, `depthOf`, `sceneAt`, `cityWindows`, `cityLamps`, `cityTrees`, `trafficAt`
+- const (16): `CAM`, `STREET`, `BAKE_EXT`, `BLOCKS`, `FLOOR`, `FAR`, `camBasis`, `vanishing`, `DEPTH`, `hillsAt`, `RAIN_CITY_SEED`, `TRAFFIC`, `RAIN_TRAFFIC`, `EAR`, `trafficAt`, `trafficDensity`
+- fn (7): `project`, `rayOf`, `depthOf`, `sceneAt`, `cityWindows`, `cityLamps`, `cityTrees`
 
 ## apps/night/rooms/rain/pure/drops.js
 RAIN-0b: THE DROPS ON THE PANE — a stateful simulation, so drops see each other (pure, rule #36; data row «RAIN glass law (app)»).
@@ -366,7 +385,7 @@ RAIN-0: THE WINDOWS — their places, which one a note lights, and how a lit win
 
 ## apps/night/rooms/rain/rain-city.js
 RAIN-0b: THE STAND-IN CITY's prepared picture and its DEPTH MAP, painted ONCE on the GPU (an opening, a resize, a mood): one ray per pixel through the view law (pure/city.js — this shader is its po…
-- const (1): `CITY_F`
+- const (2): `BAKED_F`, `CITY_F`
 - fn (1): `cityUniforms`
 
 ## apps/night/rooms/rain/rain-glass.js
@@ -375,8 +394,8 @@ RAIN-0: THE RAIN ROOM'S SHADERS (our own, written from the physics: a drop is a 
 
 ## apps/night/rooms/rain/rain.js
 RAIN-0 — THE RAIN ROOM's picture (docs/night/design/RAIN/CONCEPT.md; the plan and what is still a placeholder: PLAN.md).
-- const (4): `RAIN_LEVELS`, `FINGER_GAP`, `BOKEH`, `rainAssets`
-- fn (1): `buildRain`
+- const (3): `RAIN_LEVELS`, `FINGER_GAP`, `BOKEH`
+- fn (2): `rainAssets`, `buildRain`
 
 ## apps/night/rooms/rain/standin.js
 RAIN-0: the rain room's 2D STAND-IN — the «low» level and the fallback without WebGL (or after a lost context): the night sky over the city's warm glow, and a soft glow at each hand (the playing ha…
@@ -385,7 +404,7 @@ RAIN-0: the rain room's 2D STAND-IN — the «low» level and the fallback witho
 ## apps/night/roomswitch.js
 NIGHT-3 stage 5 part 2: THE ROOM SWITCH — one door for everything a room change touches, in this order: the music bed fades out and holds (it takes the new room's recipes while silent); the picture…
 - const (9): `ROOM_KEY`, `ROOM_NAME_MS`, `roomCurrent`, `roomNature`, `natureModule`, `natureLayersDbg`, `roomNext`, `roomSwitchDbg`, `natureAmbDbg`
-- fn (8): `natureLoad`, `natureRecOf`, `natureRecPcm`, `natureRecStereo`, `natureFocus`, `natureLight`, `roomRestore`, `roomSwitch`
+- fn (9): `natureLoad`, `natureRecOf`, `natureRecPcm`, `natureRecStereo`, `natureDensity`, `natureFocus`, `natureLight`, `roomRestore`, `roomSwitch`
 
 ## apps/night/scalepick.js
 CORE-20: Night fetches only the modes it plays — every room's moods and the page profile's moods (core/scalepick.js reads the profile) — and what they need.
@@ -393,7 +412,7 @@ CORE-20: Night fetches only the modes it plays — every room's moods and the pa
 
 ## apps/night/scene/host.js
 THE SCENE HOST and Night's BACKGROUNDS (VIS1b, RUN 6; Night's own since CORE-8 — the shared UI reaches it through hooks.scene).
-- const (32): `BACKGROUNDS`, `sceneRoomAdd`, `sceneRoomRemove`, `sceneRooms`, `sceneRoom`, `sceneRoomSet`, `SCENE_LEVEL_DEFAULT`, `SCENE_FADE`, `scenePausing`, `COMPILE_LOG`, `sceneFlyPick`, `sceneFlyAt`, `sceneFlyLand`, `sceneRestDbg`, `sceneLitDbg`, `backgroundOf`, `sceneLevel`, `sceneShadowDbg`, `sceneOptDbg`, `sceneInfo`, `sceneRoomDbg`, `sceneLostDbg`, `sceneStartNote`, `sceneStartLevelDbg`, `sceneHoldDbg`, `sceneGuardDbg`, `sceneLevelDbg`, `sceneHeldDbg`, `sceneProgramsDbg`, `sceneClockDbg`, `sceneBedDbg`, `sceneOpenDbg`
+- const (33): `BACKGROUNDS`, `sceneRoomAdd`, `sceneRoomRemove`, `sceneRooms`, `sceneRoom`, `sceneRoomSet`, `SCENE_LEVEL_DEFAULT`, `SCENE_FADE`, `scenePausing`, `COMPILE_LOG`, `sceneFlyPick`, `sceneFlyAt`, `sceneFlyLand`, `sceneRestDbg`, `sceneLitDbg`, `sceneHeardDbg`, `backgroundOf`, `sceneLevel`, `sceneShadowDbg`, `sceneOptDbg`, `sceneInfo`, `sceneRoomDbg`, `sceneLostDbg`, `sceneStartNote`, `sceneStartLevelDbg`, `sceneHoldDbg`, `sceneGuardDbg`, `sceneLevelDbg`, `sceneHeldDbg`, `sceneProgramsDbg`, `sceneClockDbg`, `sceneBedDbg`, `sceneOpenDbg`
 - fn (10): `loadThree`, `sceneOpen`, `sceneSwitch`, `sceneClose`, `sceneRest`, `setBackground`, `setSceneLevel`, `sceneSnapDbg`, `sceneShotDbg`, `sceneLoseDbg`
 
 ## apps/night/settabs.js
@@ -409,7 +428,7 @@ RUN 7 (C6 + C11, Night plan §5; docs/night/QUALITY.md points 4, 5, 6, 9, 10) �
 ## apps/night/sound/ambience.js
 THE ROOMS' AMBIENCE (RUN 7, C4c; Night's own since CORE-7): drone + wind + distant crickets + one soft echo (NIGHT-8: + the stream), built from a room's NATURE recipe (the forest's: apps/night/room…
 - const (4): `NATURE_WORKLET`, `BROOK_SLEEP_S`, `AMB_SWAP`, `LAYERS_WORKLET`
-- fn (13): `buildAmbience`, `ambienceSchedule`, `ambienceTune`, `ambienceSet`, `ambienceRoom`, `ambienceBrook`, `ambienceBrookLight`, `ambienceBrookStats`, `ambienceBrookRec`, `ambienceLayers`, `ambienceLayersRec`, `ambienceLayersFocus`, `ambienceLayersStats`
+- fn (14): `buildAmbience`, `ambienceSchedule`, `ambienceTune`, `ambienceSet`, `ambienceRoom`, `ambienceBrook`, `ambienceBrookLight`, `ambienceBrookStats`, `ambienceBrookRec`, `ambienceLayers`, `ambienceLayersDensity`, `ambienceLayersRec`, `ambienceLayersFocus`, `ambienceLayersStats`
 
 ## apps/night/sound/bed.js
 NIGHT-3 stage 4: THE MUSIC BED's SOUND — built once on the first On into the master's input (the sleep fade and the limiter cover it; live sound, never a track — rule #31), from a room's bed recipe B.
@@ -1043,8 +1062,8 @@ Vercel Web Analytics queue stub — a classic script, not a module: calls made b
 
 ## core/vision.js
 (no head comment)
-- const (13): `video`, `canvas`, `ctx`, `handFilesOf`, `camLabel`, `modelInfo`, `visionOpts`, `VISION_DEF`, `lowInfo`, `pathInfo`, `pumpStats`, `camStats`, `setCameraPick`
-- fn (25): `initVision`, `initDetector`, `startCamera`, `switchCamera`, `setHandsSink`, `pollFrame`, `camInfo`, `setHandsTracked`, `setModelDelegate`, `setCamFps`, `setDetectPath`, `setLowLight`, `pumpDbg`, `pumpStepDbg`, `detRunDbg`, `lowDbg`, `camSimDbg`, `camOpenDbg`, `camStatsDbg`, `cameraSwitch`, `cameraList`, `cameraPickInfo`, `cameraWatch`, `cameraWatchRetry`, `cameraWatchDbg`
+- const (14): `video`, `canvas`, `ctx`, `handFilesOf`, `camHoldInfo`, `camLabel`, `modelInfo`, `visionOpts`, `VISION_DEF`, `lowInfo`, `pathInfo`, `pumpStats`, `camStats`, `setCameraPick`
+- fn (26): `initVision`, `initDetector`, `camHoldOf`, `startCamera`, `switchCamera`, `setHandsSink`, `pollFrame`, `camInfo`, `setHandsTracked`, `setModelDelegate`, `setCamFps`, `setDetectPath`, `setLowLight`, `pumpDbg`, `pumpStepDbg`, `detRunDbg`, `lowDbg`, `camSimDbg`, `camOpenDbg`, `camStatsDbg`, `cameraSwitch`, `cameraList`, `cameraPickInfo`, `cameraWatch`, `cameraWatchRetry`, `cameraWatchDbg`
 
 ## tools/probes/core/calpanel.js
 CORE-1 CP4: a development panel for the calibration, no app UI and no console needed: run it, set the sliders, measure the wrist.
@@ -1380,7 +1399,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 - const (5): `TEST_ROOM_ID`, `TEST_ROOM`, `testRoomMode`, `testRoomInfo`, `testRoomFreeLeaks`
 - fn (2): `testRoomInstall`, `testRoomRemove`
 
-_273 modules, 2840 exported names._
+_277 modules, 2864 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

@@ -1,0 +1,40 @@
+{
+ "renderer": "three.js r128 (MIT), vendored at apps/night/vendor/three-r128/",
+ "ms": 27689,
+ "size": [
+  2050,
+  1106
+ ],
+ "counts": {
+  "late": {
+   "meshes": 69,
+   "windows": 998
+  },
+  "evening": {
+   "meshes": 77,
+   "windows": 998
+  },
+  "after": {
+   "meshes": 73,
+   "windows": 998
+  }
+ },
+ "windows": 138,
+ "sizes": {
+  "full": {
+   "late.webp": 248096,
+   "evening.webp": 253110,
+   "lit.webp": 272188,
+   "depth.png": 313007,
+   "after.webp": 250710
+  },
+  "reduced": {
+   "late.webp": 103284,
+   "evening.webp": 105636,
+   "lit.webp": 113724,
+   "depth.png": 190655,
+   "after.webp": 104454
+  }
+ },
+ "errors": []
+}

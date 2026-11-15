@@ -25,6 +25,7 @@ import { calWire, calOfferIfNew, calActive, calSideApply, calSideSet, calSetting
 import { setSceneLevel, sceneLevel, setBackground, backgroundOf, sceneInfo, sceneRoom, sceneRooms, sceneOptDbg, sceneStartNote } from './scene/host.js';   // RUN 8 (slice 4): the scene's quality (development switch); C8 the measurement
 import { roomSwitch, roomNext, natureLight } from './roomswitch.js';
 import { setTabsWire } from './settabs.js';   // DESIGN-1 part C: the settings in three tabs (revert: docs/night/design/DESIGN-1-settings-before.html)   // NIGHT-3 stage 5 part 2: the Room button
+import { persistInfo } from './persist.js';   // NIGHT-15: whether the browser keeps Night's files
 import { latReport } from '../../core/legacy-ui/latmeter.js';   // C8: the device measurement reads the latency meter
 import { cardsWire, cardsShow, cardsOpen, cardsDue, cardsDone, cardsEnvNow } from './cards.js';   // NIGHT-7: the first cards
 import { camWire, camRender } from './camera.js';   // NIGHT-10: Settings → Camera
@@ -301,7 +302,7 @@ async function measure(){
     const text=['Handsong Night — device measurement', navigator.userAgent, (latReport().gpu||{}).renderer||'', ...rows,
       (G=>`resolution guard: ${G.steps} step(s) on this screen at the level now; lowered ${G.downs} time(s), raised ${G.ups}; picture ${G.buffer ? G.buffer.join('×') : '—'}`)(sceneInfo().guard||{}),   // NIGHT-11 part 5
       O.length ? `openings: first ${op(O[0])}; later ${O.slice(1).map(op).join(', ')||'none'}` : 'openings: none',
-      `device: ${navigator.deviceMemory||'?'} GB, ${navigator.hardwareConcurrency||'?'} cores, ${devicePixelRatio} device px per CSS px, screen ${screen.width}×${screen.height}`].join('\n');
+      `device: ${navigator.deviceMemory||'?'} GB, ${navigator.hardwareConcurrency||'?'} cores, ${devicePixelRatio} device px per CSS px, screen ${screen.width}×${screen.height}`, await persistInfo()].join('\n');   // NIGHT-15: the storage line
     out.textContent=t('night.measured')+'\n'+text; try{ await navigator.clipboard.writeText(text); }catch(e){}
   } finally { clearInterval(notes); for(const o of ['measure:0','measure:1']) leadOff(o); sceneOptDbg(null);
     lightApply(keep.light,false); await setSceneLevel(keep.level); await setBackground(keep.bg); measuring=false; render(); }

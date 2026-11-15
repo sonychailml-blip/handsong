@@ -66,6 +66,8 @@ THERE in full and here as one index entry):
   160 «A new version is ready» on the Poco: the start screen, a reload, a return from the background (NIGHT-14d)
   161 The room «Rain»: drops that see each other, the mist as the first touch, the focus at many depths, the view along the boulevard, the baked city's look test (RAIN-0b)
   162 The room «Rain»'s sound: the pane near, the wet street far, crossfaded by the hand's depth; drips and a quiet tick; the candidates by ear (RAIN-3)
+  164 The room «Rain»'s baked city: the boulevard, the moods' life, windows lit with their lives, the cars heard as they pass (RAIN-1)
+  163 Fixes after the backlog audit: an in-app browser's refusal, the Lighter stream, the rain room's sound on Dark, Licences, keeping the files (NIGHT-15, CORE-23)
 
 ## Moved to `archive/CLAUDE-history.md` at DOC1 (grep by title; read only what the slice needs)
 - «Module map (full, moved at DOC1)» — every module's detailed paragraph (AUD1a … IDS1, SONG1, AUTOSAVE1, PACK1 …).

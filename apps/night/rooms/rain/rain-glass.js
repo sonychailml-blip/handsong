@@ -25,10 +25,10 @@ void main(){ float r=radAt(texture2D(uDepth, vUv).a);   /* the depth rides in th
    behind a curtain, its bars, a little light spilling on the wall. Out of focus (its own radius by its depth): the same light spread over the
    window grown by that radius into a soft rounded rectangle, dimmer by the area. Premultiplied: the pane covers the dark window, the disc adds. */
 export const WIN_V=`attribute vec4 aRect; attribute float aLit, aWarm, aDepth; uniform vec2 uTan; uniform vec3 uFoc; uniform float uPad;
-varying vec2 vP, vH; varying float vLit, vWarm, vR; ${RAD}
-void main(){ vR=radAt(aDepth); vec2 hs=aRect.zw+vR+uPad*min(1., aRect.w*8.); vP=position.xy*hs; vH=aRect.zw; vLit=aLit; vWarm=aWarm;
+varying vec2 vP, vH, vV; varying float vLit, vWarm, vR; ${RAD}
+void main(){ vR=radAt(aDepth); vec2 hs=aRect.zw+vR+uPad*min(1., aRect.w*8.); vP=position.xy*hs; vH=aRect.zw; vLit=aLit; vWarm=aWarm; vV=aRect.xy+vP;
   gl_Position= aLit>0.004 ? vec4((aRect.xy+vP)/uTan, 0., 1.) : vec4(2., 2., 2., 1.); }`;
-export const WIN_F=`precision highp float; uniform float uPad; uniform vec3 uHoney, uAmber; varying vec2 vP, vH; varying float vLit, vWarm, vR;
+export const WIN_F=`precision highp float; uniform float uPad, uBaked; uniform vec3 uHoney, uAmber; uniform sampler2D uLit; uniform vec2 uExt; varying vec2 vP, vH, vV; varying float vLit, vWarm, vR;
 void main(){ vec2 q=abs(vP)-vH; float d=length(max(q, 0.))+min(max(q.x, q.y), 0.), R=max(vR, 1e-4), k=clamp(vR/(vH.y*0.9+0.002), 0., 1.);
   vec3 warm=mix(uHoney, uAmber, vWarm); vec2 u=vP/vH, lp=u-vec2(0.3*sin(vWarm*40.), -0.4);
   float folds=0.84+0.16*sin(u.x*9.+vWarm*20.), lamp=0.6+0.4*exp(-dot(lp, lp)*1.5);
@@ -37,7 +37,8 @@ void main(){ vec2 q=abs(vP)-vH; float d=length(max(q, 0.))+min(max(q.x, q.y), 0.
   float A0=4.*vH.x*vH.y, A1=A0+4.*(vH.x+vH.y)*R+3.1416*R*R, gain=pow(A0/A1, 0.5);
   float disc=smoothstep(R, R*0.7, d)*(0.86+0.14*smoothstep(R*0.2, R*0.9, d));
   float sp=uPad*min(1., vH.y*8.), spill=exp(-max(d, 0.)/(sp*0.3+1e-5))*0.16*(1.-k)*step(0., d);
-  vec3 c=mix(warm*folds*lamp*bars*inA, warm*0.85*gain*disc, k)+warm*spill;
+  vec3 inner= uBaked>0.5 ? texture2D(uLit, clamp(vV/uExt*0.5+0.5, 0., 1.)).rgb*1.1 : warm*folds*lamp*bars;   /* RAIN-1: in focus, the baked room and its life */
+  vec3 c=mix(inner*inA, warm*0.85*gain*disc, k)+warm*spill;
   gl_FragColor=vec4(c*vLit, inA*(1.-k)*min(1., vLit*1.5)); }`;
 /* A LIGHT (one instance each): aRect its centre and half size, aCol its colour and strength, aDK its depth and kind — 0 a point (a lamp, a far
    light, a car's light: a small glow in focus), 1 a reflection in the wet street (a streak below its light, fading downwards), 2 a lit rectangle

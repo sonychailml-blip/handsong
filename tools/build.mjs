@@ -9,6 +9,7 @@ import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { precachePaths, writePrecache, NIGHT_SKIP, NIGHT_LATER, NIGHT_INCLUDE } from './precache.mjs';   // NIGHT-14
+import { renderNightLicences } from './check-licences.mjs';   // NIGHT-15: Night's «Licences» page
 
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), argv=process.argv.slice(2), posix=path.posix;
 const die=s=>{ console.error('[build] FAILED — '+s); process.exit(1); };
@@ -16,7 +17,7 @@ const app=process.env.HANDSONG_APP; if(!['full','night'].includes(app)) die('HAN
 const other=app==='full' ? 'night' : 'full', i=argv.indexOf('--out'), OUT=path.resolve(ROOT, i>=0 ? argv[i+1] : 'dist');
 /* NIGHT-7: Night's Vercel PRODUCTION build is the release edition by itself (no development items for players), unless HANDSONG_EDITION=dev */
 const PREVIEW=argv.includes('--probes') || process.env.VERCEL_ENV==='preview', RELEASE=process.env.HANDSONG_EDITION==='release' || (app==='night' && process.env.VERCEL_ENV==='production' && process.env.HANDSONG_EDITION!=='dev');
-const PAGE_LEVEL=['manifest.json','sw.js','icons'], BASE=`apps/${app}`;
+const PAGE_LEVEL=['manifest.json','sw.js','icons', ...(app==='night' ? ['licences.html'] : [])], BASE=`apps/${app}`;   // NIGHT-15: Night's «Licences» page sits beside the page
 const noDocs=f=>!f.toLowerCase().endsWith('.md');
 const copyTree=(from,to,keep=noDocs)=>cpSync(path.join(ROOT,from),path.join(OUT,to),{ recursive:true, filter:s=>statSync(s).isDirectory() || keep(s) });
 
@@ -25,6 +26,10 @@ copyTree('core','core');
 copyTree(BASE,BASE,f=>{ const r=path.relative(path.join(ROOT,BASE),f).replace(/\\/g,'/'); return noDocs(f) && r!=='index.html' && !PAGE_LEVEL.some(p=>r===p||r.startsWith(p+'/')); });
 for(const f of PAGE_LEVEL){ copyTree(`${BASE}/${f}`,f); rmSync(path.join(OUT,BASE,f),{ recursive:true, force:true }); }
 copyFileSync(path.join(ROOT,'THIRD-PARTY-LICENSES.md'),path.join(OUT,'THIRD-PARTY-LICENSES.md'));
+/* NIGHT-15: Night's «Licences» page lives next to the page (its link is page-relative: «licences.html»), written again from the register here —
+   after the development rooms are gone (below), so a players' build lists only what it carries */
+const nightLicences=()=>{ rmSync(path.join(OUT,'apps/night/licences.html'),{ force:true });
+  writeFileSync(path.join(OUT,'licences.html'), renderNightLicences(JSON.parse(readFileSync(path.join(ROOT,'tools/licences.json'),'utf8')), f=>existsSync(path.join(OUT,f)))); };
 if(RELEASE) writeFileSync(path.join(OUT,'core/edition.js'),"export const EDITION='release';\n");
 /* NIGHT-14: the development rooms stay out of a players' build — their folder is not copied and the door (rooms/dev.js) loses its import() of them
    (the door is shut in the release edition anyway: data row «RAIN stays out of the players' edition (app)»). A door that changed shape fails the build. */
@@ -32,6 +37,7 @@ const DEV_DOOR="import('./rain/install.js').then(m=>m.rainInstall())";
 if(RELEASE && app==='night'){ rmSync(path.join(OUT,'apps/night/rooms/rain'),{ recursive:true, force:true });
   const f=path.join(OUT,'apps/night/rooms/dev.js'), t=readFileSync(f,'utf8'); if(t.split(DEV_DOOR).length!==2) die("apps/night/rooms/dev.js: the rain room's import() is not where the build expects it (NIGHT-14)");
   writeFileSync(f, t.replace(DEV_DOOR, 'Promise.resolve(null)')); }
+if(app==='night') nightLicences();
 
 /* the page: its references gain the app's folder; page-level ones and addresses stay. Production loses the probes tag */
 function rebasePage(html){
