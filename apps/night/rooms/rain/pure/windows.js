@@ -45,3 +45,21 @@ export function traceLevel(age){
 /* a window's light now: the city's own (its amb under the mood's share → a steady glow) or the trace of the last note on it, whichever is brighter */
 export const AMB_LEVEL=0.72;
 export const windowLight=(w, share, age)=>Math.max(w.amb<share ? AMB_LEVEL*(0.75+0.25*w.warm) : 0, traceLevel(age));
+/* RAIN-5c: LIFE IN THE WINDOWS (data row «RAIN window life (app)»): a few windows (6 %, seeded) carry a twinkling garland; and RARELY, from one seeded
+   schedule (an event every 22–55 s across the city, 7–14 s long), in one of the steadily lit windows: someone walks up to the window from inside and
+   away again (walkup), a curtain is drawn a little and back (curtain), a silhouette comes, the light goes out and comes back (onoff). Never the same
+   kind twice in a row, never the same window twice in a row. */
+const frac1=x=>x-Math.floor(x), hsh=(a, b=0)=>frac1(Math.sin(a*127.1+b*311.7)*43758.5453);
+export const WINLIFE=Object.freeze({ seed:0x57494E4C, garland:0.06, every:Object.freeze([22, 55]), dur:Object.freeze([7, 14]), kinds:Object.freeze(['walkup', 'curtain', 'onoff']) });
+export const winGarland=(i, seed=WINLIFE.seed)=>hsh(i+seed%9973, 41)<WINLIFE.garland;
+/* the schedule to t1: [{ kind, t, dur, pick (0…1: which of the lit windows) }] */
+export function winEvents(t1, seed=WINLIFE.seed, W=WINLIFE){ const out=[]; let t=W.every[0]*0.5, prev=null, pp=-1, i=0;
+  while(t<t1){ const opts=W.kinds.filter(k=>k!==prev), kind=opts[Math.floor(hsh(seed+i, 1)*opts.length)]; let pick=hsh(seed+i, 2); if(Math.abs(pick-pp)<0.02) pick=frac1(pick+0.37);
+    const dur=W.dur[0]+hsh(seed+i, 3)*(W.dur[1]-W.dur[0]); out.push({ kind, t, dur, pick }); prev=kind; pp=pick; i++; t+=dur+W.every[0]+hsh(seed+i, 4)*(W.every[1]-W.every[0]); }
+  return out; }
+const WSCHED=new Map();
+/* the event now (or null): cand — the indices of the windows lit now (the city's own); → { i (window), kind, u (0…1 through it) } */
+export function winEventAt(t, cand, seed=WINLIFE.seed){ if(!cand || !cand.length) return null; let s=WSCHED.get(seed); if(!s || s.until<t){ const until=Math.max(t+3600, s ? s.until*2 : 3600); s={ until, list:winEvents(until, seed) }; WSCHED.set(seed, s); }
+  for(const e of s.list){ if(e.t>t) break; if(t<=e.t+e.dur) return { i:cand[Math.min(cand.length-1, Math.floor(e.pick*cand.length))], kind:e.kind, u:(t-e.t)/e.dur }; } return null; }
+/* the onoff event's light through it: on, out from 55 %, back at 92 % */
+export const winOnOff=u=>u<0.55 ? 1 : u<0.92 ? Math.max(0, 1-(u-0.55)*10) : Math.min(1, (u-0.92)*12.5);

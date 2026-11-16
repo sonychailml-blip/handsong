@@ -1582,7 +1582,8 @@ async function rareCore(){
   n+=3; if(rep) miss(rep+' repeats in a row'); if(early) miss(early+' events too soon after the last'); if(badBloom) miss(badBloom+' flowers without a long-held note');
   const perH=A.length/8, kinds=new Set(A.map(e=>e.k)); n+=3; if(!(perH>=10 && perH<=30)) miss(perH.toFixed(1)+' events an hour'); if(kinds.size!==3) miss('kinds seen: '+[...kinds].join(', '));
   const Q=sim({}, false); n++;
-  if(!(Q[0].t>=K.first[0] && Q[0].t<=K.first[1]+1)) miss('the first timed event at '+Q[0].t+' s');   // a held note may open a flower sooner (a minute in) if(Q.some(e=>e.k==='bloom')) miss('a flower without any held note');
+  if(!(Q[0].t>=K.first[0] && Q[0].t<=K.first[1]+1)) miss('the first timed event at '+Q[0].t+' s');   // a held note may open a flower sooner (a minute in)
+  n++; if(Q.some(e=>e.k==='bloom')) miss('a flower without any held note');
   const C=sim({ repeat:true }); let rc=0; for(let i=1;i<C.length;i++) if(C[i].k===C[i-1].k) rc++; n++; if(!rc) miss('CONTROL: without the rule no repeat appeared (the rule check cannot fail)');
   const P=N.emblemPoints(); n+=2; if(P.length!==5 || P[2][1]!==Math.max(...P.map(p=>p[1]))) miss('emblem points: '+JSON.stringify(P));
   if(Math.abs(P[0][0]+P[4][0])>1e-12 || Math.abs(P[0][1]-P[4][1])>1e-12 || Math.abs(P[1][0]+P[3][0])>1e-12) miss('the emblem is not symmetric');
@@ -2581,6 +2582,54 @@ async function rainTimbres(){ const d=[], notes=[]; let n=0; const miss=x=>d.pus
    in the parent's degrees, the bass always inside its register and below the playing register, the glints in theirs, tempo 60…76, walking
    only at Evening. CONTROLS: Lydian's set with its G is caught; a chord tone outside the mode (degree 7) is caught; a bass register reaching
    the playing register is caught. */
+/* RAIN-4c / RAIN-4d — «RAIN lo-fi bed (app)»: the rain room's lo-fi pieces (apps/night/rooms/rain/pure/lofi/, the generative player apps/night/pure/lofi.js)
+   — each valid (lofiCheck: 2–4 progressions with their flow, grooves, lines, rhythms, motifs), one per mood; EVERY CHORD WITHIN ITS MODE (degrees of the
+   parent, the mood's notes a subset) and safe under the playing hand (no melody note a semitone above a chord tone unless it is one); over ten minutes
+   every generated vibraphone and guitar note safe over its bar's chord and inside its register, the bass inside its register and under the hand; two
+   plays the same; NEVER THE SAME TWICE: no two consecutive 16-bar spans identical (every bar's events compared), more than one progression and section
+   kind heard; LEVEL AND PIECE CHANGES ONLY ON BAR LINES (40 seeded moments; a stop exactly on a bar line, no note after it). CONTROLS: a fixed loop (no
+   chance) fails «never the same twice»; a mid-bar cut is caught; Lydian's iii is caught; a degree outside the mode is refused */
+async function rainLofi(){ const d=[], notes=[]; let n=0; const miss=x=>d.push(x), fs=await import('node:fs');
+  const LF=await import(new URL('../apps/night/pure/lofi.js', import.meta.url).href), RR=(await import(new URL('../apps/night/rooms/rain/pure/room.js', import.meta.url).href)).RAIN_ROOM, L=RR.bed2.lofi;
+  const mode=id=>{ try{ return JSON.parse(fs.readFileSync(new URL('../core/data/modes/'+id+'.json', import.meta.url), 'utf8')); }catch(e){ return null; } }, mod7=x=>((x%7)+7)%7;
+  const semi=(m, pcs)=>!pcs.includes(m) && pcs.some(q=>((m-q)%12+12)%12===1);
+  const avoid=(mel, chords, P)=>{ const bad=[]; for(const c of chords){ const pcs=[c.root, ...c.tones].map(k=>P[k]); for(const m of mel) if(semi(m, pcs)) bad.push(m); } return [...new Set(bad)]; };
+  const phrases=(Pc, P, evs)=>{ const bad=[], byBar=new Map(); for(const e of evs) if(e.kind==='chord') byBar.set(e.n, Pc.chords[Pc.progs[e.prog][e.bar]]);
+    for(const e of evs){ const ch=byBar.get(e.n); if((e.kind==='vib' || e.kind==='gtr') && ch){ const pcs=[ch.root, ...ch.tones].map(k=>P[k]), m=P[mod7(e.step)], R=LF.LOFI_REG[e.kind]; if(semi(m, pcs)) bad.push(`${e.kind} step ${e.step} over ${JSON.stringify(ch.tones)}`); if(e.step<R[0] || e.step>R[1]) bad.push(`${e.kind} step ${e.step} outside ${R}`); } }
+    return [...new Set(bad)]; };
+  /* each bar's events as a signature (kinds, steps, drums, positions to the 16th) → the first k where bars [k, k+16) equal [k+16, k+32) */
+  const repeats=(Pc, o={})=>{ const st=LF.lofiInit(Pc, 'full', { at:0.1, pc:o.pc, fixed:o.fixed }), evs=LF.lofiStep(st, 0, 600), B=LF.lofiBarSec(Pc), sig=[];
+    for(const e of evs){ if(e.n==null) continue; (sig[e.n]=sig[e.n]||[]).push([e.kind, e.drum||'', JSON.stringify(e.steps||e.step||''), Math.round((e.t-0.1-e.n*B)/B*16)].join(':')); }
+    const S=sig.map(x=>(x||[]).sort().join('|')); for(let k=0;k+32<=S.length;k++){ let same=true; for(let j=0;j<16 && same;j++) if(S[k+j]!==S[k+16+j]) same=false; if(same) return k; } return -1; };
+  const onBar=(st0, t)=>{ const B=LF.lofiBarSec(st0.P), k=(t-0.1)/B; return Math.abs(k-Math.round(k))<1e-6; };
+  const changesOk=(Pc, cut=false)=>{ const bad=[]; let r=0x51; const rnd=()=>((r=Math.imul(r^(r>>>15), 2246822507)>>>0)/4294967296);
+    for(let i=0;i<40;i++){ const st=LF.lofiInit(Pc, 'quiet', { at:0.1 }), t=1+rnd()*60, lv=['groove', 'full', 'quiet'][i%3]; LF.lofiStep(st, 0, t+0.6); const before=LF.lofiGain(st, 'beat', t);
+      const out= cut ? (()=>{ for(const L0 of LF.LOFI_LAYERS){ st.g[L0]=st.g[L0].concat([[t, LF.LOFI_LEVELS[lv].includes(L0) ? 1 : 0]]); } return [{ t, kind:'layer', layer:'beat' }]; })() : LF.lofiLevel(st, lv, t);
+      for(const L0 of LF.LOFI_LAYERS){ const G=st.g[L0], start=G.length>=2 ? G[G.length-2][0] : 0; if(G.length>1 && !onBar(st, start)) bad.push(`${L0}: a change at ${start.toFixed(3)} s, not on a bar line`); }
+      for(const e of out) if(!onBar(st, e.t)) bad.push(`a layer message at ${e.t.toFixed(3)} s`);
+      if(!cut && Math.abs(LF.lofiGain(st, 'beat', t)-before)>1e-9) bad.push('a gain changed before the bar line'); }
+    const st=LF.lofiInit(Pc, 'full', { at:0.1 }), stop=LF.lofiStop(st, 33.3), evs=LF.lofiStep(st, 0, 200); if(!onBar(st, stop)) bad.push('a piece stops off its bar line'); if(evs.some(e=>e.t>=stop-1e-9 && e.kind!=='chord')) bad.push('a note at or after the stop');
+    return [...new Set(bad)]; };
+  for(const [id] of Object.entries(RR.moods)){ const Pc=L.pieces[id]; n+=9; if(!Pc){ miss(`${id}: no lo-fi piece`); continue; } const why=LF.lofiCheck(Pc); if(why){ miss(`${id}: ${why}`); continue; }
+    const mf=mode(id), P=mode(Pc.parent); if(!mf || !P || Pc.mood!==id){ miss(`${id}: its mode, its parent «${Pc.parent}» or its mood field`); continue; } const Pd=P.degrees;
+    if(!mf.degrees.every(x=>Pd.includes(x))) miss(`${id}: the mood's notes are not all in ${Pc.parent}`);
+    const ch=LF.lofiChords(Pc); if(ch.some(c=>[c.root, ...c.tones].some(k=>!(Number.isInteger(k) && k>=0 && k<7)))) miss(`${id}: a chord outside its mode`);
+    const av=avoid(mf.degrees, ch, Pd); if(av.length) miss(`${id}: melody notes ${av} sit a semitone above a chord tone`);
+    const e1=LF.lofiStep(LF.lofiInit(Pc, 'full', { at:0.1, pc:Pd }), 0, 600), e2=LF.lofiStep(LF.lofiInit(Pc, 'full', { at:0.1, pc:Pd }), 0, 600); if(JSON.stringify(e1)!==JSON.stringify(e2)) miss(`${id}: two plays differ`);
+    const ph=phrases(Pc, Pd, e1); if(ph.length) miss(`${id}: ${ph.slice(0, 4).join('; ')}`);
+    const bb=e1.filter(e=>e.kind==='bass' && (e.step<LF.LOFI_REG.bass[0] || e.step>LF.LOFI_REG.bass[1] || e.step>=7)).length; if(bb) miss(`${id}: ${bb} bass notes outside the bass register`);
+    const rp=repeats(Pc, { pc:Pd }); if(rp>=0) miss(`${id}: bars ${rp}–${rp+15} repeat as ${rp+16}–${rp+31}`);
+    const progs=new Set(e1.filter(e=>e.kind==='chord').map(e=>e.prog)), secs=new Set(e1.filter(e=>e.kind==='chord').map(e=>e.sec)); if(progs.size<2 || secs.size<2) miss(`${id}: ten minutes hear ${progs.size} progression(s), ${secs.size} section kind(s)`);
+    const cg=changesOk(Pc); if(cg.length) miss(`${id}: ${cg.slice(0, 4).join('; ')}`);
+    const by={}; for(const e of e1) by[e.kind]=(by[e.kind]||0)+1;
+    notes.push(`${id}: ${Pc.title.en}, ${Pc.parent}, ${Pc.bpm} bpm, swing ${Pc.swing}, progressions ${Object.keys(Pc.progs).join(' ')} (heard ${[...progs].join('')}), sections ${[...secs].join(', ')}, chords ${ch.map(c=>c.name).join(' ')}; ten minutes: ${Object.entries(by).map(([k, v])=>k+' '+v).join(', ')}`); }
+  n+=5; { const Pc=L.pieces['lydian-penta'], P=mode('lydian').degrees;
+    if(repeats(Pc, { pc:P, fixed:true })<0) miss('CONTROL: a fixed loop passed «never the same twice»');
+    if(!changesOk(Pc, true).length) miss('CONTROL: a mid-bar cut passed «changes only on bar lines»');
+    const bad={ ...Pc, chords:{ ...Pc.chords, iii:{ root:2, tones:[4, 6, 1] } }, progs:{ ...Pc.progs, A:['iii', ...Pc.progs.A.slice(1)] } }; if(!avoid(mode('lydian-penta').degrees, LF.lofiChords(bad), P).length) miss('CONTROL: a piece with Lydian iii passed «safe under the melody»');
+    if(!LF.lofiCheck({ ...Pc, chords:{ ...Pc.chords, Imaj9:{ root:0, tones:[2, 7, 6] } } })) miss('CONTROL: a chord degree outside the mode passed');
+    const sf=LF.lofiSafe(Pc.chords['II9'], P); if(sf.includes(4)) miss('CONTROL: the safe notes over II9 include G (a semitone above F#)'); }
+  return { cases:n, total:d.length, differences:d, notes }; }
 async function rainJazz(){ const d=[], notes=[]; let n=0; const miss=x=>d.push(x), fs=await import('node:fs');
   const J=await import(new URL('../apps/night/pure/bedjazz.js', import.meta.url).href), RR=(await import(new URL('../apps/night/rooms/rain/pure/room.js', import.meta.url).href)).RAIN_ROOM, JZ=RR.bed2.jazz;
   const mode=id=>{ try{ return JSON.parse(fs.readFileSync(new URL('../core/data/modes/'+id+'.json', import.meta.url), 'utf8')); }catch(e){ return null; } }, idx=JSON.parse(fs.readFileSync(new URL('../core/data/index.json', import.meta.url), 'utf8')).modes;
@@ -2677,7 +2726,70 @@ async function rainLife(){ const d=[], notes=[]; let n=0; const miss=x=>d.push(x
         for(const [z0, z1, eaves] of C.BLOCKS.opp) if(z>=z0 && z<=z1 && z0<=S.len*0.75 && y<eaves && x>=S.opp+bend(z) && x<=S.opp+bend(z)+14){ cov=true; break; } }
       if(!cov) seen.push(`${xe.toFixed(1)}@${ze}`); } return seen; };
   n+=2; { const v=hidden(C.bendX); if(v.length) miss(`the street's end is seen at ${v.join(', ')}`); if(!hidden(()=>0).length) miss('CONTROL: the boulevard without its bend hid its end too'); }
+  /* (6) RAIN-5c: a cyclist faces its way — riding away (z growing) its back, coming towards us its front, never side-on; its rear light blinks.
+     CONTROL: a cyclist drawn side-on fails */
+  const faces=(list)=>{ const bad=[]; for(const t of [10, 60, 200]){ const a=list(t), b=list(t+0.5); a.forEach((c, i)=>{ const dz=b[i] ? b[i].z-c.z : 0, way= Math.abs(dz)>10 ? -Math.sign(dz) : Math.sign(dz);   /* a loop's wrap seen as a big jump */
+      if(c.view!==(way>0 ? 'back' : 'front')) bad.push(`a cyclist at z ${c.z.toFixed(1)} moving ${way>0 ? 'away' : 'towards us'} shows its ${c.view}`); }); } return bad; };
+  n+=3; { const f=faces(t=>LF.lifeCyclists(t, 'evening')); if(f.length) miss(f.slice(0, 3).join('; ')); if(!faces(t=>LF.lifeCyclists(t, 'evening').map(c=>({ ...c, view:'side' }))).length) miss('CONTROL: a side-on cyclist passed «faces its way»');
+    const bl=new Set(); for(let t=0;t<3;t+=0.05) for(const c of LF.lifeCyclists(t, 'evening')) if(c.view==='back') bl.add(c.blink); if(bl.size<2) miss('the rear light does not blink'); }
+  /* (7) RAIN-5c: the step matches the speed (longer when faster: step / height grows with the lane's pace, a cadence of 1.4–2.2 steps a second — my guess: a slow tall walker near 1.5); what they
+     carry and wear varies (5+ kinds, a hat or cap only without an umbrella); small groups walk together at Evening. CONTROL: one stride for every pace fails */
+  const strideOk=(L)=>{ const W=lifeAt(10, 'evening', [], 0, LIFE.seed, L).filter(q=>q.kind===LK.walk && q.step), bad=[]; const byV=new Map(); for(const q of W) byV.set(q.v, (byV.get(q.v)||[]).concat([q.step/q.h]));
+    const vs=[...byV.keys()].sort((a, b)=>a-b); for(let i=1;i<vs.length;i++){ const a=Math.max(...byV.get(vs[i-1])), b=Math.min(...byV.get(vs[i])); if(!(b>a-1e-9)) bad.push(`step/height ${a.toFixed(3)} at ${vs[i-1]} m/s ≥ ${b.toFixed(3)} at ${vs[i]} m/s`); }
+    for(const q of W){ const cad=q.v/q.step; if(cad<1.4 || cad>2.2) bad.push(`a cadence of ${cad.toFixed(2)} steps a second`); } return [...new Set(bad)]; };
+  n+=4; { const st=strideOk(LIFE); if(st.length) miss(st.slice(0, 3).join('; ')); if(!strideOk({ ...LIFE, stride:[0.42, 0] }).length) miss('CONTROL: one stride for every pace passed «the step matches the speed»');
+    const W=lifeAt(10, 'evening').filter(q=>q.kind===LK.walk && q.step), acc=new Set(W.map(q=>Math.floor(q.c/256))), hatU=W.filter(q=>[3, 6].includes(Math.floor(q.c/256)) && Math.floor(q.c/8)%8<UMB.hood).length;
+    if(acc.size<5) miss(`only ${acc.size} kinds of things carried or worn`); if(hatU) miss(`${hatU} walkers wear a hat under an umbrella`); if(!lifeAt(10, 'evening').some(q=>q.kind===LK.group)) miss('no small group walking together at Evening');
+    notes.push(`gait: step/height ${Math.min(...W.map(q=>q.step/q.h)).toFixed(3)}–${Math.max(...W.map(q=>q.step/q.h)).toFixed(3)} with the pace; carried and worn: ${acc.size} kinds; groups at Evening: ${lifeAt(10, 'evening').filter(q=>q.kind===LK.group).length}`); }
+  /* (8) RAIN-5c: the street's furniture — the signs are pictograms of the known set (no text, no brand), the walkers' signal red while the cars have green */
+  n+=2; { const F0=lifeAt(10, 'evening', [], 0, LIFE.seed, LIFE, null, { signal:1 }), sg=F0.filter(q=>q.kind===LK.sign); if(!sg.length || sg.some(q=>!(q.c>=0 && q.c<LF.SIGNS.length))) miss('a sign outside the pictogram set');
+    const car=F0.filter(q=>q.kind===LK.signal), walk=F0.filter(q=>q.kind===LK.walksig); if(!car.length || !walk.length || car.some(q=>q.ph<0.5) || walk.some(q=>q.ph>0.5)) miss('the crossing: the cars\' green and the walkers\' red disagree');
+    notes.push(`furniture: ${sg.length} lit pictograms (${[...new Set(sg.map(q=>LF.SIGNS[q.c]))].join(', ')}), ${car.length} traffic lights, ${walk.length} pedestrian signals, ${F0.filter(q=>q.kind===LK.flag).length} little flags`); }
   notes.push(`people out: late ${Cn.late}, after ${Cn.after}, evening ${Cn.evening}`);
+  return { cases:n, total:d.length, differences:d, notes }; }
+/* RAIN-5d — «RAIN far life (app)»: the far life's law (apps/night/rooms/rain/pure/far.js) — the hill road's cars stay on their road (every car a point of
+   the road's polyline, inside the hills' band seen by the law at least a third of the time) and never overlap (each lane's cars at least road.gap apart
+   along the road, at 600 moments); the blink rates are real ones (aviation red 20–60 a minute, the tower 20–60, turn signals 60–120, the cyclist's
+   rear light 1–2 Hz); the rare events seeded, at least 25 s apart and never the same kind twice in a row; the smoker's draws 10–18 s apart.
+   CONTROLS: a lane holding more cars than its road can space is caught overlapping; a 10 Hz strobe is caught; a schedule with a kind twice in a
+   row is caught */
+async function rainFar(){ const d=[], notes=[]; let n=0; const miss=x=>d.push(x);
+  const FA=await import(new URL('../apps/night/rooms/rain/pure/far.js', import.meta.url).href), C=await import(new URL('../apps/night/rooms/rain/pure/city.js', import.meta.url).href), LF=await import(new URL('../apps/night/rooms/rain/pure/life.js', import.meta.url).href);
+  const L=FA.FAR_LIFE, len=FA.roadLen(), hor=C.vanishing().horizon, top=u=>FA.hillTop(u, C.sceneAt, hor);
+  const overlaps=(Lx, gap=L.road.gap)=>{ let bad=0; for(let t=0;t<1200;t+=2){ const cars=FA.farCars(t, Lx); for(const a of cars) for(const b of cars){ if(a===b || a.lane!==b.lane || a.k>=b.k) continue; const ds=Math.abs(a.s-b.s), dd=Math.min(ds, len-ds); if(dd<gap-1e-9) bad++; } } return bad; };
+  n+=3; { const o=overlaps(L); if(o) miss(`${o} moments with two far cars closer than ${L.road.gap} on one lane`);
+    const L2={ ...L, road:{ ...L.road, lanes:L.road.lanes.map(l=>({ ...l, n:20 })) } }; if(!overlaps(L2)) miss('CONTROL: more cars on a lane than its road can space passed «no overlaps»');   // 20 a lane: spaced closer than the gap
+    let seen=0, all=0; for(let t=0;t<600;t+=5) for(const c of FA.farCars(t)){ all++; const p=FA.slope(c.u, c.f, top, hor); if(p && C.sceneAt(p[0], p[1]).kind==='hills') seen++; } if(seen<all/3) miss(`the far cars are on the seen hills only ${seen} of ${all} times`); notes.push(`the hill road: ${len.toFixed(2)} long, ${FA.farCars(0).length} cars, seen ${(seen/all*100).toFixed(0)} % of the time`); }
+  const rate=(f)=>{ let ch=0, prev=f(0); for(let t=0.01;t<=60;t+=0.01){ const v=f(t); if(v>prev) ch++; prev=v; } return ch; };   // rises a minute
+  const within=(r, lo, hi)=>r>=lo && r<=hi;
+  n+=5; { const m=L.masts.map(x=>rate(t=>FA.blink(t, x.hz, x.duty, x.ph))), tw=rate(t=>FA.blink(t, L.tower.hz, L.tower.duty)), tu=rate(t=>FA.blink(t, L.turn.hz, 0.5)), cy=rate(t=>LF.lifeCyclists(t, 'evening').reduce((a, c)=>a+(c.view==='back' ? c.blink : 0), 0));
+    if(!m.every(r=>within(r, 20, 60))) miss(`aviation red ${m.join(', ')} a minute (20–60)`); if(!within(tw, 20, 60)) miss(`the tower's top ${tw} a minute`); if(!within(tu, 60, 120)) miss(`turn signals ${tu} a minute (60–120)`); if(!within(cy, 60, 120)) miss(`the cyclist's rear light ${cy} a minute`);
+    if(within(rate(t=>FA.blink(t, 10, 0.5)), 20, 120)) miss('CONTROL: a 10 Hz strobe passed «a real blink rate»'); notes.push(`blinks a minute: masts ${m.join(', ')}, the tower ${tw}, turn signals ${tu}, the cyclist ${cy}`); }
+  const E=FA.farEvents(7200), E2=FA.farEvents(7200), rep=L0=>L0.some((e, i)=>i && e.kind===L0[i-1].kind); n+=5;
+  if(JSON.stringify(E)!==JSON.stringify(E2)) miss('the far events: the same seed gave two schedules'); if(rep(E)) miss('the far events: a kind twice in a row');
+  if(E.some((e, i)=>i && e.t-(E[i-1].t+E[i-1].dur)<25-1e-9)) miss('the far events: two closer than 25 s');
+  { const bad=E.slice(); bad.splice(3, 0, { ...bad[2] }); if(!rep(bad)) miss('CONTROL: a kind twice in a row passed'); }
+  { const draws=[]; let prev=0; for(let u=0;u<=1;u+=0.0005){ const g=FA.smokerGlow(u, L.events.dur.smoker, 0.4); if(g>0.9 && prev<=0.9) draws.push(u*L.events.dur.smoker); prev=g; } const gaps=draws.slice(1).map((x, i)=>x-draws[i]); if(!gaps.length || gaps.some(g=>g<10-1e-6 || g>18+1e-6)) miss(`the smoker draws every ${gaps.map(g=>g.toFixed(1)).join(', ')} s`); }
+  const by={}; for(const e of E) by[e.kind]=(by[e.kind]||0)+1; notes.push(`rare events in 2 h: ${Object.entries(by).map(([k, v])=>k+' '+v).join(', ')}`);
+  return { cases:n, total:d.length, differences:d, notes }; }
+/* RAIN-5c — «RAIN sky law (app)»: the sky's rare events (pure/sky.js) and the windows' life (pure/windows.js) — each from its seeded schedule (the same
+   seed the same list; another seed another), rare (the sky: gaps of 2 minutes or more, at most 5 events in 10 minutes; the windows: 22 s or more apart),
+   never the same kind back to back (the windows: never the same window either); the moon by mood (Late night a crescent, After the rain fuller, Evening
+   none); the searchlight and the aircraft only inside their events. CONTROLS: a list with a kind twice in a row is caught; a schedule with 30 s gaps is
+   caught as not rare */
+async function rainSky(){ const d=[], notes=[]; let n=0; const miss=x=>d.push(x);
+  const SK=await import(new URL('../apps/night/rooms/rain/pure/sky.js', import.meta.url).href), WN=await import(new URL('../apps/night/rooms/rain/pure/windows.js', import.meta.url).href);
+  const repeats=(L, key=e=>e.kind)=>L.some((e, i)=>i && key(e)===key(L[i-1])), rare=(L, gap, per10)=>{ for(let i=1;i<L.length;i++) if(L[i].t-(L[i-1].t+L[i-1].dur)<gap-1e-9) return false; for(let t=0;t<7200;t+=60) if(L.filter(e=>e.t>=t && e.t<t+600).length>per10) return false; return true; };
+  const E=SK.skyEvents(7200), E2=SK.skyEvents(7200), E3=SK.skyEvents(7200, SK.SKY.seed+1); n+=4;
+  if(JSON.stringify(E)!==JSON.stringify(E2)) miss('the sky: the same seed gave two schedules'); if(JSON.stringify(E)===JSON.stringify(E3)) miss('the sky: another seed gave the same schedule');
+  if(repeats(E)) miss('the sky: the same kind twice in a row'); if(!rare(E, 120, 5)) miss('the sky: events closer than 2 minutes or more than 5 in 10 minutes');
+  n+=2; { const bad=E.slice(); bad.splice(2, 0, { ...bad[1], t:bad[1].t+400 }); if(!repeats(bad)) miss('CONTROL: a kind twice in a row passed'); if(rare(E.map((e, i)=>({ ...e, t:i*(e.dur+30) })), 120, 5)) miss('CONTROL: a schedule with 30 s gaps passed «rare»'); }
+  n+=3; { const m=k=>SK.skyAt(10, k).moon; if(!m('late') || !(m('late').phase<0.5)) miss('Late night: no crescent'); if(!m('after') || !(m('after').phase>0.5)) miss('After the rain: no fuller moon'); if(m('evening')) miss('Evening boulevard: a moon through the overcast'); }
+  n++; { let off=0; for(let t=0;t<7200;t+=2){ const S=SK.skyAt(t, 'late'); if((S.beam || S.plane) && !S.ev) off++; } if(off) miss(`the searchlight or an aircraft outside an event (${off} moments)`); }
+  const W=WN.winEvents(7200), W2=WN.winEvents(7200); n+=4; if(JSON.stringify(W)!==JSON.stringify(W2)) miss('the windows: the same seed gave two schedules');
+  if(repeats(W)) miss('the windows: the same kind twice in a row'); if(repeats(W, e=>Math.round(e.pick*50))) miss('the windows: the same window twice in a row'); if(!rare(W, 22, 18)) miss('the windows: events closer than 22 s');
+  const gar=Array.from({ length:400 }, (_, i)=>WN.winGarland(i)).filter(Boolean).length; n++; if(!(gar>=8 && gar<=40)) miss(`${gar} garland windows of 400 (about 6 % wanted)`);
+  notes.push(`the sky: ${E.length} events in 2 h (${E.filter(e=>e.kind==='beam').length} searchlight, ${E.filter(e=>e.kind==='plane').length} aircraft), shortest gap ${Math.min(...E.slice(1).map((e, i)=>e.t-E[i].t-E[i].dur)).toFixed(0)} s; the windows: ${W.length} events in 2 h, ${gar} garlands of 400`);
   return { cases:n, total:d.length, differences:d, notes }; }
 async function forestBarkLayouts(){
   const d=[], notes=[]; let n=0; const miss=s=>d.push(s), W=await import(new URL('../apps/night/rooms/forest/pure/wood.js', import.meta.url).href), Lo=await import(new URL('../apps/night/rooms/forest/pure/layout.js', import.meta.url).href);
@@ -2991,7 +3103,10 @@ const ROWS=[
   ['FOREST natural (app)',     ()=>forestNatural(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // FOREST-2
   ['RAIN timbres (app)',       ()=>rainTimbres(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-4
   ['RAIN jazz bed (app)',      ()=>rainJazz(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-4
+  ['RAIN lo-fi bed (app)',     ()=>rainLofi(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-4c
   ['RAIN life law (app)',      ()=>rainLife(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-5
+  ['RAIN sky law (app)',       ()=>rainSky(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-5c
+  ['RAIN far life (app)',      ()=>rainFar(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-5d
   ['FOREST fireflies visit the light (app)', ()=>forestFliesVisit(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-8b
   ['NIGHT stream recording (app)', ()=>nightStreamRec(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-8b
   ['NIGHT full-screen icons (app)', ()=>nightFsIcons(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-8b

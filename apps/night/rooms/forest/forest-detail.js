@@ -103,5 +103,5 @@ export function buildDetail(ctx){
   /* probes: each silhouette's on-screen box in device coordinates (its four corners projected through the camera) */
   const silBoxes=camera=>sils.map(p=>{ p.updateMatrixWorld(); const xs=[], ys=[]; for(const [a,b] of [[-0.5,-0.5],[0.5,-0.5],[-0.5,0.5],[0.5,0.5]]){ tv.set(a*p.geometry.parameters.width, b, 0).applyMatrix4(p.matrixWorld).project(camera); xs.push(tv.x); ys.push(tv.y); }
     return { kind:p.userData.kind, x0:Math.min(...xs), x1:Math.max(...xs), y0:Math.min(...ys), y1:Math.max(...ys) }; });
-  return { update, resize, state, silBoxes, sils };
+  return { update, resize, state, silBoxes, sils, grass };   // grass: FOREST-2e's cull list names it
 }

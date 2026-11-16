@@ -9,7 +9,7 @@ import { timbreInstall, setTimbreTrim, setNightStrikes } from '../../core/audio.
 import { profileOf, profileCurrent } from '../../core/profile.js';
 import { L, t } from '../../core/i18n.js';
 
-const FILES=Object.freeze({ 'rain/e-piano':'e-piano', 'rain/vibraphone':'vibraphone', 'rain/nylon':'nylon', 'rain/celesta':'celesta' });
+const FILES=Object.freeze({ 'rain/e-piano':'e-piano', 'rain/vibraphone':'vibraphone', 'rain/nylon':'nylon' });   // RAIN-4c: the celesta left (the founder: the best of nylon / celesta; its record kept in tools/design/rain/timbres-out/)
 const fileOf=(R, id)=>new URL('timbres/'+FILES[id]+'.json', R.base);   // the room's own folder: fetched with the room, never in the forest's start set
 const installed=new Set(), last=new Map();   // room id → { mood, timbre } played there; 'profile' → the forest's
 let D0=null, applying=false;

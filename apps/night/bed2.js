@@ -6,6 +6,7 @@
    measurement's offline renders) through the same message path (msgsOf) the live tick uses. */
 import { CUR, chordRowFreq, droneSecondHz, viewKeyIdOf, scaleById, scaleView, viewKey, viewKeyC } from '../../core/scales.js';
 import { jazzInit, jazzStep, JAZZ_N } from './pure/bedjazz.js';
+import { lofiInit, lofiStep, lofiLevel, lofiStop, lofiFadeIn, LOFI_LEVELS } from './pure/lofi.js';   // RAIN-4c: the lo-fi bed (a recipe with `lofi`)
 import { scoreInit, scoreStep } from './pure/bedscore.js';   // RAIN-4b: a composed piece per mood (a recipe with `scores`)   // RAIN-4: the jazz bed (a recipe with `jazz`)
 import { seeded } from '../../core/pure/dsp.js';
 import { BUS } from '../../core/pure/bus.js';   // NIGHT-6 slice 1: the bed's events for the room (bus «bed»)
@@ -76,6 +77,37 @@ function jazzMsgs(ev, when, pv, R){ const J=R.jazz, hz=s=>chordRowFreq(mod(s, JA
     else if(d==='kick') out.push({ k:'jz', t:when, kind:'kick', hz:52, amp:J.kick*v, dur:0.4, pan:0, send:B*0.3 });
     else out.push({ k:'jz', t:when, kind:'cym', amp:J.cym*v*(d==='hat' ? 0.6 : 1), dur: d==='hat' ? 0.07 : Math.max(0.8, ev.dur), pan:0.25, send:B }); }
   return out; }
+/* RAIN-4c: THE LO-FI BED — a recipe with `lofi` (the rain room's) when its room installed an engine (bed2LofiSet: (ac, dest) → a promise of the
+   engine) and the address does not say ?bed=jazz (the RAIN-4b jazz, for comparison). Its own Web Audio engine, not the worklet. The Mood button picks
+   the piece (a new one begins at the old one's next bar line, fading in), the Music button the level (from the next bar line, the layers ramping
+   over one bar). Without `lofi` nothing here runs */
+let BEDJAZZ=false; try{ if(typeof location!=='undefined') BEDJAZZ=new URLSearchParams(location.search).get('bed')==='jazz'; }catch(e){}
+export const bedJazzDbg=v=>{ if(v!=null) BEDJAZZ=!!v; return BEDJAZZ; };
+let LOFI=null; export const bed2LofiSet=f=>{ LOFI=f||null; };
+const LF={ eng:null, loading:null, fail:false, on:false, R:null, level:'full', origin:0, view:null, players:[], tick:null };
+const lofiWanted=R=>!!(R && R.lofi && LOFI && !BEDJAZZ);
+const pieceOf=(R, v)=>{ const L=R.lofi, id=modeIdOf(v); return L.pieces[id] || L.pieces[L.first]; };
+const pcOf=P=>{ const m=scaleById(P.parent); return m && m.iv && m.iv.length===7 ? m.iv.slice() : undefined; };   // RAIN-4d: the parent's pitch classes (the phrases' safe notes)
+const lofiLevelOf=(R, preset)=>(R.lofi.levels && R.lofi.levels[preset]) || 'full';
+function lofiOn(ac, dest, R, preset, vol, now){
+  if(LF.fail) return 'failed';
+  if(!LF.eng){ if(!LF.loading) LF.loading=LOFI(ac, dest).then(e=>{ LF.eng=e; }, e=>{ LF.fail=true; console.warn('[night] the lo-fi bed could not load:', e); }); return 'pending'; }   // eslint-disable-line no-console
+  const E=LF.eng, lv=lofiLevelOf(R, preset), law=now-LF.origin;
+  if(!LF.on){ LF.on=true; LF.R=R; LF.level=lv; LF.origin=now; LF.view=VIEW(); const P=pieceOf(R, LF.view); LF.players=[{ st:lofiInit(P, lv, { at:0.1, pc:pcOf(P) }), P, pv:parentOf(P, LF.view) }]; if(E.tempo) E.tempo(P.bpm, now);
+    E.layer('crackle', LOFI_LEVELS[lv].includes('crackle') ? 1 : 0, now); E.level(levelOf(R, vol), now, 1.2); return 'on'; }
+  LF.R=R; if(lv!==LF.level){ LF.level=lv; const cur=LF.players[LF.players.length-1]; for(const ev of lofiLevel(cur.st, lv, law)) E.play(ev, LF.origin+ev.t, cur.pv); }
+  E.level(levelOf(R, vol), now, 1.2); return 'on'; }
+function lofiOff(now){ if(!LF.on) return; LF.on=false; LF.players=[]; if(LF.eng) LF.eng.level(0, now, 1.2); }
+function lofiTick(now){ const E=LF.eng, R=LF.R; if(!E || !LF.on) return; const law=now-LF.origin, v=VIEW();
+  if(v!==LF.view){ LF.view=v; const P=pieceOf(R, v), cur=LF.players[LF.players.length-1];
+    if(P!==cur.P){ const at=lofiStop(cur.st, law), st=lofiInit(P, LF.level, { at, pc:pcOf(P) }); lofiFadeIn(st); LF.players.push({ st, P, pv:parentOf(P, v) }); if(E.tempo) E.tempo(P.bpm, LF.origin+at); }
+    else cur.pv=parentOf(P, v); }
+  const late=law-1, T=LF.tick={ law:0, ep:0, bass:0, drum:0, vib:0, gtr:0, chord:0 };
+  for(const pl of LF.players){ const evs=lofiStep(pl.st, law-1, law+BED2_AHEAD), beat=60/pl.P.bpm; T.law+=evs.length;
+    for(const ev of evs){ if(ev.t<late && ev.kind!=='chord') continue; if(T[ev.kind]!=null) T[ev.kind]++; const at=Math.max(LF.origin+ev.t, now+0.02); if(pl.pv) E.play(ev, at, pl.pv);
+      if(ev.kind==='chord' || ev.kind==='ep' || ev.kind==='bass' || ev.kind==='vib' || ev.kind==='gtr') BUS.push('bed', { kind:ev.kind==='ep' ? 'comp' : ev.kind==='gtr' ? 'vib' : ev.kind, at, v:3, steps:ev.steps||null, step:ev.step??null, vel:ev.vel??null, dur:ev.dur??null, beat }); } }
+  LF.players=LF.players.filter(pl=>pl.st.stopAt===Infinity || pl.st.stopAt>law-2); }
+export const bed2LofiDbg=()=>({ wanted:!!LOFI, jazz:BEDJAZZ, loaded:!!LF.eng, fail:LF.fail, on:LF.on, level:LF.level, players:LF.players.map(p=>({ id:p.P.id, at:p.st.at, stopAt:p.st.stopAt, bar:p.st.bar, g:Object.fromEntries(Object.entries(p.st.g).map(([k, G])=>[k, G.map(q=>q.slice())])) })), origin:LF.origin, tick:LF.tick, eng:LF.eng ? LF.eng.state() : null });
 /* every pad tone out (Off, a preset change) */
 function padsOut(M, when, r){ const out=[]; for(const i of M.cur){ out.push({ k:'off', t:when, slot:i, r }); M.slots[i]={ hz:0, step:null, freeAt:when+2.1*r }; } M.cur=[]; return out; }
 
@@ -91,6 +123,8 @@ export const bed2Failed=()=>S.fail;
 let SAMPLER=null;
 export const bed2SamplerSet=f=>{ SAMPLER=f||null; };
 export function bed2On(ac, E, dest, R, preset, vol, now, o){
+  if(lofiWanted(R)){ if(S.on && S.b) bed2Off(E, now); return lofiOn(ac, dest, R, preset, vol, now); }   // RAIN-4c: the lo-fi bed (the worklet's bed let go first)
+  if(LF.on) lofiOff(now);
   if(S.fail) return 'failed';
   S.dest=dest;
   if(!S.ready){ if(!S.loading){ S.loading=true; bed2Load(ac).then(ok=>{ S.loading=false; if(ok) S.ready=true; else S.fail=true; }); } return 'pending'; }
@@ -107,15 +141,17 @@ export function bed2On(ac, E, dest, R, preset, vol, now, o){
   bed2Post(E, S.b, list); return 'on';
 }
 export function bed2Off(E, now){
+  if(LF.on){ lofiOff(now); if(!S.on) return; }   // RAIN-4c
   if(!S.b || !S.on) return; S.on=false;
   if(S.jz){ bed2Post(E, S.b, [{ k:'p', t:now, name:'level', v:0, tc:1.2 }, { k:'flush', t:now, layers:['jz'], r:2 }]); S.jz=null; S.parkAt=now+BED2_PARK_S; return; }   // RAIN-4
   bed2Post(E, S.b, [{ k:'p', t:now, name:'level', v:0, tc:1.2 }, { ...groundMsg(S.view||VIEW(), false, now, 1.2) }, ...padsOut(S.M, now, 3), { k:'flush', t:now, layers:['loop', 'glass'], r:2 }]);
   S.parkAt=now+BED2_PARK_S;
 }
-export function bed2Volume(E, vol, now){ if(S.b && S.on && S.R) bed2Post(E, S.b, [{ k:'p', t:now, name:'level', v:levelOf(S.R, vol), tc:1.2 }]); }
+export function bed2Volume(E, vol, now){ if(LF.on && LF.eng && LF.R){ LF.eng.level(levelOf(LF.R, vol), now, 1.2); return; } if(S.b && S.on && S.R) bed2Post(E, S.b, [{ k:'p', t:now, name:'level', v:levelOf(S.R, vol), tc:1.2 }]); }
 /* once per screen frame: park a while after Off; a Mood change (the ground glides, sounding loops and glass let go, the next chord soon);
    the law's next events, ahead */
 export function bed2Tick(E, now, played, answer, o){
+  if(LF.on){ lofiTick(now); return; }   // RAIN-4c
   if(!S.b) return;
   if(!S.on){ if(S.parkAt && now>=S.parkAt){ bed2Park(E, S.b, true); S.parkAt=0; } return; }
   const v=VIEW(), list=[];

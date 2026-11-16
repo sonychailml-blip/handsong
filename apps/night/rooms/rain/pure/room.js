@@ -16,6 +16,9 @@ const LOOK=(pre, mist, rain, lit, traffic)=>F({ pre, fog:0, mist, flies:0, rain,
 import LATE_NIGHT from './scores/late-night.js';   // RAIN-4b: the three composed pieces
 import EVENING_BOULEVARD from './scores/evening-boulevard.js';
 import AFTER_THE_RAIN from './scores/after-the-rain.js';
+import LOFI_LATE from './lofi/late-night.js';   // RAIN-4c: the three lo-fi pieces
+import LOFI_EVENING from './lofi/evening-boulevard.js';
+import LOFI_AFTER from './lofi/after-the-rain.js';
 export const RAIN_ROOM=F({
   format:'handsong/room', version:1, id:'room.rain', name:F({ en:'Rain', ru:'Дождь' }), icon:'depth', tint:'rain-tint', tokens:'rain-',
   still:F({ full:'still/still-full.webp', reduced:'still/still-reduced.webp', fov:68, aspect:1.85 }),
@@ -32,7 +35,7 @@ export const RAIN_ROOM=F({
   moods:F({ 'lydian-penta':'late', 'dorian-hexa':'evening', 'mixolydian-hexa':'after' }), look:'late',
   /* RAIN-4: what the room plays with — its own four timbres for the playing hand (Night's session records, apps/night/rooms/rain/timbres/; never in
      Full's lists), each with its level (dB) and its strike cap (a fast phrase stays gentle on a phone), and the moods' names */
-  music:F({ timbres:F([F({ id:'rain/e-piano', level:0, voices:6 }), F({ id:'rain/vibraphone', level:-11, voices:4 }), F({ id:'rain/nylon', level:0, voices:5 }), F({ id:'rain/celesta', level:-6, voices:4 })]),
+  music:F({ timbres:F([F({ id:'rain/e-piano', level:0, voices:6 }), F({ id:'rain/vibraphone', level:-11, voices:4 }), F({ id:'rain/nylon', level:0, voices:5 })]),
     names:F({ late:F({ en:'Late night', ru:'Поздняя ночь' }), evening:F({ en:'Evening boulevard', ru:'Вечерний бульвар' }), after:F({ en:'After the rain', ru:'После дождя' }) }) }),
   nature:F({ id:'ambience.rain',
     drone:F({ root:0.07, fifth:0.035, tc:1.4, send:0.2 }),
@@ -72,6 +75,10 @@ export const RAIN_ROOM=F({
        OF THE PARENT'S OWN DEGREES (0-based: maj7 / m9 / dom9 colours, rootless voicings), the progression [chord, bars], the comping rhythm
        [beat, velocity] (x.5 = the off-beat, swung at Evening), the bass ('root' long, 'roomy' root and fifth, 'walk' quarters) and the glints;
        per preset how much plays; amps per voice, a strum's roll (s), the sends */
+    /* RAIN-4c: THE LO-FI BED (apps/night/pure/lofi.js; the room's engine rooms/rain/lofi.js) — the room's music now; the RAIN-4b jazz below stays for
+       comparison behind ?bed=jazz. A piece per mood (the Mood button), a level per Music preset: quiet the piano, groove + bass and beat, full + crackle,
+       vibraphone and guitar; changes on bar lines */
+    lofi:F({ pieces:F({ 'lydian-penta':LOFI_LATE, 'dorian-hexa':LOFI_EVENING, 'mixolydian-hexa':LOFI_AFTER }), first:'lydian-penta', levels:F({ still:'quiet', drift:'groove', glimmer:'full' }) }),
     jazz:F({ scores:F({ 'lydian-penta':LATE_NIGHT, 'dorian-hexa':EVENING_BOULEVARD, 'mixolydian-hexa':AFTER_THE_RAIN }),   // RAIN-4b: the composed pieces (rooms/rain/pure/scores/), played instead of the generated law
       scorePresets:F({ still:F({ comp:true, bass:true, drums:false, vib:false }), drift:F({ comp:true, bass:true, drums:true, vib:false }), glimmer:F({ comp:true, bass:true, drums:true, vib:true }) }), kick:0.3, cym:0.03,
       first:'lydian-penta', roll:0.012, ep:0.055, bass:0.2, vib:0.05, brush:0.022, send:F({ ep:0.32, bass:0.1, vib:0.55, brush:0.18 }),

@@ -4,6 +4,42 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`, `archive/NIGHT-RUN-LOG-2026-10.md`. New runs start at `NIGHT-1`.
 
+# RAIN-5d (NIGHT track, 2026-11-16): life at every distance
+Tree hashes: the four parts of this batch (fix-hidden, FOREST-2f, RAIN-4d, RAIN-5d) were built interleaved — one pair: before (RAIN-5c's after): core 36450d3d646be550 · apps/full 0148bb454440c3e3 · apps/night 46d7dc5652cc1681. After: core and Full unchanged · apps/night 73685d357da03d5f.
+- New `rooms/rain/pure/far.js`; `pure/life.js` (scooter, sign flicker), `rain.js` (far lights, turn signals, the attic), `rain-glass.js` (scooter sprite), `night.css` (ember, turn tokens). Rows: data «RAIN far life (app)»; quad edges over kind 23. Tools: `rain-snap.mjs --rain5d`.
+- Verdicts: [probe-data] PASS — 91 checks, 0 differences; RAIN no quad edges 2/0; RAIN room 47/0. Fix rounds: 4.
+
+# RAIN-4d (NIGHT track, 2026-11-16): lo-fi with our own sound, never the same twice
+Tree hashes: see RAIN-5d (one pair for the batch).
+- `apps/night/pure/lofi.js` rewritten (v2, generative); the three pieces rewritten (v2: progressions, flow, grooves, lines, rhythms, motifs); `rooms/rain/lofi.js` (core tine banks, the physical nylon, the effects chain); `bed2.js` (pitch classes, tempo); `tools/rain-lofi.mjs`; data row «RAIN lo-fi bed (app)» rewritten.
+- Verdicts: the data row 32/0 (CONTROL a fixed loop); NIGHT music bed 46/0; RAIN forest bed unchanged 4/0. Fix rounds: 2 (the piano 9 dB too loud; the guitar quieter than the bed).
+
+# FOREST-2f (NIGHT track, 2026-11-16): the left pair; the cull by default
+Tree hashes: see RAIN-5d (one pair for the batch).
+- `pure/spacing.js` LEFT_PAIR; `forest-canopy.js` (the pin, no fern rule), `forest.js` (the pinned fern, wider declared fern search, cull default, debug why/test), `pure/natural.js` (cardSpot rings), `pure/spruce.js` (fixed draw, pin/from), `pure/canopy.js` (sp marks), `pure/cull.js` regenerated, stills; `tools/probes/night/forest2.js` (spruce census, declared ferns, content without the cull), `forest2e.js` (the pair on both levels).
+- Verdicts: plants apart 12/0, nothing lost 24/0, switch level 11/0, today 16/0, clear 4/0, cull 20/0; proof 0 px. Fix rounds: 6.
+
+# fix-hidden (NIGHT track, 2026-11-16): two hidden lines; the RAIN room window check
+Tree hashes: see RAIN-5d.
+- `rooms/rain/heard.js` (the return), `tools/probe-data.mjs` (the flower check), `tools/probes/night/rainroom.js` (the room's own clock, the music held, a new CONTROL), `.gitignore` (the lo-fi page). RAIN room 47/0; data PASS.
+
+# RAIN-5c (NIGHT track, 2026-11-16): much more life in the city
+Tree hashes: the three parts of this batch (FOREST-2e, RAIN-4c, RAIN-5c) were built interleaved, so one pair for all three — before (RAIN-5b's after): core 36450d3d646be550 · apps/full 0148bb454440c3e3 · apps/night 6bed8a60823de8ef. After: core and Full unchanged · apps/night 46d7dc5652cc1681.
+- `rooms/rain/pure/life.js` (step from speed, facing, gear, groups, `lifeCyclists`, furniture), `pure/sky.js` (new), `pure/windows.js` (winGarland, winEvents, winEventAt, winOnOff), `rain-glass.js` (VIEW_F sky, LIFE_F people/cyclist/signs/lights, WIN_F garlands and silhouettes), `rain.js` (uniforms, string lights, cyclist lamp, signals, window events, skyDbg, winEvDbg), `night.css` (`--cv-rain-*` tokens).
+- Rows: data «RAIN life law (app)» extended, new «RAIN sky law (app)»; P.night «RAIN no quad edges» to kinds 0–22. Tools: `tools/rain-snap.mjs --rain5c`; pages `tools/.ui-snap/rain5c/compare.html`.
+- Verdicts: static PASSED; [probe-data] PASS — 90 checks, 0 differences; RAIN no quad edges 2/0; RAIN room 46/1 (the known window check). Fix rounds: 6 (a swallowed line, the group width, the cadence bound, sprite aspect, the moon phase, the umbrella clip).
+
+# RAIN-4c (NIGHT track, 2026-11-16): the rain room's music as lo-fi
+Tree hashes: see RAIN-5c (one pair for the batch).
+- New: `apps/night/pure/lofi.js`, `rooms/rain/pure/lofi/{late-night,evening-boulevard,after-the-rain}.js`, `rooms/rain/lofi.js`, `tools/rain-lofi.mjs`. Changed: `bed2.js` (lo-fi driver, `bed2LofiSet`, `?bed=jazz`), `rooms/rain/pure/room.js` (`bed2.lofi`, timbres without the celesta), `rooms/rain/install.js`, `roomdoors.js`, the timbre records e-piano / vibraphone / nylon (tape colour); celesta.json moved to `tools/design/rain/timbres-out/`.
+- Rows: data «RAIN lo-fi bed (app)» (25 cases, 4 CONTROLS); NIGHT music bed 46/0 (with Begin); RAIN forest bed unchanged 4/0. Page `tools/design/rain/lofi/index.html` (beds −46…−50 dBFS RMS at the room's level).
+- Fix rounds: 3 (a CONTROL that could not fail — notes before their bar line; a glyph the licence row refused; the level balance).
+
+# FOREST-2e (NIGHT track, 2026-11-16): plants apart; a natural young broad-leaved tree; the cull
+Tree hashes: see RAIN-5c (one pair for the batch).
+- New: `rooms/forest/pure/spacing.js`, `forest-cull.js`, `pure/cull.js` (generated), `tools/forest-cull.mjs`, rows `tools/probes/night/forest2e.js`, `forestcull.js`. Changed: `forest.js` (APART, fern move, fernBlock, cull, debug doors), `forest-canopy.js` (spruces apart, the leaf trees), `pure/canopy.js` (youngLeaf, leafSpot), `pure/natural.js` (cones as solids), `forest-detail.js` (grass handed out); `tools/probes/night/forest2.js` (declared leaf-tree moves in the census); stills re-rendered.
+- Verdicts: FOREST plants apart 9/0; FOREST cull same frames 20/0; switch off 16/0, looks as full 16/0, clear 4/0, nothing lost 16/0, switch level 9/0 (with Begin); the cull proof 0 px on 28 views × 2 levels (`tools/.ui-snap/forest2e/cull-proof.json`). Fix rounds: 7 (swallowed lines ×3, fern moves beyond 1.8 m, a fern hiding two mushrooms, the founder's fern without a place, soft-edge peeling, more map poses).
+
 # RAIN-5b (NIGHT track, 2026-11-16): no quad edges; varied people with a gait; gradual arrivals; houses with character
 Tree hashes before (RAIN-4b's after): core 36450d3d646be550 · apps/full 0148bb454440c3e3 · apps/night 4d847f2581608749. After: core and Full unchanged · apps/night 6bed8a60823de8ef.
 - `rooms/rain/pure/life.js` (LK + child, old, stand, talk; UMB; lifePeople; gates; hist), `rain-glass.js` LIFE_V/LIFE_F (border window, fade, palette, umbrellas, gait), `rain.js` (lifeHist; captures reset it), bake `city.js` (house character), `model.js` lifeCanvas variants, `citybake.js` 16-room atlas and stairLit; re-baked.

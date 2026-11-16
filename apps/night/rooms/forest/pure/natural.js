@@ -14,6 +14,7 @@ import { STREAM, streamNear, bankGround } from './forestlife.js';
 import { forestTrunkYaws } from './layout.js';
 import { ROOTS as BULGE } from './relief.js';
 import { WOOD, trunkRadius, trunkOuter } from './wood.js';
+import { inSpruce, spruceBase } from './spacing.js';   // FOREST-2e: the spruces as solids for the ferns
 
 const F=Object.freeze, TAU=2*Math.PI;
 export const NATURAL=F({
@@ -198,8 +199,13 @@ export function inSolid3(x, y, z, S3){ const cell=S3.grid.get(S3.key(Math.floor(
     if(s.k==='trunk'){ const hb=y-s.y0; if(hb>=0 && hb<WOOD.trunk.len && Math.hypot(x-s.x, z-s.z)<trunkRadius(s.r, hb)+0.03) return 'trunk'; }
     else if(s.k==='stump' || s.k==='rock'){ if(y<s.top && Math.hypot(x-s.x, z-s.z)<s.r) return s.k; }
     else if(s.k==='log'){ const [d, t]=seg3(x, z, s.a, s.b), yc=s.a[1]+(s.b[1]-s.a[1])*t; if(Math.hypot(d, y-yc)<s.r) return 'log'; }
-    else if(s.k==='root'){ const [d]=seg3(x, z, s.a, s.b); if(d<s.w+0.02 && y<s.top) return 'root'; } }
+    else if(s.k==='root'){ const [d]=seg3(x, z, s.a, s.b); if(d<s.w+0.02 && y<s.top) return 'root'; }
+    else if(s.k==='cone'){ if(inSpruce(x, y, z, s)) return 'spruce'; } }
   return null; }
+/* FOREST-2e: S3 plus the young spruces' cones ({ x, z, H, y0 }) — a new grid; the old one untouched */
+export function withCones(S3, spruces){ const grid=new Map(); for(const [k, v] of S3.grid) grid.set(k, v.slice());
+  for(const sp of spruces){ const R=spruceBase(sp.H)+0.1; for(let i=Math.floor(sp.x-R);i<=Math.floor(sp.x+R);i++) for(let j=Math.floor(sp.z-R);j<=Math.floor(sp.z+R);j++){ const k=S3.key(i, j); if(!grid.has(k)) grid.set(k, []); grid.get(k).push({ k:'cone', x:sp.x, z:sp.z, H:sp.H, y0:sp.y0 }); } }
+  return { grid, key:S3.key }; }
 /* a fern's fronds (today's card 0.42 × 1.15 standing on its foot; each { tilt, yaw, sx, sy }) at (x, y0, z) → their sample points (the card's middle
    and 0.15 m × its scale to each side — the leaflets — from 10 % to 85 % of its height) */
 export function frondPoints(x, y0, z, fronds){ const out=[];
@@ -228,7 +234,7 @@ function cardSpot1(x, z, pointsAt, S3, o={}){ const C=NATURAL.clear, cut=(px, pz
   if(!cut(x, z)) return [x, z, false];
   const water=o.water==null ? 0.2 : o.water, eye=o.eye==null ? 2.6 : o.eye, B=o.box, view=a=>Math.abs(a[0]-C.eye[0])/Math.max(0.5, C.eye[1]-a[1]), v0=view([x, z])+0.02, eyeD=a=>Math.hypot(a[0]-C.eye[0], a[1]-C.eye[1]);
   const better=(a, b)=>{ const ia=view(a)<=v0, ib=view(b)<=v0; if(ia!==ib) return ia; return ia ? eyeD(a)<eyeD(b) : view(a)<view(b); };
-  for(let k=1;k<=C.rings;k++){ const rr=k*C.step, na=8+4*k; let best=null;
+  for(let k=1;k<=(o.rings||C.rings);k++){ const rr=k*C.step, na=8+4*k; let best=null;   // FOREST-2f: o.rings — a wider search (a declared move)
     for(let j=0;j<na;j++){ const a=(j%2 ? 1 : -1)*Math.ceil(j/2)*TAU/na, px=x+Math.cos(a)*rr, pz=z+Math.sin(a)*rr;
       if(B && (px<B[0] || px>B[1] || pz<B[2] || pz>B[3])) continue; if(Math.hypot(px-C.eye[0], pz-C.eye[1])<eye) continue; if(streamNear(px, pz).d<STREAM.half+water) continue;
       if(o.avoid && o.avoid(px, pz, o.reach||0.3, o.height, x, z)) continue;   // never nearer a mushroom's line of sight than today

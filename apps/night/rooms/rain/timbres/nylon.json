@@ -10,7 +10,7 @@
  },
  "recipe": {
   "fb": 0.994,
-  "damp": 0.58,
+  "damp": 0.62,
   "exBase": 0.16,
   "exSpan": 0.5
  },

@@ -11,7 +11,11 @@
      (no sliding feet); the shader draws the gait (legs, arms, a bob and a sway, the umbrella swaying with the step).
    Each item: { kind, x, y, z (m), h, w (m), ph, c (look code: clothes + 8 × umbrella kind + 64 × umbrella colour), a (0…1) }. */
 const F=Object.freeze, frac=x=>x-Math.floor(x), hash=(a, b=0)=>frac(Math.sin(a*127.1+b*311.7)*43758.5453);
-export const LK=F({ walk:0, couple:1, dog:2, cycle:3, run:4, sit:5, waiter:6, pigeon:7, cat:8, leaf:9, steam:10, ring:11, splash:12, head:13, child:14, old:15, stand:16, talk:17 });
+import { farEventAt, FAR_LIFE } from './far.js';   // RAIN-5d
+export const LK=F({ walk:0, couple:1, dog:2, cycle:3, run:4, sit:5, waiter:6, pigeon:7, cat:8, leaf:9, steam:10, ring:11, splash:12, head:13, child:14, old:15, stand:16, talk:17, group:18, flag:19, sign:20, signal:21, walksig:22, scooter:23 });
+/* RAIN-5c: what a walker carries or wears (the look code's 256s): none, a shoulder bag, a backpack, a hat, a scarf, a bag and a scarf, a knitted cap, a tote */
+export const ACC=F({ none:0, bag:1, backpack:2, hat:3, scarf:4, bagScarf:5, cap:6, tote:7 });
+export const SIGNS=F(['cup', 'cross', 'scissors', 'key', 'croissant']);
 export const UMB=F({ black:0, colour:1, clear:2, golf:3, hood:4, paper:5, coat:6 });
 export const LIFE=F({ seed:0x4C494645, loop:180, z0:12, r:0.35, rCouple:0.6, gate:30, stagger:40, fadeMove:2, fadeStand:6,
   lanes:F([F({ x:-2.6, dir:1, v:1.25 }), F({ x:-1.2, dir:-1, v:0.85, old:true }), F({ x:20.2, dir:1, v:1.35 }), F({ x:21.6, dir:-1, v:1.2 }), F({ x:26.4, dir:1, v:1.3 }), F({ x:27.8, dir:-1, v:1.15 }), F({ x:29.4, dir:1, v:1.05 })]),
@@ -20,7 +24,12 @@ export const LIFE=F({ seed:0x4C494645, loop:180, z0:12, r:0.35, rCouple:0.6, gat
   tables:F({ x:37.4, cafes:F([F([40, 66]), F([98, 138])]), every:3.2 }),
   stand:F([F({ x:-3.6, z:69, b:'wait' }), F({ x:-3.6, z:69.8, b:'wait' }), F({ x:18.7, z:70, b:'wait' }), F({ x:24.0, z:90, b:'phone' })]),
   talk:F([F({ x:23.6, z:36 }), F({ x:24.6, z:36 })]),
-  wire:F({ x:11.9, y:6.25, z:F([30, 44]) }), cat:F({ x:39.2, z:50, span:6 }),
+  wire:F({ x:11.9, y:6.25, z:F([30, 44]) }),
+  stride:F([0.15, 0.17]), group:13,   // RAIN-5c: a step = h × (0.15 + 0.17 × speed) (longer when faster: 1.65–2 steps a second); every 13th walker a small group of three
+  bunting:F({ x:38.9, y:3.5, sag:0.35, every:0.75, posts:6 }),   // RAIN-5c: little flags over the café terraces (the string lights: rain.js), sagging between posts
+  signs:F([F({ x:39.3, y:3.4, z:30, g:'key' }), F({ x:39.3, y:3.5, z:53, g:'cup' }), F({ x:39.3, y:3.5, z:78, g:'cross' }), F({ x:39.3, y:3.4, z:104, g:'croissant' }), F({ x:39.3, y:3.5, z:124, g:'scissors' }),
+    F({ x:-3.3, y:3.4, z:58, g:'cross' }), F({ x:-3.3, y:3.5, z:92, g:'cup' })]),   // lit pictograms, no text, never a brand: blade signs facing along the street
+  signals:F([F({ x:-0.9, z:70 }), F({ x:13.9, z:72 })]), walk:F([F({ x:-0.5, z:69.2 }), F({ x:13.5, z:71.2 })]), cat:F({ x:39.2, z:50, span:6 }),   // the crossing's lights (the vehicles') and its pedestrian signals
   steam:F([F([4.5, 0, 26]), F([39.6, 3.2, 47])]), puddles:F([F([20.2, 30]), F([24.8, 41]), F([18.6, 55]), F([28.8, 63]), F([22.5, 76]), F([33.0, 34])]),
   roadPuddles:F([F([2.6, 34]), F([6.2, 52]), F([2.6, 88])]),
   pop:F({ walkers:30, sit:10, stand:4, talk:1 }),
@@ -30,9 +39,10 @@ export const LIFE=F({ seed:0x4C494645, loop:180, z0:12, r:0.35, rCouple:0.6, gat
 
 /* the seeded population of walkers, given to lanes; order — the order the moods take them in (a mood with M walkers takes orders 0 … M−1) */
 export function lifePeople(seed=LIFE.seed, L=LIFE){ const N=L.pop.walkers, per=L.lanes.map(()=>[]);
-  for(let i=0;i<N;i++){ const r=k=>hash(i+seed%997, k), kind= i%9===2 ? LK.couple : i%9===5 ? LK.dog : i%9===7 ? LK.child : LK.walk, u=r(2);
-    const umb= kind===LK.child || kind===LK.couple ? (u<0.5 ? UMB.golf : UMB.black) : u<0.3 ? UMB.black : u<0.5 ? UMB.colour : u<0.6 ? UMB.clear : u<0.68 ? UMB.golf : u<0.8 ? UMB.hood : u<0.88 ? UMB.paper : UMB.coat;
-    per[i%L.lanes.length].push({ i, kind, umb, clothes:Math.floor(r(3)*8), uc:Math.floor(r(4)*4), h:1.6+0.32*r(5), build:0.85+0.35*r(6), rank:r(7), stagger:r(8)*L.stagger }); }
+  for(let i=0;i<N;i++){ const r=k=>hash(i+seed%997, k), kind= i%L.group===4 ? LK.group : i%9===2 ? LK.couple : i%9===5 ? LK.dog : i%9===7 ? LK.child : LK.walk, u=r(2);
+    const umb= kind===LK.child || kind===LK.couple || kind===LK.group ? (u<0.5 ? UMB.golf : UMB.black) : u<0.3 ? UMB.black : u<0.5 ? UMB.colour : u<0.6 ? UMB.clear : u<0.68 ? UMB.golf : u<0.8 ? UMB.hood : u<0.88 ? UMB.paper : UMB.coat;
+    const a9=r(9), acc= a9<0.2 ? ACC.none : a9<0.36 ? ACC.bag : a9<0.5 ? ACC.backpack : a9<0.6 ? (umb>=UMB.hood ? ACC.hat : ACC.scarf) : a9<0.72 ? ACC.scarf : a9<0.8 ? ACC.bagScarf : a9<0.9 ? (umb>=UMB.hood ? ACC.cap : ACC.tote) : ACC.tote;   // a hat or a cap only without an umbrella
+    per[i%L.lanes.length].push({ i, kind, umb, acc, clothes:Math.floor(r(3)*8), uc:Math.floor(r(4)*4), h:1.6+0.32*r(5), build:0.85+0.35*r(6), rank:r(7), stagger:r(8)*L.stagger }); }
   const out=[]; per.forEach((ps, lane)=>{ const ln=L.lanes[lane]; ps.forEach((p, slot)=>{ if(ln.old && slot===0){ p.kind=LK.old; p.umb=UMB.black; p.h=1.62; } out.push({ ...p, lane, slot, n:ps.length }); }); });
   const ranks=out.map(p=>p.rank).sort((a, b)=>a-b); out.forEach(p=>{ p.order=ranks.indexOf(p.rank); }); return out; }
 const POP=new Map(), peopleOf=(seed, L)=>{ const k=seed+':'+JSON.stringify(L.lanes)+':'+L.pop.walkers; if(!POP.has(k)) POP.set(k, lifePeople(seed, L)); return POP.get(k); };
@@ -47,13 +57,13 @@ function moverAlpha(L, hist, grp, o, stagger, ln, off, t){ const m=member(L, his
   const tg= L.instant ? m.since : gateAfter(ln, m.since+stagger, off, L), f= L.instant ? 1 : Math.max(0, Math.min(1, (t-tg)/L.fadeMove)); if(t<tg) return m.on ? 0 : 1; return m.on ? f : 1-f; }
 function standAlpha(L, hist, grp, o, stagger, t){ const m=member(L, hist, grp, o, t); if(m.since<-1e8 || L.instant) return m.on ? 1 : 0; const f=Math.max(0, Math.min(1, (t-m.since-stagger)/L.fadeStand)); return m.on ? f : 1-f; }
 /* everything out at time t (s); look — now; cars: the traffic law's list at t; wave 0…1; hist: [[t, look]…] (absent: always `look`) → items */
-export function lifeAt(t, look, cars=[], wave=0, seed=LIFE.seed, L=LIFE, hist=null){ const H=hist && hist.length ? hist : [[-1e9, look]], cur=H[H.length-1][1], M=L.moods[cur]||L.moods.late, out=[];
+export function lifeAt(t, look, cars=[], wave=0, seed=LIFE.seed, L=LIFE, hist=null, o=null){ const H=hist && hist.length ? hist : [[-1e9, look]], cur=H[H.length-1][1], M=L.moods[cur]||L.moods.late, out=[];   // RAIN-5c: o { signal } — the crossing's light
   for(const p of peopleOf(seed, L)){ const ln=L.lanes[p.lane], off=p.slot/p.n+hash(p.lane, 3)*0.5, a=moverAlpha(L, H, 'walkers', p.order, p.stagger, ln, off, t); if(a<=0.001) continue;
-    const s=walked(ln, t, off, L), wide=p.kind===LK.couple || p.kind===LK.child || p.kind===LK.dog || p.umb===UMB.golf, stride=0.42*p.h;
-    out.push({ kind:p.kind, x:ln.x, y:0, z:zOf(ln, s, L), h:p.h, w:(wide ? 1.3 : 0.75)*p.build, ph:frac(s/(2*stride)), c:p.clothes+8*p.umb+64*p.uc, a, lane:p.lane, dir:ln.dir, r:wide ? L.rCouple : L.r }); }
+    const s=walked(ln, t, off, L), wide=p.kind===LK.couple || p.kind===LK.child || p.kind===LK.dog || p.kind===LK.group || p.umb===UMB.golf, step=p.h*(L.stride[0]+L.stride[1]*ln.v)*(p.kind===LK.old ? 0.8 : 1);   // RAIN-5c: the step from the speed
+    out.push({ kind:p.kind, x:ln.x, y:0, z:zOf(ln, s, L), h:p.h, w:(p.kind===LK.group ? 1.5 : wide ? 1.3 : 0.75)*p.build, ph:frac(s/(2*step))+(ln.dir<0 ? 1 : 0), c:p.clothes+8*p.umb+64*p.uc+256*p.acc, a, lane:p.lane, dir:ln.dir, face:ln.dir<0 ? 'front' : 'back', step, v:ln.v, r:wide ? L.rCouple : L.r }); }
   { const q=L.pause, per=q.walk+q.stop, k=Math.floor(t/per), u=t-k*per, s=(k*q.walk+Math.min(u, q.walk))*q.v, a=standAlpha(L, H, 'pause', 0, 12, t);   // the one who stops and looks round (a lane of their own)
     if(a>0.001) out.push({ kind:u<q.walk ? LK.walk : LK.stand, x:q.x, y:0, z:zOf(q, s, L), h:1.74, w:0.75, ph:u<q.walk ? frac(s/1.46) : 0.5+0.5*Math.sin((u-q.walk)/q.stop*6.28), c:2+8*UMB.colour+64*2, a, lane:'pause', dir:q.dir, r:L.r }); }
-  for(let i=0;i<(M.cycle||0);i++){ const q=L.cycle, s=q.v*t+0.31*L.loop; out.push({ kind:LK.cycle, x:q.x, y:0, z:zOf(q, s, L), h:1.75, w:1.7, ph:frac(s/2.1), c:1+8*UMB.hood, a:1, lane:'cycle', dir:q.dir, r:0.5 }); }
+  for(const c of lifeCyclists(t, cur, L)) out.push(c);   // RAIN-5c: facing its way (its back as it rides away), the rear light blinking
   for(let i=0;i<(M.run||0);i++){ const q=L.run, s=q.v*t+0.67*L.loop; out.push({ kind:LK.run, x:q.x, y:0, z:zOf(q, s, L), h:1.8, w:0.7, ph:frac(s/2.4), c:6+8*UMB.hood, a:1, lane:'run', dir:q.dir, r:L.r }); }
   { const T=L.tables, seats=[]; for(const [a, b] of T.cafes) for(let z=a+1.5;z<b-1.5;z+=T.every) seats.push(z);
     for(let i=0;i<Math.min(L.pop.sit, seats.length);i++){ const a=standAlpha(L, H, 'sit', i, hash(i, 15)*L.stagger, t); if(a<=0.001) continue; const z=seats[Math.floor(hash(i, 7)*seats.length)]+((i%2) ? 0.7 : -0.7), sx=T.x+((i%3)-1)*0.75;
@@ -72,6 +82,23 @@ export function lifeAt(t, look, cars=[], wave=0, seed=LIFE.seed, L=LIFE, hist=nu
   L.puddles.forEach((P, i)=>{ const ph=frac(t*0.55+hash(i, 21)); out.push({ kind:LK.ring, x:P[0], y:0.02, z:P[1], h:0.05, w:0.4+ph*1.2, ph, c:0, a:0.5*(1-ph), lane:'ground' }); });
   for(const c of cars) if(c.kind!=='tram') for(const P of L.roadPuddles) if(Math.abs(c.x-P[0])<1.2 && Math.abs(c.z-P[1])<2.2){ const ph=1-Math.abs(c.z-P[1])/2.2; out.push({ kind:LK.splash, x:P[0]+0.9, y:0, z:P[1], h:0.7*ph, w:1.4, ph, c:0, a:0.7*ph, lane:'ground' }); }
   for(const c of cars) if(c.kind==='tram') for(let k=0;k<6;k++) if(hash(Math.round(c.id||c.t0||0)+k, 31)<0.62) out.push({ kind:LK.head, x:c.x, y:1.55, z:c.z-c.dir*(2+k*4.3)+0.6, h:0.6, w:0.55, ph:0, c:0, a:1, lane:'tram' });
+  /* RAIN-5c: the street's furniture — bunting over the terraces (swaying with Wave), the lit pictogram signs, the crossing's lights and its pedestrian signals
+     (the vehicles' green = the walkers' red; o.signal: the room's music-driven light) */
+  { const B=L.bunting; for(const [a, b] of L.tables.cafes){ const n=Math.floor((b-a)/B.every); for(let j=0;j<=n;j++){ const z=a+j*B.every, u=frac((z-a)/B.posts), sag=B.sag*4*u*(1-u), sw=Math.sin(t*1.3+z*0.7)*(0.08+0.25*Math.max(0, wave));
+      out.push({ kind:LK.flag, x:B.x, y:B.y-sag-0.32, z, h:0.32, w:0.26, ph:frac(0.5+sw*0.5), c:j%4, a:0.95, lane:'air' }); } } }
+  const fev=farEventAt(t);   // RAIN-5d: the rare events (pure/far.js): a sign flickering, the scooter
+  L.signs.forEach((q, j)=>{ const fl= fev && fev.kind==='flicker' && j===Math.floor(fev.k*L.signs.length) && frac(fev.u*FAR_LIFE.events.dur.flicker*6.7+fev.k)<0.3 ? 0.35 : 1;
+    out.push({ kind:LK.sign, x:q.x, y:q.y, z:q.z, h:0.7, w:0.7, ph:0.5+0.04*Math.sin(t*0.7+q.z), c:SIGNS.indexOf(q.g), a:fl, lane:'sign' }); });
+  if(fev && fev.kind==='scooter'){ const S=FAR_LIFE.scooter; out.push({ kind:LK.scooter, x:S.x, y:0, z:S.z[0]+(S.z[1]-S.z[0])*fev.u, h:1.65, w:0.8, ph:0.3+1, c:3+8*UMB.hood, a:Math.min(1, fev.u*10, (1-fev.u)*10), lane:'scooter', dir:S.dir, view:'front', r:0.5 }); }
+  const go=o && o.signal ? 1 : 0;
+  for(const q of L.signals) out.push({ kind:LK.signal, x:q.x, y:3.6, z:q.z, h:1.05, w:0.42, ph:go ? 0.75 : 0.25, c:0, a:1, lane:'signal' });
+  for(const q of L.walk) out.push({ kind:LK.walksig, x:q.x, y:2.2, z:q.z, h:0.5, w:0.42, ph:go ? 0.25 : 0.75, c:0, a:1, lane:'signal' });
+  return out; }
+/* RAIN-5c: the cyclists out at t in mood `look`: each faces its way — riding away (z growing) it shows its back and its red rear light, blinking
+   (1.6 per second, on 40 %); coming towards us its front and its white light. view: 'back' | 'front' (the row: never 'side') */
+export function lifeCyclists(t, look, L=LIFE){ const M=L.moods[look]||L.moods.late, out=[];
+  for(let i=0;i<(M.cycle||0);i++){ const q=L.cycle, s=q.v*t+0.31*L.loop, away=q.dir>0, blink=frac(t*1.6)<0.4 ? 1 : 0;
+    out.push({ kind:LK.cycle, x:q.x, y:0, z:zOf(q, s, L), h:1.75, w:0.9, ph:frac(s/2.1)+(away ? 0 : 1)+2*blink, c:1+8*UMB.hood, a:1, lane:'cycle', dir:q.dir, view:away ? 'back' : 'front', blink, r:0.5 }); }
   return out; }
 /* the kinds counted as people (the row: the count eases, never jumps) */
-export const PEOPLE=F([LK.walk, LK.couple, LK.dog, LK.cycle, LK.run, LK.sit, LK.waiter, LK.child, LK.old, LK.stand, LK.talk]);
+export const PEOPLE=F([LK.walk, LK.couple, LK.dog, LK.cycle, LK.run, LK.sit, LK.waiter, LK.child, LK.old, LK.stand, LK.talk, LK.group, LK.scooter]);

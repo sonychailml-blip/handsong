@@ -53,6 +53,31 @@ function crownOf(tx, tz, r, H, R){ const C=CANOPY.crown, gy=forestGround(tx, tz)
   for(let k=0;k<n;k++){ const a=a0+k*TAU/n+(R()-0.5)*0.8, h=gy+H*(C.from+R()*(C.to-C.from)), rise=C.rise[0]+R()*(C.rise[1]-C.rise[0]), len=C.len[0]+R()*(C.len[1]-C.len[0]);
     grow(tx+Math.cos(a)*r*0.6, h, tz+Math.sin(a)*r*0.6, Math.cos(a), rise, Math.sin(a), len*(0.6+r), C.r0*(0.6+r), 0); }
   return { limbs, sprays }; }
+/* FOREST-2e: a NATURAL young broad-leaved tree (the founder: the one in the middle of the frame read as leaf clumps on sticks) — one leader almost to
+   the top, a clean lower stem (shade prunes it), 9–13 branches in a spiral (137.5°) from a third of the height, rising, longest a little below the
+   middle of the crown (an egg-shaped crown), each with a side twig; sprays of ONE leaf kind (one species) along their outer parts and round the
+   leader's top. Its own seeded draws (R). → { limbs, sprays } like crownOf */
+export function youngLeaf(x, z, H, r, R){ const gy=bankGround(x, z), limbs=[], sprays=[], k=Math.floor(R()*4), lean=R()*TAU, lk=0.04+R()*0.05, n=9+Math.floor(R()*5), a0=R()*TAU;
+  const lx=Math.cos(lean)*lk, lz=Math.sin(lean)*lk, axis=h=>[x+lx*h/H*h*0.6, gy+h, z+lz*h/H*h*0.6];   // the leader bends gently towards its light
+  let p=axis(-0.1); for(let j=1;j<=5;j++){ const h=H*0.97*j/5, q=axis(h); limbs.push([p[0], p[1], p[2], q[0], q[1], q[2], r*(1-0.8*(j-1)/5), r*(1-0.8*j/5)]); p=q; }
+  const spray=(px, py, pz, s, tilt)=>sprays.push({ x:px+(R()-0.5)*0.18, y:py+(R()-0.5)*0.16, z:pz+(R()-0.5)*0.18, s, yaw:R()*TAU, tilt, k, first:true });
+  for(let i=0;i<n;i++){ const u=i/(n-1), h=H*(0.34+0.58*u), b=axis(h), a=a0+i*2.39996+(R()-0.5)*0.3, len=H*0.3*Math.pow(Math.sin(Math.PI*(0.18+0.74*u)), 0.8)*(0.8+R()*0.4)+0.25,
+      up=0.55+0.5*u+(R()-0.5)*0.2, c=Math.cos(a), s=Math.sin(a), l1=Math.hypot(1, up), rb=r*0.32*(1-0.5*u);
+    const m=[b[0]+c*len*0.55/l1, b[1]+up*len*0.55/l1, b[2]+s*len*0.55/l1], e=[m[0]+c*len*0.45, m[1]+len*0.45*(up*0.5-0.12), m[2]+s*len*0.45];   // rises, then levels out at the tip
+    limbs.push([b[0], b[1], b[2], m[0], m[1], m[2], rb, rb*0.6], [m[0], m[1], m[2], e[0], e[1], e[2], rb*0.6, rb*0.25]);
+    const sa=a+(R()<0.5 ? -1 : 1)*(0.6+R()*0.4), sl=len*(0.3+R()*0.2), se=[m[0]+Math.cos(sa)*sl, m[1]+sl*0.25, m[2]+Math.sin(sa)*sl]; limbs.push([m[0], m[1], m[2], se[0], se[1], se[2], rb*0.4, rb*0.15]);
+    for(let t=0.3;t<=1.001;t+=0.17) spray(b[0]+(e[0]-b[0])*t, b[1]+(e[1]-b[1])*t+0.08, b[2]+(e[2]-b[2])*t, (0.62+R()*0.22)*(1-0.25*u), (R()-0.5)*0.5);
+    spray(se[0], se[1]+0.06, se[2], 0.55+R()*0.2, (R()-0.5)*0.5); }
+  const top=axis(H*0.97); for(let j=0;j<4;j++) spray(top[0], top[1]-0.25-j*0.35, top[2], 0.55+R()*0.15, (R()-0.5)*0.4);   // the leader's top in leaf
+  return { limbs, sprays }; }
+/* FOREST-2e: a young broad-leaved tree whose crown stands in the gap (the moon's window and the view down the stream: no leaf grows there) steps
+   sideways, the nearer side first, up to 12 m, until at most LEAF_GAP of its crown (an egg of 0.32 H round its upper part) is in the gap, on free floor
+   (no trunk, no water, no other young tree, off every mushroom's line of sight); else the place with the least → [x, z] (unchanged when clear) */
+function leafSpot(x, z, H, trunks, others=[], blocks=null){ const share=(px, pz)=>{ const gy=bankGround(px, pz); let n=0, t=0; for(let h=0.4;h<=1.001;h+=0.15) for(let j=0;j<8;j++){ const a=j*TAU/8, rr=H*0.32*Math.sin(Math.PI*Math.min(1, (h-0.3)/0.75)); t++; if(inGap(px+Math.cos(a)*rr, gy+H*h, pz+Math.sin(a)*rr)) n++; } return n/t; };
+  if(share(x, z)<=LEAF_GAP) return [x, z]; const sd=x<0 ? -1 : 1; let best=[x, z], bs=share(x, z);
+  for(let k=1;k<=30;k++) for(const s of [sd, -sd]){ const px=x+s*k*0.4; if(!floorFree(px, z, trunks, 1.2, [], 0.6) || others.some(o=>Math.hypot(o.x-px, o.z-z)<LEAF_APART) || (blocks && blocks(px, z, H))) continue; const v=share(px, z); if(v<=LEAF_GAP) return [px, z]; if(v<bs){ bs=v; best=[px, z]; } }
+  return best; }
+const LEAF_GAP=0.15, LEAF_APART=3.5;   // at most 15 % of the crown in the gap; 3.5 m from every other young tree (a spruce's reach + its own crown): my guesses
 /* a free place on the floor for the understorey */
 const outOfReach=(x, z)=>Math.abs(x)>CANOPY.reach.x || z<CANOPY.reach.z;
 function floorFree(x, z, trunks, gap, items, water=0.4){ if(streamNear(x,z).d<STREAM.half+water) return false; const E=CANOPY.eye;
@@ -63,19 +88,22 @@ function floorFree(x, z, trunks, gap, items, water=0.4){ if(streamNear(x,z).d<ST
 /* counts: { crowns (0 | 1), crownShare (0…1: the share of each crown's sprays), young, shrubs, saplings, stars } → { limbs (every crown's and
    the understorey's wood), sprays (leaf cards: { x, y, z, s, yaw, tilt, k (variant 0…3), of: 'crown'|'young'|'shrub'|'sapling' }), stems
    (the understorey's trunks and stems as limbs), young, shrubs, saplings (their places), stars ([x, y, z, size, phase]) } — no spray in the gap */
-export function canopyPlaces(counts, trunks, seed=CANOPY.seed, noGap=false, clear=null, skip=null){   // noGap: probes only (the CONTROL that a leaf can block the moon); FOREST-2: clear(x, z, kind) → [x, z] — the understorey kept clear of solids (?forest=new; no random draw)   // FOREST-2c: skip(kind, x, z, H) → true: that young tree or sapling is placed (and draws its numbers) but grows nothing here (a spruce takes its place)
+export function canopyPlaces(counts, trunks, seed=CANOPY.seed, noGap=false, clear=null, skip=null, leaf=false){   // FOREST-2e: leaf ({ blocks(x, z, H) } or false) — a young broad-leaved tree that stays (not a spruce) grows as youngLeaf, off the mushrooms' sight   // noGap: probes only (the CONTROL that a leaf can block the moon); FOREST-2: clear(x, z, kind) → [x, z] — the understorey kept clear of solids (?forest=new; no random draw)   // FOREST-2c: skip(kind, x, z, H) → true: that young tree or sapling is placed (and draws its numbers) but grows nothing here (a spruce takes its place)
   const limbs=[], sprays=[], keep=s=>noGap || !inGap(s.x, s.y, s.z), share=clamp(counts.crownShare==null ? 1 : counts.crownShare, 0, 1);
   if(counts.crowns){ trunks.forEach(([x,z,r],i)=>{ const R=seeded(seed+101*i), c=crownOf(x, z, r, 16, R); limbs.push(...c.limbs);
     c.sprays.forEach((s,j)=>{ if((s.first || (j*0.618)%1<share) && keep(s)) sprays.push({ ...s, of:'crown' }); }); }); }
   const R=seeded(seed+7), items=[], young=[], shrubs=[], saplings=[], stems=[];
   { const Y=CANOPY.young; for(let g=0; young.length<(counts.young|0) && g<6000; g++){ let x=(R()*2-1)*16, z=2-R()*28; if(!outOfReach(x,z) || lightAt(x,z)<Y.light || !floorFree(x, z, trunks, Y.gap, items)) continue;
-      const H=Y.H[0]+R()*(Y.H[1]-Y.H[0]), r=Y.r[0]+R()*(Y.r[1]-Y.r[0]); items.push([x, z, 1.8]); const from=[x, z]; if(clear) [x, z]=clear(x, z, 'young'); const gy=bankGround(x,z); young.push(clear ? { x, z, H, r, from } : { x, z, H, r }); const sk=!!(skip && skip('young', x, z, H)), JK=[];   // FOREST-2: today's place decides the rest (items), the plant stands at its clear place
+      const H=Y.H[0]+R()*(Y.H[1]-Y.H[0]), r=Y.r[0]+R()*(Y.r[1]-Y.r[0]); items.push([x, z, 1.8]); const from=[x, z]; if(clear) [x, z]=clear(x, z, 'young'); const gy=bankGround(x,z); young.push(clear ? { x, z, H, r, from } : { x, z, H, r }); const sk=!!(skip && skip('young', x, z, H)), JK=[]; if(sk) young[young.length-1].sp=true;   // FOREST-2: today's place decides the rest (items), the plant stands at its clear place
+      if(leaf && !sk){ R(); R(); young[young.length-1].leaf=young.length; continue; }   // grown after every young tree has its place (it keeps clear of them); the stem's two draws kept   // the stem's two draws kept: everything after as seeded
       (sk ? JK : stems).push([x, gy-0.1, z, x+(R()-0.5)*0.2, gy+H*0.7, z+(R()-0.5)*0.2, r, r*0.45]);
       if(clear && young.length && young[young.length-1].from){ const Y0=young[young.length-1], dx=x-Y0.from[0], dz=z-Y0.from[1], dy=gy-bankGround(Y0.from[0], Y0.from[1]);   // FOREST-2: the crown grown at today's place (today's sprays kept), carried whole
         const c=crownOf(Y0.from[0], Y0.from[1], r*3, H, seeded(seed+5000+young.length)); (sk ? JK : stems).push(...c.limbs.map(l=>[l[0]+dx, l[1]+dy, l[2]+dz, l[3]+dx, l[4]+dy, l[5]+dz, l[6]*0.45, l[7]*0.45]));
         c.sprays.forEach((s,j)=>{ if((s.first || (j*0.618)%1<share) && keep(s)) (sk ? JK : sprays).push({ ...s, x:s.x+dx, y:s.y+dy, z:s.z+dz, s:s.s*0.85, of:'young' }); }); }
       else { const c=crownOf(x, z, r*3, H, seeded(seed+5000+young.length)); (sk ? JK : stems).push(...c.limbs.map(l=>[l[0], l[1], l[2], l[3], l[4], l[5], l[6]*0.45, l[7]*0.45]));
-      c.sprays.forEach((s,j)=>{ if((s.first || (j*0.618)%1<share) && keep(s)) (sk ? JK : sprays).push({ ...s, s:s.s*0.85, of:'young' }); }); } } }
+      c.sprays.forEach((s,j)=>{ if((s.first || (j*0.618)%1<share) && keep(s)) (sk ? JK : sprays).push({ ...s, s:s.s*0.85, of:'young' }); }); } }
+    for(const q of young) if(q.leaf){ const n0=q.leaf; q.was=[q.x, q.z]; [q.x, q.z]=leafSpot(q.x, q.z, q.H, trunks, young.filter(o=>o!==q), leaf.blocks); q.leaf=true;   // FOREST-2e: the natural young broad-leaved trees
+      const c=youngLeaf(q.x, q.z, q.H, q.r*0.75, seeded(seed+5000+n0)); stems.push(...c.limbs); c.sprays.forEach(s=>{ if(keep(s)) sprays.push({ ...s, of:'young' }); }); } }
   { const S=CANOPY.shrubs; for(let g=0; shrubs.length<(counts.shrubs|0) && g<6000; g++){ let x=(R()*2-1)*14, z=3-R()*26; const m=moistAt(x,z); if(!outOfReach(x,z) || R()>0.05+0.95*smooth(S.moist[0], S.moist[1], m) || inGap(x, 1.2, z) || !floorFree(x, z, trunks, 0.8, items, 0.6)) continue;   // damper is likelier; never in the view down the stream
       items.push([x, z, 1.6]); const x0=x, z0=z; if(clear) [x, z]=clear(x, z, 'shrub'); const gy=bankGround(x,z), dgy= clear ? gy-bankGround(x0, z0) : 0, n=S.stems[0]+Math.floor(R()*(S.stems[1]-S.stems[0]+1)), H=S.H[0]+R()*(S.H[1]-S.H[0]); shrubs.push({ x, z, H, n });
       for(let k=0;k<n;k++){ const a=R()*TAU, out=0.4+R()*0.9, ox=Math.cos(a)*out, oz=Math.sin(a)*out, h=H*(0.7+R()*0.4);
@@ -84,7 +112,7 @@ export function canopyPlaces(counts, trunks, seed=CANOPY.seed, noGap=false, clea
           if((j===0 || (j*0.618)%1<share) && keep(clear ? { ...sp, x:sp.x-(x-x0), y:sp.y-dgy, z:sp.z-(z-z0) } : sp)) sprays.push(sp); } } } }   // FOREST-2: kept or not as at today's place
   { const S=CANOPY.saplings, E=CANOPY.eye; for(let g=0; saplings.length<(counts.saplings|0) && g<6000; g++){ const a=-Math.PI/2+(R()-0.5)*2.4, rr=S.eye[0]+R()*(S.eye[1]-S.eye[0]); let x=E[0]+Math.cos(a)*rr, z=E[2]+Math.sin(a)*rr;
       if(Math.abs(x)<CANOPY.reach.sapX || lightAt(x,z)<S.light || !floorFree(x, z, trunks, 0.9, items)) continue;
-      items.push([x, z, 1.1]); const x0=x, z0=z; if(clear) [x, z]=clear(x, z, 'sapling'); const gy=bankGround(x,z), dgy= clear ? gy-bankGround(x0, z0) : 0, H=S.H[0]+R()*(S.H[1]-S.H[0]); saplings.push({ x, z, H }); const sk=!!(skip && skip('sapling', x, z, H)), JK=[];
+      items.push([x, z, 1.1]); const x0=x, z0=z; if(clear) [x, z]=clear(x, z, 'sapling'); const gy=bankGround(x,z), dgy= clear ? gy-bankGround(x0, z0) : 0, H=S.H[0]+R()*(S.H[1]-S.H[0]); saplings.push({ x, z, H }); const sk=!!(skip && skip('sapling', x, z, H)), JK=[]; if(sk) saplings[saplings.length-1].sp=true;   // FOREST-2f: a spruce grows in its place (the census checks it is there)
       (sk ? JK : stems).push([x, gy-0.05, z, x+(R()-0.5)*0.15, gy+H, z+(R()-0.5)*0.15, 0.02, 0.006]);
       for(let j=0;j<4+Math.floor(R()*4);j++){ const t=0.45+R()*0.55, sp={ x:x+(R()-0.5)*0.5, y:gy+H*t, z:z+(R()-0.5)*0.5, s:0.35+R()*0.25, yaw:R()*TAU, tilt:(R()-0.5)*1.0, k:Math.floor(R()*4), of:'sapling' }; if(keep(clear ? { ...sp, x:sp.x-(x-x0), y:sp.y-dgy, z:sp.z-(z-z0) } : sp)) (sk ? JK : sprays).push(sp); } } }
   const stars=[]; { const S=CANOPY.stars, Rs=seeded(seed+9), E=CANOPY.eye; for(let i=0;i<(counts.stars|0);i++){ const az=(S.az[0]+Rs()*(S.az[1]-S.az[0]))/D, el=Math.asin(lerp(Math.sin(S.el[0]/D), Math.sin(S.el[1]/D), Rs()));

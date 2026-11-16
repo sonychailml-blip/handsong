@@ -59,8 +59,8 @@ let H=null, T=null, CV=null, FM=null;
 async function kit(){ if(!H){ H=await import('../../../apps/night/scene/host.js'); T=await H.loadThree(); CV=(await import('../../../core/palette.js')).cv; FM=await import('../../../apps/night/rooms/forest/forest.js'); } return { H, T, CV, F:FM }; }
 /* the forest at `level`, the switch `on` (null: leave it), mutate(room, T) before the frames → per view { hash, cover, mass, ground } + geo, prog */
 export async function forestFrames({ level='reduced', on=false, mutate=null, veg=true, vis=false }={}){
-  const { T, CV, F }=await kit(), was=F.forestNewDbg ? F.forestNewDbg() : false;
-  if(F.forestNewDbg && on!=null) F.forestNewDbg(on);
+  const { T, CV, F }=await kit(), was=F.forestNewDbg ? F.forestNewDbg() : false, wasC=F.forestCullDbg ? F.forestCullDbg() : false;
+  if(F.forestNewDbg && on!=null) F.forestNewDbg(on); if(F.forestCullDbg) F.forestCullDbg(false);   // FOREST-2f: the content judged without the cull (it re-packs the instance lists; its own row proves the frames the same)
   const canvas=document.createElement('canvas'); let r=null, room=null;
   try{
     await Promise.race([F.forestAssets(level), new Promise((_, no)=>setTimeout(()=>no(new Error('the forest files did not arrive in 60 s')), 60000))]);
@@ -83,7 +83,7 @@ export async function forestFrames({ level='reduced', on=false, mutate=null, veg
     return out;
   } finally {
     try{ if(room) room.dispose(); }catch(e){} try{ if(r){ r.dispose(); r.forceContextLoss(); } }catch(e){}
-    if(F.forestNewDbg) F.forestNewDbg(was);
+    if(F.forestNewDbg) F.forestNewDbg(was); if(F.forestCullDbg) F.forestCullDbg(wasC);
   }
 }
 /* the three rows share their builds: per level today (off), new (on) and FOREST-1's ferns (c1, frames only) — six forests in all, made once per run
@@ -264,17 +264,28 @@ export function censusCompare(A, B, declared={}){ const lost=[], moved=[], added
   for(const [k, list] of Object.entries(A.kinds)){ const pool=(B.kinds[k]||[]).map(q=>({ q, used:false })), lim=declared[k]!=null ? declared[k] : MOVE[k]==null ? 0.001 : MOVE[k];
     const byIndex=pool.length>=list.length;   // the same law, the same order: each one is itself at its own index (additions come after)
     list.forEach((a, i)=>{ let best=null, bd=Infinity; if(byIndex){ best=pool[i]; bd=Math.hypot(best.q[0]-a[0], best.q[2]-a[2]); } else for(const c of pool){ if(c.used) continue; const d=Math.hypot(c.q[0]-a[0], c.q[2]-a[2]); if(d<bd){ bd=d; best=c; } }
-      if(best && bd<=lim+1e-6){ best.used=true; if(bd>0.005) moved.push(`${k} #${i} (${a[0].toFixed(2)}, ${a[2].toFixed(2)}) moved ${bd.toFixed(2)} m`); }
+      if(best && typeof lim==='function' && byIndex && bd>(MOVE[k]||0)+1e-6 && lim(i, a)){ best.used=true; moved.push(`${k} #${i} (${a[0].toFixed(2)}, ${a[2].toFixed(2)}) moved ${bd.toFixed(2)} m (declared by the room)`); }
+      else if(best && bd<=(typeof lim==='function' ? (MOVE[k]||0) : lim)+1e-6){ best.used=true; if(bd>0.005) moved.push(`${k} #${i} (${a[0].toFixed(2)}, ${a[2].toFixed(2)}) moved ${bd.toFixed(2)} m`); }
       else lost.push(`${k} #${i} at (${a[0].toFixed(2)}, ${a[2].toFixed(2)})${best ? ` — the nearest is ${bd.toFixed(2)} m away (allowed ${lim} m)` : ' — none left'}`); });
     const extra=pool.filter(c=>!c.used).length; if(extra) added[k]=extra; }
   for(const [t, n] of Object.entries(A.roots)) if((B.roots[t]||0)!==n) lost.push(`the roots of tree ${t}: ${B.roots[t]||0}, today ${n}`);
   return { lost, moved, added }; }
 async function todayCensus(room, T){ const c=forestCensus(room, T), bur=await buriedOf(room, false); c.buried=capsOf(room, T).map(q=>bur(q[0], q[1], q[2])); return c; }
-const declOf=v=>({ grass:Infinity, 'understorey spray':Infinity });   // FOREST-2c: the grass is placed in every word (the default); with the spruces the young trees' and saplings' sprays are replaced by needles (declared)
-async function variantCensus(room, T, v, A){ const B=forestCensus(room, T), res=censusCompare(A, B, declOf(v)), bur=await buriedOf(room, v), caps=capsOf(room, T), buried=[];
+const declOf=(v, room)=>({ grass:Infinity, 'understorey spray':Infinity, ...(room ? { 'young tree':leafMoved(room), fern:fernMoved(room) } : {}) });
+/* FOREST-2f: a fern farther than MOVE only when the room declares exactly that one moved off a spruce (fernsDbg.apart.moved: its place of today) */
+const fernMoved=room=>(i, a)=>{ const m=room.fernsDbg && room.fernsDbg.apart && room.fernsDbg.apart.moved && room.fernsDbg.apart.moved[i]; return !!(m && Math.hypot(m[0]-a[0], m[1]-a[2])<0.01); };
+/* FOREST-2f (the founder saw the left spruce vanish at Detailed): every sapling or young tree a spruce replaced has its spruce, within 3.2 m (the pinned
+   place's reach and the step-aside rings) → the missing ones; drop: the probes' CONTROL (that spruce left out of the list) */
+export function spruceCensus(room, drop=-1){ const CP=room.canopyDbg.places, SP=room.canopyDbg.spruces, P=(SP ? SP.places : []).filter((_, i)=>i!==drop), miss=[];
+  for(const [kind, L] of [['sapling', CP.saplings], ['young tree', CP.young]]) L.forEach((q, i)=>{ if(q.sp && !P.some(p=>p.from && Math.abs(p.from[0]-q.x)<1e-6 && Math.abs(p.from[1]-q.z)<1e-6 && Math.hypot(p.x-q.x, p.z-q.z)<=3.2)) miss.push(`${kind} #${i} (${q.x.toFixed(2)}, ${q.z.toFixed(2)}) has no spruce of its own`); });   // its own: the spruce that grew from it
+  return miss; }   // FOREST-2e: + the young broad-leaved trees the room moved out of the gap, each by its own declaration (below)
+/* FOREST-2e: a young tree may be farther than MOVE only when the room declares exactly that one moved (canopy places: leaf, and its place before the
+   move `was` equal to today's) — the founder asked for it to become a natural broad-leaved tree, which cannot grow its leaves in the gap */
+const leafMoved=room=>(i, a)=>{ const q=room.canopyDbg && room.canopyDbg.places.young[i]; return !!(q && q.leaf && q.was && Math.hypot(q.was[0]-a[0], q.was[1]-a[2])<0.01); };   // FOREST-2c: the grass is placed in every word (the default); with the spruces the young trees' and saplings' sprays are replaced by needles (declared)
+async function variantCensus(room, T, v, A){ const B=forestCensus(room, T), res=censusCompare(A, B, declOf(v, room)), bur=await buriedOf(room, v), caps=capsOf(room, T), buried=[];
   A.kinds.mushroom.forEach((a, i)=>{ let bd=Infinity, bq=null; for(const q of caps){ const dd=Math.hypot(q[0]-a[0], q[2]-a[2]); if(dd<bd){ bd=dd; bq=q; } } if(!bq || bd>MOVE.mushroom) return;
     const w=bur(bq[0], bq[1], bq[2]); if(w && !A.buried[i]) buried.push(`mushroom #${i} (${a[0].toFixed(2)}, ${a[2].toFixed(2)}) inside a ${w}`); });
-  const nat=room.natDbg ? room.natDbg() : null; return { ...res, buried, shroomMoves:nat && nat.moved ? nat.moved.shrooms : [] }; }
+  const nat=room.natDbg ? room.natDbg() : null, spr=spruceCensus(room), sprC=spruceCensus(room, room.canopyDbg.spruces ? room.canopyDbg.spruces.places.findIndex(p=>p.pin) : -1); return { ...res, buried, shroomMoves:nat && nat.moved ? nat.moved.shrooms : [], spr, sprC, spruces:room.canopyDbg.spruces ? room.canopyDbg.spruces.places.length : 0 }; }
 let CENSUS=null;
 export async function checkForestLost(){
   const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); return !!c; }, out={};
@@ -299,6 +310,8 @@ export async function checkForestLost(){
       const hid=[]; for(const [k] of FOREST2_VIEWS){ const a=SH.off.views[k].shrooms, b=fr.views[k].shrooms; a.forEach((n0, i)=>{ const n1=b[i]||0; if(n0>0 && n0-n1>VIS_RULE.px && n1<n0*(1-VIS_RULE.rel)) hid.push(`mushroom #${i} on the ${k} view: ${b[i]||0} px, today ${n0}`); }); }
       ok(`${lv} ?forest=${v}: ${hid.length} mushrooms less visible than today — ${hid.slice(0, 6).join('; ')}`, hid.length===0);
       ok(`${lv} ?forest=${v}: ${r.lost.length} lost — ${r.lost.slice(0, 6).join('; ')}`, r.lost.length===0);
+      ok(`${lv} ?forest=${v}: ${r.spr.length} spruces missing — ${r.spr.slice(0, 4).join('; ')}`, r.spr.length===0);   // FOREST-2f
+      ok(`CONTROL ${lv} ?forest=${v}: the left pair's spruce left out was not caught`, r.sprC.length>0);
       ok(`${lv} ?forest=${v}: ${r.buried.length} mushrooms buried in a new solid — ${r.buried.slice(0, 6).join('; ')}`, r.buried.length===0);
       out[lv].variants[v]={ moved:r.moved, added:r.added, shroomMoves:r.shroomMoves };
       notes.push(`${lv} ?forest=${v}: lost ${r.lost.length}, moved ${r.moved.length} (${[...new Set(r.moved.map(x=>x.split(' #')[0]))].join(', ')||'none'}), added ${JSON.stringify(r.added)}, mushrooms nudged ${r.shroomMoves.length}`); } }
@@ -310,22 +323,23 @@ export const forestCensusDbg=()=>CENSUS;
    room's census equals today's live census at Detailed except the moves each switch declares (MOVE). CONTROL: a switch forced to Standard must fail both */
 const until=async (f, ms, step=100)=>{ const t0=performance.now(); while(performance.now()-t0<ms){ if(await f()) return true; await new Promise(r=>setTimeout(r, step)); } return !!(await f()); };
 export async function checkForestLevels(){
-  const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); return !!c; }, { H, T, F }=await kit(), keep={ bg:H.backgroundOf(), level:H.sceneLevel(), parts:F.forestNewDbg() };
+  const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); return !!c; }, { H, T, F }=await kit(), keep={ bg:H.backgroundOf(), level:H.sceneLevel(), parts:F.forestNewDbg(), cull:F.forestCullDbg() }; F.forestCullDbg(false);   // FOREST-2f: the census without the cull
   const tday=await checkForestToday(); if(!ok('the forest of today does not equal the pins — no census taken', tday.total===0)) return { cases:n, total:d.length, differences:d.concat(tday.differences), notes };
   const open=async (parts, lv)=>{ await H.setBackground('dark'); F.forestNewDbg(parts||false); await H.setSceneLevel(lv); await H.setBackground('forest');
     const okOpen=await until(()=>{ const I=H.sceneInfo(); return I.webgl && !I.opening && I.rendered>0 && I.id==='room.forest'; }, 120000, 200); const I=H.sceneInfo(), room=H.sceneRoomDbg();
-    return { okOpen, level:I.level, held:I.held, built:room && room.natDbg ? room.natDbg().parts : null, census:room ? forestCensus(room, T) : null }; };
+    return { okOpen, level:I.level, held:I.held, built:room && room.natDbg ? room.natDbg().parts : null, census:room ? forestCensus(room, T) : null, room }; };
   try{
     const A=await open(false, 'full'); ok('the forest of today did not open at Detailed through the host', A.okOpen && A.level==='full' && !A.held);
     notes.push(`today at Detailed through the host: ${Object.entries(A.census.kinds).map(([k, L])=>k+' '+L.length).join(', ')}`);
-    for(const v of VARIANTS){ const B=await open(v, 'full'), want=v==='new' ? F.FOREST_PARTS.slice() : F.FOREST_PARTS.filter(k=>F.FOREST_DEFAULT.includes(k) || k===v), res=censusCompare(A.census, B.census, declOf(v));
+    for(const v of VARIANTS){ const B=await open(v, 'full'), want=v==='new' ? F.FOREST_PARTS.slice() : F.FOREST_PARTS.filter(k=>F.FOREST_DEFAULT.includes(k) || k===v), res=censusCompare(A.census, B.census, declOf(v, B.room));
       ok(`?forest=${v}: opened at ${B.level}${B.held ? ' (Detailed held back)' : ''}, chosen Detailed`, B.okOpen && B.level==='full' && !B.held);
       ok(`?forest=${v}: the room was built with ${JSON.stringify(B.built)}, wanted ${JSON.stringify(want)}`, JSON.stringify((B.built||[]).slice().sort())===JSON.stringify(want.slice().sort()));
+      { const sm=spruceCensus(B.room); ok(`?forest=${v} at Detailed: ${sm.length} spruces missing — ${sm.slice(0, 3).join('; ')}`, sm.length===0); }   // FOREST-2f: the spruces through the host too
       ok(`?forest=${v} at Detailed: ${res.lost.length} of today's lost — ${res.lost.slice(0, 4).join('; ')}`, res.lost.length===0);
       notes.push(`?forest=${v}: level ${B.level}, built ${JSON.stringify(B.built)}, moved ${res.moved.length}, added ${JSON.stringify(res.added)}`); }
     { const C=await open('roots', 'reduced'), res=censusCompare(A.census, C.census), caught=C.level!=='full' && res.lost.length>0;
       ok(`CONTROL: ?forest=roots forced to Standard was not caught (level ${C.level}, lost ${res.lost.length})`, caught); notes.push(`CONTROL Standard under roots: level ${C.level}, lost ${res.lost.length}`); }
-  } finally { try{ F.forestNewDbg(keep.parts||false); await H.setSceneLevel(keep.level); await H.setBackground(keep.bg); }catch(e){} }
+  } finally { try{ F.forestNewDbg(keep.parts||false); F.forestCullDbg(keep.cull); await H.setSceneLevel(keep.level); await H.setBackground(keep.bg); }catch(e){} }
   return { cases:n, total:d.length, differences:d, notes };
 }
 row({ at:1009.9855, night:true, name:'FOREST switch level', drawn:true, run:()=>checkForestLevels(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });

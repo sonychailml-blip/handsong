@@ -53,8 +53,8 @@ try{
   } else if(argv.includes('--row')){   // the browser row «RAIN room» alone (a quick look while working; the judged run is the Night suite's)
     const { ctx, p, errs }=await open({ width:1280, height:800 }, LEVEL);
     console.log(JSON.stringify(await p.evaluate(async ()=>(await import('/tools/probes/night/rainroom.js')).checkRainRoom()), null, 1), errs.slice(0, 5)); await ctx.close();
-  } else if(argv.includes('--rain1') || argv.includes('--rain2') || argv.includes('--rain5') || argv.includes('--rain5b')){   // RAIN-2: --rain2 the same captures into tools/.ui-snap/rain2/ (its comparison page: --rain2page)   /* RAIN-1: the baked city — each mood, the focus near / middle / far, a phrase lighting windows; a before / after page */
-    const O1=path.join(ROOT, argv.includes('--rain5b') ? 'tools/.ui-snap/rain5b' : argv.includes('--rain5') ? 'tools/.ui-snap/rain5' : argv.includes('--rain2') ? 'tools/.ui-snap/rain2' : 'tools/.ui-snap/rain1'); await mkdir(O1, { recursive:true }); const made1=[], log1={};
+  } else if(argv.includes('--rain1') || argv.includes('--rain2') || argv.includes('--rain5') || argv.includes('--rain5b') || argv.includes('--rain5c') || argv.includes('--rain5d')){   // RAIN-2: --rain2 the same captures into tools/.ui-snap/rain2/ (its comparison page: --rain2page)   /* RAIN-1: the baked city — each mood, the focus near / middle / far, a phrase lighting windows; a before / after page */
+    const O1=path.join(ROOT, argv.includes('--rain5d') ? 'tools/.ui-snap/rain5d' : argv.includes('--rain5c') ? 'tools/.ui-snap/rain5c' : argv.includes('--rain5b') ? 'tools/.ui-snap/rain5b' : argv.includes('--rain5') ? 'tools/.ui-snap/rain5' : argv.includes('--rain2') ? 'tools/.ui-snap/rain2' : 'tools/.ui-snap/rain1'); await mkdir(O1, { recursive:true }); const made1=[], log1={};
     const RU={ late:'Поздняя ночь', evening:'Вечерний бульвар', after:'После дождя' };
     for(const [tag, vp, dpr] of [['phone', { width:390, height:844 }, 2.75], ['laptop', { width:1280, height:800 }, 1]]){
       const { ctx, p, errs }=await open(vp, LEVEL, dpr), shot=async (name, ru)=>{ const f=`${tag}-${name}${SUF}.png`; await p.screenshot({ path:path.join(O1, f) }); log1[f]=await stateOf(p); made1.push([f, ru]); };
@@ -66,6 +66,16 @@ try{
           await new Promise(r=>setTimeout(r, 250)); if(FO.focusDepth(R.state().target)>FO.LAYER_DEPTH.street) lo=s; else hi=s; } return best; });
       for(const mood of ['late', 'evening', 'after']){ await p.evaluate(m=>window.__H.sceneRoomDbg().lookDbg(m), mood); await hand(p, 0.5, 0.45, mid, false, 10); await p.waitForTimeout(3200);
         await shot(`mood-${mood}`, `${RU[mood]}: фокус на бульваре`); }
+      if(argv.includes('--rain5d')){   /* RAIN-5d: the far life's rare events, each at a moment inside it (the scene's clock moved there) */
+        const at=await p.evaluate(async ()=>{ const F=await import('/apps/night/rooms/rain/pure/far.js'), E=F.farEvents(4000), o={}; for(const k of ['scooter', 'smoker', 'attic', 'bridge']){ const e=E.find(x=>x.kind===k); o[k]=e.t+e.dur*(k==='scooter' ? 0.55 : 0.5); } return o; });
+        for(const [k, mood, ru] of [['scooter', 'evening', 'Курьер на скутере с маленькой фарой (у бордюра, едет к нам)'], ['smoker', 'late', 'Сосед курит на балконе: огонёк сигареты (дом напротив)'], ['attic', 'evening', 'В освещённой мансарде кто-то ходит'], ['bridge', 'after', 'Огни машины на мосту на холмах']]){
+          await p.evaluate(([m, t])=>{ const R=window.__H.sceneRoomDbg(); R.lookDbg(m); window.__H.sceneClockDbg(t); }, [mood, at[k]]); await hand(p, 0.5, 0.45, k==='bridge' ? 0.08 : mid, false, 10); await p.waitForTimeout(2500); await shot('far-'+k, ru); }
+        await p.evaluate(()=>window.__H.sceneClockDbg(null)); }
+      if(argv.includes('--rain5c') || argv.includes('--rain5d')){   /* RAIN-5c: the sky's rare events, held at a moment of each (the room's sky clock) */
+        const at=await p.evaluate(async ()=>{ const S=await import('/apps/night/rooms/rain/pure/sky.js'), E=S.skyEvents(4000); const b=E.find(e=>e.kind==='beam'), q=E.find(e=>e.kind==='plane'); return { beam:b.t+b.dur*0.45, plane:q.t+q.dur*0.3 }; });
+        for(const [k, mood, ru] of [['beam', 'late', 'Прожектор с крепости на холме скользит по облакам (поздняя ночь, полумесяц)'], ['plane', 'after', 'Огни далёкого самолёта над горизонтом (после дождя, луна в разрыве)']]){
+          await p.evaluate(([m, t])=>{ const R=window.__H.sceneRoomDbg(); R.lookDbg(m); R.skyDbg(t); }, [mood, at[k]]); await hand(p, 0.5, 0.45, 0.08, false, 10); await p.waitForTimeout(3000); await shot('sky-'+k, ru); }
+        await p.evaluate(()=>window.__H.sceneRoomDbg().skyDbg(null)); }
       await p.evaluate(()=>window.__H.sceneRoomDbg().lookDbg('evening'));
       await hand(p, 0.5, 0.45, 0.32, false, 10); await p.waitForTimeout(2600); await shot('focus-near', 'Фокус близко: капли резкие, город в мягком боке');
 

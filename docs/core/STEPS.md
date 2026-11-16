@@ -75,6 +75,12 @@ THERE in full and here as one index entry):
   170 The rain room's street alive: life by mood, the music shown, balconies, the boulevard's far end (RAIN-5)
   171 The rain room's composed music: three pieces, synth and recorded versions (RAIN-4b)
   172 The rain room's street more alive: no quad edges, varied people walking, gradual arrivals, houses with character (RAIN-5b)
+  173 The forest's plants apart, a natural young broad-leaved tree, the cull behind ?forest=cull (FOREST-2e)
+  174 The rain room's music as lo-fi: three pieces × three levels, bar-line changes (RAIN-4c)
+  175 The rain room's city much more alive: the gait, the cyclist, the café's lights, signs and signals, windows, the sky (RAIN-5c)
+  176 The forest's left pair the same on both levels; the cull by default (FOREST-2f)
+  177 The rain room's lo-fi with our own sound: the tine piano, the physical guitar, effects, never the same twice (RAIN-4d)
+  178 The rain room's life at every distance: the hills, the rare events (RAIN-5d)
   163 Fixes after the backlog audit: an in-app browser's refusal, the Lighter stream, the rain room's sound on Dark, Licences, keeping the files (NIGHT-15, CORE-23)
 
 ## Moved to `archive/CLAUDE-history.md` at DOC1 (grep by title; read only what the slice needs)

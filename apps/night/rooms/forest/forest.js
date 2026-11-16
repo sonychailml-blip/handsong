@@ -19,7 +19,10 @@ import { buildDetail } from './forest-detail.js';   // RUN 9 (slice 3): grass, l
 import { buildRare } from './forest-rare.js';
 import { buildMirror } from './forest-mirror.js';   // NIGHT-9: the water's mirror   // RUN 9 (slice 4): the falling star, the flower, the emblem
 import { buildAnswers } from './forest-answers.js';   // NIGHT-6 slice 1: dew and webs
-import { buildFloor } from './forest-floor.js';   // NIGHT-6 slice 3: the herb layer and the fine fern
+import { buildFloor } from './forest-floor.js';
+import { fernInSpruces, LEFT_PAIR } from './pure/spacing.js';   // FOREST-2e: plants apart
+import { cullTargets, cullApply } from './forest-cull.js';
+import { FOREST_CULL } from './pure/cull.js';   // FOREST-2e: the cull   // NIGHT-6 slice 3: the herb layer and the fine fern
 import { buildStream } from './forest-stream.js';   // NIGHT-6 slice 4: rocks, pebbles, drifting leaves, the mist over the water
 import { STREAM, STREAM_LINE, streamNear, bankGround, lifePlaces } from './pure/forestlife.js';
 import { outOfWater } from './pure/stream.js';
@@ -39,7 +42,7 @@ import { handLightK, HANDLIGHT_GLOW_OLD } from '../../pure/handlight.js';   // N
 import { patchGroundMacro, patchGroundNight } from './forest-ground.js';   // NIGHT-8: the bare ground's large scale
 import { litterPlaces } from './pure/ground.js';   // NIGHT-8: leaves, pebbles and twigs on the ground
 import { naturalAssets, naturalHas, naturalTextures, NAT_UNI } from './forest-natural.js';   // FOREST-2: the objects made natural (?forest=new only)
-import { NATURAL, rootsOrganic, solidsOf, clearSpot, growersOn, keepSize, solids3Of, fernSpot, frondPoints, inSolid3, spraysClear, shroomsFree, rootTopAt, sightBlock, solidHit } from './pure/natural.js';
+import { NATURAL, rootsOrganic, solidsOf, clearSpot, growersOn, keepSize, solids3Of, fernSpot, frondPoints, inSolid3, withCones, cardSpot, spraysClear, shroomsFree, rootTopAt, sightBlock, solidHit } from './pure/natural.js';
 import { streamRocks } from './pure/stream.js';
 import { SPRUCES } from './pure/spruce.js';   // FOREST-2b
 
@@ -91,6 +94,10 @@ const partsOf=v=>{ const S=new Set(); if(v===true) v='new'; if(v===false || v==n
 let PARTS=partsOf(''); try{ if(typeof location!=='undefined') PARTS=partsOf(new URLSearchParams(location.search).getAll('forest').join(',')); }catch(e){}
 export const forestNewDbg=v=>{ if(v!==undefined && v!==null) PARTS=partsOf(v); return PARTS.size ? FOREST_PARTS.filter(k=>PARTS.has(k)) : false; };   // false = the old forest; 'default'; a word = the default + it; true / 'new' = all
 export const forestNewAssets=level=>naturalAssets(level, PARTS);
+let CULL=true; try{ if(typeof location!=='undefined') CULL=!new URLSearchParams(location.search).getAll('forest').join(',').split(',').map(w=>w.trim()).includes('nocull'); }catch(e){}
+export const forestCullDbg=v=>{ if(v!=null) CULL=!!v; return CULL; };   // FOREST-2e: the cull — leave out what no view ever shows; FOREST-2f: the DEFAULT (the founder), ?forest=nocull without it
+let CULL_EXTRA=null; export const forestCullListDbg=v=>{ CULL_EXTRA=v||null; return CULL_EXTRA; };   // probes only: more instances to drop with the list ({ name:[indices] }: the row's CONTROL)
+let APART=true; export const forestApartDbg=v=>{ if(v!=null) APART=!!v; return APART; };   // FOREST-2e: plants apart (the default); false — the probes' CONTROL only (the forest as at FOREST-2d)
 const WOOD_MEMO=new Map(), LITTER_MEMO=new Map();   // NIGHT-8: + the litter's places per counts   // NIGHT-6 slice 5: the wood's places per counts (pure, seeded): worked out once per session
 const IMG={}, LOADING={}, assetErr=[];
 async function fileImage(url){ const r=await fetch(url); if(!r.ok) throw new Error(r.status+' '+url.pathname);
@@ -222,8 +229,8 @@ export function buildForest(T, opt){
   const frondM=new T.MeshStandardMaterial({ map:fernT, alphaTest:0.45, side:T.DoubleSide, roughness:0.85 }), frondD=new T.MeshDistanceMaterial({ map:fernT, alphaTest:0.45, side:T.DoubleSide });
   const fronds=new T.InstancedMesh(frondG, frondM, ferns.length*7); fronds.customDistanceMaterial=frondD; own.push(frondM, frondD);
   const clrAvoid= has('clear') ? sightBlock(lifePlaces(Lv.shrooms, Lv.blooms).filter(q=>q.kind==='shroom').concat(WOOD_MEMO.get(wkeyN).shrooms)) : null;
-  let S3=null; if(has('clear')){ S3=solids3Of({ trunks:spots, wood:WOOD_MEMO.get(wkeyN), rocks:streamRocks(Math.max(0, Lv.rocks|0)), aisle:ROCKS_TODAY, ground:gy });   // FOREST-2: each fern against its own fronds in 3D (the same draws as today, in the same order)
-    let fi=0; for(const f of ferns){ const sc=f[2], a0=R()*6.28, fr=[]; for(let j=0;j<7;j++){ const tilt=0.75+R()*0.5, yaw=a0+j*0.9+R()*0.3; fr.push({ tilt, yaw, sx:sc, sy:sc*(0.8+R()*0.4) }); }
+  const FR=[]; let S3=null; if(has('clear')){ S3=solids3Of({ trunks:spots, wood:WOOD_MEMO.get(wkeyN), rocks:streamRocks(Math.max(0, Lv.rocks|0)), aisle:ROCKS_TODAY, ground:gy });   // FOREST-2: each fern against its own fronds in 3D (the same draws as today, in the same order)
+    let fi=0; for(const f of ferns){ const sc=f[2], a0=R()*6.28, fr=[]; FR.push(fr); for(let j=0;j<7;j++){ const tilt=0.75+R()*0.5, yaw=a0+j*0.9+R()*0.3; fr.push({ tilt, yaw, sx:sc, sy:sc*(0.8+R()*0.4) }); }
       { const r=fernSpot(f[0], f[1], fr, S3, gy, { eye:2.2, water:0.3+sc*0.25, box:[-12, 12, -22, 4], avoid:clrAvoid, reach:0.9*sc, height:0.85*sc });
         if(r[2]){ const E=NATURAL.clear.eye, k=Math.hypot(r[0]-E[0], r[1]-E[1])/Math.max(0.5, Math.hypot(f[0]-E[0], f[1]-E[1])), big=fr.map(q=>({ ...q, sx:q.sx*k, sy:q.sy*k }));   // a moved fern keeps its size on screen while it stays clear
           if(k>1) for(const f of [1, 0.75, 0.5, 0.25]){ const kt=1+(k-1)*f, bg=fr.map(q=>({ ...q, sx:q.sx*kt, sy:q.sy*kt })); if(!frondPoints(r[0], gy(r[0], r[1])-0.02, r[1], bg).some(p=>inSolid3(p[0], p[1], p[2], S3))){ fr.splice(0, fr.length, ...bg); break; } }   // the largest step of its size back that fits
@@ -307,8 +314,29 @@ export function buildForest(T, opt){
     trunks.instanceMatrix.needsUpdate=true; }
   /* NIGHT-6 slice 7: the canopy (crowns, the understorey, the stars) and the dappled moonlight on the ground */
   let crownTex=null; if(files.crown && Lv.crowns){ crownTex=new T.Texture(files.crown); crownTex.encoding=T.sRGBEncoding; crownTex.anisotropy=4; crownTex.needsUpdate=true; own.push(crownTex); }
-  const spruce= has('spruce') && NT && NT.foliage ? { n:SPRUCES[opt.level]||SPRUCES.full, tex:NT.foliage, shrooms:lifePlaces(Lv.shrooms, Lv.blooms).filter(q=>q.kind==='shroom').concat(WP.shrooms, nearMore) } : null;   // FOREST-2b
+  const spruce= has('spruce') && NT && NT.foliage ? { n:SPRUCES[opt.level]||SPRUCES.full, tex:NT.foliage, shrooms:lifePlaces(Lv.shrooms, Lv.blooms).filter(q=>q.kind==='shroom').concat(WP.shrooms, nearMore), apart:APART } : null;   // FOREST-2b; FOREST-2e apart (FOREST-2f: spruces no longer step aside for ferns — the ferns move)
   const canopy= has('clear') ? buildCanopy({ T, s, C, own, lv:Lv, trunks:spots, U:life.U, crownTex, woodMat:wood.parts.material, soft, clear:clr, reach:NATURAL.reach, tall:NATURAL.tall, sprays:q=>spraysClear(q, spots.map(([x, z, r])=>({ x, z, r, y0:gy(x, z)+WOOD.trunk.foot })).concat(WP.snags.map(S=>({ x:S.x, z:S.z, r:S.s, y0:S.y+WOOD.trunk.foot })))), clearKey:opt.level+(Lv.rocks|0), spruce }) : spruce ? buildCanopy({ T, s, C, own, lv:Lv, trunks:spots, U:life.U, crownTex, woodMat:wood.parts.material, soft, spruce }) : buildCanopy({ T, s, C, own, lv:Lv, trunks:spots, U:life.U, crownTex, woodMat:wood.parts.material, soft });
+  /* FOREST-2e: PLANTS APART — a fern whose fronds enter a young spruce's cone moves to the nearest clear place from its place of today (the same
+     search and limits as its clearing: solids, water, the eye, the mushrooms' sight, 1.76 m at most), a little smaller (×0.85, 0.7, 0.55) only where no
+     place fits it whole; its seven fronds re-placed, no random draw (pure/spacing.js) */
+  const apartN={ ferns:0, smaller:0, stuck:0, moved:{} }; if(APART && S3 && canopy.spruces && canopy.spruces.places.length){ const cones=canopy.spruces.places.map(p=>({ x:p.x, z:p.z, H:p.H, y0:bankGround(p.x, p.z) })), S3c=withCones(S3, cones), FR0=FR.map(fr=>fr && fr.map(q=>({ ...q })));   // FR0: the fronds before any move (the probes' test)
+    ferns.forEach((f, i)=>{ const fr=FR[i]; if(!fr) return; const pts=(x, z, F)=>frondPoints(x, gy(x, z)-0.02, z, F); if(fernInSpruces(pts(f[0], f[1], fr), cones)<0) return;
+      const sc=f[2], o0=fernsToday ? fernsToday[i] : f, cut=(x, z, F)=>pts(x, z, F).some(p=>inSolid3(p[0], p[1], p[2], S3c));   // from TODAY's place: «FOREST nothing lost» lets a fern move 1.8 m in all
+      const pinF=LEFT_PAIR.ferns[i]; if(pinF){ const F=fr.map(q=>({ ...q, sx:q.sx*pinF.k, sy:q.sy*pinF.k })); if(!cut(pinF.x, pinF.z, F)){ fr.splice(0, fr.length, ...F); f[0]=pinF.x; f[1]=pinF.z; apartN.ferns++; if(pinF.k<1) apartN.smaller++; apartN.moved[i]=[o0[0], o0[1]]; apartN.pinned=i;
+          fr.forEach((q, j)=>{ d.position.set(f[0], gy(f[0], f[1])-0.02, f[1]); d.rotation.set(q.tilt, q.yaw, 0, 'YXZ'); d.scale.set(q.sx, q.sy, q.sx); d.updateMatrix(); fronds.setMatrixAt(i*7+j, d.matrix); }); return; } }   // FOREST-2f: the left pair's fern, pinned (the same on both levels)
+      let done=false; for(const [kk, rings] of [[1], [0.85], [0.7], [0.55], [1, 44], [0.85, 44], [0.7, 44], [0.55, 44], [0.85, 66], [0.7, 66]]){ const F=fr.map(q=>({ ...q, sx:q.sx*kk, sy:q.sy*kk })), r=cardSpot(o0[0], o0[1], (x, z)=>pts(x, z, F), S3c, { eye:2.2, water:0.3+sc*0.25, box:[-12, 12, -22, 4], avoid:clrAvoid, reach:0.9*sc*kk, height:0.85*sc*kk, rings });   // FOREST-2f: then up to 3.5 m, at last 5.3 m (declared: apartN.moved)
+        if(cut(r[0], r[1], F) || (clrAvoid && (r[0]!==o0[0] || r[1]!==o0[1]) && clrAvoid(r[0], r[1], 0.9*sc*kk, 0.85*sc*kk, o0[0], o0[1]))) continue; fr.splice(0, fr.length, ...F); f[0]=r[0]; f[1]=r[1]; apartN.ferns++; if(kk<1) apartN.smaller++; if(rings) apartN.moved[i]=[o0[0], o0[1]]; done=true; break; }   // the nearest clear place at full size, else a little smaller; never one that hides a mushroom (the search's own fallback may)
+      if(!done){ apartN.stuck++; return; }
+      fr.forEach((q, j)=>{ d.position.set(f[0], gy(f[0], f[1])-0.02, f[1]); d.rotation.set(q.tilt, q.yaw, 0, 'YXZ'); d.scale.set(q.sx, q.sy, q.sx); d.updateMatrix(); fronds.setMatrixAt(i*7+j, d.matrix); }); });
+    fronds.instanceMatrix.needsUpdate=true;
+    apartN.why=i=>{ const f=ferns[i], fr=FR0[i], o0=fernsToday ? fernsToday[i] : f, sc=f[2], C=NATURAL.clear, R={ ok:0, cut:{}, water:0, eye:0, box:0, avoid:0 };   // probes only: why fern i finds no place (the rings to 5.3 m)
+      for(let k=1;k<=66;k++){ const rr=k*C.step, na=8+4*k; for(let j=0;j<na;j++){ const a=j/na*6.2832, px=o0[0]+Math.cos(a)*rr, pz=o0[1]+Math.sin(a)*rr;
+        if(px<-12 || px>12 || pz<-22 || pz>4){ R.box++; continue; } if(Math.hypot(px-C.eye[0], pz-C.eye[1])<2.2){ R.eye++; continue; } if(streamNear(px, pz).d<STREAM.half+0.3+sc*0.25){ R.water++; continue; }
+        const hit=frondPoints(px, gy(px, pz)-0.02, pz, fr).map(p=>inSolid3(p[0], p[1], p[2], S3c)).find(Boolean); if(hit){ R.cut[hit]=(R.cut[hit]||0)+1; continue; }
+        if(clrAvoid && clrAvoid(px, pz, 0.9*sc, 0.85*sc, o0[0], o0[1])){ R.avoid++; continue; } R.ok++; if(!R.first) R.first=[px, pz, k]; } }
+      const pts=(x, z)=>frondPoints(x, gy(x, z)-0.02, z, fr), r=cardSpot(o0[0], o0[1], pts, S3c, { eye:2.2, water:0.3+sc*0.25, box:[-12, 12, -22, 4], avoid:clrAvoid, reach:0.9*sc, height:0.85*sc, rings:66 });
+      R.test=(px, pz, kk=1)=>{ const F=fr.map(q=>({ ...q, sx:q.sx*kk, sy:q.sy*kk })), hit=frondPoints(px, gy(px, pz)-0.02, pz, F).map(p=>inSolid3(p[0], p[1], p[2], S3c)).find(Boolean); if(hit) return hit; if(streamNear(px, pz).d<STREAM.half+0.3+sc*0.25) return 'water'; if(clrAvoid && clrAvoid(px, pz, 0.9*sc*kk, 0.85*sc*kk, o0[0], o0[1])) return 'hides a mushroom'; return 'ok'; };
+      R.search=[r[0], r[1], r[2], pts(r[0], r[1]).some(p=>inSolid3(p[0], p[1], p[2], S3c)), !!(clrAvoid && clrAvoid(r[0], r[1], 0.9*sc, 0.85*sc, o0[0], o0[1]))]; R.o0=o0.slice(0, 2); return R; }; }
   let dapTex=null; const DU={ uDap:{ value:null }, uDapK:{ value:0 }, uDapT:{ value:0 }, uDapCol:{ value:pal.moonhalo } };
   if(files.dapple && Lv.dapple){ dapTex=new T.Texture(files.dapple); dapTex.wrapS=dapTex.wrapT=T.RepeatWrapping; dapTex.format= opt.gl2!==false ? T.RedFormat : T.RGBAFormat; dapTex.needsUpdate=true; own.push(dapTex); DU.uDap.value=dapTex; patchDapple(groundM, DU); }
   const gust=buildGust({ T, s, own, lv:Lv, U:life.U, floorMat:floorTex ? floor.parts.material : null, life, reduce });   // NIGHT-6 slice 6
@@ -492,8 +520,11 @@ export function buildForest(T, opt){
   const waterY=(()=>{ const P=STREAM_LINE.filter(q=>q.z>-12 && q.z<4); return P.reduce((a,q)=>a+q.y,0)/Math.max(1, P.length); })();
   const mirror=buildMirror({ T, s, camera, lv:Lv, y:waterY, WU:life.WU, paint, silhouettes:[trunks, branches, canopy.parts.wood, canopy.parts.leaves, canopy.parts.stars, moonS, moonD, ...clouds], own, skyCol:pal.sky });
   const render=r=>{ mirror.render(r, now*1000); paint.render(r, now); };   // NIGHT-9: the mirror first, when due by the room's own clock (one frame drawn twice stays one picture)   // the room's own frame time: one frame drawn twice is the same picture (the grain too)
+  /* FOREST-2e: the cull (?forest=cull, the default parts only): the instances no view ever shows left out (./forest-cull.js, the list ./pure/cull.js) */
+  const cullT=cullTargets({ trunks, branches, ferns:fronds, floor:floor.parts, canopy:canopy.parts, stream:stream.parts, wood:wood.parts, grass:detail.grass, bases }), CL=FOREST_CULL[opt.level];
+  const cullSt= CULL && CL && CL.list && FOREST_CULL.parts.length===NP.size && FOREST_CULL.parts.every(k=>NP.has(k)) ? cullApply(cullT, CULL_EXTRA ? Object.fromEntries([...new Set([...Object.keys(CL.list), ...Object.keys(CULL_EXTRA)])].map(k=>[k, { n:CL.list[k] ? CL.list[k].n : cullT[k] && cullT[k].count, drop:(CL.list[k] ? CL.list[k].drop : []).concat(CULL_EXTRA[k]||[]) }])) : CL.list) : null;
   resize(W,H);
-  return { id:FOREST_ROOM.id, scene:s, camera, update, resize, place, glint, project, state, dispose, lightsOf, lifeDbg:life, detailDbg:detail, bed, texBytes, answersDbg:answers, floorDbg:floor, streamDbg:stream, woodDbg:wood, gustDbg:gust, canopyDbg:canopy, dappleDbg:DU, render, paintDbg:paint, mirrorDbg:mirror, hiddenDbg:hidden, foxDbg:FU, fernsDbg:{ fronds, frondM, frondD }, woodPlacesDbg:WP, trunksDbg:{ trunks, branches, spots }, trunkBasesDbg:()=>bases, vegDbg:()=>[wood.parts.moss, wood.parts.ivy, life.parts.caps, life.parts.stems, life.parts.petals].filter(m=>m && m.parent), natDbg:()=>({ on:nat, parts:[...NP], moved:{ ...movedN }, solids:SOL ? SOL.length : 0, files:!!NT && !!NT.barkA && !!NT.rockC }), groundDbg:{ U:macroU, branches, brs:brs.length, litter },   // NIGHT-8: probes   // FOREST-2: probes
+  return { id:FOREST_ROOM.id, scene:s, camera, update, resize, place, glint, project, state, dispose, lightsOf, lifeDbg:life, detailDbg:detail, bed, texBytes, answersDbg:answers, floorDbg:floor, streamDbg:stream, woodDbg:wood, gustDbg:gust, canopyDbg:canopy, dappleDbg:DU, render, paintDbg:paint, mirrorDbg:mirror, hiddenDbg:hidden, foxDbg:FU, fernsDbg:{ fronds, frondM, frondD, fr:FR, apart:apartN }, cullDbg:{ targets:cullT, state:cullSt }, woodPlacesDbg:WP, trunksDbg:{ trunks, branches, spots }, trunkBasesDbg:()=>bases, vegDbg:()=>[wood.parts.moss, wood.parts.ivy, life.parts.caps, life.parts.stems, life.parts.petals].filter(m=>m && m.parent), natDbg:()=>({ on:nat, parts:[...NP], moved:{ ...movedN }, solids:SOL ? SOL.length : 0, files:!!NT && !!NT.barkA && !!NT.rockC }), groundDbg:{ U:macroU, branches, brs:brs.length, litter },   // NIGHT-8: probes   // FOREST-2: probes
     held:sec=>{ heldNow= sec>0 ? sec : 0; rare.held(sec); }, rareDbg:kind=>rare.force(kind, now, { light:rigs[0].cur, flies }), viewDbg:o=>{ const lens=v=>!!(v && (v.fov || v.rest)), had=lens(viewOver); viewOver=o||null; if(had || lens(viewOver)) resize(W, H, pxH); else aimCamera(); return viewOver; },
     rest:on=>{ const was=restOn; restOn=!!on; if(restOn && !was){ goalOf(camLook, camGoal); camOff.copy(camGoal); motionK=0; aimCamera(); } return restOn; },   // NIGHT-13: the camera at rest (host sceneRest)
     flyAt, flyPick, flyLand:i=>{ if(flies[i]) lands.push({ i, t0:null }); return !!flies[i]; },   // NIGHT-13: the start's dot becomes one of the fireflies; 13b: its landing swell

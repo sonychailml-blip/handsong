@@ -2065,6 +2065,42 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
     3. They walk — legs, arms, a slight bob — never slide.
     4. Change the mood: people come and go gradually over about a minute, from side streets and doorways.
     5. The houses: varied rooms and window dressing, lit stairwells, antennas and tanks; the Poco smooth.
+173. The forest after FOREST-2e (Detailed). Pictures: `tools/.ui-snap/forest2e/index.html` (before | after). Five checks:
+    1. On the left the young spruce and the big fern stand apart now — no fern growing through a spruce anywhere you look.
+    2. The young broad-leaved trees: a real young tree (one leader, branches in a spiral, an egg-shaped crown, one kind of leaf), standing aside of the moon's window.
+    3. Mushrooms as visible as before; nothing missing.
+    4. `?forest=cull` in a second tab: the same picture as without it, on the laptop and the Poco, with the hand leaning the camera far left and right.
+    5. The Poco at Standard with `?forest=cull`: smoother or the same? (No timing was measured.)
+174. The rain room's music as lo-fi (RAIN-4c). Listen first: `tools/design/rain/lofi/index.html` — 3 pieces × 3 levels, with and without a melody, the bar-line changes, the old jazz beside it. Five checks by ear:
+    1. Does it sound like lo-fi (dusty warm piano, laid-back beat, vinyl, tape) and good to sit in the rain with?
+    2. The three pieces: Late night dreamy, Evening boulevard the most groove, After the rain warm — distinct enough?
+    3. The Music button (quiet / groove / full): each level right; the change waits for the bar line and fades, never cuts.
+    4. In the app with `?room=rain`: the Mood button changes the piece at the bar line; the hand's notes never clash; the hand's timbres sit in the mix (the electric piano, the vibraphone, the nylon guitar).
+    5. `?room=rain&bed=jazz`: the old jazz still there for comparison; the forest's music unchanged.
+175. The rain room's city much more alive (RAIN-5c; `?room=rain`). Pictures: `tools/.ui-snap/rain5c/compare.html` (RAIN-5b against now, and every new shape large). Five checks:
+    1. The people walk more naturally (the foot lifting, the hips, the arms against the legs, the umbrella arm still); bags, backpacks, hats, scarves, small groups.
+    2. The cyclist rides along the street (its back and a blinking red light riding away), not sideways.
+    3. The café's string lights and little flags, the lit pictograms, the traffic lights and the pedestrian signals at the crossing; garlands in a few windows.
+    4. Watch a few minutes: someone comes to a window, a curtain moves, a light goes off and on — rarely; the clouds drift, the moon by mood, a searchlight sweep or a far aircraft now and then.
+    5. The Poco at Standard: smooth? (No timing was measured.)
+176. The forest's left pair after FOREST-2f (both levels). Pictures: `tools/.ui-snap/forest2f/`. Five checks:
+    1. Standard: the young spruce on the left at its earlier, farther place; the big fern aside (back left).
+    2. Detailed: the same arrangement — the spruce there, not gone.
+    3. The mushrooms as visible as before.
+    4. The cull is now the default: the picture the same as with `?forest=nocull`, leaning far left and right.
+    5. The Poco at Standard. (No timing was measured.)
+177. The rain room's lo-fi with our own sound (RAIN-4d). Listen: `tools/design/rain/lofi/index.html` (kept local). Five checks by ear:
+    1. The electric piano (the hand's own tine engine) against the old FM sample — natural now?
+    2. The nylon guitar (the physical model) against the old plucked string — a guitar now?
+    3. The effects: the piano's chorus, tremolo and auto-pan, the tape delay on the guitar and vibraphone, the tape and the gentle compression — audible, musical, breathing?
+    4. Three minutes of each piece: never the same twice, the harmony still recognisable, the breaks and returns natural?
+    5. In the app with `?room=rain`: the Music button's levels, the Mood button's pieces on bar lines; the forest's music unchanged.
+178. The rain room's life at every distance (RAIN-5d; `?room=rain`). Pictures: `tools/.ui-snap/rain5d/compare.html`. Five checks:
+    1. The hills with the focus far: the cars on the winding road, the masts and the tower blinking, the window lights twinkling.
+    2. The cable car's cabins and the lit church.
+    3. A few minutes: a scooter rider, a smoker's glow on a balcony, someone in a lit attic, a car's turn signal, a sign flickering — rare, never two of a kind in a row.
+    4. Nothing blinks too fast; nothing looks like a Christmas tree.
+    5. The Poco at Standard. (No timing was measured.)
 ## Superseded at DOC1 (old lines verbatim, replaced in place above by a later slice)
 - NIGHT-2 stage 3 (2026-11-03, the rule of at most five manual checks) updated this line of CLAUDE.md's report format:
   probe verdict lines and fix rounds; what was left undone; docs found stale; the user's remaining steps (ear, camera, phone).

@@ -46,8 +46,8 @@ function spruceTree(R, x, z, H, gy, rs, limbs, cards){ const S=SPRUCE;
     for(let k=0;k<2;k++) cards.push({ x, y:gy+H-0.42, z, b:cardBasis([0.05*(k ? 1 : -1), 1, 0.02], k*1.57), s:0.5, cell:'spruceA', tone:0.95, of:'spruce' });   // the leader
 }
 /* FOREST-2c: spruces AT given places (the visible young trees and saplings they replace) — { x, z, H } each, its own seeded draws */
-export function sprucesAt(at, seed=SPRUCE.seed^0x2C){ const places=[], limbs=[], cards=[];
-  at.forEach((q, i)=>{ const R=seeded(seed+977*i), H=q.H*(0.92+0.16*R()), gy=bankGround(q.x, q.z), rs=0.035+H*0.012; places.push({ x:q.x, z:q.z, H, of:q.of }); spruceTree(R, q.x, q.z, H, gy, rs, limbs, cards); });
+export function sprucesAt(at, seed=SPRUCE.seed^0x2C){ const places=[], limbs=[], cards=[];   // FOREST-2f: q.key — a fixed draw for a pinned spruce (the same tree on every level)
+  at.forEach((q, i)=>{ const R=seeded(seed+977*(q.key==null ? i : q.key)), H=q.H*(0.92+0.16*R()), gy=bankGround(q.x, q.z), rs=0.035+H*0.012; places.push({ x:q.x, z:q.z, H, of:q.of, pin:!!q.pin, from:q.from||null }); spruceTree(R, q.x, q.z, H, gy, rs, limbs, cards); });
   return { places, limbs, cards }; }
 /* FOREST-2c: would a spruce of height H at (x, z) stand in the eye's way to a mushroom? The spruce as a cone (its branches' reach 0.12 + 0.36 H × the share
    of height left) against each segment from the eye to a cap, at the height the segment passes it; margin: the cap's size */

@@ -110,12 +110,18 @@ export async function checkRainRoom(){
       for(const [x, y] of [[0.75, 0.55], [0.25, 0.55], [0.7, 0.62], [0.3, 0.62], [0.82, 0.5], [0.18, 0.5], [0.6, 0.55], [0.4, 0.55], [0.5, 0.6]]){ hand(x, y, FAR, false, 45); await until(()=>st().focus>0.95, 5000); await sleep(500); const L=st().light, q=Wn.windowPick(W, L.x, L.y);
         if(q>=0 && st().lit[q]<0.05){ k=q; at=[x, y]; break; } }
       n++; if(k<0) miss('no place of the hand points at a dark window (the row cannot play its note)');
-      else { const p0=st().picks; hand(at[0], at[1], FAR, true, 4); n+=3; const on=await until(()=>st().lit[k]>=0.9, 2000), S=st();
+      else { const p0=st().picks; hand(at[0], at[1], FAR, true, 4); n+=3; const on=await until(()=>st().lit[k]>=0.9, 2000), S=st(), tNote=S.now;   // fix-hidden: the note's moment on the ROOM's clock
         if(!on) miss(`a far note on window ${k}: its light is ${S.lit[k].toFixed(3)} after 2 s (≥ 0.9 expected), last pick ${S.lastPick}`);
         if(!(S.picks>p0) || S.pickLog.slice(p0-S.picks).some(q=>q!==k)) miss(`a far note picked ${JSON.stringify(S.pickLog.slice(p0-S.picks))}, the law names only ${k}`);
         hand(at[0], at[1], FAR, false, 4); await frames(2);
         /* the clock jump: read once the room's own clock shows it and it has stepped once more there (an event, with a 5-s limit) */
-        const T=performance.now()/1000+120; H.sceneClockDbg(T); const seen=await until(()=>st().now>=T-1, 5000), more=seen && await stepped(2), later=st().lit[k], law=Wn.traceLevel(st().now-(T-120)); H.sceneClockDbg(null); await frames(2);
+        /* fix-hidden (2026-11-16): the music held while the trace is read — its long notes make lit windows BREATHE (rain.js, RAIN-5: ×1.22 at most), which
+           this check read as a wrong trace since RAIN-5 (0.409 against 0.363); the queued notes drain first (1.5 s) */
+        const SHm=await import('../../../apps/night/shell.js'); SHm.nightMusicHoldDbg(true); await sleep(1500);
+        /* and the jump from the room's own clock: it was set from the page's (performance.now), which the room's clock runs ~20 s ahead of — the window
+           was then ~95 s old, not 120 (0.409–0.426 against the law's 0.363) */
+        const T=tNote+120; H.sceneClockDbg(T); const seen=await until(()=>st().now>=T-1, 5000), more=seen && await stepped(2), later=st().lit[k], age=st().now-tNote, law=Wn.traceLevel(age); H.sceneClockDbg(null); SHm.nightMusicHoldDbg(false); await frames(2);
+        n++; if(Math.abs(later-Wn.traceLevel(age-20))<=0.03) miss('CONTROL: a window 20 s younger than the law would read passed «the trace law»');
         notes.push(`window ${k} lit by a far note; two minutes later ${later.toFixed(3)} (the law: ${law.toFixed(3)})`);
         if(!seen || !more) miss('the room did not step after its clock was moved (5 s)');
         else if(!(Math.abs(later-law)<=0.03 && later>0.1 && later<0.9)) miss(`two minutes after its note the window glows at ${later.toFixed(3)}, the trace law says ${law.toFixed(3)} (its ambient threshold ${W[k] && W[k].amb}, the lit share ${st().share.toFixed(4)}, mood ${st().mood})`); }
