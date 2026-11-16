@@ -90,9 +90,9 @@ export function buildFacade(T, M, o={}){
 
 /* THE LIVES: small interiors drawn by our own 2D code on a canvas (lamp behind a curtain, a reader, someone cooking, a cat on the sill, a plant, a
    TV's blue flicker) — the back wall of a lit room. kind 0…5 → a canvas */
-export function lifeCanvas(kind, seed=1){
+export function lifeCanvas(kind, seed=1, v={}){   // RAIN-5b: v { temp warm | white | dim, cur side | blind | sheer | drape | none, col 0…5 }
   const c=document.createElement('canvas'); c.width=256; c.height=384; const x=c.getContext('2d'), W=256, H=384, R=(()=>{ let s=seed*9301+49297; return ()=>((s=(s*9301+49297)%233280)/233280); })();
-  const tv=kind===5, wall=tv ? ['#20263a', '#3a4a6e'] : ['#5a3a22', '#e3a45e'];
+  const tv=kind===5, wall=tv ? ['#20263a', '#3a4a6e'] : v.temp==='white' ? ['#3e3c38', '#e6e0cf'] : v.temp==='dim' ? ['#2a1e14', '#8a6038'] : ['#5a3a22', '#e3a45e'];
   let gr=x.createRadialGradient(W*0.55, H*0.42, 10, W*0.5, H*0.5, H*0.75); gr.addColorStop(0, wall[1]); gr.addColorStop(1, wall[0]); x.fillStyle=gr; x.fillRect(0, 0, W, H);
   x.fillStyle='rgba(40,22,12,0.55)'; x.fillRect(0, H*0.78, W, H*0.22);   // the floor and the furniture's shadow
   const lamp=(lx, ly, rr)=>{ const g2=x.createRadialGradient(lx, ly, 2, lx, ly, rr); g2.addColorStop(0, 'rgba(255,236,190,1)'); g2.addColorStop(0.25, 'rgba(255,200,120,0.6)'); g2.addColorStop(1, 'rgba(255,170,80,0)'); x.fillStyle=g2; x.fillRect(lx-rr, ly-rr, 2*rr, 2*rr);
@@ -109,7 +109,14 @@ export function lifeCanvas(kind, seed=1){
     x.fillStyle='#3a2416'; x.fillRect(W*0.27, H*0.78, 44, 30); }
   else { const g3=x.createRadialGradient(W*0.5, H*0.55, 4, W*0.5, H*0.55, 170); g3.addColorStop(0, 'rgba(170,205,255,0.9)'); g3.addColorStop(1, 'rgba(90,130,220,0)'); x.fillStyle=g3; x.fillRect(0, 0, W, H);   // a TV's blue light
     x.fillStyle='#0c0f18'; x.beginPath(); x.ellipse(W*0.35, H*0.6, 16, 19, 0, 0, 7); x.fill(); x.fillRect(W*0.27, H*0.64, 34, 70); }
-  /* the curtain: two soft folds at the sides, light through them */
+  /* RAIN-5b: the window's dressing — blinds (slats), a sheer veil, heavy drapes, curtains at the sides (the colour its own), or nothing */
+  const CC=['150,80,40', '96,40,52', '44,62,96', '74,86,52', '170,150,112', '124,62,94'][(v.col||0)%6], cur=v.cur||'side';
+  if(cur==='blind'){ for(let y=0;y<H;y+=14){ x.fillStyle=`rgba(${CC},0.78)`; x.fillRect(0, y, W, 9); } return c; }
+  if(cur==='sheer'){ x.fillStyle=`rgba(${CC},0.28)`; x.fillRect(0, 0, W, H); return c; }
+  if(cur==='none') return c;
+  const side= cur==='drape' ? 0.34 : 0.22;
+  for(const s of [0, 1]) if(!tv){ const g5=x.createLinearGradient(s ? W*(1-side) : 0, 0, s ? W : W*side, 0); g5.addColorStop(0, `rgba(${CC},0.9)`); g5.addColorStop(1, `rgba(${CC},0.55)`); x.fillStyle=g5; x.fillRect(s ? W*(1-side) : 0, 0, W*side, H); }
+  if(!tv) return c;
   for(const s of [0, 1]){ const g4=x.createLinearGradient(s ? W*0.78 : 0, 0, s ? W : W*0.22, 0); g4.addColorStop(0, tv ? 'rgba(40,50,80,0.85)' : 'rgba(150,80,40,0.85)'); g4.addColorStop(1, tv ? 'rgba(80,100,150,0.6)' : 'rgba(240,170,90,0.55)');
     x.fillStyle=g4; x.fillRect(s ? W*0.78 : 0, 0, W*0.22, H); x.fillStyle='rgba(0,0,0,0.12)'; for(let k=0;k<4;k++) x.fillRect((s ? W*0.8 : W*0.02)+k*13, 0, 4, H); }
   return c;

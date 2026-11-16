@@ -13,6 +13,9 @@ import { RAIN_TRAFFIC, EAR } from './city.js';   // RAIN-1: the vehicles' law an
 const F=Object.freeze;
 const LOOK=(pre, mist, rain, lit, traffic)=>F({ pre, fog:0, mist, flies:0, rain, lit, traffic,
   tokens:F({ sky:pre+'sky', glow:pre+'glow', cloud:pre+'cloud', haze:pre+'haze', stone:pre+'stone', plaster:pre+'plaster', asphalt:pre+'asphalt', mist:pre+'mist' }) });
+import LATE_NIGHT from './scores/late-night.js';   // RAIN-4b: the three composed pieces
+import EVENING_BOULEVARD from './scores/evening-boulevard.js';
+import AFTER_THE_RAIN from './scores/after-the-rain.js';
 export const RAIN_ROOM=F({
   format:'handsong/room', version:1, id:'room.rain', name:F({ en:'Rain', ru:'Дождь' }), icon:'depth', tint:'rain-tint', tokens:'rain-',
   still:F({ full:'still/still-full.webp', reduced:'still/still-reduced.webp', fov:68, aspect:1.85 }),
@@ -69,7 +72,9 @@ export const RAIN_ROOM=F({
        OF THE PARENT'S OWN DEGREES (0-based: maj7 / m9 / dom9 colours, rootless voicings), the progression [chord, bars], the comping rhythm
        [beat, velocity] (x.5 = the off-beat, swung at Evening), the bass ('root' long, 'roomy' root and fifth, 'walk' quarters) and the glints;
        per preset how much plays; amps per voice, a strum's roll (s), the sends */
-    jazz:F({ first:'lydian-penta', roll:0.012, ep:0.055, bass:0.2, vib:0.05, brush:0.022, send:F({ ep:0.32, bass:0.1, vib:0.55, brush:0.18 }),
+    jazz:F({ scores:F({ 'lydian-penta':LATE_NIGHT, 'dorian-hexa':EVENING_BOULEVARD, 'mixolydian-hexa':AFTER_THE_RAIN }),   // RAIN-4b: the composed pieces (rooms/rain/pure/scores/), played instead of the generated law
+      scorePresets:F({ still:F({ comp:true, bass:true, drums:false, vib:false }), drift:F({ comp:true, bass:true, drums:true, vib:false }), glimmer:F({ comp:true, bass:true, drums:true, vib:true }) }), kick:0.3, cym:0.03,
+      first:'lydian-penta', roll:0.012, ep:0.055, bass:0.2, vib:0.05, brush:0.022, send:F({ ep:0.32, bass:0.1, vib:0.55, brush:0.18 }),
       presets:F({ still:F({ comp:0.45, vib:false, bass:true }), drift:F({ comp:0.8, vib:false, bass:true }), glimmer:F({ comp:0.8, vib:true, bass:true }) }),
       moods:F({
         'lydian-penta':F({ parent:'lydian', bpm:62, swing:0.5, bass:'root', vib:F({ every:F([6, 10]) }),

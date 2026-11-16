@@ -229,7 +229,7 @@ export const MOVE=Object.freeze({ mushroom:0.45, flower:0.45, fern:1.8, 'fine fe
 export const VIS_RULE=Object.freeze({ px:3, rel:0.1 });
 /* the shared «all» build: every switch but the grass (its fix spreads today's one tuft of blades over the forest — judged by eye; its own census and visibility run as ?forest=grass) */
 export const ALL_BUT_GRASS=Object.freeze(['old', 'rocks', 'roots', 'bark', 'moss', 'stumps', 'clear', 'spruce']);   // FOREST-2c: «old» first — no default (the grass is in it now); the shared «all» build is ?forest=new
-export const VARIANTS=Object.freeze(['default', 'roots', 'spruce', 'new']);   // FOREST-2c: bark, moss, stumps and grass are in the default now   // FOREST-2b: the default (rocks + clear), each switch on top of it, all
+export const VARIANTS=Object.freeze(['default', 'new']);   // FOREST-2d: every part is in the default now («new» = the same, built by its own word)   // FOREST-2c: bark, moss, stumps and grass are in the default now   // FOREST-2b: the default (rocks + clear), each switch on top of it, all
 async function forestRoom(level, parts, fn){ const { T, CV, F }=await kit(), was=F.forestNewDbg(); F.forestNewDbg(parts||false); let room=null;
   try{ await Promise.race([F.forestAssets(level), new Promise((_, no)=>setTimeout(()=>no(new Error('the forest files did not arrive in 60 s')), 60000))]);
     room=F.buildForest(T, { C:CV, level, w:390, h:844, reduce:false, mood:null, shadow:false, gl2:true }); return await fn(room, T); }
@@ -270,7 +270,7 @@ export function censusCompare(A, B, declared={}){ const lost=[], moved=[], added
   for(const [t, n] of Object.entries(A.roots)) if((B.roots[t]||0)!==n) lost.push(`the roots of tree ${t}: ${B.roots[t]||0}, today ${n}`);
   return { lost, moved, added }; }
 async function todayCensus(room, T){ const c=forestCensus(room, T), bur=await buriedOf(room, false); c.buried=capsOf(room, T).map(q=>bur(q[0], q[1], q[2])); return c; }
-const declOf=v=>({ grass:Infinity, ...((v==='spruce' || v==='new') ? { 'understorey spray':Infinity } : {}) });   // FOREST-2c: the grass is placed in every word (the default); with the spruces the young trees' and saplings' sprays are replaced by needles (declared)
+const declOf=v=>({ grass:Infinity, 'understorey spray':Infinity });   // FOREST-2c: the grass is placed in every word (the default); with the spruces the young trees' and saplings' sprays are replaced by needles (declared)
 async function variantCensus(room, T, v, A){ const B=forestCensus(room, T), res=censusCompare(A, B, declOf(v)), bur=await buriedOf(room, v), caps=capsOf(room, T), buried=[];
   A.kinds.mushroom.forEach((a, i)=>{ let bd=Infinity, bq=null; for(const q of caps){ const dd=Math.hypot(q[0]-a[0], q[2]-a[2]); if(dd<bd){ bd=dd; bq=q; } } if(!bq || bd>MOVE.mushroom) return;
     const w=bur(bq[0], bq[1], bq[2]); if(w && !A.buried[i]) buried.push(`mushroom #${i} (${a[0].toFixed(2)}, ${a[2].toFixed(2)}) inside a ${w}`); });

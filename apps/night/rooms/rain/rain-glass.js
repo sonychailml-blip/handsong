@@ -133,33 +133,48 @@ void main(){
    (kind, phase, colour, alpha), aDep its focus depth — silhouettes drawn by shape (no texture), their edges softened by the focus like the lights;
    the rings, splashes and steam pale, the rest dark against the lit street (an umbrella in its colour). Premultiplied over the view. */
 export const LIFE_V=`attribute vec4 aRect, aK; attribute float aDep; uniform vec2 uTan; uniform vec3 uFoc; uniform float uPx;
-varying vec2 vQ; varying vec4 vK; varying float vSoft; ${RAD}
-void main(){ float R=radAt(aDep), pad=R+1.5/uPx; vec2 hs=aRect.zw+pad, c=vec2(aRect.x, aRect.y+aRect.w), P=c+position.xy*hs;
+varying vec2 vQ, vE; varying vec4 vK; varying float vSoft, vFade; ${RAD}
+void main(){ float R=radAt(aDep), pad=R+1.5/uPx; vec2 hs=aRect.zw+pad, c=vec2(aRect.x, aRect.y+aRect.w), P=c+position.xy*hs; vE=position.xy; vFade=min(1., (aRect.z*aRect.w)/max(1e-12, hs.x*hs.y)*1.6);
   vQ=vec2((P.x-aRect.x)/max(aRect.z, 1e-6), (P.y-aRect.y)/max(2.*aRect.w, 1e-6)); vK=aK; vSoft=(R+0.8/uPx)/max(2.*aRect.w, 1e-6);
   gl_Position= aK.w>0.003 ? vec4(P/uTan, 0., 1.) : vec4(2., 2., 2., 1.); }`;
-export const LIFE_F=`precision highp float; varying vec2 vQ; varying vec4 vK; varying float vSoft;
+export const LIFE_F=`precision highp float; varying vec2 vQ, vE; varying vec4 vK; varying float vSoft, vFade; uniform float uWin;
 float el(vec2 p, vec2 c, vec2 r){ return (length((p-c)/r)-1.)*min(r.x, r.y*2.); }
-float person(vec2 p, float ox, float ph, float sw){ float s=sin(ph*6.2832)*sw;
-  float d=min(el(p, vec2(ox, 0.5), vec2(0.42, 0.27)), el(p, vec2(ox, 0.86), vec2(0.26, 0.06)));
-  return min(d, min(el(p, vec2(ox-0.13+s, 0.13), vec2(0.13, 0.13)), el(p, vec2(ox+0.13-s, 0.13), vec2(0.13, 0.13)))); }
-float dome(vec2 p, float ox, float w){ return p.y<0.92 ? 1. : el(p, vec2(ox, 0.92), vec2(w, 0.12)); }
-void main(){ float k=floor(vK.x+0.5), ph=vK.y, ci=floor(vK.z+0.5); vec2 p=vQ; float d=1., du=1., light=0.;
-  if(k<0.5){ d=person(p, 0., ph, 0.1); du=dome(p, 0., 1.); }
-  else if(k<1.5){ d=min(person(p, -0.3, ph, 0.07), person(p, 0.3, ph+0.5, 0.07)); du=dome(p, 0., 1.); }
-  else if(k<2.5){ d=min(person(p, -0.35, ph, 0.09), el(p, vec2(0.6, 0.12), vec2(0.32, 0.07))); du=dome(p, -0.35, 0.8); }
+/* a person at ox: body, head, two legs and two arms swinging in opposition with the phase, a bob and a sway; st 1 = standing (no swing), bend = a stoop */
+float person(vec2 p, float ox, float ph, float sw, float st, float bend){ float a=ph*6.2832, s=sin(a)*sw*(1.-st), bob=abs(cos(a))*0.012*(1.-st), sway=sin(a)*0.02*(1.-st);
+  vec2 q=p-vec2(sway+bend*(p.y-0.3)*0.5, bob);
+  float d=min(el(q, vec2(ox, 0.52), vec2(0.4, 0.25)), el(q, vec2(ox+bend*0.12, 0.86), vec2(0.25, 0.06)));
+  d=min(d, min(el(q, vec2(ox-0.13+s, 0.14), vec2(0.12, 0.14)), el(q, vec2(ox+0.13-s, 0.14), vec2(0.12, 0.14))));
+  return min(d, min(el(q, vec2(ox-0.38-s*0.6, 0.5), vec2(0.08, 0.17)), el(q, vec2(ox+0.38+s*0.6, 0.5), vec2(0.08, 0.17)))); }
+float dome(vec2 p, float ox, float w, float y){ return p.y<y ? 1. : el(p, vec2(ox, y), vec2(w, 0.12)); }
+vec3 cloth(float i){ return i<0.5 ? vec3(0.05, 0.05, 0.06) : i<1.5 ? vec3(0.05, 0.07, 0.14) : i<2.5 ? vec3(0.1, 0.11, 0.06) : i<3.5 ? vec3(0.17, 0.05, 0.06) : i<4.5 ? vec3(0.2, 0.15, 0.09) : i<5.5 ? vec3(0.11, 0.11, 0.12) : i<6.5 ? vec3(0.04, 0.12, 0.12) : vec3(0.2, 0.16, 0.05); }
+vec3 ucol(float i){ return i<0.5 ? vec3(0.2, 0.03, 0.04) : i<1.5 ? vec3(0.24, 0.18, 0.03) : i<2.5 ? vec3(0.03, 0.05, 0.13) : vec3(0.04, 0.13, 0.07); }
+void main(){ float k=floor(vK.x+0.5), ph=fract(vK.y), sub=floor(vK.y), code=floor(vK.z+0.5), ci=mod(code, 8.), uk=mod(floor(code/8.), 8.), uci=floor(code/64.);
+  vec2 p=vQ; float d=1., du=1., light=0., clear=0., uy=0.92, uw=1., ux=0.04*sin(ph*6.2832);
+  if(k<0.5 || (k>14.5 && k<15.5) || (k>15.5 && k<16.5)){ float st= k>15.5 ? 1. : 0., bend= k>14.5 && k<15.5 ? 0.25 : 0.;
+    d=person(p, 0., ph, k>14.5 && k<15.5 ? 0.06 : 0.1, st, bend);
+    if(k>15.5 && ph<0.3) d=min(d, el(p, vec2(0.22, 0.74), vec2(0.1, 0.05)));   /* the phone held up */
+    if(uk<1.5 || uk>2.5 && uk<3.5){ uw= uk>2.5 ? 1.4 : 1.; du=dome(p, ux, uw, uy); } else if(uk>1.5 && uk<2.5){ du=dome(p, ux, 1., uy); clear=1.; }
+    else if(uk>3.5 && uk<4.5) d=min(d, el(p, vec2(0., 0.88), vec2(0.32, 0.09)));   /* a hood */
+    else if(uk>4.5 && uk<5.5) d=min(d, el(p, vec2(0., 0.97), vec2(0.55, 0.03))); }   /* a newspaper over the head */
+  else if(k<1.5){ d=min(person(p, -0.3, ph, 0.07, 0., 0.), person(p, 0.3, ph+0.5, 0.07, 0., 0.)); du=dome(p, ux, 1.25, uy); }
+  else if(k<2.5){ float pull=0.06*sin(ph*12.566); d=min(person(p, -0.38, ph, 0.09, 0., 0.), el(p, vec2(0.62+pull, 0.12), vec2(0.3, 0.07)));   /* the dog ahead, pulling */
+    float t=clamp((p.x+0.2)/0.75, 0., 1.); if(p.x>-0.2 && p.x<0.55) d=min(d, abs(p.y-mix(0.5, 0.18, t))-0.012); du=dome(p, -0.38+ux, 0.8, uy); }
   else if(k<3.5){ d=min(el(p, vec2(0.05, 0.62), vec2(0.3, 0.22)), el(p, vec2(0.15, 0.9), vec2(0.18, 0.06))); d=min(d, abs(el(p, vec2(-0.55, 0.16), vec2(0.36, 0.17)))-0.02); d=min(d, abs(el(p, vec2(0.55, 0.16), vec2(0.36, 0.17)))-0.02); }
-  else if(k<4.5){ d=person(p, 0., ph, 0.2); }
+  else if(k<4.5){ d=person(p, 0., ph, 0.22, 0., 0.1); }
   else if(k<5.5){ d=min(el(p, vec2(0., 0.45), vec2(0.45, 0.26)), el(p, vec2(0.02*sin(ph*6.2832), 0.8), vec2(0.28, 0.08))); }
-  else if(k<6.5){ d=min(person(p, 0., ph, 0.08), el(p, vec2(0.55, 0.63), vec2(0.38, 0.02))); }
-  else if(k<7.5){ d=el(p, vec2(0., 0.45), vec2(0.8, 0.4)); if(ph>=0.) d=min(d, el(p, vec2(0., 0.55+0.3*sin(ph*6.2832)), vec2(1., 0.12))); }
+  else if(k<6.5){ d=min(person(p, 0., ph, 0.08, 0., 0.), el(p, vec2(0.55, 0.63), vec2(0.38, 0.02))); }
+  else if(k<7.5){ d=el(p, vec2(0., 0.45), vec2(0.8, 0.4)); if(vK.y>=0.) d=min(d, el(p, vec2(0., 0.55+0.3*sin(ph*6.2832)), vec2(1., 0.12))); }
   else if(k<8.5){ d=min(el(p, vec2(0., 0.4), vec2(0.7, 0.28)), min(el(p, vec2(0.7, 0.68), vec2(0.25, 0.18)), el(p, vec2(-0.8, 0.65), vec2(0.12, 0.35)))); }
   else if(k<9.5){ float a=ph*6.2832; vec2 q=mat2(cos(a), -sin(a), sin(a), cos(a))*(p-vec2(0., 0.5)); d=(abs(q.x)+abs(q.y*2.)-0.8)*0.4; }
-  else if(k<10.5){ light=1.; float m=smoothstep(1., 0.2, length((p-vec2(0., 0.5))/vec2(1., 0.5))); gl_FragColor=vec4(vec3(0.42, 0.44, 0.47)*m*vK.w, m*vK.w*0.6); return; }
+  else if(k<10.5){ float m=smoothstep(1., 0.2, length((p-vec2(0., 0.5))/vec2(1., 0.5)))*mix(1., 1.-smoothstep(0.6, 0.9, max(abs(vE.x), abs(vE.y))), uWin); gl_FragColor=vec4(vec3(0.42, 0.44, 0.47)*m*vK.w, m*vK.w*0.6); return; }
   else if(k<11.5){ light=1.; d=abs(el(p, vec2(0., 0.5), vec2(1., 0.5)))-0.05; }
   else if(k<12.5){ light=1.; d=p.y<0.5 ? 1. : abs(el(p, vec2(0., 0.5), vec2(1., 0.5)))-0.08; }
-  else { d=min(el(p, vec2(0., 0.72), vec2(0.4, 0.2)), el(p, vec2(0., 0.15), vec2(1., 0.3))); }
-  float sw=max(vSoft, 0.02), m=smoothstep(sw, -sw, d), mu=smoothstep(sw, -sw, du);
-  vec3 U= ci<0.5 ? vec3(0.02, 0.02, 0.025) : ci<1.5 ? vec3(0.2, 0.03, 0.04) : ci<2.5 ? vec3(0.03, 0.05, 0.12) : vec3(0.22, 0.15, 0.04);
+  else if(k<13.5){ d=min(el(p, vec2(0., 0.72), vec2(0.4, 0.2)), el(p, vec2(0., 0.15), vec2(1., 0.3))); }
+  else if(k<14.5){ vec2 q=p; d=person(vec2(q.x, q.y), -0.3, ph, 0.08, 0., 0.); vec2 c=vec2((q.x-0.35)/0.62, q.y/0.62); d=min(d, person(c, 0., fract(ph*1.4), 0.12, 0., 0.)*0.62);   /* a child holding a hand */
+    if(p.x>-0.1 && p.x<0.25) d=min(d, abs(p.y-0.42)-0.014); du=dome(p, -0.3+ux, 0.9, uy); }
+  else { d=person(p, 0., ph, 0.05, 1., 0.); d=min(d, el(p, vec2(sub>1.5 ? -0.32 : 0.32, 0.58+0.05*sin(ph*6.2832)), vec2(0.09, 0.08))); }   /* talking: a gesturing hand */
+  float win=mix(1., 1.-smoothstep(0.6, 0.9, max(abs(vE.x), abs(vE.y))), uWin), fade=mix(1., vFade, uWin), sw=clamp(vSoft, 0.02, 0.6), m=smoothstep(sw, -sw, d)*win*fade, mu=smoothstep(sw, -sw, du)*win*fade;   // RAIN-5b: never a visible quad edge
   if(light>0.5){ gl_FragColor=vec4(vec3(0.6, 0.6, 0.62)*m*vK.w, m*vK.w*0.35); return; }
-  vec3 body= k>8.5 && k<9.5 ? (ci<0.5 ? vec3(0.1, 0.06, 0.03) : vec3(0.32, 0.31, 0.29)) : vec3(0.025, 0.022, 0.03);
-  float a=max(m, mu)*vK.w; vec3 col=mix(body, U, mu*(1.-m*0.0)); gl_FragColor=vec4(col*a, a); }`;
+  vec3 body= k>8.5 && k<9.5 ? (ci<0.5 ? vec3(0.1, 0.06, 0.03) : vec3(0.32, 0.31, 0.29)) : (k<0.5 || k>13.5 || (k>0.5 && k<2.5)) ? cloth(ci)*(uk>5.5 ? 1.8 : 1.) : vec3(0.025, 0.022, 0.03);
+  vec3 U= uk<0.5 ? vec3(0.02, 0.02, 0.025) : uk>2.5 && uk<3.5 ? mix(ucol(uci), vec3(0.3), step(0.5, fract(p.x*2.))) : ucol(uci);
+  float ua= clear>0.5 ? 0.35 : 1.; vec3 col=mix(body, U, mu*ua*(1.-m*0.6)); float a=max(m, mu*ua)*vK.w; gl_FragColor=vec4(col*a, a); }`;

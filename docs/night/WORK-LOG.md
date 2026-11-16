@@ -4,6 +4,20 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`, `archive/NIGHT-RUN-LOG-2026-10.md`. New runs start at `NIGHT-1`.
 
+# RAIN-5b (NIGHT track, 2026-11-16): no quad edges; varied people with a gait; gradual arrivals; houses with character
+Tree hashes before (RAIN-4b's after): core 36450d3d646be550 · apps/full 0148bb454440c3e3 · apps/night 4d847f2581608749. After: core and Full unchanged · apps/night 6bed8a60823de8ef.
+- `rooms/rain/pure/life.js` (LK + child, old, stand, talk; UMB; lifePeople; gates; hist), `rain-glass.js` LIFE_V/LIFE_F (border window, fade, palette, umbrellas, gait), `rain.js` (lifeHist; captures reset it), bake `city.js` (house character), `model.js` lifeCanvas variants, `citybake.js` 16-room atlas and stairLit; re-baked.
+- Rows: data «RAIN life law (app)» rewritten; P.night «RAIN no quad edges» (`tools/probes/night/rain5.js`); `rainroom.js` the hills point. Tools: `tools/rain-snap.mjs --rain5b`.
+- Verdicts: static PASSED; [probe-data] PASS — 88 checks, 0 differences; RAIN no quad edges 2/0; RAIN room 46/1 (the known check; «the middle» once failed by load, passed on its rerun). Fix rounds: 5.
+# RAIN-4b (NIGHT track, 2026-11-16): the rain room's music composed; a recorded version
+Tree hashes before (FOREST-2d's after): core 36450d3d646be550 · apps/full 0148bb454440c3e3 · apps/night 44a46d1af73d00e4. After: core and Full unchanged · apps/night 4d847f2581608749.
+- New: `apps/night/pure/bedscore.js`, `rooms/rain/pure/scores/{late-night,evening-boulevard,after-the-rain}.js`, `rooms/rain/sampled.js`, `rooms/rain/samples/*` (42 MP3 + samples.json), `tools/rain-samples.mjs`; sources `tools/design/rain/music/cc0/` (dev).
+- Changed: `bed2.js` (jzNew / jzStep, drum events, the sampler hook `bed2SamplerSet`), `worklets/bed-worklet.js` (kick, cym), `rooms/rain/pure/room.js` (jazz.scores, scorePresets, kick, cym), `rooms/rain/install.js` (?bedrec=on), `tools/rain-music.mjs` (the pieces), `tools/check-static.mjs` (sampled.js fetches), `tools/licences.json` + documents.
+- Verdicts: static PASSED; [probe-data] PASS — 88 checks, 0 differences; check-licences PASS (430); NIGHT music bed 46/0, RAIN forest bed unchanged 4/0. Fix rounds: 4.
+# FOREST-2d (NIGHT track, 2026-11-16): every part the default; the last saplings become spruces
+Tree hashes before (RAIN-5's after): core 36450d3d646be550 · apps/full 0148bb454440c3e3 · apps/night 01b87a12c1187dfa. After: core and Full unchanged · apps/night 44a46d1af73d00e4.
+- `forest.js` FOREST_DEFAULT + roots, spruce; `forest-canopy.js` spAt (1.8 m, shorter heights); `tools/precache.mjs` (the sheet in, its master out); data row files rule; `forest2.js` VARIANTS default/new, declOf; stills re-rendered.
+- Verdicts: static PASSED; [probe-data] PASS — 88 checks, 0 differences; forest rows 16/0, 16/0, 4/0, 16/0, 9/0. Fix rounds: 0.
 # RAIN-5 (NIGHT track, 2026-11-16): life on the street, the music shown, balconies, the boulevard extended
 Tree hashes before (RAIN-4's after): core 36450d3d646be550 · apps/full 0148bb454440c3e3 · apps/night 13f92ed7b94e4a55. After: core 36450d3d646be550 (unchanged) · apps/full 0148bb454440c3e3 (unchanged) · apps/night 01b87a12c1187dfa. Level 2 (a room); iteration mode.
 - `rooms/rain/pure/life.js` (LIFE, LK, lifeCast, lifeAt), `pure/shown.js` (SHOWN, showDue, flashOf, breathOf), `rain-glass.js` LIFE_V / LIFE_F, `rain.js` (the life draw, the bed queue, signals, spark, flash, breath; doors `bed`, `lifeDbg`), `night.css` tokens rain-go / -spark / -flash.

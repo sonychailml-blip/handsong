@@ -84,7 +84,7 @@ const scanOf=level=> groundOver ? groundOver==='scan' : !!(FOREST_LEVELS[level]|
 export const FOREST_PARTS=Object.freeze(['rocks', 'roots', 'bark', 'moss', 'stumps', 'clear', 'spruce', 'grass']);
 /* FOREST-2b (the founder's verdict): rocks and clear are the DEFAULT — every player's forest; the other words add to them; «old» = the approved
    forest before FOREST-2 (no part: equal to the pins, row «FOREST switch off = today»); «new» = every part. A list without «old» = the default + it */
-export const FOREST_DEFAULT=Object.freeze(['rocks', 'clear', 'bark', 'moss', 'stumps', 'grass']);   // FOREST-2c: + bark, moss, stumps, grass (the founder approved them)
+export const FOREST_DEFAULT=Object.freeze(['rocks', 'clear', 'bark', 'moss', 'stumps', 'grass', 'roots', 'spruce']);   // FOREST-2c: + bark, moss, stumps, grass (the founder approved them)
 const partsOf=v=>{ const S=new Set(); if(v===true) v='new'; if(v===false || v==null) return S; const W=(Array.isArray(v) ? v : String(v).split(',')).map(w=>String(w).trim()).filter(Boolean);
   if(!W.length) FOREST_DEFAULT.forEach(k=>S.add(k)); else if(!W.includes('old')) FOREST_DEFAULT.forEach(k=>S.add(k));
   for(const x of W){ if(x==='new') FOREST_PARTS.forEach(k=>S.add(k)); else if(x==='default') FOREST_DEFAULT.forEach(k=>S.add(k)); else if(FOREST_PARTS.includes(x)) S.add(x); } return S; };

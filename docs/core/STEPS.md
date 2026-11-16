@@ -73,6 +73,8 @@ THERE in full and here as one index entry):
   168 The forest after FOREST-2c: bark, moss, stumps, grass by default; trunk and roots as one surface (?forest=roots); spruces at the small trees' places (?forest=spruce); the Standard still's mushrooms
   169 The rain room's music: its moods, timbres and jazz bed by ear; the listening page (RAIN-4)
   170 The rain room's street alive: life by mood, the music shown, balconies, the boulevard's far end (RAIN-5)
+  171 The rain room's composed music: three pieces, synth and recorded versions (RAIN-4b)
+  172 The rain room's street more alive: no quad edges, varied people walking, gradual arrivals, houses with character (RAIN-5b)
   163 Fixes after the backlog audit: an in-app browser's refusal, the Lighter stream, the rain room's sound on Dark, Licences, keeping the files (NIGHT-15, CORE-23)
 
 ## Moved to `archive/CLAUDE-history.md` at DOC1 (grep by title; read only what the slice needs)

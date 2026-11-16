@@ -22,24 +22,64 @@
    "rms": "-41.3",
    "scaled": 1
   },
-  "mood-lydian-penta": {
-   "peak": "-27.7",
-   "rms": "-49.2",
-   "scaled": 1
-  },
-  "mood-dorian-hexa": {
-   "peak": "-21.2",
-   "rms": "-46.4",
-   "scaled": 1
-  },
-  "mood-mixolydian-hexa": {
+  "piece-lydian-penta-synth": {
    "peak": "-28.6",
+   "rms": "-48.9",
+   "scaled": 1
+  },
+  "piece-lydian-penta-synth-bed": {
+   "peak": "-28.9",
+   "rms": "-49.3",
+   "scaled": 1
+  },
+  "piece-lydian-penta-rec": {
+   "peak": "-29.5",
    "rms": "-47.9",
    "scaled": 1
   },
-  "mood-dorian-hexa-brush": {
-   "peak": "-21.3",
-   "rms": "-46.4",
+  "piece-lydian-penta-rec-bed": {
+   "peak": "-29.5",
+   "rms": "-48.2",
+   "scaled": 1
+  },
+  "piece-dorian-hexa-synth": {
+   "peak": "-21.4",
+   "rms": "-46.6",
+   "scaled": 1
+  },
+  "piece-dorian-hexa-synth-bed": {
+   "peak": "-28.8",
+   "rms": "-48.4",
+   "scaled": 1
+  },
+  "piece-dorian-hexa-rec": {
+   "peak": "-20.9",
+   "rms": "-44.0",
+   "scaled": 1
+  },
+  "piece-dorian-hexa-rec-bed": {
+   "peak": "-30.1",
+   "rms": "-44.9",
+   "scaled": 1
+  },
+  "piece-mixolydian-hexa-synth": {
+   "peak": "-28.1",
+   "rms": "-49.0",
+   "scaled": 1
+  },
+  "piece-mixolydian-hexa-synth-bed": {
+   "peak": "-28.2",
+   "rms": "-49.8",
+   "scaled": 1
+  },
+  "piece-mixolydian-hexa-rec": {
+   "peak": "-29.2",
+   "rms": "-47.1",
+   "scaled": 1
+  },
+  "piece-mixolydian-hexa-rec-bed": {
+   "peak": "-30.4",
+   "rms": "-47.6",
    "scaled": 1
   }
  }

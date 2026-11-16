@@ -99,6 +99,8 @@ class NightBed extends AudioWorkletProcessor{
     else if(e.kind==='vib'){ v.dk=Math.exp(-1/(2.6*fs)); v.d1=Math.exp(-1/(0.7*fs)); v.d2=Math.exp(-1/(0.22*fs)); v.g1=e.hz*3.98<0.45*fs ? 0.12 : 0; v.g2=e.hz*9.2<0.45*fs ? 0.035 : 0; v.p1=0; v.p2=0; v.dr=Math.exp(-1/(0.6*fs)); v.th=1; v.thd=1; }
     else if(e.kind==='bass'){ const L=Math.max(2, Math.min(JZ_KS-2, Math.round(fs/Math.max(20, e.hz)))); v.L=L; v.w=0; v.fb=0.9965; v.lp=0; let y=0;
       for(let i=0;i<L;i++){ y+=0.35*((this.rnd()*2-1)-y); v.buf[i]=y*(0.8+0.4*(e.vel||0.7)); } v.th=0.45; v.thd=Math.exp(-1/(0.11*fs)); v.dr=0.985; }
+    else if(e.kind==='kick'){ v.pc=0; v.env=1; v.dk=Math.exp(-1/(0.2*fs)); v.th=1; v.thd=Math.exp(-1/(0.03*fs)); }   // RAIN-4b: a soft kick (a falling sine)
+    else if(e.kind==='cym'){ v.dk=Math.exp(-1/(Math.max(0.04, e.dur||0.6)*0.45*fs)); v.hp=0; v.lp2=0; v.env=0; v.p1=0; v.p2=0; v.th=0.002; }   // RAIN-4b: a ride or a hi-hat (bright noise and a metallic ring)
     else { v.dk=Math.exp(-1/(Math.max(0.03, (e.dur||0.2)*0.5)*fs)); v.hp=0; v.lp2=0; v.env=0; v.th=e.dur>0.3 ? 0.06 : 0.01; }   // brush: its attack (s)
     this.idle=false; }
   jazz(dL, dR, rv){
@@ -112,6 +114,8 @@ class NightBed extends AudioWorkletProcessor{
           y=(Math.sin(TAU*v.pc)+v.g1*v.th*Math.sin(TAU*v.p1)+v.g2*v.thd*Math.sin(TAU*v.p2))*v.env*att; v.pc+=v.hz/fs; v.p1+=v.hz*3.98/fs; v.p2+=v.hz*9.2/fs; if(v.pc>=1) v.pc-=1; if(v.p1>=1) v.p1-=1; if(v.p2>=1) v.p2-=1; }
         else if(v.kind==='bass'){ const b=v.buf, L=v.L, r0=b[v.w], r1=b[(v.w+1)%L]; v.lp+=0.55*(0.5*(r0+r1)-v.lp); const fb= T<v.dur ? v.fb : v.dr*v.fb; b[v.w]=v.lp*fb; v.w=(v.w+1)%L;
           y=v.lp+v.th*Math.sin(TAU*v.pc); v.pc+=v.hz/fs; if(v.pc>=1) v.pc-=1; v.th*=v.thd; v.env=Math.max(Math.abs(v.lp)+v.th, v.env*0.9995); }
+        else if(v.kind==='kick'){ const f=v.hz*(1+1.6*v.th); v.pc+=f/fs; if(v.pc>=1) v.pc-=1; v.th*=v.thd; v.env*=v.dk; y=Math.sin(TAU*v.pc)*v.env; }
+        else if(v.kind==='cym'){ const z=this.rnd()*2-1; v.hp+=0.6*(z-v.hp); const hi=z-v.hp; v.p1+=7000/fs; v.p2+=9300/fs; if(v.p1>=1) v.p1-=1; if(v.p2>=1) v.p2-=1; const at=v.th*fs; v.env= T<at ? T/at : v.env*v.dk; y=(0.8*hi+0.3*Math.sin(TAU*v.p1)*Math.sin(TAU*v.p2))*v.env; }
         else { const z=this.rnd()*2-1; v.hp+=0.25*(z-v.hp); const bp=z-v.hp; v.lp2+=0.55*(bp-v.lp2); const at=v.th*fs;
           v.env= T<at ? T/at : v.env*v.dk; y=v.lp2*v.env; }
         y*=a; dL[i]+=y*gl; dR[i]+=y*gr; rv[i]+=y*sd; }

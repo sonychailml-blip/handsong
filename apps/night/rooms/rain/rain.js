@@ -129,9 +129,11 @@ export function buildRain(T, opt){
      over the city and under the windows and lights; and THE MUSIC SHOWN (pure/shown.js): the bed's events queued with their heard moment */
   const NLIFE=160, fg=unitQuad(), fRect=new Float32Array(NLIFE*4), fK=new Float32Array(NLIFE*4), fD=new Float32Array(NLIFE), fRA=dyn(fRect, 4), fKA=dyn(fK, 4), fDA=dyn(fD, 1);
   fg.setAttribute('aRect', fRA); fg.setAttribute('aK', fKA); fg.setAttribute('aDep', fDA); fg.instanceCount=0; let lifeN=0;
-  const lifeM=mat({ uniforms:{ uTan:{ value:UT }, uFoc:{ value:FOC }, uPx:UPX }, vertexShader:LIFE_V, fragmentShader:LIFE_F, transparent:true, blending:T.CustomBlending, blendSrc:T.OneFactor, blendDst:T.OneMinusSrcAlphaFactor, blendSrcAlpha:T.OneFactor, blendDstAlpha:T.OneMinusSrcAlphaFactor });
+  const lifeM=mat({ uniforms:{ uTan:{ value:UT }, uFoc:{ value:FOC }, uPx:UPX, uWin:{ value:1 } }, vertexShader:LIFE_V, fragmentShader:LIFE_F, transparent:true, blending:T.CustomBlending, blendSrc:T.OneFactor, blendDst:T.OneMinusSrcAlphaFactor, blendSrcAlpha:T.OneFactor, blendDstAlpha:T.OneMinusSrcAlphaFactor });
   const lifeMesh=add(new T.Mesh(fg, lifeM), 0.5);
-  function lifeUpload(t, cars, fx){ const A=lifeAt(t, moodOfLook(look), cars||[], fx && fx.wave); let n=0;
+  const lifeHist=[];
+  function lifeUpload(t, cars, fx){ const lk=moodOfLook(look); if(lookOver) lifeHist.length=0; if(!lifeHist.length || lifeHist[lifeHist.length-1][1]!==lk){ lifeHist.push([lifeHist.length ? t : -1e9, lk]); if(lifeHist.length>6) lifeHist.splice(1, 1); }
+    const A=lifeAt(t, lk, cars||[], fx && fx.wave, undefined, undefined, lifeHist); let n=0;
     for(const q of A){ if(n>=NLIFE) break; const b=project([q.x, q.y, q.z]); if(b.z<=1) continue; const tp=project([q.x, q.y+q.h, q.z]), hh=(tp.y-b.y)/2, hw=q.w/2/b.z;
       if(!(hh>0.00015) || Math.abs(b.x)>2 || Math.abs(b.y)>1.5) continue; fRect.set([b.x, b.y, hw, hh], n*4); fK.set([q.kind, q.ph, q.c, q.a], n*4); fD[n]=depthOf(b.dist); n++; }
     lifeN=n; fg.instanceCount=n; fRA.needsUpdate=fKA.needsUpdate=fDA.needsUpdate=true; }

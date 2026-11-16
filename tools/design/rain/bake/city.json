@@ -1,53 +1,53 @@
 {
  "renderer": "three.js r128 (MIT), vendored at apps/night/vendor/three-r128/",
- "ms": 87800,
+ "ms": 121618,
  "size": [
   2050,
   1106
  ],
  "counts": {
   "late": {
-   "meshes": 434,
+   "meshes": 436,
    "windows": 2965
   },
   "evening": {
-   "meshes": 440,
+   "meshes": 442,
    "windows": 2965
   },
   "after": {
-   "meshes": 434,
+   "meshes": 436,
    "windows": 2965
   }
  },
  "windows": 187,
  "sizes": {
   "full": {
-   "late.webp": 312500,
-   "evening.webp": 323556,
-   "lit.webp": 331680,
-   "depth.png": 355139,
-   "after.webp": 315444
+   "late.webp": 314026,
+   "evening.webp": 325274,
+   "lit.webp": 331254,
+   "depth.png": 362411,
+   "after.webp": 317364
   },
   "reduced": {
-   "late.webp": 117840,
-   "evening.webp": 123376,
-   "lit.webp": 126292,
-   "depth.png": 204300,
-   "after.webp": 118790
+   "late.webp": 118740,
+   "evening.webp": 124246,
+   "lit.webp": 125892,
+   "depth.png": 209404,
+   "after.webp": 119752
   }
  },
  "light": {
   "late": {
    "skyN": 16,
-   "skyMs": 12707
+   "skyMs": 18940
   },
   "evening": {
    "skyN": 16,
-   "skyMs": 10426
+   "skyMs": 14281
   },
   "after": {
    "skyN": 16,
-   "skyMs": 10387
+   "skyMs": 14102
   }
  },
  "crowns": {

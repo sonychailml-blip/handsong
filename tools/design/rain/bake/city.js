@@ -191,6 +191,13 @@ function house(T, m, mats, img, side, h, o, out){
     m.put(new T.BoxGeometry(W+2*o2, 0.18, 0.12), mats.zinc, P, W/2, top+0.5, o2);   // the eaves' gutter
     for(let k=0;k<Math.max(1, Math.round(W/8));k++){ const u=1+R()*(W-2), d=-2-R()*(D-4); m.put(new T.BoxGeometry(0.6, 1.6, 0.6), brick ? mats.brickBand : mats.chimney, P, u, top+0.5+Math.min(W, D)*0.25+0.4, d);
       if(R()<0.35) m.put(new T.CylinderGeometry(0.012, 0.012, 2.2, 4), mats.dark, P, u+0.5, top+2.4, d); } }
+  /* RAIN-5b: each house its own character, on its own draws (nothing placed above moves): rooftop clutter — antennas (a mast, cross-bars), a water
+     tank, a dish; a stairwell — a column of small windows on the half-landings between two bays, most of them dimly lit */
+  { const Rh=rngOf((KIT.seed^0x434841)+h.id*101), rt=top+0.5+Math.min(W, D)*0.2;
+    for(let k=0, na=Math.floor(Rh()*3);k<na;k++){ const u=1+Rh()*(W-2), d=-1.5-Rh()*(D-3); m.put(new T.CylinderGeometry(0.02, 0.025, 2.4, 4), mats.dark, P, u, rt+1.2, d); for(let j=0;j<3;j++) m.put(new T.BoxGeometry(0.9-j*0.2, 0.02, 0.02), mats.dark, P, u, rt+1.6+j*0.35, d); }
+    if(Rh()<0.4){ const u=1.5+Rh()*(W-3), d=-2-Rh()*(D-5); m.put(new T.CylinderGeometry(0.6, 0.6, 1.1, 10), mats.tank, P, u, rt+0.55, d); }
+    if(Rh()<0.3){ const u=1+Rh()*(W-2); m.put(new T.SphereGeometry(0.35, 10, 6, 0, Math.PI*2, 0, Math.PI/2), mats.tank, P, u, top+0.3, -0.4, 0, -1.2, 0); }
+    if(n>=2 && Rh()<0.75){ const sx=bw*(1+Math.floor(Rh()*(n-1))), lit=Rh()<0.8; for(let f=0;f<floors-1;f++) m.put(new T.PlaneGeometry(0.42, 0.8), lit ? mats.stairLit : mats.shopDark, P, sx, ground+f*floorH+floorH*0.78, 0.02); } }
   /* drainpipes down the facade's edges, a funnel under the gutter; rust where their brackets hold */
   for(const u of R()<0.85 ? [0.3, W-0.3] : [W-0.3]){ pipe(T, m, mats.zinc, P, [[u, top+0.45, 0.25], [u, top-0.4, 0.25], [u, top-0.7, 0.12], [u, 0.35, 0.12], [u, 0.1, 0.25]], 0.055); m.put(new T.CylinderGeometry(0.16, 0.06, 0.3, 6), mats.zinc, P, u, top+0.35, 0.25); stains.push([u, top-0.8, 0.12, 2.5]); }
   /* AC units under some windows (a box, a grille, brackets) */
@@ -207,8 +214,8 @@ function house(T, m, mats, img, side, h, o, out){
     const fd=-0.3; for(const sd of [-1, 1]) m.put(new T.BoxGeometry(0.07, winH-0.1, 0.07), mats.frame, P, xc+sd*(winW/2-0.035), y0+winH/2-0.05, fd);
     m.put(new T.BoxGeometry(winW, 0.07, 0.07), mats.frame, P, xc, y0+0.035, fd); m.put(new T.BoxGeometry(winW, 0.07, 0.07), mats.frame, P, xc, y0+winH*0.7, fd); m.put(new T.BoxGeometry(0.05, winH*0.7, 0.06), mats.frame, P, xc, y0+winH*0.35, fd);
     m.put(new T.PlaneGeometry(winW, winH), mats.glass, P, xc, y0+winH/2, fd-0.02);
-    const id=out.windows.length, life=Math.floor(R()*8), amb=R(), warm=R();
-    { const g=new T.PlaneGeometry(winW*1.05, winH*1.05), uv=g.attributes.uv, cu=(life%4)/4, cv=Math.floor(life/4)/2; for(let i=0;i<uv.count;i++) uv.setXY(i, cu+uv.getX(i)/4, cv+uv.getY(i)/2); m.put(g, mats.life, P, xc, y0+winH/2, -0.6); }
+    const id=out.windows.length, life=Math.floor(R()*16), amb=R(), warm=R();   // RAIN-5b: 16 rooms (the same one draw)
+    { const g=new T.PlaneGeometry(winW*1.05, winH*1.05), uv=g.attributes.uv, cu=(life%4)/4, cv=Math.floor(life/4)/4; for(let i=0;i<uv.count;i++) uv.setXY(i, cu+uv.getX(i)/4, cv+uv.getY(i)/4); m.put(g, mats.life, P, xc, y0+winH/2, -0.6); }
     if((style==='classical' || style==='wooden') && R()<0.35*wear){ const open=0.4+R()*0.9, c=mats.shut[Math.floor(R()*mats.shut.length)]; for(const sd of [-1, 1]) m.put(new T.BoxGeometry(winW/2, winH, 0.04), c, P, xc+sd*(winW/2+Math.cos(open)*winW/4), y0+winH/2, Math.sin(open)*winW/4, sd*open); }
     if(!balc.has(w) && R()<0.14){ m.put(new T.BoxGeometry(winW+0.2, 0.25, 0.3), mats.pot, P, xc, y0+0.06, 0.32); plantAt(m, T, P, mats, R, xc, y0+0.3, 0.32, 1.2); }
     const C=[[xc-winW/2, y0], [xc+winW/2, y0], [xc+winW/2, y0+winH], [xc-winW/2, y0+winH]].map(([u, v])=>new T.Vector3(u, v, fd).applyMatrix4(P));

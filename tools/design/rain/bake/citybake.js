@@ -20,8 +20,9 @@ const LOOKS={ late:{ sky:'#1b1a2b', cloud:'#5a3a4a', glow:'#8a5a44', hills:'#1a1
   evening:{ sky:'#23203a', cloud:'#6a4456', glow:'#a06a48', hills:'#1f1a26', roofs:'#271f25', town:'#342b33', wall:'#c08240' },
   after:{ sky:'#171a2c', cloud:'#453848', glow:'#6f5560', hills:'#191a24', roofs:'#1f1d24', town:'#2a2832', wall:'#98703e' } };
 /* the lives' atlas: 4 × 2 rooms behind curtains (a lamp, a reader, someone cooking, a cat, a plant, a TV, two more lamps), each 256 × 384 */
-function livesAtlas(){ const c=document.createElement('canvas'); c.width=1024; c.height=768; const x=c.getContext('2d');
-  for(let k=0;k<8;k++){ const cell=lifeCanvas(k%6, k*17+5); x.drawImage(cell, (k%4)*256, (1-Math.floor(k/4))*384); }   // rows: the atlas's v grows upwards (texture space)
+function livesAtlas(){ const c=document.createElement('canvas'); c.width=1024; c.height=1536; const x=c.getContext('2d');   // RAIN-5b: 4 × 4 rooms, each its light and its window dressing
+  const TEMP=['warm', 'white', 'warm', 'dim'], CUR=['side', 'blind', 'sheer', 'side', 'none', 'blind', 'side', 'drape'];
+  for(let k=0;k<16;k++){ const cell=lifeCanvas(k%6, k*17+5, { temp:TEMP[k%4], cur:CUR[(k*3)%8], col:k%6 }); x.drawImage(cell, (k%4)*256, (3-Math.floor(k/4))*384); }   // rows: the atlas's v grows upwards (texture space)
   const t=new T.CanvasTexture(c); t.encoding=T.sRGBEncoding; return t; }
 function pool(){ const c=document.createElement('canvas'); c.width=c.height=128; const x=c.getContext('2d'), g=x.createRadialGradient(64, 64, 2, 64, 64, 64); g.addColorStop(0, 'rgba(255,190,110,0.55)'); g.addColorStop(0.5, 'rgba(255,170,90,0.16)'); g.addColorStop(1, 'rgba(255,160,80,0)'); x.fillStyle=g; x.fillRect(0, 0, 128, 128); const t=new T.CanvasTexture(c); t.encoding=T.sRGBEncoding; return t; }
 /* RAIN-2: our own drawn textures — the carved lattice band of a wooden balcony (diamonds and drilled holes), its roof board's fringe (a zigzag edge) */
@@ -64,7 +65,7 @@ function materials(lives){
     iron:std('#15120f', { metalness:0.55, roughness:0.45 }), frame:std('#3a291c', { roughness:0.6 }), wood:std('#5a3e28', { roughness:0.85 }), bike:std('#7a2a24', { metalness:0.4 }),
     glass:new T.MeshStandardMaterial({ color:'#0a0d14', metalness:0.2, roughness:0.05, transparent:true, opacity:0.3, depthWrite:false }),
     life, shut:['#2f4236', '#4a3426', '#3a4450', '#544830'].map(c=>std(c, { roughness:0.85 })), cloth:['#e8e2d4', '#c45a4a', '#5a7ab0', '#e0c060', '#7aa070', '#d890a8', '#f0f0f0'].map(c=>std(c, { side:T.DoubleSide })),
-    paneLit:glow(5, 2.8, 1.2), lantern:glow(6, 3.6, 1.5), shopLit:glow(5.5, 3.2, 1.5), shopDark:new T.MeshBasicMaterial({ color:'#06070a' }), dormerLit:glow(4.5, 2.6, 1.1),
+    paneLit:glow(5, 2.8, 1.2), lantern:glow(6, 3.6, 1.5), shopLit:glow(5.5, 3.2, 1.5), stairLit:glow(2.6, 1.9, 1.1), shopDark:new T.MeshBasicMaterial({ color:'#06070a' }), dormerLit:glow(4.5, 2.6, 1.1),
     pave:pbr('red_sandstone_pavement', { color:new T.Color('#8a6c58'), roughness:0.5 }), prom:pbr('red_sandstone_pavement', { color:new T.Color('#9a806a'), roughness:0.45 }),
     asphalt:pbr('asphalt_02', { color:new T.Color('#55555f'), roughness:0.4 }), kerb:pbr('large_sandstone_blocks', { color:new T.Color('#8a7a6e') }), rail:std('#9a9aa0', { metalness:0.9, roughness:0.22 }),
     lampHead:glow(4, 3.1, 2.0), pool:new T.MeshBasicMaterial({ map:pool(), color:new T.Color(0.22, 0.22, 0.22), transparent:true, blending:T.AdditiveBlending, depthWrite:false })   /* RAIN-2: a hint only — the lamps' own light lights the ground */, kiosk:std('#3a4a3e'), stripe, table:std('#d8d0c0'), bulb:glow(6, 4.6, 2.6) };

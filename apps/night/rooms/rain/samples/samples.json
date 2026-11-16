@@ -1,0 +1,258 @@
+{
+ "made": "RAIN-4b",
+ "rate": 44100,
+ "files": {
+  "bass-A1": {
+   "file": "bass-A1.mp3",
+   "hz": 110,
+   "sec": 2.6
+  },
+  "bass-As0": {
+   "file": "bass-As0.mp3",
+   "hz": 58.27,
+   "sec": 1.951
+  },
+  "bass-C1": {
+   "file": "bass-C1.mp3",
+   "hz": 65.406,
+   "sec": 1.534
+  },
+  "bass-Cs2": {
+   "file": "bass-Cs2.mp3",
+   "hz": 138.591,
+   "sec": 2.6
+  },
+  "bass-D1": {
+   "file": "bass-D1.mp3",
+   "hz": 73.416,
+   "sec": 2.6
+  },
+  "bass-E0": {
+   "file": "bass-E0.mp3",
+   "hz": 41.203,
+   "sec": 2.403
+  },
+  "bass-E1": {
+   "file": "bass-E1.mp3",
+   "hz": 82.407,
+   "sec": 1.668
+  },
+  "bass-E2": {
+   "file": "bass-E2.mp3",
+   "hz": 164.814,
+   "sec": 2.483
+  },
+  "bass-Fs1": {
+   "file": "bass-Fs1.mp3",
+   "hz": 92.499,
+   "sec": 2.6
+  },
+  "bass-G0": {
+   "file": "bass-G0.mp3",
+   "hz": 48.999,
+   "sec": 0.961
+  },
+  "bass-Gs1": {
+   "file": "bass-Gs1.mp3",
+   "hz": 103.826,
+   "sec": 2.6
+  },
+  "bass-Gs2": {
+   "file": "bass-Gs2.mp3",
+   "hz": 207.652,
+   "sec": 2.131
+  },
+  "ep-C2": {
+   "file": "ep-C2.mp3",
+   "hz": 65.406,
+   "sec": 3.6
+  },
+  "ep-C3": {
+   "file": "ep-C3.mp3",
+   "hz": 130.813,
+   "sec": 3.6
+  },
+  "ep-C4": {
+   "file": "ep-C4.mp3",
+   "hz": 261.626,
+   "sec": 3.6
+  },
+  "ep-C5": {
+   "file": "ep-C5.mp3",
+   "hz": 523.251,
+   "sec": 3.6
+  },
+  "ep-C6": {
+   "file": "ep-C6.mp3",
+   "hz": 1046.502,
+   "sec": 3.6
+  },
+  "ep-E2": {
+   "file": "ep-E2.mp3",
+   "hz": 82.407,
+   "sec": 3.6
+  },
+  "ep-E3": {
+   "file": "ep-E3.mp3",
+   "hz": 164.814,
+   "sec": 3.6
+  },
+  "ep-E4": {
+   "file": "ep-E4.mp3",
+   "hz": 329.628,
+   "sec": 3.6
+  },
+  "ep-E5": {
+   "file": "ep-E5.mp3",
+   "hz": 659.255,
+   "sec": 3.6
+  },
+  "vib-A2": {
+   "file": "vib-A2.mp3",
+   "hz": 220,
+   "sec": 4
+  },
+  "vib-A4": {
+   "file": "vib-A4.mp3",
+   "hz": 880,
+   "sec": 4
+  },
+  "vib-B3": {
+   "file": "vib-B3.mp3",
+   "hz": 493.883,
+   "sec": 4
+  },
+  "vib-C3": {
+   "file": "vib-C3.mp3",
+   "hz": 261.626,
+   "sec": 4
+  },
+  "vib-C5": {
+   "file": "vib-C5.mp3",
+   "hz": 1046.502,
+   "sec": 3.636
+  },
+  "vib-D4": {
+   "file": "vib-D4.mp3",
+   "hz": 587.33,
+   "sec": 4
+  },
+  "vib-E3": {
+   "file": "vib-E3.mp3",
+   "hz": 329.628,
+   "sec": 4
+  },
+  "vib-E5": {
+   "file": "vib-E5.mp3",
+   "hz": 1318.51,
+   "sec": 4
+  },
+  "vib-F2": {
+   "file": "vib-F2.mp3",
+   "hz": 174.614,
+   "sec": 4
+  },
+  "vib-F4": {
+   "file": "vib-F4.mp3",
+   "hz": 698.456,
+   "sec": 4
+  },
+  "vib-G3": {
+   "file": "vib-G3.mp3",
+   "hz": 391.995,
+   "sec": 4
+  },
+  "kick": {
+   "file": "kick.mp3",
+   "hz": null,
+   "sec": 1.1
+  },
+  "ride-tip": {
+   "file": "ride-tip.mp3",
+   "hz": null,
+   "sec": 2.4
+  },
+  "ride-wash": {
+   "file": "ride-wash.mp3",
+   "hz": null,
+   "sec": 3
+  },
+  "hat-foot": {
+   "file": "hat-foot.mp3",
+   "hz": null,
+   "sec": 0.5
+  },
+  "hat-tick": {
+   "file": "hat-tick.mp3",
+   "hz": null,
+   "sec": 0.4
+  },
+  "tap-1": {
+   "file": "tap-1.mp3",
+   "hz": null,
+   "sec": 0.45
+  },
+  "tap-2": {
+   "file": "tap-2.mp3",
+   "hz": null,
+   "sec": 0.4
+  },
+  "tap-3": {
+   "file": "tap-3.mp3",
+   "hz": null,
+   "sec": 0.4
+  },
+  "swish-1": {
+   "file": "swish-1.mp3",
+   "hz": null,
+   "sec": 1.1
+  },
+  "swish-2": {
+   "file": "swish-2.mp3",
+   "hz": null,
+   "sec": 1.1
+  }
+ },
+ "sources": {
+  "bass_A1.wav": "9e88d5aec796ccf4facbcc7b1964217e20090d23",
+  "bass_As0.wav": "e62f20bc00d4d06cefcc177faa7f36d312418c02",
+  "bass_C1.wav": "15459d3245f1b47155a378aa282d537d26340010",
+  "bass_Cs2.wav": "aff9369a1099758c6815f0c18893650a15bc4c71",
+  "bass_D1.wav": "8313918be788b05b6808165135c720f57fe48b53",
+  "bass_E0.wav": "c6077263fda89c66dfaf03275495e0d8b7da9ca4",
+  "bass_E1.wav": "15560db29dc322399bd3a0268d8b6c039118336c",
+  "bass_E2.wav": "4bc551d71ecfe5249c543880da484bdb36c992ca",
+  "bass_Fs1.wav": "d7d35a0ad576280777babf0d796928ad1eeb90b5",
+  "bass_G0.wav": "9c6395c7dba9599f1f3adfb1ac660530197eeca2",
+  "bass_Gs1.wav": "8427c1ee665d0ec7c4d6c0702772e7e21ac9131e",
+  "bass_Gs2.wav": "e342c2451d91d8e0f10adefd245a5fbe4d8563fb",
+  "ep_C2.wav": "af126abc77f69116aa329d3ffd119a22ffde3f79",
+  "ep_C3.wav": "5861551e497a870a4f541d2932efe65dd08eb2b0",
+  "ep_C4.wav": "aba89767bcb4734175f1d0e252d8a9b9b258476e",
+  "ep_C5.wav": "f10c64899f220618bcc234fa0d98b7995a86f42e",
+  "ep_C6.wav": "4ebc2f40ee6f33fcf55ffa7a7dee442293fb522b",
+  "ep_E2.wav": "597053dba3666532316257eb81ca3d82557a5d8b",
+  "ep_E3.wav": "f4d3887b2c69116e5460b0296318374b6211c5dc",
+  "ep_E4.wav": "3f3a6aa201f3aa9d9306512817579a4cca89c55c",
+  "ep_E5.wav": "c332377ddb24fc4869ae833726b091d51ab9604f",
+  "vib_A2.wav": "2c75565af7559c3d89d9f693d1db37b7e52cccf0",
+  "vib_A4.wav": "aba693fee49423ec8cb8d5660f909c35b1544350",
+  "vib_B3.wav": "07bffc5ef6b2daf92f5b6607c5bfdbd24d8c960c",
+  "vib_C3.wav": "2c61e12e2a29ff568936ef3180d684c96b8d0719",
+  "vib_C5.wav": "91c8126851f4f4797169339dbd375b95190aa3f4",
+  "vib_D4.wav": "28e20d28161cec39dafd1f77befebf82c7497b32",
+  "vib_E3.wav": "c60ba02c1dcad8e823ddde831611fe96164d8251",
+  "vib_E5.wav": "8ba69881a771efa5e60570ccf0c8b98676efb432",
+  "vib_F2.wav": "c5c232572a5c163e263b6ebb5b3b18777aab6315",
+  "vib_F4.wav": "0e63d6e4dfe9c6aaf0caec755f29f2c9e15ea7fc",
+  "vib_G3.wav": "40350ceb12182b4244bf71f25d332bfb268198da",
+  "kick.wav": "f532801205ff01b316858a4381b0a4c3cd631b81",
+  "ride_pp.wav": "5b7f2790135e53839bbdc249428ab74037ceeb04",
+  "ride_soft.wav": "71962b2d075e8fcdb71c77601a033f8193d77b6a",
+  "hat_foot.wav": "efe38af0021d4f5e08e44fd31ee63c6bd78836e2",
+  "hat_tick.wav": "cc199819ff54d49af105e085ca1200a440f8a8a3",
+  "brush_614387.mp3": "e79328b99abcef22b5602d170b5cfa5ed8caeb87",
+  "brush_725845.mp3": "ec9ee3fc3086817371dcc48dad89be082304b1e8",
+  "brushset_843460.mp3": "1829388b7ec2668794f1582c52c9a304b16c0d01"
+ }
+}

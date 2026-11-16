@@ -70,9 +70,9 @@ export async function checkRainRoom(){
       { const S=st(); n+=2; if(S.wipe.wiped || S.wipe.max>0 || !(S.mist>=0.6)) miss(`the pane does not open misted: ${JSON.stringify(S.wipe)}, mist ${S.mist}`);
         if(!(S.drops.n>20 && S.drops.n<=S.drops.cap && Math.abs(S.drops.ledger)<1e-9)) miss('the pane\'s drops: '+JSON.stringify(S.drops));
         notes.push(`opened misted (${S.mist.toFixed(2)}) and wet: ${S.drops.n} drops (${S.drops.running} running) of ${S.drops.cap}`);
-        /* RAIN-1: the baked city — the painted depth is the baked map's (the street, the house opposite) and the law's where the bake cast the law (the hills, the sky) */
+        /* RAIN-1: the baked city — the painted depth is the baked map's (the street, the house opposite) and the law's where the bake cast the law (the hills, the sky); RAIN-5b: the hills' point 0.06 over the horizon — the far houses' roof clutter now reaches 0.02 */
         n++; if(!S.baked) miss('the baked city did not load (the stand-in paints the city)');
-        const [tw, th]=S.tan, at=[[0, -th*0.85], [tw*0.5, -th*0.05], [CT.vanishing().x+0.3, CT.vanishing().horizon+0.02], [0, th*0.9]], got=(room().rtReadDbg('base', at)||[]).map(c=>c[3]), law=at.map(([x, y], i)=>S.baked && i<2 ? room().bakedDepthDbg(x, y) : room().lawDepthDbg(x, y)); n++;
+        const [tw, th]=S.tan, at=[[0, -th*0.85], [tw*0.5, -th*0.05], [CT.vanishing().x+0.3, CT.vanishing().horizon+0.06], [0, th*0.9]], got=(room().rtReadDbg('base', at)||[]).map(c=>c[3]), law=at.map(([x, y], i)=>S.baked && i<2 ? room().bakedDepthDbg(x, y) : room().lawDepthDbg(x, y)); n++;
         const off=at.map((p, i)=>Math.abs((got[i]==null ? -1 : got[i])-law[i])); if(!(got.length===at.length && off.every(e=>e<=3/255+1e-6))) miss(`the painted depth is not the law's: painted ${JSON.stringify(got.map(v=>+(+v).toFixed(3)))}, law ${JSON.stringify(law.map(v=>+v.toFixed(3)))}`);
         else notes.push((S.baked ? 'the painted depth equals the baked map at the street and the house opposite and the law at the hills and the sky: ' : 'the painted depth equals the law at the street, the house opposite, the hills and the sky: ')+law.map(v=>v.toFixed(2)).join(', ')); }
       /* (2) depth is focus, and the sound's closeness */

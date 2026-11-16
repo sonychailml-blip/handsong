@@ -2053,6 +2053,18 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
     3. Balconies back on many houses (iron and wooden), different from house to house.
     4. The boulevard goes on into the haze and bends away: no end seen, on any screen shape and with the camera's lean.
     5. The Poco at Standard: smooth? (No timing was measured.)
+171. The rain room's composed music (RAIN-4b). Listen: `tools/design/rain/music/index.html` — each piece once through, the synth version beside the recorded one, with the melody and without. Five checks by ear:
+    1. Late night, Evening boulevard, After the rain: do they sound like composed pieces (form, a bass part, a drummer), not a wandering bed?
+    2. Synth or recorded — which version, per instrument if mixed (the recorded bass and brushes are what the synth lacked)?
+    3. No note of the melody ever clashes; the swing feels right (Evening 0.64, After the rain 0.56)?
+    4. In the app with `?room=rain` (and `&bedrec=on` for the recorded one): the piece follows the Mood button; the Music button's Still has no drums.
+    5. The forest's music unchanged.
+172. The rain room's street, more alive and more real (RAIN-5b; `?room=rain`). Pictures: `tools/.ui-snap/rain5b/compare.html` (RAIN-5 against now). Five checks:
+    1. No square field round any leaf, scrap or person, at any focus (move the hand near and far).
+    2. The people: different clothes, umbrellas and none, heights, a child, an older walker, someone stopping, two talking, a phone, waiting at the crossing, a dog pulling.
+    3. They walk — legs, arms, a slight bob — never slide.
+    4. Change the mood: people come and go gradually over about a minute, from side streets and doorways.
+    5. The houses: varied rooms and window dressing, lit stairwells, antennas and tanks; the Poco smooth.
 ## Superseded at DOC1 (old lines verbatim, replaced in place above by a later slice)
 - NIGHT-2 stage 3 (2026-11-03, the rule of at most five manual checks) updated this line of CLAUDE.md's report format:
   probe verdict lines and fix rounds; what was left undone; docs found stale; the user's remaining steps (ear, camera, phone).
