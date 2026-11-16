@@ -22,9 +22,11 @@ import { RAIN_SEED, windowsLayout, farLights, windowPick, windowLight } from './
 import { GLASS, wipeNew, wipeStamp, wipeStroke, wipeStep, wipeAt, wipeCell } from './pure/glass.js';
 import { DROPS, dropsNew, dropsRegion, dropAdd, dropsStep, dropStretch, dropsLedger, laneAt } from './pure/drops.js';
 import { winQuad } from './pure/windows.js';   // RAIN-2: a window's projected quad
-import { project, cityLamps, trafficAt, trafficDensity, sceneAt, depthOf, BAKE_EXT, DENS_MARGIN } from './pure/city.js';
+import { project, cityLamps, trafficAt, trafficDensity, sceneAt, depthOf, BAKE_EXT, DENS_MARGIN, STREET } from './pure/city.js';
 import { passBook, passBookSet } from '../../pure/passes.js';   // RAIN-2: the density book
-import { QUAD_V, BLUR_F, VIEW_F, WIN_V, WIN_F, LIGHT_V, LIGHT_F, DROP_V, DROP_F, glassShader } from './rain-glass.js';
+import { lifeAt } from './pure/life.js';   // RAIN-5: the people and the street's small life
+import { showDue, flashOf, breathOf, SHOWN } from './pure/shown.js';   // RAIN-5: the music shown when heard
+import { QUAD_V, BLUR_F, VIEW_F, WIN_V, WIN_F, LIGHT_V, LIGHT_F, DROP_V, DROP_F, LIFE_V, LIFE_F, glassShader } from './rain-glass.js';
 import { cityUniforms, CITY_F, BAKED_F } from './rain-city.js';
 
 export const RAIN_LEVELS=RAIN_ROOM.levels;
@@ -88,7 +90,7 @@ export function buildRain(T, opt){
   const wins=add(new T.Mesh(wg, winM), 1);
 
   /* THE LIGHTS: static (the far lights on the hills and roofs, the lamps and their reflections) then dynamic (cars, the tram, their reflections) */
-  const FAR=farLights(Lv.farLights), LAMPS=cityLamps(), CARS_MAX=Lv.cars|0 || 24, NL=FAR.length+LAMPS.length*2+CARS_MAX*4+24;
+  const FAR=farLights(Lv.farLights), LAMPS=cityLamps(), CARS_MAX=Lv.cars|0 || 24, NL=FAR.length+LAMPS.length*2+CARS_MAX*4+32;
   const lg=unitQuad(), lRect=new Float32Array(NL*4), lCol=new Float32Array(NL*4), lDK=new Float32Array(NL*2), aRect=dyn(lRect, 4), aCol=dyn(lCol, 4), aDK=dyn(lDK, 2);
   lg.setAttribute('aRect', aRect); lg.setAttribute('aCol', aCol); lg.setAttribute('aDK', aDK);
   let nStatic=0, nLights=0;
@@ -116,10 +118,25 @@ export function buildRain(T, opt){
     if(clock && EVT){ const now=performance.now(), at=clock.ctx+(now-clock.perf)/1000;
       for(const e of layersEvents(EVT, EVT_SEED, at-0.5, at)) if(e.kind==='drip' && i<NL){ const p=(at-e.t)/0.45, pg=Math.min(1, heardMs(clock, e.t)<=now ? p : 0);
         if(pg<=0 || pg>=1) continue; put(i++, e.pan*tw*0.85, th*(1.02-1.5*pg), 0.0016, 0.012, LIGHT, 0.9*(1-pg)*e.amp/EVT.drips.gain, 0.04, 1); dripsShown++; } }
+    for(const [x, z] of [[STREET.kerbA-0.9, 70], [STREET.kerbB+0.9, 72]]) i=lightAt(i, [x, 4.4, z], 0.13, signal ? GO : TAIL, 0.9, true);
+    { const tr=cars.find(c=>c.kind==='tram'), ag=now-sparkAt; if(tr && ag<SHOWN.spark) i=lightAt(i, [tr.x, STREET.wire, tr.z-tr.dir*3], 0.3, SPARK, 1.6*(1-ag/SHOWN.spark), false); }
+    { const ag=now-flashAt; if(ag<SHOWN.flash){ const fl=(ag<0.08 || (ag>0.18 && ag<0.26)) ? 1 : 0.25; put(i++, -0.2, 0.32, 1.4, 0.22, FLASH, 0.18*fl*(1-ag/SHOWN.flash), 1, 2); } }
     for(let j=i;j<nLights;j++) lCol[j*4+3]=0;   // last frame's extra lights out
     nLights=Math.max(i, nStatic); lg.instanceCount=Math.max(nLights, 1); aRect.needsUpdate=aCol.needsUpdate=aDK.needsUpdate=true; return cars; }
   const lightM=mat({ uniforms:{ uTan:{ value:UT }, uFoc:{ value:FOC }, uPx:UPX }, vertexShader:LIGHT_V, fragmentShader:LIGHT_F, transparent:true, blending:T.AdditiveBlending });
   const lights=add(new T.Mesh(lg, lightM), 2);
+  /* RAIN-5: THE PEOPLE AND THE STREET'S SMALL LIFE (pure/life.js): one draw, each item projected by the view law and sized by its distance, drawn
+     over the city and under the windows and lights; and THE MUSIC SHOWN (pure/shown.js): the bed's events queued with their heard moment */
+  const NLIFE=160, fg=unitQuad(), fRect=new Float32Array(NLIFE*4), fK=new Float32Array(NLIFE*4), fD=new Float32Array(NLIFE), fRA=dyn(fRect, 4), fKA=dyn(fK, 4), fDA=dyn(fD, 1);
+  fg.setAttribute('aRect', fRA); fg.setAttribute('aK', fKA); fg.setAttribute('aDep', fDA); fg.instanceCount=0; let lifeN=0;
+  const lifeM=mat({ uniforms:{ uTan:{ value:UT }, uFoc:{ value:FOC }, uPx:UPX }, vertexShader:LIFE_V, fragmentShader:LIFE_F, transparent:true, blending:T.CustomBlending, blendSrc:T.OneFactor, blendDst:T.OneMinusSrcAlphaFactor, blendSrcAlpha:T.OneFactor, blendDstAlpha:T.OneMinusSrcAlphaFactor });
+  const lifeMesh=add(new T.Mesh(fg, lifeM), 0.5);
+  function lifeUpload(t, cars, fx){ const A=lifeAt(t, moodOfLook(look), cars||[], fx && fx.wave); let n=0;
+    for(const q of A){ if(n>=NLIFE) break; const b=project([q.x, q.y, q.z]); if(b.z<=1) continue; const tp=project([q.x, q.y+q.h, q.z]), hh=(tp.y-b.y)/2, hw=q.w/2/b.z;
+      if(!(hh>0.00015) || Math.abs(b.x)>2 || Math.abs(b.y)>1.5) continue; fRect.set([b.x, b.y, hw, hh], n*4); fK.set([q.kind, q.ph, q.c, q.a], n*4); fD[n]=depthOf(b.dist); n++; }
+    lifeN=n; fg.instanceCount=n; fRA.needsUpdate=fKA.needsUpdate=fDA.needsUpdate=true; }
+  const bedQ=[], shownLog=[], GO=col('go'), SPARK=col('spark'), FLASH=col('flash'); let signal=0, sparkAt=-1e9, flashAt=-1e9, breathEnd=-1e9;
+  const bedIn=(ev, when)=>{ if(Number.isFinite(when)){ bedQ.push({ ...ev, when }); if(bedQ.length>256) bedQ.shift(); } };
 
   /* THE DROPS: the simulation and its map */
   const SIM=dropsNew(RAIN_SEED^0x44524F50, { cap:Lv.drops }), DMAX=Math.ceil(Lv.drops*1.4)+64, dg=unitQuad();
@@ -137,7 +154,7 @@ export function buildRain(T, opt){
   const glassM=mat({ uniforms:{ uView:{ value:null }, uSoft:{ value:null }, uDrop:{ value:null }, uWipe:{ value:mapTex }, uTan:{ value:UT }, uOff:{ value:UOFF }, uExt:{ value:new T.Vector2(GLASS.ext[0], GLASS.ext[1]) },
     uFloor:{ value:new T.Vector3(0, GLASS.mid[0], GLASS.mid[1]) }, uLight:{ value:new T.Vector2() }, uTime:UTIME, uRain:{ value:rainK }, uMist:{ value:mistK }, uG:{ value:0 }, uLightK:{ value:0 },
     uLightCol:{ value:LIGHT }, uMistCol:{ value:mistCol } }, vertexShader:QUAD_V, fragmentShader:glassShader(Lv.fine) });
-  const qGlass=add(new T.Mesh(quad, glassM), 0), ALL=[qCity, qBlur, qView, wins, lights, dropsMesh, qGlass];
+  const qGlass=add(new T.Mesh(quad, glassM), 0), ALL=[qCity, qBlur, qView, lifeMesh, wins, lights, dropsMesh, qGlass];
   const show=(...on)=>{ for(const m of ALL) m.visible=on.includes(m); };
   const pass=(r, target, ...on)=>{ show(...on); r.setRenderTarget(target); r.render(scene, camera); };
   const blur=(r, from, to, dx, dy)=>{ blurM.uniforms.uTex.value=from; blurM.uniforms.uDir.value.set(dx, dy); pass(r, to, qBlur); };
@@ -170,7 +187,7 @@ export function buildRain(T, opt){
   function render(r){
     rr=r; targets(r); const keep=r.getRenderTarget();
     if(dirty){ dirty=false; paint(r); }
-    pass(r, RT.view, qView, wins, lights);
+    pass(r, RT.view, qView, lifeMesh, wins, lights);
     blur(r, RT.view.texture, RT.s1, 1.2/RT.s1.width, 0); blur(r, RT.s1.texture, RT.s2, 0, 1.2/RT.s2.height); blur(r, RT.s2.texture, RT.s1, 2.4/RT.s1.width, 0); blur(r, RT.s1.texture, RT.s2, 0, 2.4/RT.s2.height);
     r.getClearColor(keepClear); const ka=r.getClearAlpha(); r.setClearColor(0x000000, 0); show(dropsMesh); r.setRenderTarget(RT.drop); r.clear(true, false, false); r.render(scene, camera); r.setClearColor(keepClear, ka);
     pass(r, keep, qGlass); show(...ALL); frames++;
@@ -210,7 +227,9 @@ export function buildRain(T, opt){
     if(!simFrozen) dropsStep(SIM, dt, rainOver==null ? rainK : rainOver); dropsUpload();
     if(wl || wipe.live || SIM.laneLive || mapDirty){ mapDirty=wipe.live || SIM.laneLive; const A=wipe.a, Ln=SIM.lane; for(let i=0;i<A.length;i++){ mapBytes[i*2]=A[i]*255; mapBytes[i*2+1]=Ln[i]*255; } mapTex.needsUpdate=true; }
     for(let i=0;i<WIN.length;i++) lit[i]=windowLight(WIN[i], litK, t-litAt[i]);
-    litAttr.needsUpdate=true; traffic(t);
+    for(const e of showDue(bedQ, t)){ shownLog.push([e.kind, e.when, t]); if(shownLog.length>64) shownLog.shift(); if(e.kind==='chord'){ signal^=1; sparkAt=t; } const b=breathOf(e); if(b) breathEnd=Math.max(breathEnd, t+b); if(flashOf(e, e.when)) flashAt=t; }
+    if(t<breathEnd){ const kb=0.22*Math.min(1, (breathEnd-t)*2); for(let i=0;i<lit.length;i++) if(lit[i]>0.15) lit[i]=Math.min(1, lit[i]*(1+kb)); }
+    litAttr.needsUpdate=true; lifeUpload(t, traffic(t), fx);
     const B=focusBlur(focus);
     viewM.uniforms.uLight.value.set(light.x, light.y, light.on*focus*(0.5+0.5*light.glow));
     const G=glassM.uniforms; UOFF.set(off.x, off.y); G.uRain.value=rainK; G.uMist.value= mistOver==null ? mistK : mistOver; G.uG.value=B.glass; USOFT.value=B.glass; G.uFloor.value.x=GLASS.floor*wipe.floorK;
@@ -235,7 +254,7 @@ export function buildRain(T, opt){
   /* the pane starts wet: drops scattered at once (they merge as they land), the simulation goes on from there */
   { const R=seeded(RAIN_SEED^0x57455421), [x0, y0, x1, y1]=SIM.region, n=Math.round(Lv.drops*(0.35+0.4*rainK)); for(let i=0;i<n;i++) dropAdd(SIM, x0+(x1-x0)*R(), y0+(y1-y0)*R(), DROPS.r0+Math.pow(R(), DROPS.rPow)*(DROPS.rSpan+DROPS.rSpanRain*rainK)); }
   return { id:RAIN_ROOM.id, scene, camera, update, resize, render, glint, state, dispose, texBytes, held:sec=>{ heldNow= sec>0 ? sec : 0; }, project:()=>null,
-    heard:ck=>{ clock=ck; }, dripsDbg:()=>dripsShown,
+    heard:ck=>{ clock=ck; }, dripsDbg:()=>dripsShown, bed:(it, when)=>bedIn(it, when), lifeDbg:()=>({ n:lifeN, shown:shownLog.slice(), queued:bedQ.length }),
     rest:on=>{ restOn=!!on; return restOn; }, restDbg:()=>({ rest:restOn, off:[off.x, off.y], fov:Math.atan(th)*360/Math.PI }),
     viewDbg:o=>{ viewOver=o||null; resize(W, H); return viewOver; },
     flyPick, flyAt:i=>{ const q=windowAt(i); return q ? { i, x:q.x, y:q.y, r:Math.max(1.5, q.r), glow:lit[i], dist:30, front:q.inView } : null; }, flyLand:i=>{ if(!WIN[i]) return false; litAt[i]=now; return true; },

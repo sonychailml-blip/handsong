@@ -1,0 +1,15 @@
+{
+  "format": "handsong/mode",
+  "version": 1,
+  "id": "dorian-hexa",
+  "tuning": "edo12",
+  "name": {"en": "Dorian hexatonic", "ru": "Дорийская гексатоника"},
+  "menu": {"tradition": "common", "group": "modes"},
+  "degrees": [0,  2,  3,  5,  7,  9],
+  "root": 0,
+  "anchor": {"policy": "tonic"},
+  "chords": {
+    "rule": {"kind": "stack"},
+    "modes": "stackPower"
+  }
+}

@@ -70,6 +70,9 @@ THERE in full and here as one index entry):
   165 The room «Rain»'s city made real: houses of their own, plane trees, the bake's light, defocused windows in perspective, cars steady through Wave (RAIN-2)
   166 The forest's objects made natural behind six switches (?forest=rocks, roots, bark, moss, stumps, clear; new = all): nothing lost (the census), plants clear of solids, as full as today (FOREST-2)
   167 The forest after the founder's verdict: rocks and clear by default; bark, moss, stumps, roots, spruce, grass behind their words; ?forest=old the old forest (FOREST-2b)
+  168 The forest after FOREST-2c: bark, moss, stumps, grass by default; trunk and roots as one surface (?forest=roots); spruces at the small trees' places (?forest=spruce); the Standard still's mushrooms
+  169 The rain room's music: its moods, timbres and jazz bed by ear; the listening page (RAIN-4)
+  170 The rain room's street alive: life by mood, the music shown, balconies, the boulevard's far end (RAIN-5)
   163 Fixes after the backlog audit: an in-app browser's refusal, the Lighter stream, the rain room's sound on Dark, Licences, keeping the files (NIGHT-15, CORE-23)
 
 ## Moved to `archive/CLAUDE-history.md` at DOC1 (grep by title; read only what the slice needs)

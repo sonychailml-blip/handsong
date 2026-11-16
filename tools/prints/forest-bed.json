@@ -1,0 +1,22 @@
+{
+ "made": "RAIN-4, before the jazz bed",
+ "rate": 48000,
+ "sec": 20,
+ "renders": {
+  "still": {
+   "L": "f652516d",
+   "R": "9b9c5ec3",
+   "view": "minor-penta#stack~9"
+  },
+  "drift": {
+   "L": "1ebf9de6",
+   "R": "3cf6c05a",
+   "view": "minor-penta#stack~9"
+  },
+  "glimmer": {
+   "L": "ac2db481",
+   "R": "eb634c7e",
+   "view": "minor-penta#stack~9"
+  }
+ }
+}

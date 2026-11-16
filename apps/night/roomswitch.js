@@ -10,6 +10,7 @@ import { ROOMS, roomById } from './rooms/index.js';
 import { ROOM_IDS } from './pure/room.js';
 import { bedHold, bedResume, bedTakesDrone } from './bed.js';
 import { tintApply } from './tint.js';   // DESIGN-1: the interface takes the room's tint
+import { roomMusicApply } from './roomdoors.js';   // RAIN-4
 import { buildAmbience, ambienceSchedule, ambienceTune, ambienceSet, ambienceRoom, ambienceBrook, ambienceBrookLight, ambienceBrookRec, ambienceLayers, ambienceLayersRec, ambienceLayersFocus, ambienceLayersDensity, ambienceLayersStats, NATURE_WORKLET } from './sound/ambience.js';
 
 export const ROOM_KEY='handsong.nightRoom';
@@ -90,6 +91,7 @@ export async function roomSwitch(id, o={}){
   if(ROOM_IDS.includes(id)) save(ROOM_KEY, id);
   bedHold(rec.bed, rec.bed2);
   const pic=sceneSwitch(id, { fast:o.fast });   // sets the host's current room at once (its synchronous part)
+  roomMusicApply();   // RAIN-4: the room's own mood and timbre (or the forest's back)
   tintApply(rec, { now:o.fast });   // DESIGN-1: the interface's accents ease to the new room's tint over the picture's fades
   const I=ambienceInfo(); if(I && I.on) ambienceOn(true, I.level);   // the nature crossfade: the module now finds the new room's recipe
   if(!o.fast) nameShow(rec);

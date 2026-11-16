@@ -1,0 +1,27 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "rain/nylon",
+ "family": "solo",
+ "engine": "ks",
+ "name": {
+  "en": "Nylon guitar",
+  "ru": "Нейлоновая гитара"
+ },
+ "recipe": {
+  "fb": 0.994,
+  "damp": 0.58,
+  "exBase": 0.16,
+  "exSpan": 0.5
+ },
+ "env": {
+  "att": 0.002,
+  "rel": 0.6
+ },
+ "policies": {
+  "voiceMode": "poly",
+  "glide": 0.02,
+  "register": "solo",
+  "quant": 0
+ }
+}

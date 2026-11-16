@@ -1,0 +1,50 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "rain/e-piano",
+ "family": "solo",
+ "engine": "tine",
+ "name": {
+  "en": "Electric piano",
+  "ru": "Электропиано"
+ },
+ "recipe": {
+  "partials": [
+   [
+    1,
+    1,
+    2.8,
+    "sine"
+   ],
+   [
+    2,
+    0.2,
+    1.2,
+    "sine"
+   ],
+   [
+    3,
+    0.05,
+    0.5,
+    "sine"
+   ],
+   [
+    14,
+    0.03,
+    0.05,
+    "sine"
+   ]
+  ],
+  "lvl": 0.5
+ },
+ "env": {
+  "att": 0.004,
+  "rel": 0.9
+ },
+ "policies": {
+  "voiceMode": "poly",
+  "glide": 0.02,
+  "register": "solo",
+  "quant": 0
+ }
+}

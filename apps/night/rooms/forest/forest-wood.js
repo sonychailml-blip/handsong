@@ -79,7 +79,7 @@ function lookOf(nat, mossK, stumpK){ let L=LOOK;
   if(nat) L=L.replace('    c=mix(c, mc, mm*0.88); }', NAT_SPOTS+'    c=mix(c, mc, mm*0.88); }');
   if(mossK) L=L.replace('float dens=clamp(mh*(0.35+0.65*side)*(0.45+0.9*vBk7.z), 0.0, 1.0),', 'float dens=clamp(mh*(0.35+0.65*side)*(0.45+0.9*vBk7.z)*uMossK, 0.0, 1.0),')
     .replace('float top=smoothstep(0.15, 0.7, wn.y)*topM*(0.55+0.9*fm);', 'float top=smoothstep(0.1, 0.6, wn.y)*min(1.0, topM*uMossK)*(0.7+0.9*fm);')
-    .replace('    c=mix(c, mc, mm*0.88); }', '    mc=mix(mc, mc*vec3(1.05, 1.22, 0.85), 0.55)*(0.9+0.35*fm);\n    c=mix(c, mc, mm*0.88); }');
+    .replace('    c=mix(c, mc, mm*0.88); }', '    mc=mix(mc, mc*vec3(1.05, 1.22, 0.85), 0.42)*(0.9+0.35*fm);\n    c=mix(c, mc, mm*0.88); }');
   if(stumpK) L=L.replace('g=mix(g, uGrainDark*0.45, crack); g=mix(g, uDead*0.9, dead*0.45); c=mix(g, c, smoothstep(0.88, 0.97, rho)); }',
       'g=mix(g, uGrainDark*0.45, crack); g=mix(g, uDead*0.9, dead*0.45);\n    g=mix(g, uDead*vec3(0.66, 0.62, 0.56), 0.72*uStumpK)*(0.62+0.38*vn7(vCap7*6.0+3.7));\n    g=mix(g, uGrainDark*0.32, (1.0-smoothstep(0.0, 0.42, rho))*0.7*uStumpK*(0.55+0.45*vn7(vCap7*4.0)));\n    g=mix(g, uGrainDark*0.25, smoothstep(0.86, 0.95, vn7(vec2(atan(vCap7.y, vCap7.x)*5.0, rho*1.5)))*smoothstep(0.1, 0.4, rho)*uStumpK);\n    c=mix(g, c, smoothstep(0.88, 0.97, rho)); }')
     .replace('    c=mix(c, mc, mm*0.88); }', '    if(dead>0.25){ float bare=smoothstep(0.52, 0.6, vp8(q*vec2(0.8, 0.45)+vec2(3.3, 1.9), N0))*uStumpK; vec3 wd=uDead*vec3(1.25, 1.18, 1.05)*(0.8+0.4*vp8(vec2(q.x*9.0, q.y*0.6), 9.0*N0));\n      c=mix(c, wd, bare); mm*=1.0-0.8*bare; }\n    c=mix(c, mc, mm*0.88); }');
@@ -178,7 +178,7 @@ function builder(PM){ const pos=[], uv=[], w=[], cap=[], idx=[], bk=[], bkb=[]; 
 }
 /* places (pure/wood.js woodPlaces) → the merged wood geometry */
 function woodGeo(T, P, nat=null){ const B=builder(woodPieces('wood'));   // FOREST-2: nat { ground(x, z) } — organic roots' sections, natural stumps and snags
-  for(const rt of P.roots){ B.piece(); if(nat && rt.smooth) B.tube(rt.pts, 14, [0, 0, 0.6]); else if(nat && rt.sec) B.tube(rt.pts, 10, [0, 0, 0.85], { sec:rt.sec }); else B.tube(rt.pts, 6, [0, 0, 0.6]); }   // FOREST-2b: the smooth roots, 14 sides round   // roots: live bark, moss on top (FOREST-2: a fin at the trunk, flat along the ground, more moss on top)
+  for(const rt of P.roots){ B.piece(); if(nat && nat.skip && nat.skip.has(rt.tree)) continue; if(nat && rt.smooth) B.tube(rt.pts, 14, [0, 0, 0.6]); else if(nat && rt.sec) B.tube(rt.pts, 10, [0, 0, 0.85], { sec:rt.sec }); else B.tube(rt.pts, 6, [0, 0, 0.6]); }   // FOREST-2b: the smooth roots, 14 sides round   // roots: live bark, moss on top (FOREST-2: a fin at the trunk, flat along the ground, more moss on top)
   for(const L of P.logs){ B.piece(); const S=16, pts=[], l=Math.hypot(L.b[0]-L.a[0], L.b[1]-L.a[1], L.b[2]-L.a[2]);
     for(let i=0;i<=14;i++){ const t=i/14; pts.push([lerp(L.a[0],L.b[0],t), lerp(L.a[1],L.b[1],t), lerp(L.a[2],L.b[2],t), lerp(L.r0,L.r1,t)*(1+0.06*Math.sin(t*l*2.1)+0.04*Math.sin(t*l*5.3))]); }
     const W=[0.3, 0, 1], first=B.tube(pts, S, W); B.capOver(first, S, ...L.a, [0.3, 1, 1], -1); B.capOver(first+14*(S+1), S, ...L.b, [0.3, 1, 1], 1); }

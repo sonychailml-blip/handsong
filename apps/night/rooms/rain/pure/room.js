@@ -24,7 +24,13 @@ export const RAIN_ROOM=F({
     evening:LOOK('rain-eve-', 0.7, 0.65, 0.42, 1.15),   // Evening boulevard: steady rain, many windows, busy
     after:LOOK('rain-after-', 1.15, 0.14, 0.2, 0.7),   // After the rain: heavy mist, a few slow drops, few cars
   }),
-  moods:F({ 'major-penta':'late', 'minor-penta':'evening', 'egyptian':'after' }), look:'late',
+  /* RAIN-4: the room's own moods — a safe 5–6 note set of a jazz mode each (core/data/modes: Lydian pentatonic, Dorian hexatonic, Mixolydian
+     hexatonic; no note of the set clashes with any chord of its bed), its look, its own name (the Mood button reads it here) */
+  moods:F({ 'lydian-penta':'late', 'dorian-hexa':'evening', 'mixolydian-hexa':'after' }), look:'late',
+  /* RAIN-4: what the room plays with — its own four timbres for the playing hand (Night's session records, apps/night/rooms/rain/timbres/; never in
+     Full's lists), each with its level (dB) and its strike cap (a fast phrase stays gentle on a phone), and the moods' names */
+  music:F({ timbres:F([F({ id:'rain/e-piano', level:0, voices:6 }), F({ id:'rain/vibraphone', level:-11, voices:4 }), F({ id:'rain/nylon', level:0, voices:5 }), F({ id:'rain/celesta', level:-6, voices:4 })]),
+    names:F({ late:F({ en:'Late night', ru:'Поздняя ночь' }), evening:F({ en:'Evening boulevard', ru:'Вечерний бульвар' }), after:F({ en:'After the rain', ru:'После дождя' }) }) }),
   nature:F({ id:'ambience.rain',
     drone:F({ root:0.07, fifth:0.035, tc:1.4, send:0.2 }),
     wind:F({ hz:2600, q:0.35, sweep:500, rate:0.045, gain:0.012, send:0.1, sec:2, seed:0x5241494E }),   // RAIN-3: only a breath of air now (the layers carry the rain; it stays if they cannot play)
@@ -59,6 +65,20 @@ export const RAIN_ROOM=F({
     air:F({ amp:0.008, bands:F([4600, 7600]), sway:0.25, q:2, every:F([14, 32]), tc:9 }),
     reverb:F({ pre:0.03, wet:0.5 }),
     lighter:F({ loops:2, padOsc:2, padTones:3, glass:0.5, release:0.7 }),
+    /* RAIN-4: THE JAZZ BED (apps/night/pure/bedjazz.js; the driver runs it instead of the v2 law): per mood its parent mode, tempo, chords as SETS
+       OF THE PARENT'S OWN DEGREES (0-based: maj7 / m9 / dom9 colours, rootless voicings), the progression [chord, bars], the comping rhythm
+       [beat, velocity] (x.5 = the off-beat, swung at Evening), the bass ('root' long, 'roomy' root and fifth, 'walk' quarters) and the glints;
+       per preset how much plays; amps per voice, a strum's roll (s), the sends */
+    jazz:F({ first:'lydian-penta', roll:0.012, ep:0.055, bass:0.2, vib:0.05, brush:0.022, send:F({ ep:0.32, bass:0.1, vib:0.55, brush:0.18 }),
+      presets:F({ still:F({ comp:0.45, vib:false, bass:true }), drift:F({ comp:0.8, vib:false, bass:true }), glimmer:F({ comp:0.8, vib:true, bass:true }) }),
+      moods:F({
+        'lydian-penta':F({ parent:'lydian', bpm:62, swing:0.5, bass:'root', vib:F({ every:F([6, 10]) }),
+          chords:F([F({ root:0, tones:F([2, 4, 6, 3]) }), F({ root:1, tones:F([3, 5, 0, 2]) })]), prog:F([F([0, 2]), F([1, 2])]), comp:F([F([0, 0.55]), F([2.5, 0.32])]) }),   // Imaj7#11 · II9 (rootless)
+        'dorian-hexa':F({ parent:'dorian', bpm:72, swing:0.64, bass:'walk', vib:F({ every:F([2, 4]) }),
+          chords:F([F({ root:0, tones:F([2, 4, 6, 1]) }), F({ root:3, tones:F([5, 0, 2, 4]) })]), prog:F([F([0, 2]), F([1, 2])]), comp:F([F([1, 0.5]), F([2.5, 0.38]), F([3.5, 0.3])]) }),   // i m9 · IV9
+        'mixolydian-hexa':F({ parent:'mixolydian', bpm:66, swing:0.56, bass:'roomy', vib:F({ every:F([3, 6]) }),
+          chords:F([F({ root:0, tones:F([2, 6, 1, 5]) }), F({ root:6, tones:F([1, 3, 5, 0]) }), F({ root:4, tones:F([6, 1, 3, 5]) })]), prog:F([F([0, 2]), F([1, 1]), F([2, 1])]), comp:F([F([0, 0.5]), F([1.5, 0.34]), F([3, 0.4])]) }),   // I9(13) · ♭VIImaj9 · v m9
+      }) }),
     presets:F({
       still:F({ loops:2, loopLen:F([31, 41]), loopReg:F([0.4, 1.4]), notes:F([2, 3]), padTones:F([2, 3]), padReg:F([0, 2.4]), every:F([32, 50]),
         glass:null, air:false, breath:1.3, bright:0.18, arcDepth:0.7, rt60:5.5, damp:2000, loopDb:5 }),

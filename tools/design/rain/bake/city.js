@@ -12,7 +12,7 @@
      (Evening: busy, umbrellas; Late night: almost empty; After the rain: few people, umbrellas closed, puddles).
    - FAR: the roofs beyond and the hills with the old town are a backdrop (the law's own silhouettes, hillsAt), drawn on a canvas far away.
    Everything static is merged per material (few draws, a fast bake). → { group, windows, lamps, backdrop } */
-import { STREET, BLOCKS, CAM, FAR, hillsAt, vanishing, rayOf, depthOf } from '../../../../apps/night/rooms/rain/pure/city.js';
+import { STREET, BLOCKS, CAM, FAR, hillsAt, vanishing, rayOf, depthOf, bendX } from '../../../../apps/night/rooms/rain/pure/city.js';
 
 const TAU=Math.PI*2;
 export const KIT=Object.freeze({ seed:0x43495459, plaster:Object.freeze(['#c99f72', '#d2a48c', '#cbbf9a', '#9fae9a', '#a9b4c2', '#b88a6a', '#d8c7a8', '#c4a39a']),
@@ -24,7 +24,7 @@ const rngOf=seed=>{ let s=(seed>>>0)||1; return ()=>{ s^=s<<13; s>>>=0; s^=s>>>1
 /* ---------- merging: every static piece goes into one geometry per material (world coordinates) ---------- */
 function merger(T){
   const by=new Map(), o=new T.Object3D();
-  const add=(geo, mat, M)=>{ let a=by.get(mat); if(!a){ a=[]; by.set(mat, a); } const g=geo.index ? geo.toNonIndexed() : geo.clone(); g.applyMatrix4(M); a.push(g); geo.dispose(); };
+  const add=(geo, mat, M)=>{ let a=by.get(mat); if(!a){ a=[]; by.set(mat, a); } const g=geo.index ? geo.toNonIndexed() : geo.clone(); g.applyMatrix4(M); { const p=g.attributes.position; for(let i=0;i<p.count;i++) p.setX(i, p.getX(i)+bendX(p.getZ(i))); } a.push(g); geo.dispose(); };
   /* a geometry placed by a parent matrix P and its own position / rotation (Euler y, x, z) / scale */
   const put=(geo, mat, P, x=0, y=0, z=0, ry=0, rx=0, rz=0, sx=1, sy=1, sz=1)=>{ o.position.set(x, y, z); o.rotation.set(rx, ry, rz, 'YXZ'); o.scale.set(sx, sy, sz); o.updateMatrix(); add(geo, mat, P ? P.clone().multiply(o.matrix) : o.matrix.clone()); };
   const build=(group, shadow=true)=>{ for(const [mat, list] of by){ let n=0; for(const g of list) n+=g.attributes.position.count;
@@ -149,7 +149,7 @@ function house(T, m, mats, img, side, h, o, out){
   const s=new T.Shape(); s.moveTo(0, ground); s.lineTo(W, ground); s.lineTo(W, top); s.lineTo(0, top); s.lineTo(0, ground);
   const wins=[]; for(let k=0;k<n;k++) for(let f=0;f<floors;f++){ const xc=(k+0.5)*bw, y0=ground+f*floorH+sill; s.holes.push(archP(new T.Path(), xc-winW/2, y0, winW, winH)); wins.push({ k, f, xc, y0 }); }
   /* balconies: iron ones (nouveau, classical), Tbilisi's enclosed carved wooden ones (wooden) spanning bays */
-  const balc=new Set(); for(const w of wins){ if(w.f===floors-1) continue; const on= style==='nouveau' ? (w.f%2===0 || w.k%2===0) && w.f<floors-1 : style==='classical' ? w.f===0 && w.k%2===1 : false; if(on){ balc.add(w); balconies.push([w.xc, w.y0-0.15, winW+0.9]); } }
+  const balc=new Set(); for(const w of wins){ if(w.f===floors-1) continue; const hb=((Math.sin(w.xc*12.9898+w.y0*78.233+h.z0*37.719)*43758.5453)%1+1)%1, on= style==='nouveau' ? (w.f%2===0 || w.k%2===0) && w.f<floors-1 : style==='classical' ? (w.f===0 || (w.f===2 && hb<0.6)) && w.k%2===1 : style==='brick' ? w.f>=1 && hb<0.3 : style==='wooden' ? w.f>=2 && hb<0.25 : false; if(on){ balc.add(w); balconies.push([w.xc, w.y0-0.15, winW+0.9]); } }   // RAIN-5: a good share of RAIN-1's balconies back, varied per house (a hash per window: no other draw moves)
   const wood=[]; if(style==='wooden'){ const span=Math.min(n, 2+Math.floor(R()*2)), k0=Math.floor(R()*(n-span+1)); for(let f=0;f<Math.min(floors-1, 1+Math.floor(R()*2));f++){ wood.push({ k0, span, f }); balconies.push([(k0+span/2)*bw, ground+f*floorH+sill-0.15, span*bw]); } }
   /* AC units (their drips go into the canvas) */
   const acs=[]; for(const w of wins) if(w.f>=0 && !balc.has(w) && R()<(style==='nouveau' ? 0.06 : 0.14)){ acs.push(w); stains.push([w.xc+winW/2+0.55, w.y0-0.05, 0.25, 1.2+R()*1.6]); }
@@ -277,11 +277,11 @@ export function buildCity(T, mats, img, o={}){
     for(const side of ['opp', 'left']){ const X=S[side]+(side==='opp' ? -0.15 : 0.15); for(let z=16;z<S.len*0.45;z+=10+Rw()*16){ const y=5.6+Rw()*2, L2=8+Rw()*14, pts=[]; for(let k=0;k<=8;k++){ const t=k/8; pts.push([X, y-0.5*4*t*(1-t), z+L2*t]); } pipe(T, m, mats.dark, null, pts, 0.01); } } }
   /* the ground: the left pavement, the road (asphalt), the promenade (paving), kerbs; the rails and the wires */
   const L=S.len, Lz=L/2;
-  const slab=(x0, x1, mat, y=0)=>{ const geo=new T.BoxGeometry(x1-x0, 0.2, L+80), uv=geo.attributes.uv, p=geo.attributes.position; for(let i=0;i<uv.count;i++) uv.setXY(i, p.getX(i)/4+(x0+x1)/8, p.getZ(i)/4); m.put(geo, mat, null, (x0+x1)/2, y-0.1, Lz-40); };
+  const SEG=Math.ceil((L+80)/10), slab=(x0, x1, mat, y=0)=>{ const geo=new T.BoxGeometry(x1-x0, 0.2, L+80, 1, 1, SEG), uv=geo.attributes.uv, p=geo.attributes.position; for(let i=0;i<uv.count;i++) uv.setXY(i, p.getX(i)/4+(x0+x1)/8, p.getZ(i)/4); m.put(geo, mat, null, (x0+x1)/2, y-0.1, Lz-40); };
   slab(S.left-16, S.kerbA, mats.pave, 0.14); slab(S.kerbA, S.kerbB, mats.asphalt, 0); slab(S.kerbB, S.opp+0.5, mats.prom, 0.14);
-  for(const xk of [S.kerbA, S.kerbB]) m.put(new T.BoxGeometry(0.3, 0.22, L+80), mats.kerb, null, xk, 0.08, Lz-40);
-  for(const xr of S.tracks) m.put(new T.BoxGeometry(0.08, 0.04, L+80), mats.rail, null, xr, 0.02, Lz-40);
-  for(const xw of [(S.tracks[0]+S.tracks[1])/2, (S.tracks[2]+S.tracks[3])/2]) m.put(new T.CylinderGeometry(0.008, 0.008, L+80, 3), mats.dark, null, xw, S.wire, Lz-40, 0, Math.PI/2, 0);
+  for(const xk of [S.kerbA, S.kerbB]) m.put(new T.BoxGeometry(0.3, 0.22, L+80, 1, 1, SEG), mats.kerb, null, xk, 0.08, Lz-40);   // RAIN-5: segments along the street, so the bend bends them
+  for(const xr of S.tracks) m.put(new T.BoxGeometry(0.08, 0.04, L+80, 1, 1, SEG), mats.rail, null, xr, 0.02, Lz-40);
+  for(const xw of [(S.tracks[0]+S.tracks[1])/2, (S.tracks[2]+S.tracks[3])/2]) m.put(new T.CylinderGeometry(0.008, 0.008, L+80, 3, SEG), mats.dark, null, xw, S.wire, Lz-40, 0, Math.PI/2, 0);
   for(let z=10;z<L*0.7;z+=30) m.put(new T.CylinderGeometry(0.09, 0.11, S.wire+0.6, 6), mats.iron, null, S.kerbB-0.4, (S.wire+0.6)/2, z), m.put(new T.BoxGeometry(S.kerbB-S.tracks[0]+0.6, 0.06, 0.06), mats.iron, null, (S.kerbB+S.tracks[0])/2, S.wire+0.1, z);
   /* the plane trees: two rows between the road and the promenade (mottled trunks, crowns of leaf clusters) */
   /* RAIN-2: real plane trees (planeTree); o.oldTrees — the RAIN-1 crowns of spheres, kept only for the crown-cover CONTROL */

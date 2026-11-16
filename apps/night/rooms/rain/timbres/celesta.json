@@ -1,0 +1,55 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "rain/celesta",
+ "family": "solo",
+ "engine": "modal",
+ "name": {
+  "en": "Celesta",
+  "ru": "Челеста"
+ },
+ "recipe": {
+  "modes": [
+   {
+    "r": 1,
+    "g": 0.75,
+    "d": 1.6,
+    "a": 0.0008
+   },
+   {
+    "r": 3.0,
+    "g": 0.1,
+    "d": 0.4,
+    "a": 0.0008
+   },
+   {
+    "r": 5.97,
+    "g": 0.04,
+    "d": 0.15,
+    "a": 0.0008
+   }
+  ],
+  "lvl": 0.9,
+  "att": 0.001,
+  "dk": 0.5,
+  "vb": 0.7,
+  "lp": 8000,
+  "noise": {
+   "g": 0.1,
+   "hz": 5000,
+   "q": 1.5,
+   "d": 0.006,
+   "t": 0.2
+  }
+ },
+ "env": {
+  "att": 0.0015,
+  "rel": 1.0
+ },
+ "policies": {
+  "voiceMode": "poly",
+  "glide": 0.02,
+  "register": "solo",
+  "quant": 0
+ }
+}

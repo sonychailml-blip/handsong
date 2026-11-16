@@ -8,7 +8,8 @@
      dimmed by the clouds (patchDapple). The moon's face itself is a prepared file too (tex/moon-*.png; forest.js puts it on the disc).
    Colours: tokens (--cv-forest-star; the moon's colour for the dapple). */
 import { canopyPlaces, crownCellUv, CANOPY } from './pure/canopy.js';
-import { youngSpruces, foliageCellUv, FOLIAGE_ATLAS } from './pure/spruce.js';   // FOREST-2b «spruce»
+import { bankGround, streamNear, STREAM } from './pure/forestlife.js';
+import { sprucesAt, spruceBlocks, inMiddle, foliageCellUv, FOLIAGE_ATLAS } from './pure/spruce.js';   // FOREST-2b «spruce»
 import { plantMaterial } from './forest-floor.js';
 import { limbGeo } from './forest-wood.js';
 import { seeded } from '../../../../core/pure/dsp.js';
@@ -23,9 +24,10 @@ const MEMO=new Map();
 export function buildCanopy(ctx){
   const { T, s, C, own, lv, trunks, U }=ctx, counts={ crowns:lv.crowns ? 1 : 0, crownShare:lv.crownShare==null ? 1 : lv.crownShare, young:lv.young|0, shrubs:lv.shrubs|0, saplings:lv.saplings|0, stars:lv.stars|0 };
   const cl=ctx.clear ? (x, z, k)=>ctx.clear(x, z, ctx.reach[k], { tall:ctx.tall[k], eye:3.4, aisle: k==='sapling' ? [CANOPY.reach.sapX, -1e9] : [CANOPY.aisle, -8] }).slice(0, 2) : null;   // FOREST-2: the understorey clear of solids (?forest=new)
-  const key=JSON.stringify(counts)+(cl ? '.nat'+ctx.clearKey : ''); if(!MEMO.has(key)) MEMO.set(key, cl ? (q=>({ ...q, sprays:ctx.sprays(q.sprays) }))(canopyPlaces(counts, trunks, undefined, false, cl)) : canopyPlaces(counts, trunks)); const P=MEMO.get(key), d=new T.Object3D(), c=new T.Color(), R=seeded(0x43414E31);   // FOREST-2: ctx.sprays — the understorey's sprays pushed off the trunks
+  const spOn=(x, z, H)=>!inMiddle(x, bankGround(x, z)+H*0.5, z) && !(ctx.spruce.shrooms && spruceBlocks(x, z, H, ctx.spruce.shrooms)), hOf=(k, H)=>k==='young' ? 2.4+(H-4)*0.75 : H, spAt=(x, z, H)=>{ if(spOn(x, z, H)) return [x, z]; for(let k=1;k<=8;k++) for(let j=0, n=8+2*k;j<n;j++){ const a=j/n*6.2832, px=x+Math.cos(a)*k*0.15, pz=z+Math.sin(a)*k*0.15; if(streamNear(px, pz).d<STREAM.half+0.7 || !spOn(px, pz, H)) continue; if(cl){ const q=cl(px, pz, 'sapling'); if(q[0]!==px || q[1]!==pz) continue; } return [px, pz]; } return null; }, spSkip= ctx.spruce ? (k, x, z, H)=>!!spAt(x, z, hOf(k, H)) : null;   // a spruce that would cut a mushroom's sight steps aside ≤ 1.2 m (clear of solids, water, the middle); none found: the old tree stays   // FOREST-2c: every young tree and sapling off the frame's middle and off every mushroom's line of sight (a spruce is bulkier) becomes a young spruce
+  const key=JSON.stringify(counts)+(cl ? '.nat'+ctx.clearKey : '')+(spSkip ? '.spruce' : ''); if(!MEMO.has(key)) MEMO.set(key, cl ? (q=>({ ...q, sprays:ctx.sprays(q.sprays) }))(canopyPlaces(counts, trunks, undefined, false, cl, spSkip)) : spSkip ? canopyPlaces(counts, trunks, undefined, false, null, spSkip) : canopyPlaces(counts, trunks)); const P=MEMO.get(key), d=new T.Object3D(), c=new T.Color(), R=seeded(0x43414E31);   // FOREST-2: ctx.sprays — the understorey's sprays pushed off the trunks
   /* limbs and stems: the wood's material, no shadow */
-  const SP= ctx.spruce ? youngSpruces(ctx.spruce.n, trunks, [...P.young, ...P.shrubs, ...P.saplings].map(p=>[p.x, p.z, 1.5])) : null;   // FOREST-2b: the young spruces (their own seeded law; nothing above moves)
+  const SP= ctx.spruce ? sprucesAt([...P.young.map(q=>({ q, H:hOf('young', q.H), of:'young' })), ...P.saplings.map(q=>({ q, H:q.H, of:'sapling' }))].map(o=>{ const at=spAt(o.q.x, o.q.z, o.H); return at ? { x:at[0], z:at[1], H:o.H, of:o.of } : null; }).filter(Boolean)) : null;   // FOREST-2c: the spruces at the young trees' and saplings' own places (heights 2.4–5.4 m and 1.4–3 m)
   const spSegs= SP ? SP.limbs.flatMap(l=>l.pts.slice(1).map((q, i)=>{ const p=l.pts[i]; return [p[0], p[1], p[2], q[0], q[1], q[2], p[3], q[3]]; })) : [];
   const wg=limbGeo(T, SP ? P.limbs.concat(P.stems, spSegs) : P.limbs.concat(P.stems), [0, 0, 0.3]), wood= wg ? new T.Mesh(wg, ctx.woodMat) : null; if(wood){ own.push(wg); wood.receiveShadow=true; s.add(wood); }
   /* the leaf sprays */

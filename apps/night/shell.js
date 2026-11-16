@@ -36,6 +36,7 @@ import { coachBegin, coachTick, coachWire, coachShown } from './coach.js';   // 
 import { homeHintFor } from './pure/homehint.js';
 import { scenePausing } from './scene/host.js';
 import { noticeOf, noticeShow, noticeHide } from './notice.js';
+import { roomMusicNote } from './roomdoors.js';   // RAIN-4
 
 const $=id=>document.getElementById(id), READ=BUS.reader();
 /* NIGHT-1 stage 2: what this app never plays leaves the graph (the sound stays the same to rounding; row «NIGHT lean path»). Its chain has no drive, brightness or tremolo; its one role is solo */
@@ -100,7 +101,7 @@ function render(){
   $('nightRoom').hidden=sceneRooms().length<2; val('nightRoom', L(room().name));   // NIGHT-3 stage 5 part 2: the Room button only with two rooms or more
   val('nightMusic', t('night.music.'+bedModeOf()));
   val('nightSound', D.timbreName(D.timbre()));
-  val('nightMood', t('night.mood.'+D.mood()));
+  val('nightMood', D.moodName ? D.moodName(D.mood()) : t('night.mood.'+D.mood()));   // RAIN-4: a room with its own music names its moods
   const nm=D.noteMode(); val('nightNotes', t(nm==='hold' ? 'night.notesStay' : 'night.notesFollow')); setIcon('nightNotes', nm==='hold' ? 'note-stay' : 'note-follow');
   sleepLabel(performance.now());
   $('nightFieldTg').classList.toggle('on', !!(nightView && nightView.fieldAll));
@@ -133,8 +134,8 @@ function wire(){
   const tap=(id,f)=>{ $(id).onclick=()=>{ if(!D) return; f(); glint($(id)); render(); }; };
   tap('nightRoom', ()=>{ const id=roomNext(); if(id){ roomSwitch(id).then(()=>render()); render(); } });   // NIGHT-8: the slider's icon follows at once   // NIGHT-3 stage 5 part 2: the next room
   tap('nightMusic', ()=>{ const m=bedNext(bedModeOf()); bedSetMode(m, room().bed, room().bed2); save(MUSIC_KEYS.mode, m); if(amb) ambienceOn(true, roomSound()); });   // NIGHT-3 stage 4: off → still → drift → glimmer → off; the drone hands over
-  tap('nightSound', ()=>D.setTimbre(nextOf(D.timbres(), D.timbre())));
-  tap('nightMood', ()=>D.setMood(nextOf(D.moods(), D.mood())));
+  tap('nightSound', ()=>{ D.setTimbre(nextOf(D.timbres(), D.timbre())); roomMusicNote(); });
+  tap('nightMood', ()=>{ D.setMood(nextOf(D.moods(), D.mood())); roomMusicNote(); });   // RAIN-4: remembered per room
   tap('nightNotes', ()=>D.setNoteMode(D.noteMode()==='hold' ? 'note' : 'hold'));
   tap('nightSleep', ()=>sleepSet(nextOf(NIGHT_UI.sleepMins, sleep.mins)));
   $('nightInfoBtn').onclick=()=>infoShow(true); $('nightInfoClose').onclick=()=>infoShow(false);

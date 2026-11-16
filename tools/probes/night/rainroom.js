@@ -105,6 +105,7 @@ export async function checkRainRoom(){
       hand(0.5, 0.5, FAR, false, 45); await until(()=>st().focus>0.95, 5000);
       hand(0.5, 0.5, NEAR, false, 45); await stepped(2); n++; { const f2=st().focus; if(!(f2>0.5)) miss(`the focus jumped: ${f2.toFixed(3)} two room frames after the hand went near (it should glide; limit ${FO.FOCUS.maxRate} a second)`); }
       /* (3) a far note lights the window under the light; CONTROLS: the sky, a near note */
+      { const RV0=await import('../../../apps/night/pure/room.js'), RR0=(await import('../../../apps/night/rooms/rain/pure/room.js')).RAIN_ROOM, aim=()=>RV0.roomLook(RR0, st().mood).lit; const steady=await until(()=>Math.abs(st().share-aim())<0.002, 60000); n++; if(!steady) miss(`the look of the mood did not settle within 60 s (lit share ${st().share.toFixed(3)}, its mood's ${aim()})`); }   // RAIN-4: the room puts its own mood on when it opens; its lit share eases (MOOD_TC) — pick a dark window only once it holds
       const W=room().windowsDbg(); let k=-1, at=null;   // RAIN-1: the room's own window map (the bake's)
       for(const [x, y] of [[0.75, 0.55], [0.25, 0.55], [0.7, 0.62], [0.3, 0.62], [0.82, 0.5], [0.18, 0.5], [0.6, 0.55], [0.4, 0.55], [0.5, 0.6]]){ hand(x, y, FAR, false, 45); await until(()=>st().focus>0.95, 5000); await sleep(500); const L=st().light, q=Wn.windowPick(W, L.x, L.y);
         if(q>=0 && st().lit[q]<0.05){ k=q; at=[x, y]; break; } }
@@ -117,7 +118,7 @@ export async function checkRainRoom(){
         const T=performance.now()/1000+120; H.sceneClockDbg(T); const seen=await until(()=>st().now>=T-1, 5000), more=seen && await stepped(2), later=st().lit[k], law=Wn.traceLevel(st().now-(T-120)); H.sceneClockDbg(null); await frames(2);
         notes.push(`window ${k} lit by a far note; two minutes later ${later.toFixed(3)} (the law: ${law.toFixed(3)})`);
         if(!seen || !more) miss('the room did not step after its clock was moved (5 s)');
-        else if(!(Math.abs(later-law)<=0.03 && later>0.1 && later<0.9)) miss(`two minutes after its note the window glows at ${later.toFixed(3)}, the trace law says ${law.toFixed(3)}`); }
+        else if(!(Math.abs(later-law)<=0.03 && later>0.1 && later<0.9)) miss(`two minutes after its note the window glows at ${later.toFixed(3)}, the trace law says ${law.toFixed(3)} (its ambient threshold ${W[k] && W[k].amb}, the lit share ${st().share.toFixed(4)}, mood ${st().mood})`); }
       { hand(0.5, 0.06, FAR, false, 12); await sleep(500); const L=st().light, q=Wn.windowPick(W, L.x, L.y), p0=st().picks, l0=st().litNow; n++;
         if(q>=0) notes.push('the sky CONTROL could not run: the top of the picture points at window '+q);
         else { hand(0.5, 0.06, FAR, true, 4); await sleep(400); hand(0.5, 0.06, FAR, false, 4); const S=st(); if(S.picks!==p0 || S.litNow>l0) miss(`CONTROL: a far note on the sky lit a window (${S.picks-p0} picks, ${S.litNow-l0} more lit)`); else notes.push('CONTROL: a far note on the sky lights nothing'); } }

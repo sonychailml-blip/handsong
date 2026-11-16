@@ -1,0 +1,46 @@
+{
+ "made": "RAIN-4",
+ "rate": 32000,
+ "stats": {
+  "timbre-e-piano": {
+   "peak": "-24.7",
+   "rms": "-40.0",
+   "scaled": 1
+  },
+  "timbre-vibraphone": {
+   "peak": "-20.6",
+   "rms": "-40.1",
+   "scaled": 1
+  },
+  "timbre-nylon": {
+   "peak": "-20.2",
+   "rms": "-42.1",
+   "scaled": 1
+  },
+  "timbre-celesta": {
+   "peak": "-24.0",
+   "rms": "-41.3",
+   "scaled": 1
+  },
+  "mood-lydian-penta": {
+   "peak": "-27.7",
+   "rms": "-49.2",
+   "scaled": 1
+  },
+  "mood-dorian-hexa": {
+   "peak": "-21.2",
+   "rms": "-46.4",
+   "scaled": 1
+  },
+  "mood-mixolydian-hexa": {
+   "peak": "-28.6",
+   "rms": "-47.9",
+   "scaled": 1
+  },
+  "mood-dorian-hexa-brush": {
+   "peak": "-21.3",
+   "rms": "-46.4",
+   "scaled": 1
+  }
+ }
+}

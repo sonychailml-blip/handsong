@@ -28,7 +28,7 @@ NIGHT-3 stage 4: THE MUSIC BED's DOOR AND ITS v1 DRIVER (live) — the state the
 
 ## apps/night/bed2.js
 NIGHT-4: THE MUSIC BED v2's DRIVER (live and offline).
-- const (7): `BED2_AHEAD`, `bed2ViewOver`, `bed2Failed`, `bed2Dbg`, `bed2StatsLive`, `bed2NodeDbg`, `bed2ViewDbg`
+- const (9): `BED2_AHEAD`, `bedBrushDbg`, `jazzMoodOf`, `bed2ViewOver`, `bed2Failed`, `bed2Dbg`, `bed2StatsLive`, `bed2NodeDbg`, `bed2ViewDbg`
 - fn (6): `bed2Load`, `bed2On`, `bed2Off`, `bed2Volume`, `bed2Tick`, `bed2Plan`
 - → ./sound/bed2.js (1): `bed2Stats`
 
@@ -116,6 +116,11 @@ NIGHT-4: THE MUSIC BED v2's LAW — what plays and when, as numbers (pure, rule 
 - const (4): `BED2_SEED`, `bed2Reg`, `BED2_WORK`, `BED2_TABLE`
 - fn (9): `bed2Fold`, `bed2Density`, `bed2Init`, `bed2Soon`, `bed2LoopReg`, `bed2Voice`, `bed2Step`, `bed2Work`, `bed2Tables`
 
+## apps/night/pure/bedjazz.js
+RAIN-4: THE JAZZ BED's LAW — late-night jazz in the rain, as numbers (pure, rule #36; data row «RAIN jazz bed (app)»).
+- const (4): `JAZZ_SEED`, `JAZZ_N`, `JAZZ_REG`, `jazzDegrees`
+- fn (4): `jazzVoicing`, `jazzBassStep`, `jazzInit`, `jazzStep`
+
 ## apps/night/pure/brook.js
 NIGHT-8: THE STREAM'S MURMUR — the law and the synthesis, pure (rule #36; data row «NIGHT stream sound (app)»), run unchanged by the nature worklet (apps/night/worklets/nature-worklet.js) and by th…
 - const (2): `BROOK`, `brookStats`
@@ -192,6 +197,11 @@ NIGHT-3: THE ROOM RECORD's shape and validator (pure, rule #36; data row «NIGHT
 DESIGN-1 part D: THE START SCREEN'S STILL AND THE REVEAL — the law (pure, rule #36; data row «NIGHT start still (app)»).
 - const (9): `STILL`, `STILL_PHASES`, `stillEase`, `stillDot`, `stillFile`, `stillTan`, `stillWidest`, `stillVeilMax`, `DOT`
 - fn (7): `stillPhase`, `stillLook`, `stillFit`, `stillVeil`, `dotFlare`, `dotGate`, `dotFlight`
+
+## apps/night/roomdoors.js
+RAIN-4: A ROOM'S OWN MUSIC — the shell's doors (core/legacy-ui/ui.js shellDoors) seen through the current room.
+- const (1): `roomDoorsDbg`
+- fn (4): `roomTimbresInstall`, `roomDoors`, `roomMusicApply`, `roomMusicNote`
 
 ## apps/night/rooms/dev.js
 RAIN-0: THE DEVELOPMENT ROOMS' DOOR — a room the founder has not approved yet stays out of the players' edition: it is not in ROOMS, its id is not pinned, and its code is loaded only here, only in …
@@ -339,12 +349,17 @@ NIGHT-13: THE FOREGROUND SILHOUETTES — dark fronds and a branch held in the co
 ## apps/night/rooms/forest/pure/spruce.js
 FOREST-2b «spruce» — FOREST-1's YOUNG SPRUCES, brought back (the founder liked them on captures but never saw them in the app: the level bug).
 - const (4): `SPRUCES`, `FOLIAGE_ATLAS`, `LOWER`, `SPRUCE`
-- fn (5): `foliageCellUv`, `viewAt`, `inMiddle`, `cardBasis`, `youngSpruces`
+- fn (7): `foliageCellUv`, `viewAt`, `inMiddle`, `cardBasis`, `youngSpruces`, `sprucesAt`, `spruceBlocks`
 
 ## apps/night/rooms/forest/pure/stream.js
 NIGHT-6 slice 4 — THE STREAM'S LIFE, as numbers.
 - const (3): `STREAM_LIFE`, `streamLength`, `STREAM_SOUND`
 - fn (7): `outOfWater`, `streamRocks`, `streamPebbles`, `floatersInit`, `floatAt`, `mistStrips`, `streamVoices`
+
+## apps/night/rooms/forest/pure/trunkbase.js
+FOREST-2c «roots» — A TRUNK AND ITS ROOTS AS ONE SURFACE (pure, rule #36).
+- const (1): `TRUNK_BASE`
+- fn (4): `seenTrunks`, `inv4`, `trunkLocal`, `trunkBase`
 
 ## apps/night/rooms/forest/pure/water.js
 NIGHT-9 — THE STREAM'S FLOW, as numbers (pure, rule #36; data row «FOREST water flow (app)»).
@@ -376,7 +391,7 @@ RAIN-0: THE RAIN ROOM JOINS THE APP — loaded only by the development rooms' do
 
 ## apps/night/rooms/rain/pure/city.js
 RAIN-0b: THE VIEW LAW — the eye on the 8th floor, looking slightly down and diagonally along the boulevard (concept §3), as ONE pure projection used by the painting, the depth map, the lights, the …
-- const (18): `CAM`, `STREET`, `BAKE_EXT`, `BLOCKS`, `FLOOR`, `FAR`, `camBasis`, `vanishing`, `DEPTH`, `hillsAt`, `RAIN_CITY_SEED`, `NEAR_TREES`, `TRAFFIC`, `DENS_MARGIN`, `RAIN_TRAFFIC`, `EAR`, `trafficAt`, `trafficDensity`
+- const (20): `CAM`, `STREET`, `BEND`, `bendX`, `BAKE_EXT`, `BLOCKS`, `FLOOR`, `FAR`, `camBasis`, `vanishing`, `DEPTH`, `hillsAt`, `RAIN_CITY_SEED`, `NEAR_TREES`, `TRAFFIC`, `DENS_MARGIN`, `RAIN_TRAFFIC`, `EAR`, `trafficAt`, `trafficDensity`
 - fn (7): `project`, `rayOf`, `depthOf`, `sceneAt`, `cityWindows`, `cityLamps`, `cityTrees`
 
 ## apps/night/rooms/rain/pure/drops.js
@@ -394,9 +409,19 @@ RAIN-0: THE GLASS's law (pure, rule #36; data row «RAIN glass law (app)») — 
 - const (4): `GLASS`, `midAt`, `wipeStamp`, `wipeAt`
 - fn (4): `wipeNew`, `wipeStroke`, `wipeStep`, `wipeCell`
 
+## apps/night/rooms/rain/pure/life.js
+RAIN-5: LIFE ON THE STREET — who is out in the rain, as a pure seeded law of time (rule #36; data row «RAIN life law (app)»).
+- const (2): `LK`, `LIFE`
+- fn (2): `lifeCast`, `lifeAt`
+
 ## apps/night/rooms/rain/pure/room.js
 RAIN-0: THE RAIN ROOM'S RECORD (docs/night/design/RAIN/CONCEPT.md, PLAN.md) — what the room is, as data (pure, rule #36; checked by apps/night/pure/room.js).
 - const (1): `RAIN_ROOM`
+
+## apps/night/rooms/rain/pure/shown.js
+RAIN-5: THE MUSIC SHOWN WHEN HEARD (PLAN slice 8; pure, rule #36; data row «RAIN life law (app)» proves the timing).
+- const (3): `SHOWN`, `flashOf`, `breathOf`
+- fn (1): `showDue`
 
 ## apps/night/rooms/rain/pure/windows.js
 RAIN-0: THE WINDOWS — their places, which one a note lights, and how a lit window fades (pure, rule #36; data rows «RAIN window pick (app)», «RAIN window fade (app)»).
@@ -410,7 +435,7 @@ RAIN-0b: THE STAND-IN CITY's prepared picture and its DEPTH MAP, painted ONCE on
 
 ## apps/night/rooms/rain/rain-glass.js
 RAIN-0: THE RAIN ROOM'S SHADERS (our own, written from the physics: a drop is a small strong lens that shows the view upside down and wide, darker at its rim; a running drop leaves a wet lane and b…
-- const (10): `QUAD_V`, `BLUR_F`, `VIEW_F`, `WIN_V`, `WIN_F`, `LIGHT_V`, `LIGHT_F`, `DROP_V`, `DROP_F`, `glassShader`
+- const (12): `QUAD_V`, `BLUR_F`, `VIEW_F`, `WIN_V`, `WIN_F`, `LIGHT_V`, `LIGHT_F`, `DROP_V`, `DROP_F`, `glassShader`, `LIFE_V`, `LIFE_F`
 
 ## apps/night/rooms/rain/rain.js
 RAIN-0 — THE RAIN ROOM's picture (docs/night/design/RAIN/CONCEPT.md; the plan and what is still a placeholder: PLAN.md).
@@ -1320,6 +1345,7 @@ SPLIT-2: the probe entry of the Night page: its own rows and the core rows flagg
 - → ./night/nightmigrate.js (1): `checkNightMigrate`
 - → ./night/nightprofile.js (1): `checkNightProfile`
 - → ./night/pixels.js (2): `checkNightPixels`, `checkNightDetailedGuard`
+- → ./night/rain4.js (1): `checkForestBed`
 - → ./night/rainnature.js (1): `checkRainNature`
 - → ./night/rainroom.js (1): `checkRainRoom`
 - → ./night/roomswitch.js (1): `checkNightRoomSwitch`
@@ -1351,6 +1377,10 @@ VIS1c (RUN 6, Night plan §10, review 2026-10-17): two rows (quick and all).
 FOREST-2 — the forest's objects made natural behind the address word ?forest=new.
 - const (7): `FOREST2_VIEWS`, `FULL_RULE`, `MOVE`, `VIS_RULE`, `ALL_BUT_GRASS`, `VARIANTS`, `forestCensusDbg`
 - fn (17): `geoPrint`, `progPrint`, `vegCover`, `groundDetail`, `vegMeshes`, `forestFrames`, `forestShared`, `dumpForestToday`, `checkForestToday`, `forest1Ferns`, `checkForestFull`, `plantCuts`, `checkForestClear`, `forestCensus`, `censusCompare`, `checkForestLost`, `checkForestLevels`
+
+## tools/probes/night/forestvis.js
+FOREST-2c — THE FOREST'S VISIBILITY MAP (a probe tool, no row): what a player actually sees from the fixed camera, per object, in pixels.
+- fn (1): `forestVisMap`
 
 ## tools/probes/night/headroom-calc.js
 NIGHT-1: the headroom page's sums, pure (runs in node: tools/probe-data.mjs, row «NIGHT-1 headroom sums»).
@@ -1395,6 +1425,10 @@ SPLIT-2: row «NIGHT profile round trip» on Night's page: the checks of C0 that
 NIGHT-11 part 5 — rows «NIGHT pixel budget» and «NIGHT Detailed guard», on the running app with the forest open.
 - fn (2): `checkNightPixels`, `checkNightDetailedGuard`
 
+## tools/probes/night/rain4.js
+RAIN-4 — «RAIN forest bed unchanged»: the forest's music bed v2 rendered offline (bed2Plan, the worklet for real; Still, Drift, Glimmer, 20 s at 48 kHz, the live view) equals, sample for sample, th…
+- fn (1): `checkForestBed`
+
 ## tools/probes/night/rainnature.js
 RAIN-3: row «RAIN nature» (P.night) — the rain room's layered recordings in the real graph (apps/night/sound/ambience.js, the nature worklet's «night-layers»), rendered OFFLINE (deterministic, no r…
 - fn (1): `checkRainNature`
@@ -1425,7 +1459,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 - const (5): `TEST_ROOM_ID`, `TEST_ROOM`, `testRoomMode`, `testRoomInfo`, `testRoomFreeLeaks`
 - fn (2): `testRoomInstall`, `testRoomRemove`
 
-_282 modules, 2960 exported names._
+_289 modules, 2997 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

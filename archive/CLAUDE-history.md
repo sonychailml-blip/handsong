@@ -2035,6 +2035,24 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
     3. `?forest=stumps` then `?forest=roots`: a stump's cut grey and weathered with rings and cracks, its root stubs round; the roots round and smooth, on their old paths, melting into trunk and soil — nothing angular?
     4. `?forest=spruce` then `?forest=grass`: young spruces at the sides only (on the laptop at Detailed; a few at Standard), never in the middle; the grass spread over the ground (no stray streak near the start).
     5. The Poco at Standard with no word (the new default): smooth? Then `?forest=new`. (No timing was measured: a timing pass is owed.)
+168. The forest after FOREST-2c. No address word: the forest now also has FOREST-2's bark, moss (a little less), stumps and the grass spread over what the eye sees. `?forest=roots`: the trunks whose feet a player sees are drawn with their roots as one surface; `?forest=spruce`: young spruces stand where the young trees and saplings stood; `?forest=old` the forest before FOREST-2. Pictures first: `tools/.ui-snap/forest2/index.html` (and the visibility map, `vismap.json`). Five checks, at Detailed unless said:
+    1. No word: rocks, bark, moss, stumps and grass as approved; the moss not too much; the grass reads denser where it is seen.
+    2. `?forest=roots` with the hand near the two nearest trunks: the trunk widens at its foot and runs into its roots without a seam; the bark goes on along each root at its own scale; the roots taper and sink into the soil.
+    3. `?forest=spruce`: young spruces (whorls, drooping tips, varied heights) where the small broad-leaved trees stood, at the sides, none in the middle; every glowing mushroom still seen.
+    4. Standard: the start still shows the near-right group of glowing mushrooms, and the room behind it has them too when it appears.
+    5. The Poco at Standard with no word: smooth? (No timing was measured.)
+169. The rain room's music (RAIN-4; the development room, `?room=rain`). Listen first: `tools/design/rain/music/index.html` — each timbre for the playing hand alone, near then far; each mood's bed for two minutes with a simple melody; Evening once more with the brushes. Five checks by ear:
+    1. The timbres: electric piano and vibraphone mellow and in balance; of the two candidates (nylon guitar, celesta) which to keep — or both?
+    2. The moods: Late night (Lydian), Evening boulevard (Dorian, the walking bass), After the rain (Mixolydian) — slow, spacious, never a wrong note under the melody?
+    3. The brushes: keep them off, or on (`?brush=on`) at Evening?
+    4. In the app with `?room=rain`: the Mood button reads the room's names, the Sound button its four timbres; a fast phrase stays gentle (the Poco).
+    5. Back to the forest: its own mood and timbre come back; the forest's music sounds as before.
+170. The rain room's street alive (RAIN-5; `?room=rain`). Pictures first: `tools/.ui-snap/rain5/compare.html` (RAIN-2 against now, each mood, phone and laptop, both levels). Five checks:
+    1. Each mood: Evening busy (umbrellas, a couple, a dog, a cyclist, a runner, the café), Late night a few night owls and a cat, After the rain people coming out — nobody walks through a tree, a table or anyone.
+    2. With the music on: the crossing's lights change on the chords, a spark on the wire when a tram is there, lit windows breathe with long notes, now and then far lightning — all on the beat you hear.
+    3. Balconies back on many houses (iron and wooden), different from house to house.
+    4. The boulevard goes on into the haze and bends away: no end seen, on any screen shape and with the camera's lean.
+    5. The Poco at Standard: smooth? (No timing was measured.)
 ## Superseded at DOC1 (old lines verbatim, replaced in place above by a later slice)
 - NIGHT-2 stage 3 (2026-11-03, the rule of at most five manual checks) updated this line of CLAUDE.md's report format:
   probe verdict lines and fix rounds; what was left undone; docs found stale; the user's remaining steps (ear, camera, phone).

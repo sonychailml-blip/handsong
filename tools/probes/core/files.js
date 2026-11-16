@@ -191,6 +191,10 @@ export const SNAPSHOT_CHANGES={
   f7b:[{ field:'modes.partch-43.chordBuild', kind:'new', count:()=>1 }, { field:'modes.bohlen-pierce.chordBuild', kind:'new', count:()=>1 },
        { field:'modes.just-intonation.typedChords', kind:'new', count:()=>1 }, { field:'modes.just-intonation.chordBuild', kind:'new', count:()=>1 },
        { field:'modes.just-intonation.chordModes[*].over.degNaming', kind:'new', count:()=>1 }],
+  /* RAIN-4: three modes APPENDED (the rain room's moods: Lydian pentatonic, Dorian and Mixolydian hexatonic) — each a new mode, its two chord-mode
+     views and its chord-mode list in both languages; two menu groups one entry longer in each language (appended at their ends: nothing moves) */
+  rain4:['lydian-penta', 'dorian-hexa', 'mixolydian-hexa'].flatMap(id=>[{ field:'modes.'+id, kind:'new', count:()=>1 }, { field:'chordModes.*.'+id, kind:'new', count:()=>2 }, { field:'views.'+id+'#*', kind:'new', count:()=>2 }])
+    .concat([{ field:'menu.*[*].groups[*].scales', kind:'length', count:()=>4 }]),
 };
 const reEsc=q=>q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 const fieldRe=f=>new RegExp('^'+f.split('[*]').map(p=>p.split('*').map(reEsc).join('[^.\\[\\]]+')).join('\\[\\*\\]')+'$');   // '*' — одно звено; '[*]' — номер в сводке, как есть

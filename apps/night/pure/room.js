@@ -7,7 +7,7 @@ export const ROOM_FORMAT='handsong/room', ROOM_VERSION=1;
 export const ROOM_IDS=Object.freeze(['room.forest']);   // pinned: never renamed or reused
 export const ROOM_LEVELS=Object.freeze(['full','reduced']);   // the WebGL levels; «minimal» is the 2D stand-in
 export const ROOM_ACOUSTICS=Object.freeze(['fdepth']);
-const FIELDS=['format','version','id','name','icon','tint','still','view','tokens','levels','looks','moods','look','nature','acoustic','bed','bed2'];   // DESIGN-1: tint — the room's light on the interface   // NIGHT-8: icon — the room's own picture for its Room-sounds slider
+const FIELDS=['format','version','id','name','icon','tint','still','view','tokens','levels','looks','moods','look','nature','acoustic','bed','bed2','music'];   // DESIGN-1: tint — the room's light on the interface   // NIGHT-8: icon — the room's own picture for its Room-sounds slider
 const NATURE=['id','drone','wind','crickets','echo','stream','layers','level','master','ahead'];   // RAIN-3: layers (optional: the layered recordings near / far)   // NIGHT-8: stream (optional: a room without water has none)
 const plain=o=> o!==null && typeof o==='object' && !Array.isArray(o);
 /* DESIGN-1: a room's TINT (a token of the room, its colour in night.css) colours the interface's small accents (--night-tint) with dark ink on it (a
@@ -20,7 +20,7 @@ const num=v=> typeof v==='number' && Number.isFinite(v);
 /* a room's look for a mood (a mode id, or a look's own key) → the look; unknown → the room's default look */
 export const roomLook=(room, mood)=> room.looks[room.moods[mood]||mood] || room.looks[room.look];
 /* CORE-20: the modes the rooms name (their moods' keys), once each, in order — with the profile's moods, all the modes Night loads */
-export const roomModes=records=>[...new Set(records.flatMap(r=>Object.keys((r && r.moods) || {})))];
+export const roomModes=records=>[...new Set(records.flatMap(r=>[...Object.keys((r && r.moods) || {}), ...Object.values((r && r.bed2 && r.bed2.jazz && r.bed2.jazz.moods) || {}).map(m=>m.parent)]))];   // RAIN-4: + the jazz bed's parent modes (it prices its steps there)
 /* null = valid; otherwise ONE line naming the field. known (optional): modes — the app's mode ids (each mood must be one); ids — the room ids
    allowed (default ROOM_IDS; a development room passes its own, never pinned and never remembered) */
 /* NIGHT-13: the camera's vertical field of view (degrees) for a view w × h by the room's lens law (its record's `view`) — the room and its start still read it */
@@ -49,6 +49,9 @@ function checkLayers(L){
 export function checkRoom(r, known={}){
   if(!plain(r)) return 'not an object';
   for(const k of Object.keys(r)) if(!FIELDS.includes(k)) return `unknown field «${k}»`;
+  if(r.music!=null){ const M=r.music; if(!plain(M) || !Array.isArray(M.timbres) || !M.timbres.length || !plain(M.names)) return 'music: { timbres:[{ id, level, voices }…], names:{ look:{ en, ru } } }';   // RAIN-4: a room's own timbres and mood names
+    for(const T of M.timbres) if(!plain(T) || typeof T.id!=='string' || !Number.isFinite(T.level) || T.level>0 || !Number.isInteger(T.voices) || T.voices<1 || T.voices>6) return `music.timbres: «${T && T.id}» needs an id, a level of at most 0 dB and a strike cap 1…6`;
+    for(const [k, nm] of Object.entries(M.names)) if(!plain(nm) || typeof nm.en!=='string' || typeof nm.ru!=='string') return `music.names.${k}: {en, ru}`; }
   if(r.format!==ROOM_FORMAT) return 'format: '+JSON.stringify(r.format);
   if(r.version!==ROOM_VERSION) return 'version: '+JSON.stringify(r.version);
   if(!(known.ids||ROOM_IDS).includes(r.id)) return `id: «${r.id}» is not a pinned room id`;

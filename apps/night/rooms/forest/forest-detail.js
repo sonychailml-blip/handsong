@@ -46,7 +46,7 @@ export function buildDetail(ctx){
     for(let j=0;j<k && gn<lv.grass;j++){ const x=cx+(R()-0.5)*1.4, z=cz+(R()-0.5)*1.4;
       const qd=streamNear(x,z).d; if(qd<STREAM.half+0.08 || Math.hypot(x, z-5.5)<3.2) continue;
       const sc=0.16+R()*0.26; d.position.set(x, bankGround(x,z,qd)-0.01, z);   // NIGHT-6 slice 4: on the carved bank d.rotation.set((R()-0.5)*0.35, R()*6.283, (R()-0.5)*0.35); d.scale.set(1, sc, 1); d.updateMatrix(); grass.setMatrixAt(gn, d.matrix);
-      if(ctx.grass){ let gx=x, gz=z; if(ctx.grass.fix) [gx, gz]=ctx.grass.fix(x, z, sc); d.position.set(gx, bankGround(gx, gz)-0.01, gz); d.rotation.set((Rg()-0.5)*0.35, Rg()*6.283, (Rg()-0.5)*0.35); d.scale.set(1, sc, 1); d.updateMatrix(); grass.setMatrixAt(gn, d.matrix); }   // FOREST-2b «grass»: the placement the comment above swallowed since NIGHT-6 slice 4 (its own draws: nothing else moves)
+      if(ctx.grass){ const vz=2.2-(2.2-cz)*0.72, hw=(5.5-vz)*1.05+0.4; let gx=cx/9*hw+(x-cx), gz=vz+(z-cz); if(ctx.grass.fix) [gx, gz]=ctx.grass.fix(gx, gz, sc); d.position.set(gx, bankGround(gx, gz)-0.01, gz); d.rotation.set((Rg()-0.5)*0.35, Rg()*6.283, (Rg()-0.5)*0.35); d.scale.set(1, sc, 1); d.updateMatrix(); grass.setMatrixAt(gn, d.matrix); }   // FOREST-2b «grass»: the placement the comment above swallowed since NIGHT-6 slice 4 (its own draws: nothing else moves)   // FOREST-2c: the tufts gathered into what the eye sees (denser there; the same blades)
       gc.copy(G1).lerp(G2, R()*0.6).multiplyScalar(0.75+R()*0.5); grass.setColorAt(gn, gc); gn++; } }
   grass.count=gn; if(grass.instanceColor) grass.instanceColor.needsUpdate=true; s.add(grass);
   /* falling leaves */

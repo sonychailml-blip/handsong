@@ -1033,3 +1033,12 @@ chordFreqs), строить чистыми от корня НЕЛЬЗЯ — ст
 куплена резкостью дальних. */
 ```
 
+
+## modes/lydian-penta.json, modes/dorian-hexa.json, modes/mixolydian-hexa.json
+```
+/* RAIN-4 (Night's rain room, its three moods; any app may list them): the safe melody sets of three jazz modes — every note of the set
+   stays off a semitone above each tone of the room's bed chords (bass root included), so the playing hand can never land a wrong note.
+   Lydian pentatonic C D E F# A (Lydian without G and B: G is a semitone over F# of the II9), Dorian hexatonic C D Eb F G A (Dorian without
+   Bb: a semitone over A of the IV9), Mixolydian hexatonic C D E G A Bb (Mixolydian without F: a semitone over E of the I9). Equal 12, tonic
+   anchor; chords by stacking (the set's own steps). */
+```

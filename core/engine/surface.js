@@ -9,6 +9,7 @@ const SURFACE={
   'apps/night/roomswitch.js':['ambienceOn', 'ambienceInfo'],
   'apps/night/lifecycle.js':['AC'],   // NIGHT-11 part 1: the context resumed after the phone looked away   // CORE-12: the room switch's nature crossfade (NIGHT-3 stage 5 part 2)
   'apps/night/shell.js':['outputFade', 'ambienceOn', 'ambienceRetune', 'ambienceTick', 'fxInstance', 'setTimbreTrim', 'setLowPower', 'setNightStrikes', 'AC', 'leadOn', 'leadOff', 'timbreIdx', 'ambienceInfo', 'setLeanPath', 'leadParkTick'],   // RUN 8: + the device measurement's notes; RUN 9: the wind's phase
+  'apps/night/roomdoors.js':['timbreInstall', 'setTimbreTrim', 'setNightStrikes'],   // RAIN-4: a room's own timbres (Night's session records) and their levels and caps
   'core/clip.js':['createRecordingTap'],
   'apps/full/demo.js':['AC', 'initAudio'],
   'core/freeze/registry.js':['AC', 'frzReader', 'frzReady', 'frzStoreCount', 'frzStoreDbg', 'frzStoreDel', 'frzStorePut', 'fxSnapshot',

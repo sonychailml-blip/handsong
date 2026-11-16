@@ -18,16 +18,23 @@ export const CAM=F({ x:8, y:25, z:0, yaw:14, pitch:-13 });   // 8th floor (25 m)
    alley); treeRows the two rows of plane trees; zFrom: the vehicles drive on past our house (under the window) to here. Rows begin at `rows`. */
 export const STREET=F({ left:-4, rows:12, kerbA:0, kerbB:13, alleyA:13, alleyB:40, opp:40, tracks:F([8.9, 10.4, 11.4, 12.9]), wire:6.2,
   lanes:F([F({ x:2.6, dir:-1 }), F({ x:6.2, dir:1 })]),   // dir −1 comes towards us (headlights), +1 goes away (tail lights): driving on the right
-  treeRows:F([14.6, 17.6]), terrace:F([34, 40]), len:520, zFrom:-80, lampEvery:24, treeEvery:11 });
+  treeRows:F([14.6, 17.6]), terrace:F([34, 40]), len:1600, zFrom:-80, lampEvery:24, treeEvery:11 });   // RAIN-5: the boulevard goes on to 1.6 km (it was 520 m: the founder saw it end)
+/* RAIN-5: THE BEND — beyond z0 the boulevard curves gently to the right (x grows ∝ (z − z0)², then straight on at that angle from z1), so the houses of
+   the row opposite close the view and its end is never seen. One law for every consumer: project() bends any world point, the bake bends its
+   geometry by it; nothing nearer than z0 moves (the street seen today is unchanged) */
+export const BEND=F({ z0:600, z1:1700, k:2.2e-4 });
+export const bendX=z=> z<=BEND.z0 ? 0 : z<=BEND.z1 ? BEND.k*(z-BEND.z0)**2 : BEND.k*(BEND.z1-BEND.z0)*(BEND.z1-BEND.z0+2*(z-BEND.z1));
 /* RAIN-1: the prepared city's picture covers every screen shape the room's lens law allows: x −BAKE_EXT[0]…BAKE_EXT[0], y −BAKE_EXT[1]…BAKE_EXT[1]
    (view-angle units: a 2.4 : 1 screen at 55°, an upright phone at 68° — tan 34°) */
 export const BAKE_EXT=F([1.25, 0.6745]);
 /* the houses: blocks along both rows (z from, z to, eaves height, mansard height) */
 export const BLOCKS=F({
-  opp:F([F([12, 40, 21, 4]), F([40, 66, 23, 3.5]), F([66, 98, 18, 3.5]), F([98, 138, 23, 4]), F([138, 180, 20, 3]), F([180, 236, 22, 4]), F([236, 320, 19, 3]), F([320, 520, 21, 3])]),
-  left:F([F([16, 42, 22, 3.5]), F([42, 70, 20, 3]), F([70, 112, 23, 3.5]), F([112, 160, 19, 3]), F([160, 230, 21, 3]), F([230, 520, 20, 3])]) });
+  opp:F([F([12, 40, 21, 4]), F([40, 66, 23, 3.5]), F([66, 98, 18, 3.5]), F([98, 138, 23, 4]), F([138, 180, 20, 3]), F([180, 236, 22, 4]), F([236, 320, 19, 3]), F([320, 520, 21, 3]),
+    F([520, 610, 22, 3.5]), F([610, 720, 19, 3]), F([720, 850, 23, 4]), F([850, 990, 20, 3]), F([990, 1130, 22, 3.5]), F([1130, 1260, 21, 3])]),   // RAIN-5: appended beyond 520 m (those before untouched)
+  left:F([F([16, 42, 22, 3.5]), F([42, 70, 20, 3]), F([70, 112, 23, 3.5]), F([112, 160, 19, 3]), F([160, 230, 21, 3]), F([230, 520, 20, 3]),
+    F([520, 640, 21, 3]), F([640, 780, 23, 3.5]), F([780, 920, 19, 3]), F([920, 1060, 22, 3]), F([1060, 1200, 20, 3.5])]) });
 export const FLOOR=F({ h:3.5, ground:4.4, bay:3.4, winW:1.3, winH:2.2, sill:0.9 });   // floor height, ground floor, bay pitch, window size, sill above the floor
-export const FAR=F({ z:900, roofs:F([14, 34]), hillsZ:3200, hillsY:F([150, 330]) });   // the roofs beyond the boulevard's end, the hills' distance and heights
+export const FAR=F({ z:2000, roofs:F([14, 34]), hillsZ:3200, hillsY:F([150, 330]) });   // the roofs beyond the boulevard's end, the hills' distance and heights
 
 /* the camera's basis (unit vectors): right, up, forward */
 export const camBasis=(c=CAM)=>{ const y=c.yaw*D2R, p=c.pitch*D2R, f=[Math.sin(y)*Math.cos(p), Math.sin(p), Math.cos(y)*Math.cos(p)], r=[Math.cos(y), 0, -Math.sin(y)];
@@ -35,7 +42,7 @@ export const camBasis=(c=CAM)=>{ const y=c.yaw*D2R, p=c.pitch*D2R, f=[Math.sin(y
 const B0=camBasis();
 /* a world point → { x, y (view-angle units), z (distance along the view axis, m), dist (m) } ; z ≤ 0: behind the eye */
 export function project(P, c=CAM, B=B0){
-  const vx=P[0]-c.x, vy=P[1]-c.y, vz=P[2]-c.z, z=vx*B.f[0]+vy*B.f[1]+vz*B.f[2];
+  const vx=P[0]+bendX(P[2])-c.x, vy=P[1]-c.y, vz=P[2]-c.z, z=vx*B.f[0]+vy*B.f[1]+vz*B.f[2];   // RAIN-5: the bend (0 nearer than BEND.z0)
   return { x:(vx*B.r[0]+vy*B.r[1]+vz*B.r[2])/z, y:(vx*B.u[0]+vy*B.u[1]+vz*B.u[2])/z, z, dist:Math.hypot(vx, vy, vz) };
 }
 /* a view direction (view-angle units) → the world ray's unit direction */
@@ -110,7 +117,7 @@ export const TRAFFIC=F({ every:F([10, 12]), p:0.6, speed:F([11.5, 12.5]), carLen
 /* RAIN-2: a vehicle's existence is decided by the density booked COMMIT s before it enters (≥ the sound's lead 9 s + the margin); a change is booked
    DENS_MARGIN s ahead of the picture's audio time, so the audio thread has it before it counts (pure/passes.js passBook) */
 export const DENS_MARGIN=0.5, DENS_COMMIT=10;
-export const RAIN_TRAFFIC=F({ commit:DENS_COMMIT, len:STREET.len, zFrom:STREET.zFrom, every:TRAFFIC.every, p:TRAFFIC.p, speed:TRAFFIC.speed, carLen:TRAFFIC.carLen, lanes:STREET.lanes,
+export const RAIN_TRAFFIC=F({ commit:DENS_COMMIT, len:520, zFrom:STREET.zFrom, every:TRAFFIC.every, p:TRAFFIC.p, speed:TRAFFIC.speed, carLen:TRAFFIC.carLen, lanes:STREET.lanes,
   tram:F({ every:TRAFFIC.tram, p:TRAFFIC.tramP, speed:TRAFFIC.tramSpeed, len:TRAFFIC.tramLen, track:TRAFFIC.tramTrack }) });
 /* the listener: the eye at the window (its right vector for the pan) */
 export const EAR=F({ x:CAM.x, y:CAM.y, z:CAM.z, r:F(camBasis().r) });

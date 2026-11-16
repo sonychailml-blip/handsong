@@ -129,3 +129,37 @@ void main(){
   col+=uLightCol*uLightK*(0.1*glow+0.3*glow*mist+0.7*m*exp(-d2/0.035)*smoothstep(0.35, 1., l)*max(0., dot(dn/max(l, 1e-3), -dl/max(sqrt(d2), 1e-3))));
   float vg=length((vUv-0.5)*vec2(1.1, 1.25)); col*=1.-0.38*smoothstep(0.35, 0.9, vg);
   gl_FragColor=vec4(col, 1.); }`;
+/* RAIN-5: THE PEOPLE AND THE STREET'S SMALL LIFE (pure/life.js), one instance each: aRect its foot (view units), half width and half height, aK
+   (kind, phase, colour, alpha), aDep its focus depth — silhouettes drawn by shape (no texture), their edges softened by the focus like the lights;
+   the rings, splashes and steam pale, the rest dark against the lit street (an umbrella in its colour). Premultiplied over the view. */
+export const LIFE_V=`attribute vec4 aRect, aK; attribute float aDep; uniform vec2 uTan; uniform vec3 uFoc; uniform float uPx;
+varying vec2 vQ; varying vec4 vK; varying float vSoft; ${RAD}
+void main(){ float R=radAt(aDep), pad=R+1.5/uPx; vec2 hs=aRect.zw+pad, c=vec2(aRect.x, aRect.y+aRect.w), P=c+position.xy*hs;
+  vQ=vec2((P.x-aRect.x)/max(aRect.z, 1e-6), (P.y-aRect.y)/max(2.*aRect.w, 1e-6)); vK=aK; vSoft=(R+0.8/uPx)/max(2.*aRect.w, 1e-6);
+  gl_Position= aK.w>0.003 ? vec4(P/uTan, 0., 1.) : vec4(2., 2., 2., 1.); }`;
+export const LIFE_F=`precision highp float; varying vec2 vQ; varying vec4 vK; varying float vSoft;
+float el(vec2 p, vec2 c, vec2 r){ return (length((p-c)/r)-1.)*min(r.x, r.y*2.); }
+float person(vec2 p, float ox, float ph, float sw){ float s=sin(ph*6.2832)*sw;
+  float d=min(el(p, vec2(ox, 0.5), vec2(0.42, 0.27)), el(p, vec2(ox, 0.86), vec2(0.26, 0.06)));
+  return min(d, min(el(p, vec2(ox-0.13+s, 0.13), vec2(0.13, 0.13)), el(p, vec2(ox+0.13-s, 0.13), vec2(0.13, 0.13)))); }
+float dome(vec2 p, float ox, float w){ return p.y<0.92 ? 1. : el(p, vec2(ox, 0.92), vec2(w, 0.12)); }
+void main(){ float k=floor(vK.x+0.5), ph=vK.y, ci=floor(vK.z+0.5); vec2 p=vQ; float d=1., du=1., light=0.;
+  if(k<0.5){ d=person(p, 0., ph, 0.1); du=dome(p, 0., 1.); }
+  else if(k<1.5){ d=min(person(p, -0.3, ph, 0.07), person(p, 0.3, ph+0.5, 0.07)); du=dome(p, 0., 1.); }
+  else if(k<2.5){ d=min(person(p, -0.35, ph, 0.09), el(p, vec2(0.6, 0.12), vec2(0.32, 0.07))); du=dome(p, -0.35, 0.8); }
+  else if(k<3.5){ d=min(el(p, vec2(0.05, 0.62), vec2(0.3, 0.22)), el(p, vec2(0.15, 0.9), vec2(0.18, 0.06))); d=min(d, abs(el(p, vec2(-0.55, 0.16), vec2(0.36, 0.17)))-0.02); d=min(d, abs(el(p, vec2(0.55, 0.16), vec2(0.36, 0.17)))-0.02); }
+  else if(k<4.5){ d=person(p, 0., ph, 0.2); }
+  else if(k<5.5){ d=min(el(p, vec2(0., 0.45), vec2(0.45, 0.26)), el(p, vec2(0.02*sin(ph*6.2832), 0.8), vec2(0.28, 0.08))); }
+  else if(k<6.5){ d=min(person(p, 0., ph, 0.08), el(p, vec2(0.55, 0.63), vec2(0.38, 0.02))); }
+  else if(k<7.5){ d=el(p, vec2(0., 0.45), vec2(0.8, 0.4)); if(ph>=0.) d=min(d, el(p, vec2(0., 0.55+0.3*sin(ph*6.2832)), vec2(1., 0.12))); }
+  else if(k<8.5){ d=min(el(p, vec2(0., 0.4), vec2(0.7, 0.28)), min(el(p, vec2(0.7, 0.68), vec2(0.25, 0.18)), el(p, vec2(-0.8, 0.65), vec2(0.12, 0.35)))); }
+  else if(k<9.5){ float a=ph*6.2832; vec2 q=mat2(cos(a), -sin(a), sin(a), cos(a))*(p-vec2(0., 0.5)); d=(abs(q.x)+abs(q.y*2.)-0.8)*0.4; }
+  else if(k<10.5){ light=1.; float m=smoothstep(1., 0.2, length((p-vec2(0., 0.5))/vec2(1., 0.5))); gl_FragColor=vec4(vec3(0.42, 0.44, 0.47)*m*vK.w, m*vK.w*0.6); return; }
+  else if(k<11.5){ light=1.; d=abs(el(p, vec2(0., 0.5), vec2(1., 0.5)))-0.05; }
+  else if(k<12.5){ light=1.; d=p.y<0.5 ? 1. : abs(el(p, vec2(0., 0.5), vec2(1., 0.5)))-0.08; }
+  else { d=min(el(p, vec2(0., 0.72), vec2(0.4, 0.2)), el(p, vec2(0., 0.15), vec2(1., 0.3))); }
+  float sw=max(vSoft, 0.02), m=smoothstep(sw, -sw, d), mu=smoothstep(sw, -sw, du);
+  vec3 U= ci<0.5 ? vec3(0.02, 0.02, 0.025) : ci<1.5 ? vec3(0.2, 0.03, 0.04) : ci<2.5 ? vec3(0.03, 0.05, 0.12) : vec3(0.22, 0.15, 0.04);
+  if(light>0.5){ gl_FragColor=vec4(vec3(0.6, 0.6, 0.62)*m*vK.w, m*vK.w*0.35); return; }
+  vec3 body= k>8.5 && k<9.5 ? (ci<0.5 ? vec3(0.1, 0.06, 0.03) : vec3(0.32, 0.31, 0.29)) : vec3(0.025, 0.022, 0.03);
+  float a=max(m, mu)*vK.w; vec3 col=mix(body, U, mu*(1.-m*0.0)); gl_FragColor=vec4(col*a, a); }`;

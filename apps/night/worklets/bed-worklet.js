@@ -16,6 +16,7 @@ const TAU=2*Math.PI, BL=128;
 const LINES=[2441, 2903, 3343, 3821, 4271, 4751, 5303, 6067], DIFF=[227, 331, 497, 677], DIFF_G=0.62, MOD_MS=0.3, MOD_HZ=[0.071, 0.113];
 const FREE=1e-3;   // a voice is free once its level is 60 dB under its own peak (under the mix and the room, nothing is heard of it)
 const HAND=1.8;    // s: a loop voice's last note fades this fast once its next note starts
+const JZ_POOL=16, JZ_KS=1024;   // RAIN-4: the jazz voices (made at the first jazz note) and a string's longest delay line (samples at the synthesis rate)
 const eq=p=>[Math.cos((p+1)*Math.PI/4), Math.sin((p+1)*Math.PI/4)];
 const p2=n=>{ let s=1; while(s<n) s<<=1; return s; };
 /* the state-variable filter's coefficients (g = tan(π f / fs), k = 1/Q) */
@@ -85,6 +86,37 @@ class NightBed extends AudioWorkletProcessor{
     v.a1=0; v.a2=0; v.b1s=0; v.b2s=0;
   }
   free(pool){ for(const v of pool) if(!v.on) return v; return null; }
+  /* RAIN-4: THE JAZZ VOICES (a room whose bed2 recipe has `jazz`; made at the first such note — a bed that never gets one computes and counts
+     nothing new): 'ep' a mellow electric piano (a sine carrier, a ratio-1 modulator whose index falls after the strike, a faint tine at ×14),
+     'vib' a vibraphone (three bar partials 1 : 3.98 : 9.2, the motor off), 'bass' a soft plucked upright (a Karplus–Strong string, its excitation
+     low-passed, a thump of the fundamental), 'brush' a brushed tap or sweep (band-passed noise). Each note ends by its own envelope */
+  jzMake(){ if(this.jz) return; this.jz=Array.from({ length:JZ_POOL }, ()=>({ on:false, kind:'', t:0, n:0, hz:0, amp:0, gl:0, gr:0, send:0, dur:0, rel:0, env:0, e0:1,
+    pc:0, pm:0, ix:0, ixd:0, dk:0, dr:0, p1:0, p2:0, d1:0, d2:0, g1:0, g2:0, buf:new Float32Array(JZ_KS), L:1, w:0, lp:0, fb:0, th:0, thd:0, hp:0, lp2:0 }));
+    this.st.max.jz=0; this.st.sum.jz=0; }
+  jzStart(v, e, off){ const fs=this.fs; v.on=true; v.kind=e.kind; v.t=-off; v.hz=e.hz; v.amp=e.amp; const [gl, gr]=eq(e.pan||0); v.gl=gl; v.gr=gr; v.send=e.send||0;
+    v.dur=Math.max(0.05, e.dur||1)*fs; v.rel=0; v.env=0; v.pc=0; v.pm=0;
+    if(e.kind==='ep'){ const lo=Math.pow(220/Math.max(40, e.hz), 0.3); v.ix=1.3*(0.6+0.6*(e.vel||0.7)); v.ixd=Math.exp(-1/(0.32*fs)); v.dk=Math.exp(-1/(2.2*lo*fs)); v.dr=Math.exp(-1/(0.22*fs)); v.th=0.035; v.thd=Math.exp(-1/(0.05*fs)); }
+    else if(e.kind==='vib'){ v.dk=Math.exp(-1/(2.6*fs)); v.d1=Math.exp(-1/(0.7*fs)); v.d2=Math.exp(-1/(0.22*fs)); v.g1=e.hz*3.98<0.45*fs ? 0.12 : 0; v.g2=e.hz*9.2<0.45*fs ? 0.035 : 0; v.p1=0; v.p2=0; v.dr=Math.exp(-1/(0.6*fs)); v.th=1; v.thd=1; }
+    else if(e.kind==='bass'){ const L=Math.max(2, Math.min(JZ_KS-2, Math.round(fs/Math.max(20, e.hz)))); v.L=L; v.w=0; v.fb=0.9965; v.lp=0; let y=0;
+      for(let i=0;i<L;i++){ y+=0.35*((this.rnd()*2-1)-y); v.buf[i]=y*(0.8+0.4*(e.vel||0.7)); } v.th=0.45; v.thd=Math.exp(-1/(0.11*fs)); v.dr=0.985; }
+    else { v.dk=Math.exp(-1/(Math.max(0.03, (e.dur||0.2)*0.5)*fs)); v.hp=0; v.lp2=0; v.env=0; v.th=e.dur>0.3 ? 0.06 : 0.01; }   // brush: its attack (s)
+    this.idle=false; }
+  jazz(dL, dR, rv){
+    const fs=this.fs, BH=this.BH; let n=0;
+    for(const v of this.jz){ if(!v.on) continue; n++; const gl=v.gl, gr=v.gr, sd=v.send, a=v.amp;
+      for(let i=0;i<BH;i++){ if(v.t<0){ v.t++; continue; } let y=0; const T=v.t++;
+        if(v.kind==='ep'){ const ph=TAU*v.pc, s=Math.sin(ph+v.ix*Math.sin(TAU*v.pm)); v.pc+=v.hz/fs; if(v.pc>=1) v.pc-=1; v.pm+=v.hz/fs; if(v.pm>=1) v.pm-=1;
+          v.ix=v.ix*v.ixd+0.12*(1-v.ixd); const att= T<0.004*fs ? T/(0.004*fs) : 1; v.env=(T<v.dur ? (v.env===0 ? 1 : v.env*v.dk) : v.env*v.dr);
+          y=(s+v.th*Math.sin(TAU*v.pc*14))*v.env*att; v.th*=v.thd; }
+        else if(v.kind==='vib'){ const att= T<0.002*fs ? T/(0.002*fs) : 1; v.env=(T<v.dur ? (v.env===0 ? 1 : v.env*v.dk) : v.env*v.dr); v.th*=v.d1; v.thd*=v.d2;
+          y=(Math.sin(TAU*v.pc)+v.g1*v.th*Math.sin(TAU*v.p1)+v.g2*v.thd*Math.sin(TAU*v.p2))*v.env*att; v.pc+=v.hz/fs; v.p1+=v.hz*3.98/fs; v.p2+=v.hz*9.2/fs; if(v.pc>=1) v.pc-=1; if(v.p1>=1) v.p1-=1; if(v.p2>=1) v.p2-=1; }
+        else if(v.kind==='bass'){ const b=v.buf, L=v.L, r0=b[v.w], r1=b[(v.w+1)%L]; v.lp+=0.55*(0.5*(r0+r1)-v.lp); const fb= T<v.dur ? v.fb : v.dr*v.fb; b[v.w]=v.lp*fb; v.w=(v.w+1)%L;
+          y=v.lp+v.th*Math.sin(TAU*v.pc); v.pc+=v.hz/fs; if(v.pc>=1) v.pc-=1; v.th*=v.thd; v.env=Math.max(Math.abs(v.lp)+v.th, v.env*0.9995); }
+        else { const z=this.rnd()*2-1; v.hp+=0.25*(z-v.hp); const bp=z-v.hp; v.lp2+=0.55*(bp-v.lp2); const at=v.th*fs;
+          v.env= T<at ? T/at : v.env*v.dk; y=v.lp2*v.env; }
+        y*=a; dL[i]+=y*gl; dR[i]+=y*gr; rv[i]+=y*sd; }
+      if(v.t>v.dur && (v.kind==='bass' ? v.env<1e-4 : v.env<1e-4)) v.on=false; }
+    return n; }
   apply(x, off){
     const e=x.e, R=this.R;
     switch(e.k){
@@ -98,11 +130,13 @@ class NightBed extends AudioWorkletProcessor{
       case 'ground': { const G=this.gr, N=this.N, fs=this.fs, b=R.ground.beat; G.t0=e.root*N/fs; G.t1=(e.root+b)*N/fs; G.t2=e.fifth*N/fs;
         if(!G.set){ G.i0=G.t0; G.i1=G.t1; G.i2=G.t2; G.set=true; G.p0=this.rnd()*N; G.p1=this.rnd()*N; G.p2=this.rnd()*N; }
         G.gt=e.on ? 1 : 0; G.gk=this.kb(e.tc||1); if(e.on){ G.on=true; this.idle=false; } return; }
+      case 'jz': { this.jzMake(); const v=this.free(this.jz); if(!v){ this.st.dropped++; return; } this.jzStart(v, e, off); return; }   // RAIN-4
       case 'p': { const p=this.P[e.name]; if(!p) return; p.t=e.v; p.k=this.kb(e.tc||0.05); if(e.name==='air' && e.v>0) this.idle=false; return; }
       /* NIGHT-3 stage 5 part 2: another room's recipe (sent while the bed is silent, before its first chord there) */
       case 'recipe': { this.R=e.recipe; if(this.rev) this.rev.pd=Math.round((this.R.reverb.pre||0.04)*this.fs); return; }
       case 'flush': { const L=e.layers||[], f=x.f; this.q=this.q.filter(y=>!(y.f>=f && L.includes(y.e.k)));
-        for(const name of L){ const pool= name==='loop' ? this.loop : name==='glass' ? this.glass : null; if(!pool) continue;
+        for(const name of L){ if(name==='jz'){ if(this.jz) for(const v of this.jz) if(v.on) v.dur=Math.min(v.dur, Math.max(0, v.t)); continue; }   // RAIN-4: the jazz notes let go
+          const pool= name==='loop' ? this.loop : name==='glass' ? this.glass : null; if(!pool) continue;
           for(const v of pool) if(v.on){ const r=e.r||2;
             if(name==='glass'){ const d=Math.exp(-1/(r/3.2*this.fs)); v.d0=Math.min(v.d0, d); v.d1=Math.min(v.d1, d); v.d2=Math.min(v.d2, d); }
             else { v.rel=true; v.tgt=0; v.hold=-1; v.k=v.cr=this.kb(r/4.5); } } } return; }
@@ -124,6 +158,7 @@ class NightBed extends AudioWorkletProcessor{
     let n=this.pads(dL, dR, rv, bg0, bg1); this.count('pad', n); any=any||n>0;
     n=this.loops(dL, dR, rv, nz); this.count('loop', n); any=any||n>0;
     n=this.glasses(dL, dR, rv); this.count('glass', n); any=any||n>0;
+    if(this.jz){ n=this.jazz(dL, dR, rv); this.count('jz', n); any=any||n>0; }   // RAIN-4: only once a jazz note came
     if(airOn){ this.airs(dL, dR, rv, nz, nz2, P.air.v); any=true; }
     const peak=this.reverb(rv, dL, dR, P.wet.v);
     /* the bus level, ramped across the block (no zipper), then up to the output rate */

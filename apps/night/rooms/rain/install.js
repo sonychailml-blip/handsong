@@ -7,14 +7,17 @@ import { checkRoom } from '../../pure/room.js';
 import { roomAdd } from '../index.js';
 import { sceneRoomAdd, sceneRoomSet } from '../../scene/host.js';
 import { tintApply } from '../../tint.js';
-import { rainHeard } from './heard.js';   // NIGHT-15: the sound's focus while the picture is not drawn
+import { rainHeard } from './heard.js';
+import { scalesLoadRest } from '../../../../core/scales.js';   // RAIN-4: the room's own moods (core modes Night does not load at start)   // NIGHT-15: the sound's focus while the picture is not drawn
 
-export const RAIN=Object.freeze({ record:RAIN_ROOM, standIn:standInRain, base:new URL('./', import.meta.url).href,
+let READY=null;   // RAIN-4: the other built-in modes, loaded once when the room joins
+export const RAIN=Object.freeze({ ready:()=>READY||Promise.resolve(), record:RAIN_ROOM, standIn:standInRain, base:new URL('./', import.meta.url).href,
   load:(o={})=>import('./rain.js').then(m=>m.rainAssets(o.level).then(city=>(T, opt)=>m.buildRain(T, { ...opt, city }))),   // RAIN-1: the baked city's files go with the build
   prefetch:()=>import('./rain.js').then(()=>null), heard:rainHeard });
 /* → the room's id once it is in and current; throws when its record is refused */
 export function rainInstall(){
   const why=checkRoom(RAIN_ROOM, { ids:[RAIN_ROOM.id] }); if(why) throw new Error('the rain room\'s record was refused: '+why);
+  if(!READY) READY=scalesLoadRest().catch(e=>{ console.warn('[night] the modes of the rain room did not load:', e); });   // eslint-disable-line no-console
   if(roomAdd(RAIN)) sceneRoomAdd(RAIN_ROOM.id, { load:RAIN.load, standIn:RAIN.standIn, heard:RAIN.heard, three:()=>import('../../vendor/three-r128/three.min.js') });
   sceneRoomSet(RAIN_ROOM.id); tintApply(RAIN_ROOM, { now:true }); return RAIN_ROOM.id;
 }

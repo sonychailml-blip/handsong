@@ -4,7 +4,8 @@
    chordRowFreq of the scale, its tonic and A4), and the pad tones' slots mirrored here (a tone whose PITCH stays keeps its slot; after a
    Mood change the same step is another pitch, so it changes). bed2Plan lays a whole timeline into any context (the probes' and the cost
    measurement's offline renders) through the same message path (msgsOf) the live tick uses. */
-import { CUR, chordRowFreq, droneSecondHz, viewKeyIdOf } from '../../core/scales.js';
+import { CUR, chordRowFreq, droneSecondHz, viewKeyIdOf, scaleById, scaleView, viewKey, viewKeyC } from '../../core/scales.js';
+import { jazzInit, jazzStep, JAZZ_N } from './pure/bedjazz.js';   // RAIN-4: the jazz bed (a recipe with `jazz`)
 import { seeded } from '../../core/pure/dsp.js';
 import { BUS } from '../../core/pure/bus.js';   // NIGHT-6 slice 1: the bed's events for the room (bus «bed»)
 import { BED2_SEED, bed2Init, bed2Step, bed2Soon, bed2Tables, bed2Density } from './pure/bed2.js';
@@ -55,6 +56,19 @@ function msgsOf(M, ev, when, v, R, P, o){
   else if(ev.kind==='color') out.push({ k:'p', t:when, name:ev.layer==='pad' ? 'cpad' : 'cloop', v:ev.v, tc:ev.tc });
   return out;
 }
+/* RAIN-4: THE JAZZ BED — a recipe with `jazz` (the rain room's): the mood's recipe by the live mode id, every step priced in the mood's PARENT
+   mode at the live key (rule #2); the brushes behind the address word ?brush=on (the founder decides by ear). Without `jazz` nothing here runs */
+let BRUSH=false; try{ if(typeof location!=='undefined') BRUSH=new URLSearchParams(location.search).get('brush')==='on'; }catch(e){}
+export const bedBrushDbg=v=>{ if(v!=null) BRUSH=!!v; return BRUSH; };
+const modeIdOf=v=> v ? (v.mode && v.mode.id) || v.id || null : null;
+export const jazzMoodOf=(R, v)=>{ const J=R.jazz, id=modeIdOf(v); return J.moods[id] ? { id, M:J.moods[id] } : { id:J.first, M:J.moods[J.first] }; };
+const parentOf=(M, v)=>{ const m=scaleById(M.parent); return m ? scaleView(m, undefined, undefined, viewKey(v), viewKeyC(v)) : null; };
+function jazzMsgs(ev, when, pv, R){ const J=R.jazz, hz=s=>chordRowFreq(mod(s, JAZZ_N), Math.floor(s/JAZZ_N), pv), out=[];
+  if(ev.kind==='comp'){ const n=ev.steps.length; ev.steps.forEach((s, k)=>out.push({ k:'jz', t:when+k*J.roll, kind:'ep', hz:hz(s), amp:J.ep*ev.vel/Math.sqrt(n), vel:ev.vel, dur:ev.dur, pan:ev.pan+(k-(n-1)/2)*0.14, send:J.send.ep })); }
+  else if(ev.kind==='bass') out.push({ k:'jz', t:when, kind:'bass', hz:hz(ev.step), amp:J.bass*ev.vel, vel:ev.vel, dur:ev.dur, pan:ev.pan, send:J.send.bass });
+  else if(ev.kind==='vib') out.push({ k:'jz', t:when, kind:'vib', hz:hz(ev.step), amp:J.vib*ev.vel, vel:ev.vel, dur:ev.dur, pan:ev.pan, send:J.send.vib });
+  else if(ev.kind==='brush') out.push({ k:'jz', t:when, kind:'brush', amp:J.brush*ev.vel, dur:ev.dur, pan:ev.pan, send:J.send.brush });
+  return out; }
 /* every pad tone out (Off, a preset change) */
 function padsOut(M, when, r){ const out=[]; for(const i of M.cur){ out.push({ k:'off', t:when, slot:i, r }); M.slots[i]={ hz:0, step:null, freeAt:when+2.1*r }; } M.cur=[]; return out; }
 
@@ -75,11 +89,15 @@ export function bed2On(ac, E, dest, R, preset, vol, now, o){
   if(S.wR!==R){ list.push({ k:'recipe', t:now, recipe:recipeOf(R) }); S.wR=R; }   // NIGHT-3 stage 5 part 2: another room's bed (no node is made)
   if(!fresh){ list.push(...padsOut(S.M, now, 4), { k:'flush', t:now, layers:['loop', 'glass'], r:3 }); }
   S.R=R; S.preset=preset; S.on=true; S.origin=now+0.05; S.st=bed2Init((BED2_SEED+(++S.ons)*7919)>>>0, R, R.presets[preset]); S.view=VIEW();
+  if(R.jazz){ const J=jazzMoodOf(R, S.view); S.jid=J.id; S.jz=jazzInit((BED2_SEED+S.ons*7919)>>>0, J.M, R.jazz.presets[preset], BRUSH); S.pv=parentOf(J.M, S.view);   // RAIN-4: no drone under the jazz
+    if(!fresh) list.push({ k:'flush', t:now, layers:['jz'], r:1 }); list.push(...presetMsgs(R, R.presets[preset], now, levelOf(R, vol)), groundMsg(S.view, false, now, 1)); bed2Post(E, S.b, list); return 'on'; }
+  S.jz=null;
   list.push(...presetMsgs(R, R.presets[preset], now, levelOf(R, vol)), groundMsg(S.view, true, now, fresh ? 2.5 : 1));
   bed2Post(E, S.b, list); return 'on';
 }
 export function bed2Off(E, now){
   if(!S.b || !S.on) return; S.on=false;
+  if(S.jz){ bed2Post(E, S.b, [{ k:'p', t:now, name:'level', v:0, tc:1.2 }, { k:'flush', t:now, layers:['jz'], r:2 }]); S.jz=null; S.parkAt=now+BED2_PARK_S; return; }   // RAIN-4
   bed2Post(E, S.b, [{ k:'p', t:now, name:'level', v:0, tc:1.2 }, { ...groundMsg(S.view||VIEW(), false, now, 1.2) }, ...padsOut(S.M, now, 3), { k:'flush', t:now, layers:['loop', 'glass'], r:2 }]);
   S.parkAt=now+BED2_PARK_S;
 }
@@ -90,6 +108,7 @@ export function bed2Tick(E, now, played, answer, o){
   if(!S.b) return;
   if(!S.on){ if(S.parkAt && now>=S.parkAt){ bed2Park(E, S.b, true); S.parkAt=0; } return; }
   const v=VIEW(), list=[];
+  if(S.jz){ jazzTick(E, now, v, list); return; }   // RAIN-4: the jazz bed
   if(v!==S.view){ S.view=v; list.push(groundMsg(v, true, now, 0.3), { k:'flush', t:now+0.02, layers:['loop', 'glass'], r:2.5 }); bed2Soon(S.st, now-S.origin); }
   const P=S.R.presets[S.preset], evs=bed2Step(S.st, S.R, P, v.iv.length, now-S.origin+BED2_AHEAD, played, answer, !!o.light);
   /* after a gap (a hidden tab stops the frames, not the audio clock): notes more than 1 s late are skipped and only the latest missed chord
@@ -101,6 +120,17 @@ export function bed2Tick(E, now, played, answer, o){
     if(ev.kind==='chord' || ev.kind==='loop' || ev.kind==='glass') BUS.push('bed', { kind:ev.kind, at, lv:ev.v, a:ev.a, h:ev.h, r:ev.r, amp:ev.amp, v:2 }); }
   bed2Post(E, S.b, list);
 }
+/* RAIN-4: one tick of the jazz bed — a Mood change starts the new mood's recipe at the next bar (what was queued of the old one let go); the bars
+   starting within BED2_AHEAD come out at their own times; each chord and bar published on the bus «bed» at its audio time (the room shows it) */
+function jazzTick(E, now, v, list){
+  if(v!==S.view){ S.view=v; const J=jazzMood(v); if(J.id!==S.jid){ S.jid=J.id; const law=now-S.origin+0.1; S.jz=jazzInit((BED2_SEED+(++S.ons)*7919)>>>0, J.M, S.R.jazz.presets[S.preset], BRUSH); S.jz.at=law; list.push({ k:'flush', t:now, layers:['jz'], r:1.2 }); }
+    S.pv=parentOf(jazzMoodOf(S.R, v).M, v); }
+  const evs=jazzStep(S.jz, now-S.origin-1, now-S.origin+BED2_AHEAD), late=now-1-S.origin, T=S.tick={ law:evs.length, comp:0, bass:0, vib:0, brush:0, chord:0 };
+  for(const ev of evs){ if(ev.t<late && ev.kind!=='chord') continue; if(T[ev.kind]!=null) T[ev.kind]++;
+    const at=Math.max(S.origin+ev.t, now+0.02); if(S.pv) list.push(...jazzMsgs(ev, at, S.pv, S.R));
+    if(ev.kind==='chord' || ev.kind==='comp' || ev.kind==='bass' || ev.kind==='vib') BUS.push('bed', { kind:ev.kind, at, v:3, steps:ev.steps||null, step:ev.step??null, vel:ev.vel??null, dur:ev.dur??null, beat:S.jz.beat }); }
+  bed2Post(E, S.b, list); }
+const jazzMood=v=>jazzMoodOf(S.R, v);
 /* probe only */
 export const bed2Dbg=()=>({ ready:S.ready, fail:S.fail, built:!!S.b, on:S.on, parked:S.b ? S.b.parked : null, preset:S.preset,
   slots:S.M ? S.M.cur.slice() : [], voices:S.M ? S.M.slots.map(x=>({ hz:x.hz, step:x.step })) : [], density:S.st && S.R && S.preset ? bed2Density(S.st, Math.max(0, (S.E ? S.E.ac.currentTime : 0)-S.origin), S.R.presets[S.preset].arcDepth) : null,
@@ -115,6 +145,9 @@ export const bed2ViewDbg=()=>({ same:S.view===CUR(), over:!!over, starts:S.ons, 
    skip (law seconds, or 'peak' = the first arc's fullest point): the timeline starts 25 s before it (the cost measured where the bed is full) */
 export async function bed2Plan(E, dest, R, preset, sec, o={}){
   if(!(await bed2Load(E.ac))) throw new Error('the music bed v2 worklet did not load into this context');
+  if(R.jazz){ const v=o.view||CUR(), J=jazzMoodOf(R, v), pv=parentOf(J.M, v), seed=(o.seed??BED2_SEED)>>>0, st=jazzInit(seed, J.M, R.jazz.presets[preset], o.brush==null ? BRUSH : !!o.brush);   // RAIN-4: the jazz bed, offline
+    const evs=jazzStep(st, 0, sec), list=[...presetMsgs(R, R.presets[preset], 0, levelOf(R, o.vol??R.level))]; for(const ev of evs) if(pv) list.push(...jazzMsgs(ev, ev.t, pv, R));
+    const b=buildBed2(E, dest, { tables:tablesFor(E.ac.sampleRate/BED2_DIV), seed, recipe:recipeOf(R), events:list }); return { bed:b, events:evs, list, from:0, mood:J.id }; }
   const v=o.view||CUR(), n=v.iv.length, P=R.presets[preset], seed=(o.seed??BED2_SEED)>>>0, M=mirror(seed, R), st=bed2Init(seed, R, P);
   bed2Density(st, 0, P.arcDepth); const skip= o.skip==='peak' ? st.arc.ends[1]/2 : +o.skip||0, from=Math.max(0, skip-25);
   const all=bed2Step(st, R, P, n, from+sec, o.played||[], !!o.answer, !!o.light), held=from ? all.filter(e=>e.kind==='chord' && e.t<from).pop() : null;   // the chord sounding at `from` comes along, at 0

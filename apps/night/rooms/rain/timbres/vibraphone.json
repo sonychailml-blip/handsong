@@ -1,0 +1,65 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "rain/vibraphone",
+ "family": "solo",
+ "engine": "modal",
+ "name": {
+  "en": "Vibraphone",
+  "ru": "Вибрафон"
+ },
+ "recipe": {
+  "modes": [
+   {
+    "r": 1,
+    "g": 0.8,
+    "d": 3.4,
+    "a": 0.001
+   },
+   {
+    "r": 1.002,
+    "g": 0.1,
+    "d": 2.6
+   },
+   {
+    "r": 3.98,
+    "g": 0.12,
+    "d": 1.0,
+    "a": 0.001
+   },
+   {
+    "r": 9.2,
+    "g": 0.03,
+    "d": 0.35,
+    "a": 0.001
+   }
+  ],
+  "lvl": 1.0,
+  "att": 0.0015,
+  "dk": 0.4,
+  "vb": 0.6,
+  "lp": 7000,
+  "noise": {
+   "g": 0.08,
+   "hz": 2500,
+   "q": 1.2,
+   "d": 0.008,
+   "t": 0.3
+  },
+  "jit": {
+   "r": 0.0005,
+   "d": 0.04,
+   "g": 0.04
+  }
+ },
+ "env": {
+  "att": 0.002,
+  "rel": 1.4
+ },
+ "policies": {
+  "voiceMode": "poly",
+  "glide": 0.02,
+  "register": "solo",
+  "quant": 0
+ }
+}

@@ -53,8 +53,8 @@ try{
   } else if(argv.includes('--row')){   // the browser row «RAIN room» alone (a quick look while working; the judged run is the Night suite's)
     const { ctx, p, errs }=await open({ width:1280, height:800 }, LEVEL);
     console.log(JSON.stringify(await p.evaluate(async ()=>(await import('/tools/probes/night/rainroom.js')).checkRainRoom()), null, 1), errs.slice(0, 5)); await ctx.close();
-  } else if(argv.includes('--rain1') || argv.includes('--rain2')){   // RAIN-2: --rain2 the same captures into tools/.ui-snap/rain2/ (its comparison page: --rain2page)   /* RAIN-1: the baked city — each mood, the focus near / middle / far, a phrase lighting windows; a before / after page */
-    const O1=path.join(ROOT, argv.includes('--rain2') ? 'tools/.ui-snap/rain2' : 'tools/.ui-snap/rain1'); await mkdir(O1, { recursive:true }); const made1=[], log1={};
+  } else if(argv.includes('--rain1') || argv.includes('--rain2') || argv.includes('--rain5')){   // RAIN-2: --rain2 the same captures into tools/.ui-snap/rain2/ (its comparison page: --rain2page)   /* RAIN-1: the baked city — each mood, the focus near / middle / far, a phrase lighting windows; a before / after page */
+    const O1=path.join(ROOT, argv.includes('--rain5') ? 'tools/.ui-snap/rain5' : argv.includes('--rain2') ? 'tools/.ui-snap/rain2' : 'tools/.ui-snap/rain1'); await mkdir(O1, { recursive:true }); const made1=[], log1={};
     const RU={ late:'Поздняя ночь', evening:'Вечерний бульвар', after:'После дождя' };
     for(const [tag, vp, dpr] of [['phone', { width:390, height:844 }, 2.75], ['laptop', { width:1280, height:800 }, 1]]){
       const { ctx, p, errs }=await open(vp, LEVEL, dpr), shot=async (name, ru)=>{ const f=`${tag}-${name}${SUF}.png`; await p.screenshot({ path:path.join(O1, f) }); log1[f]=await stateOf(p); made1.push([f, ru]); };

@@ -30,6 +30,11 @@ export function youngSpruces(n, trunks, avoid=[], seed=SPRUCE.seed, opt={}){   /
     if(trunks.some(([tx, tz, r])=>Math.hypot(x-tx, z-tz)<r*1.6+S.gap) || taken.some(([px, pz, pr])=>Math.hypot(x-px, z-pz)<pr+0.9)) continue;
     const H=lerp(S.H[0], S.H[1], R()), gy=bankGround(x, z), rs=0.035+H*0.012; if(!opt.noReach && inMiddle(x, gy+H*0.5, z)) continue;
     places.push({ x, z, H }); taken.push([x, z, 1.2]);
+    spruceTree(R, x, z, H, gy, rs, limbs, cards);
+  }
+  return { places, limbs, cards }; }
+/* one spruce at (x, z), height H (the stem, whorls of drooping branches, needle cards, the leader) — FOREST-1's body, shared by youngSpruces and sprucesAt */
+function spruceTree(R, x, z, H, gy, rs, limbs, cards){ const S=SPRUCE;
     limbs.push({ pts:[[x, gy-0.1, z, rs*1.2], [x, gy+H*0.35, z, rs*0.8], [x+(R()-0.5)*0.05, gy+H*0.75, z+(R()-0.5)*0.05, rs*0.45], [x, gy+H, z, 0.008]], dead:0, kind:'spruce' });
     for(let h=0.18+R()*0.1, w=0; h<H-0.25; h+=lerp(S.whorl[0], S.whorl[1], R()), w++){ const f=1-h/H, len=0.12+0.36*H*f*(0.85+R()*0.3), nb=S.per[0]+Math.floor(R()*(S.per[1]-S.per[0]+1)), a0=R()*TAU, dead=h<H*S.deadBelow && R()<0.7;
       for(let k=0;k<nb;k++){ const a=a0+k*TAU/nb+(R()-0.5)*0.5, up=0.35*(1-f)-0.15*f, droop=0.25*f, ca=Math.cos(a), sa=Math.sin(a), pts=[];
@@ -39,5 +44,13 @@ export function youngSpruces(n, trunks, avoid=[], seed=SPRUCE.seed, opt={}){   /
           const roll=(R()-0.5)*0.9+(k%2 ? 0.25 : -0.25), cs=lerp(S.s[0], S.s[1], R())*(0.7+0.5*f), cell= dead ? 'dead' : (R()<0.5 ? 'spruceA' : 'spruceB'), tone=(dead ? 0.7 : 0.8)+R()*0.3, x1=lerp(p[0], q[0], u), y1=lerp(p[1], q[1], u), z1=lerp(p[2], q[2], u);
           cards.push({ x:x1, y:y1, z:z1, b:cardBasis([gx, gyy, gz], roll), s:cs, cell, tone, of:'spruce' }, { x:x1, y:y1, z:z1, b:cardBasis([gx, gyy-0.04, gz], roll+S.cross), s:cs*0.85, cell, tone:tone*0.92, of:'spruce' }); } } }
     for(let k=0;k<2;k++) cards.push({ x, y:gy+H-0.42, z, b:cardBasis([0.05*(k ? 1 : -1), 1, 0.02], k*1.57), s:0.5, cell:'spruceA', tone:0.95, of:'spruce' });   // the leader
-  }
+}
+/* FOREST-2c: spruces AT given places (the visible young trees and saplings they replace) — { x, z, H } each, its own seeded draws */
+export function sprucesAt(at, seed=SPRUCE.seed^0x2C){ const places=[], limbs=[], cards=[];
+  at.forEach((q, i)=>{ const R=seeded(seed+977*i), H=q.H*(0.92+0.16*R()), gy=bankGround(q.x, q.z), rs=0.035+H*0.012; places.push({ x:q.x, z:q.z, H, of:q.of }); spruceTree(R, q.x, q.z, H, gy, rs, limbs, cards); });
   return { places, limbs, cards }; }
+/* FOREST-2c: would a spruce of height H at (x, z) stand in the eye's way to a mushroom? The spruce as a cone (its branches' reach 0.12 + 0.36 H × the share
+   of height left) against each segment from the eye to a cap, at the height the segment passes it; margin: the cap's size */
+export function spruceBlocks(x, z, H, shrooms){ const E=LOWER.eye, gy=bankGround(x, z);
+  return shrooms.some(m=>{ const my=bankGround(m.x, m.z)+(m.s||0.1), vx=m.x-E[0], vz=m.z-E[2], L=Math.hypot(vx, vz)||1, t=((x-E[0])*vx+(z-E[2])*vz)/(L*L); if(t<=0 || t>=1.02) return false;
+    const pe=Math.hypot(E[0]+vx*t-x, E[2]+vz*t-z), y=E[1]+(my-E[1])*Math.min(1, t), f=1-(y-gy)/H; if(f<=0) return false; return pe<0.12+0.36*H*Math.min(1, f)+(m.s||0.1)*1.5; }); }

@@ -1,0 +1,15 @@
+{
+  "format": "handsong/mode",
+  "version": 1,
+  "id": "lydian-penta",
+  "tuning": "edo12",
+  "name": {"en": "Lydian pentatonic", "ru": "Лидийская пентатоника"},
+  "menu": {"tradition": "common", "group": "pentaBlues"},
+  "degrees": [0,  2,  4,  6,  9],
+  "root": 0,
+  "anchor": {"policy": "tonic"},
+  "chords": {
+    "rule": {"kind": "stack"},
+    "modes": "stackPower"
+  }
+}

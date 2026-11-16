@@ -2248,7 +2248,7 @@ async function rainGate(){
   const RV=await import(new URL('../apps/night/pure/room.js', import.meta.url).href), RR=(await import(new URL('../apps/night/rooms/rain/pure/room.js', import.meta.url).href)).RAIN_ROOM;
   const RI=await import(new URL('../apps/night/rooms/index.js', import.meta.url).href), DV=await import(new URL('../apps/night/rooms/dev.js', import.meta.url).href);
   const prof=JSON.parse(await readFile(new URL('../apps/night/data/night.json', import.meta.url), 'utf8'));
-  { const why=RV.checkRoom(RR, { ids:[RR.id], modes:prof.moods }); ok('the record is refused as a development room: '+why, why===null);
+  { const allModes=JSON.parse(await readFile(new URL('../core/data/index.json', import.meta.url), 'utf8')).modes, why=RV.checkRoom(RR, { ids:[RR.id], modes:allModes }); ok('the record is refused as a development room: '+why, why===null);   // RAIN-4: a room brings its own moods (scalepick fetches them): each must be a real mode of the data; prof stays for the rows below
     ok('the record passes as a real room (its id must not be pinned yet)', /not a pinned room id/.test(RV.checkRoom(RR)||'') && !RV.ROOM_IDS.includes(RR.id));
     ok('the room is in ROOMS', !RI.ROOMS.some(R=>R.record.id===RR.id) && RI.roomById(RR.id)===null); }
   { const W=DV.devRoomWord; ok('the door is open in the release edition', W('release', '?room=rain')===null && W('release', '?probe&room=rain')===null);
@@ -2530,12 +2530,124 @@ async function forestNatural(){
     if(N.fernSpot(0, -10, fr, none, g, { water:-99, eye:0 })[2]) miss('CONTROL: fernSpot moved a fern with no solid near'); }
   /* (6) files */
   { const FN=await import(new URL('./forest-natural.mjs', import.meta.url).href), r=FN.naturalCheck(); n+=r.cases; for(const x of r.differences) miss('files: '+x);
-    const PC=await import(new URL('./precache.mjs', import.meta.url).href); n+=3; for(const f of FN.NATURAL_FILES){ const skip=PC.NIGHT_SKIP.some(q=>q.test('apps/night/rooms/forest/new/'+f)), rock=/^rock-/.test(f); if(rock && skip) miss(`apps/night/rooms/forest/new/${f}: the rocks are the default (FOREST-2b) — it must be in the start set`); if(!rock && !skip) miss(`apps/night/rooms/forest/new/${f} would be in a player's start set`); }
+    const PC=await import(new URL('./precache.mjs', import.meta.url).href); n+=3; for(const f of FN.NATURAL_FILES){ const skip=PC.NIGHT_SKIP.some(q=>q.test('apps/night/rooms/forest/new/'+f)), rock=/^(rock|bark)-/.test(f); if(rock && skip) miss(`apps/night/rooms/forest/new/${f}: rocks and bark are the default (FOREST-2b/2c) — it must be in the start set`); if(!rock && !skip) miss(`apps/night/rooms/forest/new/${f} would be in a player's start set`); }
     if(!PC.NIGHT_SKIP.some(q=>q.test('apps/night/rooms/forest/new/foliage-1024.png'))) miss('the sheet of the spruces would be in a start set');
     if(PC.NIGHT_SKIP.some(q=>q.test('apps/night/rooms/forest/tex/floor-1024.png'))) miss('CONTROL: the skip list skips a start file of the forest');
     const { statSync }=await import('node:fs'), sz=FN.NATURAL_FILES.reduce((a, f)=>a+statSync(new URL('../apps/night/rooms/forest/new/'+f, import.meta.url)).size, 0); notes.push(`the new forest's files: ${(sz/1024).toFixed(0)} KB (only with ?forest=new; the start set unchanged)`); }
+  /* FOREST-2c «roots»: a seen trunk and its roots as ONE surface (pure/trunkbase.js). (a) above the flare's own reach every skirt vertex is under the
+     soil or inside today's root (its path, 1.05 × its radius, its top + the smooth join's 2.2 cm): no new shape hides a mushroom; CONTROL roots built 30 %
+     wider are caught. (b) the uv runs on without a seam: along every column u moves < 0.02 a row; CONTROL the skirt's u shifted by 0.1 is caught.
+     (c) every root tip and the skirt's rim end under the soil; CONTROL a root whose tip stays 10 cm up is caught. (d) seenTrunks: the near trunks in
+     view, not one behind the eye (CONTROL). */
+  { const TB=await import(new URL('../apps/night/rooms/forest/pure/trunkbase.js', import.meta.url).href), FL=await import(new URL('../apps/night/rooms/forest/pure/forestlife.js', import.meta.url).href), g=FL.bankGround;
+    const tx=3.6, tz=0.4, r=0.28, yaw=1.1, c=Math.cos(yaw), sn=Math.sin(yaw), M=[c*r, 0, -sn*r, 0, 0, 1, 0, 0, sn*r, 0, c*r, 0, tx, g(tx, tz)+7.8, tz, 1];
+    const rootAt=(a, L, lift=0)=>{ const pts=[]; for(let j=0;j<9;j++){ const t=j/8, dd=r*0.6+L*t, x=tx+Math.cos(a)*dd, z=tz+Math.sin(a)*dd; pts.push([x, g(x, z)+0.11*Math.pow(1-t, 2.2)+0.04*(1-t)-0.06*t+(j===8 ? lift : 0), z, (0.05+r*0.12)*(1-0.78*t)]); } return pts; };
+    const roots=[rootAt(0.3, 1.1), rootAt(2.4, 0.9), rootAt(4.4, 1.3)];
+    const judge=(tb, R0)=>{ const bad={ above:0, seam:0, tip:0 }, P=tb.pos, U=tb.uv, cols=tb.cols, w=i=>{ const x=P[i*3], y=P[i*3+1], z=P[i*3+2]; return [M[0]*x+M[4]*y+M[8]*z+M[12], M[1]*x+M[5]*y+M[9]*z+M[13], M[2]*x+M[6]*y+M[10]*z+M[14]]; };
+      const cx=tx, cz=tz, d0=r*1.25;
+      for(let i=tb.join; i<P.length/3; i++){ const [x, y, z]=w(i), d=Math.hypot(x-cx, z-cz); if(d<d0+0.35 || y<=g(x, z)+0.002) continue;
+        const inRoot=R0.some(pts=>{ for(let j=1;j<pts.length;j++){ const A=pts[j-1], B=pts[j], ax=B[0]-A[0], az=B[2]-A[2], L2=ax*ax+az*az||1, t=Math.max(0, Math.min(1, ((x-A[0])*ax+(z-A[2])*az)/L2)), rr=A[3]+(B[3]-A[3])*t, yc=A[1]+(B[1]-A[1])*t;
+          if(Math.hypot(x-A[0]-ax*t, z-A[2]-az*t)<=rr*1.05*1.05+0.01 && y<=yc+rr+0.022) return true; } return false; }); if(!inRoot) bad.above++; }
+      for(let y=0;y<tb.rows-1;y++) for(let k=1;k<cols-1;k++){ const a=y*cols+k, b=a+cols; if(Math.abs(U[b*2]-U[a*2])>=0.02) bad.seam++; }
+      for(let k=0;k<cols;k++){ const [x, y, z]=w((tb.rows-1)*cols+k); if(y>g(x, z)+0.005) bad.tip++; }
+      const tips=R0.map(pts=>pts[pts.length-1]); for(let i=tb.join; i<P.length/3; i++){ const [x, y, z]=w(i); if(tips.some(q=>Math.hypot(x-q[0], z-q[2])<0.06) && y>g(x, z)+0.005) bad.tip++; } return bad; };   // the rim and every root's own tip
+    const tb=TB.trunkBase(M, roots, g, 'full'), b0=judge(tb, roots); n+=3;
+    if(b0.above) miss(`the trunk's skirt stands above the soil outside today's roots at ${b0.above} vertices`); if(b0.seam) miss(`the trunk's uv jumps along a column at ${b0.seam} places (a seam)`); if(b0.tip) miss(`${b0.tip} vertices of the skirt's rim stay above the soil`);
+    n+=3; { const wide=roots.map(pts=>pts.map(q=>[q[0], q[1], q[2], q[3]*1.3])), b1=judge(TB.trunkBase(M, wide, g, 'full'), roots); if(!b1.above) miss('CONTROL: roots built 30 % wider passed «inside the roots of today»'); }
+    { const t2=TB.trunkBase(M, roots, g, 'full'), U=t2.uv; for(let i=t2.join+t2.cols; i<U.length/2; i++) U[i*2]+=0.1; if(!judge(t2, roots).seam) miss('CONTROL: a skirt with its u shifted by 0.1 passed «no seam»'); }
+    { const up=[rootAt(0.3, 1.1, 0.16), roots[1], roots[2]], b3=judge(TB.trunkBase(M, up, g, 'full'), up); if(!b3.tip) miss('CONTROL: a root tip 10 cm above the soil passed «ends under the soil»'); }
+    const Lo=await import(new URL('../apps/night/rooms/forest/pure/layout.js', import.meta.url).href), TR=Lo.forestTrunks(), all=new Set(TR.map((q, i)=>i)), seen=TB.seenTrunks(TR, all); n+=2;
+    if(!seen.includes(0) || !seen.includes(3)) miss(`seenTrunks leaves out the near trunks 0 / 3 (${seen.join(', ')})`); if(TB.seenTrunks([[0, 7.5, 0.4]], new Set([0])).length) miss('CONTROL: a trunk behind the eye was taken as seen');
+    notes.push(`trunk and roots as one surface: ${tb.pos.length/3} vertices (Detailed), skirt above the soil only inside today's roots, no seam, rims under the soil; seen trunks of the layout: ${seen.join(', ')}`); }
   return { cases:n, total:d.length, differences:d, notes };
 }
+/* RAIN-4 — «RAIN timbres (app)»: the rain room's own timbres for the playing hand (Night's session records, apps/night/rooms/rain/timbres/): each
+   record passes core's checkTimbre, its id is «rain/<file>», it is one the room lists, struck or plucked by an existing engine (tine, modal, ks),
+   and the room gives it a level ≤ 0 dB and a strike cap of 1…6 (a fast phrase stays gentle on a phone). CONTROLS: a record with its level out of
+   bounds is refused; a room entry without a cap is caught. Full never sees them (no core file names them). */
+async function rainTimbres(){ const d=[], notes=[]; let n=0; const miss=x=>d.push(x), fs=await import('node:fs');
+  const TM=await import(new URL('../core/pure/timbre.js', import.meta.url).href), RR=(await import(new URL('../apps/night/rooms/rain/pure/room.js', import.meta.url).href)).RAIN_ROOM;
+  const dir=new URL('../apps/night/rooms/rain/timbres/', import.meta.url), files=fs.readdirSync(dir).filter(f=>f.endsWith('.json')), M=RR.music;
+  const capOk=T=>T && Number.isFinite(T.level) && T.level<=0 && Number.isInteger(T.voices) && T.voices>=1 && T.voices<=6;
+  for(const f of files){ const rec=JSON.parse(fs.readFileSync(new URL(f, dir), 'utf8')), why=TM.checkTimbre(rec), T=M.timbres.find(x=>x.id===rec.id); n+=4;
+    if(why) miss(`${f}: ${why}`); if(rec.id!=='rain/'+f.replace(/\.json$/, '')) miss(`${f}: its id «${rec.id}» is not rain/<file>`);
+    if(!['tine', 'modal', 'ks'].includes(rec.engine)) miss(`${f}: engine ${rec.engine} (struck or plucked wanted)`); if(!capOk(T)) miss(`${f}: the room gives it no level ≤ 0 dB and cap 1…6 (${JSON.stringify(T)})`); }
+  n++; if(M.timbres.length!==files.length) miss(`the room lists ${M.timbres.length} timbres, ${files.length} files`);
+  n+=2; { const r=JSON.parse(fs.readFileSync(new URL(files[0], dir), 'utf8')); r.recipe.lvl=5; if(!TM.checkTimbre(r)) miss('CONTROL: a record with its level out of bounds passed'); if(capOk({ level:-3 })) miss('CONTROL: an entry without a cap passed'); }
+  notes.push(`the rain room's timbres: ${M.timbres.map(T=>`${T.id} ${T.level} dB, cap ${T.voices}`).join(' · ')}`);
+  return { cases:n, total:d.length, differences:d, notes }; }
+/* RAIN-4 — «RAIN jazz bed (app)»: for each mood of the rain room — (1) its mode file exists in core/data and is a subset of its bed's PARENT mode;
+   (2) no melody note is a semitone above a tone of any of its chords (the bass root included) unless it is itself a chord tone: the playing hand
+   has no wrong note; (3) 10 minutes of the law (every preset, the brushes on) — every comped step is a tone of the chord sounding, every chord
+   in the parent's degrees, the bass always inside its register and below the playing register, the glints in theirs, tempo 60…76, walking
+   only at Evening. CONTROLS: Lydian's set with its G is caught; a chord tone outside the mode (degree 7) is caught; a bass register reaching
+   the playing register is caught. */
+async function rainJazz(){ const d=[], notes=[]; let n=0; const miss=x=>d.push(x), fs=await import('node:fs');
+  const J=await import(new URL('../apps/night/pure/bedjazz.js', import.meta.url).href), RR=(await import(new URL('../apps/night/rooms/rain/pure/room.js', import.meta.url).href)).RAIN_ROOM, JZ=RR.bed2.jazz;
+  const mode=id=>{ try{ return JSON.parse(fs.readFileSync(new URL('../core/data/modes/'+id+'.json', import.meta.url), 'utf8')); }catch(e){ return null; } }, idx=JSON.parse(fs.readFileSync(new URL('../core/data/index.json', import.meta.url), 'utf8')).modes;
+  const avoid=(mel, chords, P)=>{ const bad=[]; for(const c of chords){ const pcs=[c.root, ...c.tones].map(k=>P[k]); for(const m of mel) if(!pcs.includes(m) && pcs.some(q=>((m-q)%12+12)%12===1)) bad.push(m); } return [...new Set(bad)]; };
+  const run=(M, reg=J.JAZZ_REG)=>{ const bad=[]; for(const preset of Object.keys(JZ.presets)){ const st=J.jazzInit(J.JAZZ_SEED, M, JZ.presets[preset], true), evs=J.jazzStep(st, 0, 600); let chord=null;
+      for(const e of evs){ if(e.kind==='chord'){ chord=M.chords.find(c=>c.root===e.root) || null; if(!chord) bad.push('a chord on root '+e.root+' not in the recipe'); }
+        else if(e.kind==='comp'){ for(const sx of e.steps) if(!chord || !chord.tones.includes(((sx%7)+7)%7)) bad.push('a comped step '+sx+' outside its chord'); }
+        else if(e.kind==='bass'){ if(e.step<reg.bass[0] || e.step>reg.bass[1] || e.step>=reg.play) bad.push('a bass step '+e.step); }
+        else if(e.kind==='vib'){ if(e.step<reg.vib[0] || e.step>reg.vib[1]) bad.push('a glint step '+e.step); } } } return [...new Set(bad)]; };
+  for(const [id, look] of Object.entries(RR.moods)){ const M=JZ.moods[id], mf=mode(id), P=M && mode(M.parent); n+=5;
+    if(!M || !mf || !P || !idx.includes(id)){ miss(`${id}: the mood, its mode file, its parent or its index entry is missing`); continue; }
+    const Pd=P.degrees, sub=mf.degrees.every(x=>Pd.includes(x)); if(!sub) miss(`${id}: its notes ${mf.degrees} are not all in ${M.parent}`);
+    if(J.jazzDegrees(M).some(k=>k<0 || k>6)) miss(`${id}: a chord degree outside the parent's seven`);
+    const av=avoid(mf.degrees, M.chords, Pd); if(av.length) miss(`${id}: melody notes ${av} sit a semitone above a chord tone`);
+    if(!(M.bpm>=60 && M.bpm<=76) || (M.bass==='walk')!==(look==='evening')) miss(`${id}: tempo ${M.bpm} or bass ${M.bass} (walking only at Evening)`);
+    const b=run(M); if(b.length) miss(`${id}: ${b.slice(0, 4).join('; ')}`);
+    notes.push(`${id} (${look}): parent ${M.parent}, melody ${mf.degrees.join(' ')}, ${M.chords.length} chords, ${M.bpm} bpm, bass ${M.bass}`); }
+  n+=3; { const L=JZ.moods['lydian-penta'], P=mode('lydian').degrees; if(!avoid([...mode('lydian-penta').degrees, 7], L.chords, P).length) miss('CONTROL: Lydian with its G passed «no wrong note»');
+    const bad={ ...L, chords:[{ root:0, tones:[2, 7, 6] }] }; if(!J.jazzDegrees(bad).some(k=>k>6)) miss('CONTROL: a chord tone outside the mode passed');
+    if(!run(L, { ...J.JAZZ_REG, play:-6 }).length) miss('CONTROL: a playing register reaching down into the bass passed'); }
+  return { cases:n, total:d.length, differences:d, notes }; }
+/* RAIN-5 — «RAIN life law (app)»: (1) the same time, the same street (seeded); (2) each mood's people as its recipe, Evening busiest, Late night
+   fewest; (3) over 10 minutes (every 0.5 s, every mood, Wave on): no two movers closer than their sizes, none in a plane tree, a lamp, a bench,
+   the kiosk or a café table (the sitters at their tables excepted); (4) the music shown in the FIRST frame that reaches its heard moment, never
+   early, never a frame late (frames of 8…40 ms); (5) the street's end never seen: the road beyond the last houses (1.3–1.6 km) hidden from the eye
+   behind the bent row opposite. CONTROLS: two walkers met head-on on one lane are caught; a lane through the lamp line is caught; a queue three
+   frames late is caught; the boulevard without its bend shows its end. */
+async function rainLife(){ const d=[], notes=[]; let n=0; const miss=x=>d.push(x);
+  const LF=await import(new URL('../apps/night/rooms/rain/pure/life.js', import.meta.url).href), C=await import(new URL('../apps/night/rooms/rain/pure/city.js', import.meta.url).href), SH=await import(new URL('../apps/night/rooms/rain/pure/shown.js', import.meta.url).href);
+  const { LIFE, LK, lifeAt }=LF, S=C.STREET, trees=C.cityTrees(), lamps=C.cityLamps();
+  const benches=[]; for(let z=18;z<S.len*0.5;z+=19) benches.push([S.treeRows[1]+1.5, z]);
+  const seats=[]; for(const [a, b] of LIFE.tables.cafes) for(let z=a+1.5;z<b-1.5;z+=LIFE.tables.every) seats.push(z);
+  const rOf=q=>q.kind===LK.couple || q.kind===LK.dog ? LIFE.rCouple : q.kind===LK.cycle ? 0.5 : LIFE.r, mover=q=>[LK.walk, LK.couple, LK.dog, LK.cycle, LK.run, LK.waiter].includes(q.kind);
+  const hits=(L, look, wave)=>{ const bad=new Set(); for(let t=0;t<600;t+=0.5){ const A=lifeAt(t, look, [], wave, LIFE.seed, L).filter(mover);
+      for(let i=0;i<A.length;i++){ const p=A[i], r=rOf(p);
+        for(let j=i+1;j<A.length;j++){ const q=A[j]; if(Math.hypot(p.x-q.x, p.z-q.z)<r+rOf(q)) bad.add(`${look}: two people meet at z ${p.z.toFixed(1)} (t ${t})`); }
+        for(const T of trees) if(Math.hypot(p.x-T.p[0], p.z-T.p[2])<r+0.32) bad.add(`${look}: someone walks through a plane tree at z ${T.p[2].toFixed(1)}`);
+        for(const l of lamps) if(Math.hypot(p.x-l.p[0], p.z-l.p[2])<r+0.11) bad.add(`${look}: someone walks through a lamp at x ${l.p[0]}`);
+        for(const [bx, bz] of benches) if(Math.abs(p.x-bx)<r+0.3 && Math.abs(p.z-bz)<r+0.9) bad.add(`${look}: someone walks through a bench at z ${bz}`);
+        if(Math.abs(p.x-24)<r+1.2 && Math.abs(p.z-58)<r+1.0) bad.add(`${look}: someone walks through the kiosk`);
+        for(const z of seats) if(Math.hypot(p.x-LIFE.tables.x, p.z-z)<r+0.35) bad.add(`${look}: someone walks through a café table at z ${z.toFixed(1)}`); } }
+    return [...bad]; };
+  /* (1) and (2) */
+  n++; if(JSON.stringify(lifeAt(123.4, 'evening'))!==JSON.stringify(lifeAt(123.4, 'evening'))) miss('the same time gave two streets');
+  const cnt=look=>{ const A=lifeAt(10, look), k=x=>A.filter(q=>q.kind===x).length; return { walk:k(LK.walk), couple:k(LK.couple), dog:k(LK.dog), cycle:k(LK.cycle), run:k(LK.run), sit:k(LK.sit), waiter:k(LK.waiter), pigeons:k(LK.pigeon), cat:k(LK.cat), people:A.filter(q=>q.kind<=LK.waiter).length }; };
+  const Cn={}; for(const look of ['late', 'evening', 'after']){ Cn[look]=cnt(look); const M=LIFE.moods[look]; n++;
+    for(const k of ['walk', 'couple', 'dog', 'cycle', 'run', 'sit', 'waiter', 'pigeons', 'cat']) if(Cn[look][k]!==M[k]){ miss(`${look}: ${k} ${Cn[look][k]}, the recipe ${M[k]}`); break; } }
+  n++; if(!(Cn.evening.people>Cn.after.people && Cn.after.people>Cn.late.people)) miss(`the moods' crowds: evening ${Cn.evening.people}, after ${Cn.after.people}, late ${Cn.late.people} (busy > coming out > night owls wanted)`);
+  /* (3) */
+  for(const look of ['late', 'evening', 'after']){ n++; const h=hits(LIFE, look, 1); if(h.length) miss(h.slice(0, 3).join('; ')); }
+  n+=2; { const L2={ ...LIFE, lanes:LIFE.lanes.map((l, i)=>i===2 ? { ...l, dir:-l.dir, v:l.v*1.7 } : l), moods:{ ...LIFE.moods, evening:{ ...LIFE.moods.evening } } }, h=hits({ ...L2, lanes:L2.lanes.concat([{ ...LIFE.lanes[2], dir:-LIFE.lanes[2].dir }]) }, 'evening', 0);
+    if(!h.some(x=>/two people meet/.test(x))) miss('CONTROL: two walkers head-on on one lane passed');
+    if(!hits({ ...LIFE, lanes:LIFE.lanes.map((l, i)=>i===2 ? { ...l, x:16.1 } : l) }, 'evening', 0).some(x=>/lamp|tree/.test(x))) miss('CONTROL: a lane through the lamp line passed'); }
+  /* (4) */
+  const frames=(lag)=>{ const r=(()=>{ let s=7; return ()=>(s=(s*16807)%2147483647)/2147483647; })(), q=[], late=[]; for(let i=0;i<400;i++) q.push({ when:0.5+i*0.137+r()*0.05, kind:'chord' });
+    let t=0; const seen=[]; while(t<60){ const dt=0.008+r()*0.032; t+=dt; seen.push(t); for(const e of SH.showDue(q, t-lag*0.016)){ const k=seen.findIndex(f=>f>=e.when); if(k<0 || seen.length-1!==k) late.push(e.when); } } return late.length; };
+  n+=2; { const L0=frames(0); if(L0) miss(`${L0} music moments shown later than the first frame that reached them`); if(!frames(3)) miss('CONTROL: a queue three frames late passed «within one frame»'); }
+  /* (5) the road beyond the last houses, hidden behind the row opposite (bent) */
+  const hidden=bend=>{ const cam=[C.CAM.x, C.CAM.y, C.CAM.z], seen=[];
+    for(const ze of [1300, 1400, 1500, 1600]) for(const xe of [S.kerbA+1, (S.kerbA+S.kerbB)/2, S.kerbB-1]){ const E=[xe+bend(ze), 0.5, ze]; let cov=false;
+      for(let k=1;k<600 && !cov;k++){ const u=k/600, x=cam[0]+(E[0]-cam[0])*u, y=cam[1]+(E[1]-cam[1])*u, z=cam[2]+(E[2]-cam[2])*u;
+        for(const [z0, z1, eaves] of C.BLOCKS.opp) if(z>=z0 && z<=z1 && z0<=S.len*0.75 && y<eaves && x>=S.opp+bend(z) && x<=S.opp+bend(z)+14){ cov=true; break; } }
+      if(!cov) seen.push(`${xe.toFixed(1)}@${ze}`); } return seen; };
+  n+=2; { const v=hidden(C.bendX); if(v.length) miss(`the street's end is seen at ${v.join(', ')}`); if(!hidden(()=>0).length) miss('CONTROL: the boulevard without its bend hid its end too'); }
+  notes.push(`people out: late ${Cn.late.people}, after ${Cn.after.people}, evening ${Cn.evening.people}; pigeons ${Cn.evening.pigeons} at Evening, a cat at Late night ${Cn.late.cat}`);
+  return { cases:n, total:d.length, differences:d, notes }; }
 async function forestBarkLayouts(){
   const d=[], notes=[]; let n=0; const miss=s=>d.push(s), W=await import(new URL('../apps/night/rooms/forest/pure/wood.js', import.meta.url).href), Lo=await import(new URL('../apps/night/rooms/forest/pure/layout.js', import.meta.url).href);
   const FW=await import(new URL('../apps/night/rooms/forest/forest-wood.js', import.meta.url).href), FR=(await import(new URL('../apps/night/rooms/forest/pure/room.js', import.meta.url).href)).FOREST_ROOM;
@@ -2846,6 +2958,9 @@ const ROWS=[
   ['FOREST bark moss (app)',    ()=>forestBarkMoss(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-8b
   ['FOREST bark layouts (app)', ()=>forestBarkLayouts(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-8c
   ['FOREST natural (app)',     ()=>forestNatural(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // FOREST-2
+  ['RAIN timbres (app)',       ()=>rainTimbres(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-4
+  ['RAIN jazz bed (app)',      ()=>rainJazz(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-4
+  ['RAIN life law (app)',      ()=>rainLife(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-5
   ['FOREST fireflies visit the light (app)', ()=>forestFliesVisit(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-8b
   ['NIGHT stream recording (app)', ()=>nightStreamRec(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-8b
   ['NIGHT full-screen icons (app)', ()=>nightFsIcons(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-8b
