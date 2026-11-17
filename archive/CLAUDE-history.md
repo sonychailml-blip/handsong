@@ -2101,6 +2101,18 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
     3. A few minutes: a scooter rider, a smoker's glow on a balcony, someone in a lit attic, a car's turn signal, a sign flickering — rare, never two of a kind in a row.
     4. Nothing blinks too fast; nothing looks like a Christmas tree.
     5. The Poco at Standard. (No timing was measured.)
+179. The rain room's bed after RAIN-4e. Listen (local): `tools/design/rain/lofi/index.html`. Five checks by ear:
+    1. The bed's electric piano sustains and flows like a Rhodes (chords held into each other, released on a change), with the tremolo and chorus on its tails.
+    2. Nothing ticks or clicks on top of the bed, in any of the nine sounds.
+    3. The guitar: low overtones, depth, a little width and room — a nylon guitar in a room.
+    4. The celesta back among the hand's four timbres (`?room=rain`, the Sound button).
+    5. `?room=rain&bedep=short`: RAIN-4d's short piano still there.
+180. The rain room's focus after RAIN-5e (`?room=rain`). Five checks:
+    1. The hand far: the whole street, the house opposite, the roofs and the hills sharp at once.
+    2. The hand near: the whole glass sharp.
+    3. The far cars' lights on the hill road round, never square.
+    4. The far lights a little livelier, still calm.
+    5. The Poco at Standard. (No timing was measured.)
 ## Superseded at DOC1 (old lines verbatim, replaced in place above by a later slice)
 - NIGHT-2 stage 3 (2026-11-03, the rule of at most five manual checks) updated this line of CLAUDE.md's report format:
   probe verdict lines and fix rounds; what was left undone; docs found stale; the user's remaining steps (ear, camera, phone).

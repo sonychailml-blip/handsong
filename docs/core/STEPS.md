@@ -81,6 +81,8 @@ THERE in full and here as one index entry):
   176 The forest's left pair the same on both levels; the cull by default (FOREST-2f)
   177 The rain room's lo-fi with our own sound: the tine piano, the physical guitar, effects, never the same twice (RAIN-4d)
   178 The rain room's life at every distance: the hills, the rare events (RAIN-5d)
+  179 The rain room's bed: the sustaining piano, no clicks, a deeper guitar, the celesta back (RAIN-4e)
+  180 The rain room's focus: the city sharp at once far, the glass near; round far lights (RAIN-5e)
   163 Fixes after the backlog audit: an in-app browser's refusal, the Lighter stream, the rain room's sound on Dark, Licences, keeping the files (NIGHT-15, CORE-23)
 
 ## Moved to `archive/CLAUDE-history.md` at DOC1 (grep by title; read only what the slice needs)

@@ -414,7 +414,7 @@ RAIN-0: THE RAIN ROOM JOINS THE APP — loaded only by the development rooms' do
 
 ## apps/night/rooms/rain/lofi.js
 RAIN-4c / RAIN-4d: THE LO-FI BED'S SOUND (the rain room's; the player is apps/night/pure/lofi.js, the driver apps/night/bed2.js).
-- const (2): `LOFI_MIX`, `NYLON`
+- const (3): `LOFI_MIX`, `NYLON`, `EP_LONG`
 - fn (2): `nylonBuffer`, `lofiEngine`
 
 ## apps/night/rooms/rain/pure/city.js
@@ -434,7 +434,7 @@ RAIN-5d: LIFE AT EVERY DISTANCE — a pure seeded law of time (rule #36; data ro
 
 ## apps/night/rooms/rain/pure/focus.js
 RAIN-0: DEPTH IS FOCUS — the law (pure, rule #36; data row «RAIN focus law (app)»).
-- const (5): `FOCUS`, `LAYER_DEPTH`, `focusDepth`, `blurAt`, `focusBlur`
+- const (6): `FOCUS`, `LAYER_DEPTH`, `focusDepth`, `focusPlateau`, `blurAt`, `focusBlur`
 - fn (2): `focusTarget`, `focusStep`
 
 ## apps/night/rooms/rain/pure/glass.js
@@ -1415,6 +1415,7 @@ SPLIT-2: the probe entry of the Night page: its own rows and the core rows flagg
 - → ./night/nightprofile.js (1): `checkNightProfile`
 - → ./night/pixels.js (2): `checkNightPixels`, `checkNightDetailedGuard`
 - → ./night/rain4.js (1): `checkForestBed`
+- → ./night/rain4e.js (1): `checkRainClicks`
 - → ./night/rain5.js (1): `checkRainQuads`
 - → ./night/rainnature.js (1): `checkRainNature`
 - → ./night/rainroom.js (1): `checkRainRoom`
@@ -1510,6 +1511,12 @@ NIGHT-11 part 5 — rows «NIGHT pixel budget» and «NIGHT Detailed guard», on
 RAIN-4 — «RAIN forest bed unchanged»: the forest's music bed v2 rendered offline (bed2Plan, the worklet for real; Still, Drift, Glimmer, 20 s at 48 kHz, the live view) equals, sample for sample, th…
 - fn (1): `checkForestBed`
 
+## tools/probes/night/rain4e.js
+RAIN-4e — «RAIN bed no clicks»: the founder heard «strange short sounds on top of the bed».
+- const (1): `CLICK`
+- default (1): `default`
+- fn (2): `clicksOf`, `checkRainClicks`
+
 ## tools/probes/night/rain5.js
 RAIN-5b — «RAIN no quad edges»: the founder saw square fields round the flying scraps (a sprite's quad showing under a wide focus blur).
 - fn (1): `checkRainQuads`
@@ -1544,7 +1551,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 - const (5): `TEST_ROOM_ID`, `TEST_ROOM`, `testRoomMode`, `testRoomInfo`, `testRoomFreeLeaks`
 - fn (2): `testRoomInstall`, `testRoomRemove`
 
-_307 modules, 3097 exported names._
+_308 modules, 3104 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

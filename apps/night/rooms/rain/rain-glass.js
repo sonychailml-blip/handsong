@@ -12,7 +12,7 @@ void main(){ vec3 c=texture2D(uTex, vUv).rgb*0.2270;
   c+=(texture2D(uTex, vUv+uDir*1.3846).rgb+texture2D(uTex, vUv-uDir*1.3846).rgb)*0.3162;
   c+=(texture2D(uTex, vUv+uDir*3.2308).rgb+texture2D(uTex, vUv-uDir*3.2308).rgb)*0.0703; gl_FragColor=vec4(c, 1.); }`;
 /* the blur radius (view-angle units) of a thing at depth d: uFoc = (focus depth, K, the widest radius) */
-const RAD=`float radAt(float d){ return uFoc.z*min(1., abs(d-uFoc.x)*uFoc.y); }`;
+const RAD=`float radAt(float d){ return uFoc.z*min(1., max(0., abs(d-uFoc.x)-uFoc.w)*uFoc.y); }`;   // RAIN-5e: uFoc.w — the sharp plateau's half-width
 /* THE VIEW's ground: the prepared picture (uBase) and its three blurred copies (uL1…uL3, their radii uRad), chosen per pixel by the depth map's
    blur; the playing light's soft pool on the city when the focus is far (uLight: its place, its strength) */
 /* RAIN-5c: THE SKY over the sky's pixels (depth 1): two cloud layers drifting (value noise), lit from below by the city's glow; the moon or a crescent
@@ -34,7 +34,7 @@ vec3 skyOver(vec3 c, vec2 p, float r){ if(uSkyA.w<0.5) return c; float hgt=clamp
     c+=uGreenCol*uPlaneC.z*exp(-dot(a-vec2(0.004, 0.), a-vec2(0.004, 0.))/(rr*rr))*e*uPlane.z*0.9;
     c+=uWhiteCol*uPlaneC.y*exp(-dot(a, a)/(rr*rr))*e*uPlane.z*1.8; }
   return c; }`;
-export const VIEW_F=`precision highp float; uniform sampler2D uBase, uL1, uL2, uL3, uDepth; uniform vec3 uRad, uFoc; uniform vec2 uTan; uniform vec3 uLight, uLightCol; varying vec2 vUv;
+export const VIEW_F=`precision highp float; uniform sampler2D uBase, uL1, uL2, uL3, uDepth; uniform vec3 uRad; uniform vec4 uFoc; uniform vec2 uTan; uniform vec3 uLight, uLightCol; varying vec2 vUv;
 ${RAD}
 ${SKY_GLSL}
 void main(){ float dep=texture2D(uDepth, vUv).a, r=radAt(dep);   /* the depth rides in the picture's alpha */
@@ -54,7 +54,7 @@ const QUAD_SD=`float sdQ(vec2 p, vec2 a, vec2 b, vec2 c, vec2 d){ float s=1., m=
 /* A LIT WINDOW (one instance each: aRect its centre and half size, aLit its light, aWarm honey … amber, aDepth its depth). In focus: the pane
    behind a curtain, its bars, a little light spilling on the wall. Out of focus (its own radius by its depth): the same light spread over the
    window grown by that radius into a soft rounded rectangle, dimmer by the area. Premultiplied: the pane covers the dark window, the disc adds. */
-export const WIN_V=`attribute vec4 aRect, aQ0, aQ1, aEv; attribute float aLit, aWarm, aDepth; uniform vec2 uTan; uniform vec3 uFoc; uniform float uPad;
+export const WIN_V=`attribute vec4 aRect, aQ0, aQ1, aEv; attribute float aLit, aWarm, aDepth; uniform vec2 uTan; uniform vec4 uFoc; uniform float uPad;
 varying vec2 vP, vH, vV; varying vec4 vQ0, vQ1, vEv; varying float vLit, vWarm, vR, vA0, vPer; ${RAD}
 void main(){ vR=radAt(aDepth); vec2 mn=min(min(aQ0.xy, aQ0.zw), min(aQ1.xy, aQ1.zw)), mx=max(max(aQ0.xy, aQ0.zw), max(aQ1.xy, aQ1.zw)), c=(mn+mx)*0.5, hs=(mx-mn)*0.5+vR+uPad*min(1., aRect.w*8.);
   vV=c+position.xy*hs; vP=vV-aRect.xy; vH=aRect.zw; vLit=aLit; vWarm=aWarm; vQ0=aQ0; vQ1=aQ1; vEv=aEv;   /* RAIN-2: the quad's bounds grown by the radius */
@@ -83,21 +83,22 @@ void main(){ float d=sdQ(vV, vQ0.xy, vQ0.zw, vQ1.xy, vQ1.zw), R=max(vR, 1e-4), k
 /* A LIGHT (one instance each): aRect its centre and half size, aCol its colour and strength, aDK its depth and kind — 0 a point (a lamp, a far
    light, a car's light: a small glow in focus), 1 a reflection in the wet street (a streak below its light, fading downwards), 2 a lit rectangle
    (the tram's windows). Out of focus each grows by its own radius into a soft disc (or rounded streak / rectangle), dimmer by the area. */
-export const LIGHT_V=`attribute vec4 aRect, aCol; attribute vec2 aDK; uniform vec2 uTan; uniform vec3 uFoc; uniform float uPx;
-varying vec2 vP, vH; varying vec3 vCol; varying float vRad, vKind, vGain, vK, vB; ${RAD}
+export const LIGHT_V=`attribute vec4 aRect, aCol; attribute vec2 aDK; uniform vec2 uTan; uniform vec4 uFoc; uniform float uPx, uWin;
+varying vec2 vP, vH, vHS; varying vec3 vCol; varying float vRad, vKind, vGain, vK, vB, vPx; ${RAD}
 void main(){ float R=radAt(aDK.x), kind=aDK.y, b=max(aRect.z, 0.7/uPx); vKind=kind; vB=b;
   vec2 h= kind<0.5 ? vec2(0.) : kind<1.5 ? vec2(0., aRect.w) : aRect.zw; float rad= kind<1.5 ? b+R : R+0.35/uPx;
   vK=clamp(R/(b*3.+0.004), 0., 1.); float glow= kind<0.5 ? 3.*b*(1.-vK) : 0.;
-  vec2 hs=h+rad+glow; vP=position.xy*hs; vH=h; vRad=rad;
+  vec2 hs=h+rad+glow+(kind<0.5 ? 2./uPx*uWin : 0.); vP=position.xy*hs; vH=h; vRad=rad; vHS=hs; vPx=uPx;   /* RAIN-5e: a point keeps 2 px of room for its round edge */
   float A0= kind<1.5 ? b*(2.*h.y+3.1416*b*0.5) : 4.*h.x*h.y, A1= kind<1.5 ? rad*(2.*h.y+3.1416*rad*0.5) : 4.*(h.x+R)*(h.y+R);
   vGain=pow(max(A0, 1e-9)/max(A1, 1e-9), 0.55); vCol=aCol.rgb*aCol.a;
   gl_Position= aCol.a>0.003 ? vec4((aRect.xy+vP)/uTan, 0., 1.) : vec4(2., 2., 2., 1.); }`;
-export const LIGHT_F=`precision highp float; varying vec2 vP, vH; varying vec3 vCol; varying float vRad, vKind, vGain, vK, vB;
+export const LIGHT_F=`precision highp float; varying vec2 vP, vH, vHS; varying vec3 vCol; varying float vRad, vKind, vGain, vK, vB, vPx; uniform float uWin;
 void main(){ vec2 q=abs(vP)-vH; float d=length(max(q, 0.))+min(max(q.x, q.y), 0.)-vRad;
   float fade= vKind>0.5 && vKind<1.5 ? pow(clamp(0.5+0.5*vP.y/max(vH.y+vRad, 1e-5), 0., 1.), 1.6) : 1.;
   float sharp= vKind<0.5 ? exp(-dot(vP, vP)/(vB*vB)*1.6)+0.18*exp(-length(vP)/(vB*1.6)) : smoothstep(0., -vRad*0.5-1e-5, d);
   float disc=smoothstep(0., -max(vRad*0.25, 1e-5), d)*(0.82+0.18*smoothstep(-vRad*0.7, 0., d))*vGain;
-  gl_FragColor=vec4(vCol*mix(sharp, disc, vK)*fade, 1.); }`;
+  float hp=min(vHS.x, vHS.y)*vPx, rp=length(vP)*vPx, win= vKind<0.5 ? mix(1., 1.-smoothstep(hp-3., hp-1.2, rp), uWin) : 1.;   /* RAIN-5e: a point light is a round disc at every size and blur (its glow faded to 0 inside its quad) */
+  gl_FragColor=vec4(vCol*mix(sharp, disc, vK)*fade*win, 1.); }`;
 /* A DROP into the DROP MAP (one instance each: aDrop its place on the pane and its radius, aShape its stretch while running). The map holds,
    premultiplied by the drop's mask, the place inside the drop (−1…1, encoded 0…1): the glass reads it as a lens. uSoft widens the edge as the
    focus leaves the glass (the drop softens into a pale disc). */
@@ -161,7 +162,7 @@ void main(){
 /* RAIN-5: THE PEOPLE AND THE STREET'S SMALL LIFE (pure/life.js), one instance each: aRect its foot (view units), half width and half height, aK
    (kind, phase, colour, alpha), aDep its focus depth — silhouettes drawn by shape (no texture), their edges softened by the focus like the lights;
    the rings, splashes and steam pale, the rest dark against the lit street (an umbrella in its colour). Premultiplied over the view. */
-export const LIFE_V=`attribute vec4 aRect, aK; attribute float aDep; uniform vec2 uTan; uniform vec3 uFoc; uniform float uPx;
+export const LIFE_V=`attribute vec4 aRect, aK; attribute float aDep; uniform vec2 uTan; uniform vec4 uFoc; uniform float uPx;
 varying vec2 vQ, vE; varying vec4 vK; varying float vSoft, vFade; ${RAD}
 void main(){ float R=radAt(aDep), pad=R+1.5/uPx; vec2 hs=aRect.zw+pad, c=vec2(aRect.x, aRect.y+aRect.w), P=c+position.xy*hs; vE=position.xy; vFade=min(1., (aRect.z*aRect.w)/max(1e-12, hs.x*hs.y)*1.6);
   vQ=vec2((P.x-aRect.x)/max(aRect.z, 1e-6), (P.y-aRect.y)/max(2.*aRect.w, 1e-6)); vK=aK; vSoft=(R+0.8/uPx)/max(2.*aRect.w, 1e-6);

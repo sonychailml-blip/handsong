@@ -8832,3 +8832,8 @@ not a control · run a "random" failure many times and print WHERE and HOW MUCH 
 - The young broad-leaved trees that stay (`pure/canopy.js` youngLeaf): leader, spiral branches, an egg-shaped crown of one leaf kind; moved out of the moon's window and the stream's view (≤ 12 m, declared in the census row). Stills re-rendered.
 - The cull (`?forest=cull`, not default; `forest-cull.js`, list `pure/cull.js` by `node tools/forest-cull.mjs`): 80 views (4 screens × rest, real, halfway, widened lean and breath), mirror, shadow reach, peeling for soft edges. Standard 3,775 / Detailed 8,322 instances never seen; triangles −7 % / −12 %; draws, textures, files unchanged; proof 0 px on 28 views × 2 levels.
 - Rows: «FOREST plants apart» 9/0 (CONTROL the old pair), «FOREST cull same frames» 20/0 (CONTROL a visible trunk), five forest rows 16/0, 16/0, 4/0, 16/0, 9/0. Waiting for step 173.
+
+## Moved from docs/night/HANDOFF.md at the FULL CHECK (2026-11-17)
+### FOREST-2f (2026-11-16): the left pair the same on both levels; the cull by default. Log: `docs/night/WORK-LOG.md`
+- The spruce pinned at its FOREST-2d Detailed place (`pure/spacing.js` LEFT_PAIR) on both levels; spruces no longer step aside for ferns; fern #76 to (−7.25, −4.75) (clear on both levels), fern #1 back. The census checks every replaced sapling's own spruce (CONTROL); content rows without the cull. The cull is the default (`?forest=nocull`); its list made again; proof 0 px. Rows: plants apart 12/0, nothing lost 24/0, switch level 11/0, today 16/0, clear 4/0, cull 20/0. Waiting for step 176.
+### fix-hidden (2026-11-16): two lines hidden in comments restored; «RAIN room» 47/0 (its check used the page's clock, not the room's). Log: `docs/night/WORK-LOG.md`

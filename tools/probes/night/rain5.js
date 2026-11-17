@@ -10,7 +10,7 @@ export async function checkRainQuads(){ const d=[], notes=[]; let n=0; const mis
   const W=512, Hh=256, canvas=document.createElement('canvas'), r=new T.WebGLRenderer({ canvas, antialias:false, preserveDrawingBuffer:true, alpha:true, premultipliedAlpha:true }); r.setPixelRatio(1); r.setSize(W, Hh, false); r.setClearColor(0x000000, 0);
   const items=[]; for(let k=0;k<=23;k++) for(const [sz, dep] of [[0.004, 0.1], [0.012, 0.6], [0.03, 0.95]]) items.push([k, sz, dep]);   // RAIN-5c: + the group, the flag, the signs, the lights
   const N=items.length, g=new T.InstancedBufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute([-1,-1,0, 1,-1,0, 1,1,0, -1,1,0], 3)); g.setIndex([0,1,2, 0,2,3]);
-  const R4=new Float32Array(N*4), K4=new Float32Array(N*4), D1=new Float32Array(N), cols=12, foc=new T.Vector3(0.1, 4, 0.04), uPx=Hh/2/0.5, quads=[];
+  const R4=new Float32Array(N*4), K4=new Float32Array(N*4), D1=new Float32Array(N), cols=12, foc=new T.Vector4(0.1, 4, 0.04, 0), uPx=Hh/2/0.5, quads=[];
   items.forEach(([k, sz, dep], i)=>{ const cx=-0.9+(i%cols)*0.16, cy=-0.42+Math.floor(i/cols)*0.2, hw=sz*(k===9 || k===7 ? 1 : 0.4), hh=sz/2; R4.set([cx, cy, hw, hh], i*4); K4.set([k, 0.3+(k===3 ? 3 : 0), 3+8*(k%4)+64+256*(k%8), 1], i*4); D1[i]=dep;
     const R=foc.z*Math.min(1, Math.abs(dep-foc.x)*foc.y), pad=R+1.5/uPx; quads.push([cx-(hw+pad), cx+(hw+pad), cy+hh-(hh+pad), cy+hh+(hh+pad)]); });
   g.setAttribute('aRect', new T.InstancedBufferAttribute(R4, 4)); g.setAttribute('aK', new T.InstancedBufferAttribute(K4, 4)); g.setAttribute('aDep', new T.InstancedBufferAttribute(D1, 1)); g.instanceCount=N;
@@ -23,6 +23,24 @@ export async function checkRainQuads(){ const d=[], notes=[]; let n=0; const mis
       for(let x=a;x<=b;x++){ look(x, c); look(x, e); } for(let y=c;y<=e;y++){ look(a, y); look(b, y); } }); return { worst, at }; };
   try{ n++; const ok=edge(1); if(ok.worst>2) miss(`a quad edge shows: alpha ${ok.worst} / 255 on item ${ok.at} (kind ${items[ok.at][0]}, size ${items[ok.at][1]}, depth ${items[ok.at][2]})`); notes.push(`the border ring's alpha at most ${ok.worst} / 255 over ${N} items`);
     n++; const bad=edge(0); if(bad.worst<=8) miss('CONTROL: without the border window no edge showed'); else notes.push(`CONTROL: without the window an edge shows (${bad.worst} / 255)`); }
-  finally{ g.dispose(); m.dispose(); r.dispose(); r.forceContextLoss(); }
+  finally{ g.dispose(); m.dispose(); }
+  /* RAIN-5e: the POINT LIGHTS (the far cars' headlights were square): three sizes × three blurs, bright, additive on black; on the ring at each
+     light's quad border (1 px inside) the brightness at most 2 / 255 (my guess); CONTROL the round window off shows the quad */
+  try{ const L=[], uPx2=Hh/2/0.5, foc2=new T.Vector4(0.3, 4, 0.04, 0); for(const b of [0.0011, 0.0015, 0.004]) for(const dep of [0.3, 0.45, 0.9]) L.push([b, dep]);
+    const g2=new T.InstancedBufferGeometry(); g2.setAttribute('position', new T.Float32BufferAttribute([-1,-1,0, 1,-1,0, 1,1,0, -1,1,0], 3)); g2.setIndex([0,1,2, 0,2,3]);
+    const RA=new Float32Array(L.length*4), CA=new Float32Array(L.length*4), DK=new Float32Array(L.length*2), boxes=[];
+    L.forEach(([b, dep], i)=>{ const cx=-0.85+(i%9)*0.2, cy=0.15-Math.floor(i/9)*0.3; RA.set([cx, cy, b, 0], i*4); CA.set([1, 0.95, 0.85, 1.4], i*4); DK.set([dep, 0], i*2);
+      const R=foc2.z*Math.min(1, Math.max(0, Math.abs(dep-foc2.x)-foc2.w)*foc2.y), bb=Math.max(b, 0.7/uPx2), vK=Math.min(1, Math.max(0, R/(bb*3+0.004))), hs=bb+R+3*bb*(1-vK); boxes.push([cx-hs, cx+hs, cy-hs, cy+hs, 2/uPx2]); });   // the quad's margin with the window on (uWin 1)
+    g2.setAttribute('aRect', new T.InstancedBufferAttribute(RA, 4)); g2.setAttribute('aCol', new T.InstancedBufferAttribute(CA, 4)); g2.setAttribute('aDK', new T.InstancedBufferAttribute(DK, 2)); g2.instanceCount=L.length;
+    const m2=new T.ShaderMaterial({ uniforms:{ uTan:{ value:new T.Vector2(1, 0.5) }, uFoc:{ value:foc2 }, uPx:{ value:uPx2 }, uWin:{ value:1 } }, vertexShader:G.LIGHT_V, fragmentShader:G.LIGHT_F, transparent:true, depthTest:false, depthWrite:false, blending:T.AdditiveBlending });
+    const mesh2=new T.Mesh(g2, m2); mesh2.frustumCulled=false; const sc2=new T.Scene(); sc2.add(mesh2); const cam2=new T.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    const ring=win=>{ m2.uniforms.uWin.value=win; r.setClearColor(0x000000, 1); r.clear(); r.render(sc2, cam2); const gl=r.getContext(), px=new Uint8Array(W*Hh*4); gl.readPixels(0, 0, W, Hh, gl.RGBA, gl.UNSIGNED_BYTE, px); let worst=0, at=-1;
+      boxes.forEach(([x0, x1, y0, y1, mg], i)=>{ x0-=mg*win; x1+=mg*win; y0-=mg*win; y1+=mg*win; const X=x=>Math.round((x+1)/2*W), Y=y=>Math.round((y+0.5)*Hh), a=X(x0)+1, b=X(x1)-2, c=Y(y0)+1, e=Y(y1)-2; if(b-a<3 || e-c<3) return;   // the border itself (1 px inside)
+        const look=(x, y)=>{ if(x<0 || y<0 || x>=W || y>=Hh) return; const k=(y*W+x)*4, v=Math.max(px[k], px[k+1], px[k+2]); if(v>worst){ worst=v; at=i; } };
+        for(let x=a;x<=b;x++){ look(x, c); look(x, e); } for(let y=c;y<=e;y++){ look(a, y); look(b, y); } }); return { worst, at }; };
+    n++; const okL=ring(1); if(okL.worst>2) miss(`a point light's quad edge shows: ${okL.worst} / 255 on light ${okL.at} (size ${L[okL.at][0]}, depth ${L[okL.at][1]})`); notes.push(`the point lights' border ring at most ${okL.worst} / 255 over ${L.length} lights`);
+    n++; const badL=ring(0); if(badL.worst<=8) miss('CONTROL: without the round window no point light showed its quad'); else notes.push(`CONTROL: without the window a point light shows its quad (${badL.worst} / 255)`);
+    g2.dispose(); m2.dispose(); }
+  finally{ r.dispose(); r.forceContextLoss(); }
   return { cases:n, total:d.length, differences:d, notes }; }
-row({ at:1009.987, night:true, name:'RAIN no quad edges', drawn:true, run:()=>checkRainQuads(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });
+row({ at:1009.98705, night:true, name:'RAIN no quad edges', drawn:true, run:()=>checkRainQuads(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });

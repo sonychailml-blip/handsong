@@ -36,7 +36,7 @@ hooks.scene={ set:setBackground, of:backgroundOf, info:sceneInfo };   // CORE-8:
 { const N=ROOMS[0].record.nature;
   const why=soundModAdd('ambience', N.id, natureModule(N));   // NIGHT-3 stage 4: the live drone steps aside while the music bed plays (a render copy keeps it)
   if(why) console.warn('[night] the ambience was not registered:', why); }   // eslint-disable-line no-console
-nightShellWire(roomDoors(shellDoors())); setFaceHook(p=>{ nightShellFace(p); roomMusicApply(); });
+nightShellWire(roomDoors(shellDoors())); setFaceHook(p=>{ nightShellFace(p); roomMusicApply(true); });
 /* DESIGN-1 part D: how the live room stands for the start still (NIGHT-13: and its camera held at rest, its fireflies) — drawn and its veil lifted (ready), the 2D stand-in (no WebGL: there at once),
    still opening (wait), or another background (other: a plain fade) */
 stillWire(()=>{ if(backgroundOf()!=='forest') return 'other'; const I=sceneInfo(); if(!I.webgl || I.level==='minimal') return I.opening ? 'wait' : 'stand-in';

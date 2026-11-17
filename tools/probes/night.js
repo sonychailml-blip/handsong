@@ -35,6 +35,7 @@ export { checkRainRoom } from './night/rainroom.js';   // RAIN-0: the rain room 
 export { checkRainNature } from './night/rainnature.js';   // RAIN-3: its layered recordings, rendered offline
 export { checkForestToday, checkForestFull, checkForestClear, checkForestLost, checkForestLevels } from './night/forest2.js';
 export { checkForestBed } from './night/rain4.js';
+export { checkRainClicks } from './night/rain4e.js';   // RAIN-4e: no clicks on the bed
 export { checkForestApart } from './night/forest2e.js';   // FOREST-2e: plants apart
 export { checkForestCull } from './night/forestcull.js';   // FOREST-2e: the cull (?forest=cull) keeps the frames
 export { checkRainQuads } from './night/rain5.js';   // RAIN-5b: no sprite's quad edge shows   // RAIN-4: the forest's bed bit-exact after the jazz bed   // FOREST-2: the switch ?forest=new

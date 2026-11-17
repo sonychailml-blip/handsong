@@ -17,7 +17,7 @@ import { layersEvents, LAYERS } from '../../pure/layers.js';
 import { heardMs } from '../../pure/heard.js';
 import { MOOD_TC } from '../../pure/cycle.js';
 import { RAIN_ROOM } from './pure/room.js';
-import { FOCUS, focusTarget, focusStep, focusBlur, focusDepth, blurAt } from './pure/focus.js';
+import { FOCUS, focusTarget, focusStep, focusBlur, focusDepth, focusPlateau, blurAt } from './pure/focus.js';
 import { RAIN_SEED, windowsLayout, farLights, windowPick, windowLight } from './pure/windows.js';
 import { GLASS, wipeNew, wipeStamp, wipeStroke, wipeStep, wipeAt, wipeCell } from './pure/glass.js';
 import { DROPS, dropsNew, dropsRegion, dropAdd, dropsStep, dropStretch, dropsLedger, laneAt } from './pure/drops.js';
@@ -67,7 +67,7 @@ export function buildRain(T, opt){
   const mat=(o)=>{ const m=new T.ShaderMaterial({ ...flat, ...o }); own.push(m); return m; };
   const rt=(w, h)=>new T.WebGLRenderTarget(Math.max(2, w), Math.max(2, h), { minFilter:T.LinearFilter, magFilter:T.LinearFilter, format:T.RGBAFormat, depthBuffer:false, stencilBuffer:false, encoding:T.sRGBEncoding });   // the screen's encoding: one program per material (no shader here encodes or decodes)
   const RT={}; own.push({ dispose:()=>{ for(const k in RT){ RT[k].dispose(); delete RT[k]; } } });
-  const FOC=new T.Vector3(0, FOCUS.K, BOKEH.r), UT=new T.Vector2(1, 1), UTIME={ value:0 }, UPX={ value:1 };   // the focus (depth, K, widest radius), the screen's half size, time, px per unit
+  const FOC=new T.Vector4(0, FOCUS.K, BOKEH.r, FOCUS.plateau[0]), UT=new T.Vector2(1, 1), UTIME={ value:0 }, UPX={ value:1 };   // the focus (depth, K, widest radius), the screen's half size, time, px per unit
   const cityU=cityUniforms(T), cityM=mat({ uniforms:cityU, vertexShader:QUAD_V, fragmentShader:CITY_F });
   /* RAIN-1: the baked city, when its files are here (the host awaited rainAssets): one texture per mood (only the current one on the GPU), the lit
      windows, the depth map; raw values (the bake wrote the screen's colours), no mipmaps */
@@ -125,13 +125,13 @@ export function buildRain(T, opt){
   /* RAIN-5d: the hills' twinkling windows (one now and then dark), the winding road's cars, the masts and the tower, the cable car, the church, the
      bridge; the smoker's glow and the scooter's lamp (the rare events) */
   function farLights2(i, t){ const ev=farEventAt(t), P=(u, f)=>slope(u, f, topAt, HOR), dark= ev && ev.kind==='hillwin' && ev.u>0.15 && ev.u<0.85 ? Math.floor(ev.k*FAR.length) : -1;
-    FAR.forEach((q, j)=>put(j, q.x, q.y, 0.0017+0.0012*q.k, 0, FARC[j], j===dark ? 0 : (0.55+0.6*q.k)*twinkle(t, j), q.depth, 0));
-    for(const c of farCars(t)){ const p=P(c.u, c.f); if(!onHill(p) || i>NL-4) continue; if(c.head){ put(i++, p[0]-0.001, p[1], 0.0015, 0, HEAD, 1.1, farDepth, 0); put(i++, p[0]+0.001, p[1], 0.0015, 0, HEAD, 1.1, farDepth, 0); } else put(i++, p[0], p[1], 0.0014, 0, TAIL, 1.05, farDepth, 0); }
-    for(const m of FAR_LIFE.masts){ const tp=topAt(m.u); if(tp!=null && sceneAt(m.u, tp+0.003).kind==='sky') put(i++, m.u, tp+0.003, 0.0014, 0, TAIL, 1.1*blink(t, m.hz, m.duty, m.ph), farDepth, 0); }
+    FAR.forEach((q, j)=>put(j, q.x, q.y, 0.0017+0.0012*q.k, 0, FARC[j], j===dark ? 0 : (0.66+0.7*q.k)*twinkle(t, j), q.depth, 0));   // RAIN-5e: ×1.2
+    for(const c of farCars(t)){ const p=P(c.u, c.f); if(!onHill(p) || i>NL-4) continue; if(c.head){ put(i++, p[0]-0.0011, p[1], 0.0018, 0, HEAD, 1.4, farDepth, 0); put(i++, p[0]+0.0011, p[1], 0.0018, 0, HEAD, 1.4, farDepth, 0); } else put(i++, p[0], p[1], 0.0017, 0, TAIL, 1.35, farDepth, 0); }   // RAIN-5e: a little more visible
+    for(const m of FAR_LIFE.masts){ const tp=topAt(m.u); if(tp!=null && sceneAt(m.u, tp+0.003).kind==='sky') put(i++, m.u, tp+0.003, 0.0017, 0, TAIL, 1.4*blink(t, m.hz, m.duty, m.ph), farDepth, 0); }
     { const T=FAR_LIFE.tower, tp=topAt(T.u); if(tp!=null) T.h.forEach((h, k)=>{ put(i++, T.u, tp+h, 0.0013, 0, TAIL, k===T.h.length-1 ? 1.2*blink(t, T.hz, T.duty) : 0.45, farDepth, 0); }); }
-    for(const c of cableAt(t)){ const p=P(c.u, c.f); if(onHill(p)) put(i++, p[0], p[1], 0.002, 0.0014, HONEY, 1.05, farDepth, 2); }
+    for(const c of cableAt(t)){ const p=P(c.u, c.f); if(onHill(p)) put(i++, p[0], p[1], 0.0022, 0.0015, HONEY, 1.25, farDepth, 2); }
     for(const e of [FAR_LIFE.cable.a, FAR_LIFE.cable.b]){ const p=P(e[0], e[1]); if(onHill(p)) put(i++, p[0], p[1], 0.0015, 0, LAMP, 0.7, farDepth, 0); }
-    { const C=FAR_LIFE.church, p=P(C.u, C.f); if(onHill(p)){ put(i++, p[0], p[1], 0.006, 0, AMBER, 0.32, farDepth, 0); put(i++, p[0]+0.012, p[1]+0.006, 0.0012, 0.006, HONEY, 0.55, farDepth, 2); } }
+    { const C=FAR_LIFE.church, p=P(C.u, C.f); if(onHill(p)){ put(i++, p[0], p[1], 0.006, 0, AMBER, 0.42, farDepth, 0); put(i++, p[0]+0.012, p[1]+0.006, 0.0012, 0.006, HONEY, 0.55, farDepth, 2); } }
     for(const p of BRIDGE) put(i++, p[0], p[1], 0.0011, 0, LAMP, 0.6, farDepth, 0);
     if(ev && ev.kind==='bridge' && BRIDGE.length>1){ const a=BRIDGE[0], b=BRIDGE[BRIDGE.length-1], q=ev.k<0.5 ? ev.u : 1-ev.u; put(i++, a[0]+(b[0]-a[0])*q, a[1]+(b[1]-a[1])*q+0.001, 0.0012, 0, ev.k<0.5 ? TAIL : HEAD, 0.8, farDepth, 0); }
     if(ev && ev.kind==='smoker'){ const S=FAR_LIFE.smoker; i=lightAt(i, [S.x, S.y, S.z], 0.035, EMBER, smokerGlow(ev.u, FAR_LIFE.events.dur.smoker, ev.k), false); }
@@ -159,7 +159,7 @@ export function buildRain(T, opt){
     { const ag=now-flashAt; if(ag<SHOWN.flash){ const fl=(ag<0.08 || (ag>0.18 && ag<0.26)) ? 1 : 0.25; put(i++, -0.2, 0.32, 1.4, 0.22, FLASH, 0.18*fl*(1-ag/SHOWN.flash), 1, 2); } }
     for(let j=i;j<nLights;j++) lCol[j*4+3]=0;   // last frame's extra lights out
     nLights=Math.max(i, nStatic); lg.instanceCount=Math.max(nLights, 1); aRect.needsUpdate=aCol.needsUpdate=aDK.needsUpdate=true; return cars; }
-  const lightM=mat({ uniforms:{ uTan:{ value:UT }, uFoc:{ value:FOC }, uPx:UPX }, vertexShader:LIGHT_V, fragmentShader:LIGHT_F, transparent:true, blending:T.AdditiveBlending });
+  const lightM=mat({ uniforms:{ uTan:{ value:UT }, uFoc:{ value:FOC }, uPx:UPX, uWin:{ value:1 } }, vertexShader:LIGHT_V, fragmentShader:LIGHT_F, transparent:true, blending:T.AdditiveBlending });
   const lights=add(new T.Mesh(lg, lightM), 2);
   /* RAIN-5: THE PEOPLE AND THE STREET'S SMALL LIFE (pure/life.js): one draw, each item projected by the view law and sized by its distance, drawn
      over the city and under the windows and lights; and THE MUSIC SHOWN (pure/shown.js): the bed's events queued with their heard moment */
@@ -250,7 +250,7 @@ export function buildRain(T, opt){
     if(play){ const [x, y]=toTan(play.x, play.y); if(light.on<0.02){ light.x=x; light.y=y; } const k=1-Math.exp(-dt*13); light.x+=(x-light.x)*k; light.y+=(y-light.y)*k; light.d=play.d; light.glow=play.glow==null ? 0.6 : play.glow; }
     light.on+=((play ? 1 : 0)-light.on)*Math.min(1, dt*(play ? 6 : 2.5));
     target= play ? focusTarget(play.d) : FOCUS.rest; focus=focusStep(focus, target, dt, !!play);
-    FOC.x=focusDepth(focus);
+    FOC.x=focusDepth(focus); FOC.w=focusPlateau(focus);   // RAIN-5e: the sharp plateau
     RAIN_FOCUS.f=focus; natureFocus(focus);   // RAIN-3: the room's sound takes the same number (near: the pane; far: the street)
     /* the pane slides a little against the city as the camera leans towards the light and breathes (none at rest: the start still's pose) */
     { const k=(reduce ? 0.3 : 1)*(Lv.lean ? 1 : 0), gx= restOn || viewOver ? 0 : -clamp(light.x/Math.max(tw, 0.3), -1, 1)*BOKEH.lean[0]*light.on*k+(reduce ? 0 : Math.sin(t*0.19)*BOKEH.breath),

@@ -82,7 +82,7 @@ export async function checkRainRoom(){
       if(!(sn.blur.facade>0.95 && sn.blur.glass<=FO.blurAt(FO.LAYER_DEPTH.glass, 0.05)+1e-9))   /* the glass at most as soft as the law makes it at the near threshold's focus */ miss('a near hand: the glass is not sharp and the house opposite soft: '+JSON.stringify(sn.blur));
       hand(0.5, 0.5, FAR, false, 45); n+=3; const farOk=await until(()=>st().focus>0.95, 5000), sf=st(), df=depth();
       if(!farOk) miss(`a far hand: the focus stays at ${sf.focus.toFixed(3)} (above 0.95 within 5 s expected)`);
-      if(!(sf.blur.glass>0.95 && sf.blur.hills<0.15 && sf.blur.hills<sf.blur.facade)) miss('a far hand: the glass is not the soft one and the hills the sharpest: '+JSON.stringify(sf.blur));
+      if(!(sf.blur.glass>=0.5 && ['streetNear', 'street', 'streetFar', 'facade', 'roofs', 'hills'].every(k=>sf.blur[k]<=0.02))) miss('a far hand: the glass is not soft or the city not sharp at once: '+JSON.stringify(sf.blur));   // RAIN-5e (the founder): far = the whole city sharp at once (was: the hills alone the sharpest, the glass fully soft)
       notes.push(`the focus: near ${sn.focus.toFixed(3)}, far ${sf.focus.toFixed(3)}; the sound's depth («Forest depth»): near ${dn.toFixed(3)}, far ${df.toFixed(3)}`);
       if(!(df>dn+0.3)) miss(`the sound's closeness does not follow the hand's depth: «Forest depth» near ${dn}, far ${df}`);
       /* RAIN-3: the room's own sound takes the same number — the live layers' node (built when the room plays) follows the picture's focus */

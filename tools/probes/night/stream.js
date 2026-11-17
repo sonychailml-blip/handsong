@@ -21,7 +21,7 @@ import { frame } from '../core/kit.js';
 import { cv } from '../../../core/palette.js';
 import { kLoud } from './night.js';
 import { loadThree, setBackground, sceneInfo, setSceneLevel, sceneLevel, sceneRoomDbg, sceneSnapDbg } from '../../../apps/night/scene/host.js';
-import { buildForest, forestAssets, FOREST_LEVELS } from '../../../apps/night/rooms/forest/forest.js';
+import { buildForest, forestAssets, FOREST_LEVELS, forestNewDbg, forestCullDbg } from '../../../apps/night/rooms/forest/forest.js';
 import { FOREST_ROOM } from '../../../apps/night/rooms/forest/pure/room.js';
 import { streamNear, STREAM } from '../../../apps/night/rooms/forest/pure/forestlife.js';
 import { WATER_RK } from '../../../apps/night/rooms/forest/forest-life.js';
@@ -34,8 +34,8 @@ export async function checkNightStream(){
   const was=profileCurrent(), keepLevel=sceneLevel(), NIN={ mood:'major-penta', sleep:0 };
   try{
     /* (1) built */
-    const T=await loadThree(); await forestAssets('full'); await forestAssets('reduced'); const rooms=[];
-    try{
+    const T=await loadThree(); await forestAssets('full'); await forestAssets('reduced'); const rooms=[], parts0=forestNewDbg(), cull0=forestCullDbg();
+    try{ forestNewDbg(false); forestCullDbg(false);   // FULL CHECK (2026-11-17): (1) judges the forest it was written for — no FOREST-2 parts, no cull (they repack the counts)
       for(const lv of ['full','reduced']){ const L=FOREST_LEVELS[lv], r=buildForest(T, { C:cv, level:lv, w:844, h:390 }); rooms.push(r);
         const P=r.streamDbg.parts, st=r.state(), G=r.groundDbg, ak=P.rocks.geometry.attributes.aRock, cush=r.woodDbg.parts.moss.geometry.attributes.aRock; n+=6;
         if(st.stream.aisle!==7 || P.rocks.count!==L.rocks+7) miss(`${lv}: the stones' draw holds ${P.rocks.count} (rocks ${L.rocks} + 7 aisle rocks wanted)`);
@@ -49,7 +49,7 @@ export async function checkNightStream(){
         for(let i=0;i<10;i++) r.update(1/30, 60+i/30, [], null, NIN);
         const GL=r.lifeDbg.WU.uGl.value.filter(v=>v.w>0); n++; if(!GL.length) miss(lv+': the water reflects no glowing thing');
         notes.push(`${lv}: ${P.rocks.count} stones (7 aisle), ${P.pebbles.count} pebbles (${L.litterPebbles} on the ground), ${P.floaters.count} leaves (${L.litterLeaves} on the ground), ${L.litterTwigs} twigs; water: ${RK.length} rocks, ${GL.length} reflections`); }
-    } finally { for(const r of rooms) r.dispose(); }
+    } finally { for(const r of rooms) r.dispose(); forestNewDbg(parts0||false); forestCullDbg(cull0); }
     /* (2) drawn */
     const why=profileApply('profile.night'); n++; if(why){ miss('Night refused: '+why); return { cases:n, total:d.length, differences:d, notes }; }
     await setSceneLevel('reduced'); await setBackground('forest'); await frames(6);

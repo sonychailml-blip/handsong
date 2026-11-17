@@ -13,4 +13,4 @@ export async function checkForestBed(){ const d=[], notes=[]; let n=0; const mis
     const got=await render(B2, FR, S, preset, pin.rate, pin.sec, {}, v); if(got.L!==want.L || got.R!==want.R) miss(`${preset}: the forest's bed differs from its pin (${got.L}/${got.R}, pinned ${want.L}/${want.R})`); else notes.push(`${preset}: equal to the pin (${got.L}/${got.R})`); }
   n++; { const c=await render(B2, FR, S, 'drift', pin.rate, pin.sec, { seed:99 }, viewOf(S, pin.renders.drift.view)); if(c.L===pin.renders.drift.L) miss('CONTROL: another seed gave the pinned bed'); else notes.push('CONTROL: another seed differs from the pin'); }
   return { cases:n, total:d.length, differences:d, notes }; }
-row({ at:1009.986, night:true, name:'RAIN forest bed unchanged', run:()=>checkForestBed(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });
+row({ at:1009.98605, night:true, name:'RAIN forest bed unchanged', run:()=>checkForestBed(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });

@@ -35,7 +35,7 @@ export const RAIN_ROOM=F({
   moods:F({ 'lydian-penta':'late', 'dorian-hexa':'evening', 'mixolydian-hexa':'after' }), look:'late',
   /* RAIN-4: what the room plays with — its own four timbres for the playing hand (Night's session records, apps/night/rooms/rain/timbres/; never in
      Full's lists), each with its level (dB) and its strike cap (a fast phrase stays gentle on a phone), and the moods' names */
-  music:F({ timbres:F([F({ id:'rain/e-piano', level:0, voices:6 }), F({ id:'rain/vibraphone', level:-11, voices:4 }), F({ id:'rain/nylon', level:0, voices:5 })]),
+  music:F({ timbres:F([F({ id:'rain/e-piano', level:0, voices:6 }), F({ id:'rain/vibraphone', level:-11, voices:4 }), F({ id:'rain/nylon', level:0, voices:5 }), F({ id:'rain/celesta', level:-6, voices:4 })]),   // RAIN-4e: the celesta back (four, like the forest)
     names:F({ late:F({ en:'Late night', ru:'Поздняя ночь' }), evening:F({ en:'Evening boulevard', ru:'Вечерний бульвар' }), after:F({ en:'After the rain', ru:'После дождя' }) }) }),
   nature:F({ id:'ambience.rain',
     drone:F({ root:0.07, fifth:0.035, tc:1.4, send:0.2 }),

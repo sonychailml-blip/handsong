@@ -1939,8 +1939,8 @@ async function nightHandLight(){
 /* RAIN-0 — the rain room's laws (apps/night/rooms/rain/pure/; docs/night/design/RAIN/PLAN.md §7). «RAIN focus law (app)»: the focus from the playing
    hand's depth — exactly 0 near and 1 far (dead zones), monotone; the glide never overshoots, never moves faster than its limit (a target flipping
    every frame cannot make it jump), is the same at 30 and 60 frames a second; without a hand it drifts slowly to the rest focus. RAIN-0b: THE FOCUS
-   HAS MANY DEPTHS — each layer's blur is |its depth − the focus depth| × K: near, the glass sharp and the house opposite fully soft; far, the hills
-   sharp and the glass fully soft; a hand in the middle: the street (near and far) sharper than the glass AND the hills; the depth law (pure/city.js
+   HAS MANY DEPTHS — each layer's blur is (|its depth − the focus depth| − the plateau) × K (RAIN-5e): near, the glass sharp and the house opposite fully soft;
+   far, the whole street to the hills sharp at once and the glass soft; a hand in the middle: the street (near and far) sharper than the glass AND the hills; the depth law (pure/city.js
    depthOf) is monotone and lands on its anchors. CONTROLS: an un-eased law breaks the speed limit; a two-plane focus (one blur for the whole city)
    fails the middle. */
 async function rainFocus(){
@@ -1962,7 +1962,13 @@ async function rainFocus(){
   /* many depths */
   const LD=F.LAYER_DEPTH, near=F.focusBlur(0), far=F.focusBlur(1);
   ok('near: the glass is not sharp or the house opposite not fully soft: '+JSON.stringify(near), near.glass===0 && near.facade===1 && near.hills===1);
-  ok('far: the hills are not sharp or the glass not fully soft: '+JSON.stringify(far), far.hills<=1e-12 && far.glass===1);
+  /* RAIN-5e: the plateau — far, the WHOLE STREET sharp at once (the street near … the hills), the glass still soft; near, the whole glass sharp.
+     CONTROL: the old narrow law (|Δ| × 1.8, no plateau, span 0.95) fails «the street sharp at once» */
+  const atOnce=blur=>['streetNear', 'street', 'streetFar', 'facade', 'roofs', 'hills'].filter(k=>blur(LD[k])>0.02);
+  { const f1=atOnce(dp=>F.blurAt(dp, 1)); ok(`far: not the whole street sharp at once — soft: ${f1.join(', ')}`, !f1.length); ok('far: the glass is not soft: '+far.glass.toFixed(2), far.glass>=0.6);
+    ok('near: the glass or the frame not sharp: '+JSON.stringify(near), near.glass===0 && near.frame===0);
+    n++; const old=atOnce(dp=>Math.min(1, Math.abs(dp-0.95)*1.8)); if(!old.length) d.push('CONTROL: the old narrow band passed «the street sharp at once» — the check cannot fail'); else notes.push('CONTROL: the old narrow band leaves soft: '+old.join(', '));
+    notes.push(`far: the plateau ±${F.focusPlateau(1).toFixed(2)} round depth ${F.focusDepth(1).toFixed(2)}; the glass ${far.glass.toFixed(2)}`); }
   { let mono=true; for(let x=0;x<1;x+=0.02){ const p=F.focusBlur(x), q=F.focusBlur(x+0.02); if(q.glass<p.glass-1e-12 || q.hills>p.hills+1e-12) mono=false; } ok('the glass does not soften, or the hills sharpen, steadily as the focus goes out', mono); }
   const mid=0.5/C.span, judgeMid=blur=>{ const g=blur(LD.glass), h=blur(LD.hills), s=[LD.streetNear, LD.street, LD.streetFar].map(blur); return s.every(v=>v<g-0.2 && v<h-0.2) ? null : { glass:g, hills:h, street:s }; };
   { const why=judgeMid(dp=>F.blurAt(dp, mid)); ok('a hand in the middle: the street is not sharper than both the glass and the hills: '+JSON.stringify(why), !why);

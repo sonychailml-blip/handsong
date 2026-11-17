@@ -4,6 +4,23 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`, `archive/NIGHT-RUN-LOG-2026-10.md`. New runs start at `NIGHT-1`.
 
+# FULL CHECK (NIGHT track, 2026-11-17): the forest's publish to night-release
+Tree hashes before (RAIN-5d's after): core 36450d3d646be550 · apps/full 0148bb454440c3e3 · apps/night 73685d357da03d5f. After (with RAIN-4e and RAIN-5e): core and Full unchanged · apps/night c22d498b2c97e188.
+- Real failures fixed at the source: the forest's shadow map never freed on leaving (`rooms/forest/forest.js`: one render target per build); RAIN-4's room memory brought chosen sounds and moods back after a profile apply (`roomdoors.js` + `main.js`: a profile applied starts fresh; the app applies one only at boot).
+- Rows: «NIGHT stream, water and ground» (build part) and «FOREST floor / wood / canopy» judge the forest they were written for (no FOREST-2 parts, no cull); «FOREST detail»'s builds without the cull; «NIGHT room switch»'s texture count was a lottery (a 256x128 canvas uploaded on some visits only, freed with its forest) — now counted in the test room (exact: 0 → 0; CONTROL the leaking room 0 → 1); three shared row «at» numbers made unique.
+- Verdicts: `P.night: PASS — 68 checks, 0 differences` (state guard clean; 3670 s, so `--limit-min 30` cannot fit — run with 150); Night UI checks PASS (rerun once: the first reload after the hour-long session lost requests to ERR_NETWORK_CHANGED, the laptop's network, in two runs); `P.quick: PASS — 93 checks, 0 differences` (FULL untouched 0; LAT1 failed once on frame rates, rerun once PASS); GOLD 101/0 (Night suite); `[smoke] PASS` with builds; `[probe-data] PASS — 91 checks, 0 differences`; static PASS.
+- Players' build: no rain room (folder and door removed, checked by the build). Precache 422 files, 33.0 MB cached, 28.6 MB to start (NIGHT-14b: 397, 31.1, 26.6); FOREST-2's files 1.66 MB of the start (bark, rocks, the spruce sheets).
+
+# RAIN-5e (NIGHT track, 2026-11-16/17): a wider depth of field, round far lights
+Tree hashes: RAIN-4e and RAIN-5e were built in one batch — before (RAIN-5d's after): core 36450d3d646be550 · apps/full 0148bb454440c3e3 · apps/night 73685d357da03d5f. After: see FULL CHECK (core and Full unchanged).
+- `rooms/rain/pure/focus.js` (a sharp plateau widening with the focus, fall-off 1.7), `rain-glass.js` (RAD with uFoc.w; point lights keep 2 px and fade before the quad's edge), `rain.js` (the plateau uniform; far lights 20-30 % brighter). Rows: data «RAIN focus law (app)» (CONTROL the old band), «RAIN no quad edges» + point lights (CONTROL the old drawing), «RAIN room» far-hand case rewritten to the new law.
+- Verdicts: [probe-data] PASS — 91 checks, 0 differences; RAIN no quad edges 4/0; RAIN room 47/0. Fix rounds: 3.
+
+# RAIN-4e (NIGHT track, 2026-11-16/17): the bed's piano sustains, no clicks, a deeper guitar, the celesta back
+Tree hashes: see RAIN-5e (one pair for the batch).
+- `rooms/rain/lofi.js` (EP_LONG: the hand's tine record with decays x2, no bark, soft attacks, a pedal, its own pool; RAIN-4d's piano behind `?bedep=short`; a 1.5-ms sample fade-in, stops below -90 dB, a 4-ms pump; the nylon's two polarisations, the body's air mode near 100 Hz and four more), `install.js`, `pure/room.js` + `roomdoors.js` + `timbres/celesta.json` (the celesta back). New P.night row «RAIN bed no clicks» (`tools/probes/night/rain4e.js`, slow; CONTROL an injected step). `tools/rain-lofi.mjs`.
+- Verdicts: RAIN bed no clicks 10/0 (about 12-16 min); RAIN timbres 19/0; NIGHT music bed 46/0, RAIN forest bed unchanged 4/0 (full suite). Fix rounds: 4 (+1: the guitar 9 dB loud on the page, trimmed).
+
 # RAIN-5d (NIGHT track, 2026-11-16): life at every distance
 Tree hashes: the four parts of this batch (fix-hidden, FOREST-2f, RAIN-4d, RAIN-5d) were built interleaved — one pair: before (RAIN-5c's after): core 36450d3d646be550 · apps/full 0148bb454440c3e3 · apps/night 46d7dc5652cc1681. After: core and Full unchanged · apps/night 73685d357da03d5f.
 - New `rooms/rain/pure/far.js`; `pure/life.js` (scooter, sign flicker), `rain.js` (far lights, turn signals, the attic), `rain-glass.js` (scooter sprite), `night.css` (ember, turn tokens). Rows: data «RAIN far life (app)»; quad edges over kind 23. Tools: `rain-snap.mjs --rain5d`.

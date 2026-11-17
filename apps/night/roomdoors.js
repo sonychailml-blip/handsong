@@ -9,7 +9,7 @@ import { timbreInstall, setTimbreTrim, setNightStrikes } from '../../core/audio.
 import { profileOf, profileCurrent } from '../../core/profile.js';
 import { L, t } from '../../core/i18n.js';
 
-const FILES=Object.freeze({ 'rain/e-piano':'e-piano', 'rain/vibraphone':'vibraphone', 'rain/nylon':'nylon' });   // RAIN-4c: the celesta left (the founder: the best of nylon / celesta; its record kept in tools/design/rain/timbres-out/)
+const FILES=Object.freeze({ 'rain/e-piano':'e-piano', 'rain/vibraphone':'vibraphone', 'rain/nylon':'nylon', 'rain/celesta':'celesta' });   // RAIN-4e: the celesta back (the founder: four, like the forest)
 const fileOf=(R, id)=>new URL('timbres/'+FILES[id]+'.json', R.base);   // the room's own folder: fetched with the room, never in the forest's start set
 const installed=new Set(), last=new Map();   // room id → { mood, timbre } played there; 'profile' → the forest's
 let D0=null, applying=false;
@@ -32,7 +32,7 @@ export function roomDoors(D){ D0=D; return { ...D,
   timbreName:id=>{ const R=musicOf(), T=R && R.music.timbres.find(x=>x.id===id); return T ? (D.timbreName(id)||id) : D.timbreName(id); } }; }
 /* after a room switch or the face's own settings: the room's mood and timbre on when it has its own (the last played there), the forest's back
    when it has not. Every change goes through the same doors the buttons use */
-export async function roomMusicApply(){ if(!D0 || applying) return; applying=true;
+export async function roomMusicApply(fresh){ if(!D0 || applying) return; applying=true; if(fresh) last.clear();   // fresh: a profile applied = a new face, nothing remembered (the app applies one only at boot)
   try{ const R=musicOf(), key=R ? R.id : 'profile', P=profileOf(profileCurrent())||{};
     if(R){ const E=musicRoom(); if(E.ready) await E.ready(); await roomTimbresInstall(R, E.base); if(!last.has('profile') && P.shell==='night') last.set('profile', { mood:D0.mood(), timbre:D0.timbre() }); }
     const want=last.get(key) || (R ? { mood:Object.keys(R.moods)[0], timbre:(R.music.timbres.find(x=>installed.has(x.id))||{}).id } : null);

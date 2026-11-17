@@ -17,7 +17,7 @@ const MIME={ '.html':'text/html; charset=utf-8', '.js':'text/javascript; charset
   '.png':'image/png', '.webp':'image/webp', '.jpg':'image/jpeg', '.svg':'image/svg+xml', '.mp3':'audio/mpeg', '.woff2':'font/woff2', '.wasm':'application/wasm', '.task':'application/octet-stream', '.ktx2':'application/octet-stream' };
 const PIECES=[['lydian-penta', 'Поздняя ночь — мечтательно, лидийский, 70', 'vibraphone'], ['dorian-hexa', 'Вечерний бульвар — больше всего грува, дорийский, 82', 'e-piano'], ['mixolydian-hexa', 'После дождя — тепло, миксолидийский, 76', 'nylon']];
 const LEVELS=[['quiet', 'Тихо: только электропиано'], ['groove', 'Грув: + бас и мягкий бит'], ['full', 'Полно: + винил, вибрафон, фразы гитары']];
-const TNAME={ 'e-piano':'электропиано', vibraphone:'вибрафон', nylon:'нейлоновая гитара' };
+const TNAME={ 'e-piano':'электропиано', vibraphone:'вибрафон', nylon:'нейлоновая гитара', celesta:'челеста' };
 
 const srv=await new Promise(res=>{ const s=http.createServer(async (q, r)=>{ try{ let p=decodeURIComponent(new URL(q.url, 'http://x').pathname); if(p.endsWith('/')) p+='index.html';
   const f=path.join(ROOT, p); if(!f.startsWith(ROOT)){ r.writeHead(403); r.end(); return; }
@@ -40,7 +40,7 @@ try{
     const R=await import('/core/render.js'), S=await import('/core/scales.js'), RR=(await import('/apps/night/rooms/rain/pure/room.js')).RAIN_ROOM, { seeded }=await import('/core/pure/dsp.js');
     const LF=await import('/apps/night/pure/lofi.js'), EN=await import('/apps/night/rooms/rain/lofi.js'), base=new URL('/apps/night/rooms/rain/', location.href).href;
     await S.scalesLoadRest();
-    const recs={}; for(const n of ['e-piano', 'vibraphone', 'nylon']) recs[n]=await (await fetch('/apps/night/rooms/rain/timbres/'+n+'.json')).json();
+    const recs={}; for(const n of ['e-piano', 'vibraphone', 'nylon', 'celesta']) recs[n]=await (await fetch('/apps/night/rooms/rain/timbres/'+n+'.json')).json();
     const viewOf=id=>S.scaleView(S.scaleById(id)), db=x=>(20*Math.log10(Math.max(1e-9, x))).toFixed(1);
     const lead=(rec, notes, sec, vol)=>R.engineProbe(async (eng, ctx)=>{ const why=eng.timbreInstall(rec); if(why) throw new Error(rec.id+': '+why); const i=eng.timbreIdx('ld', rec.id), T=RR.music.timbres.find(x=>x.id===rec.id);
       if(eng.setNightStrikes) eng.setNightStrikes({ [rec.id]:T.voices }); if(eng.setTimbreTrim) eng.setTimbreTrim({ [rec.id]:T.level });
@@ -57,7 +57,7 @@ try{
     /* one bed offline: a piece at a level (changes: [[bar, level]…] — each from that bar's line, as the room does); only: keep these event kinds; leg: the old instruments */
     const pcOf=P=>{ const m=S.scaleById(P.parent); return m && m.iv ? m.iv.slice() : undefined; };
     const bed=async (id, lv, sec, changes=[], o={})=>{ const P=RR.bed2.lofi.pieces[id], v=viewOf(id), pv=S.scaleView(S.scaleById(P.parent), undefined, undefined, S.viewKey(v), S.viewKeyC(v));
-      const c=new OfflineAudioContext(2, RATE*sec, RATE), E=await EN.lofiEngine(c, c.destination, base, { legacy:o.leg||{} }), st=LF.lofiInit(P, lv, { at:0.3, pc:pcOf(P) }), B=LF.lofiBarSec(P); E.tempo(P.bpm, 0);
+      const c=new OfflineAudioContext(2, RATE*sec, RATE), E=await EN.lofiEngine(c, c.destination, base, { legacy:o.leg||{}, ep:o.ep }), st=LF.lofiInit(P, lv, { at:0.3, pc:pcOf(P) }), B=LF.lofiBarSec(P); E.tempo(P.bpm, 0);
       E.layer('crackle', !o.only && LF.LOFI_LEVELS[lv].includes('crackle') ? 1 : 0, 0); E.level(RR.bed2.master*RR.bed2.level*RR.bed2.level, 0, 0.03);
       const put=ev=>{ if(!o.only || o.only.includes(ev.kind)) E.play(ev, ev.t, pv); };
       let t=0; const ch=changes.slice(); while(t<sec){ const nx=ch.length ? 0.3+ch[0][0]*B-0.5 : sec, evs=LF.lofiStep(st, t, Math.min(sec, nx)); if(o.arp) for(const e of evs) if(e.kind==='chord') o.arp(e).forEach(put); for(const e of evs) put(e); t=Math.min(sec, nx);
@@ -72,11 +72,11 @@ try{
     /* (2) each instrument alone, Evening boulevard, 40 s: the piano old (the FM sample) and new (the hand's tine engine); the guitar old (a plain plucked
        string) and new (the physical model) on an arpeggio of each bar's chord; the bass, the vibraphone, the drums */
     const id0='dorian-hexa', arp=e=>e.steps.concat(e.steps.slice(1).reverse()).slice(0, 6).map((s, k)=>({ t:e.t+k*60/82/2, kind:'gtr', step:Math.max(6, Math.min(15, s+(s<6 ? 7 : 0))), vel:0.55+0.15*(k===0), dur:60/82*0.6, pan:-0.2 }));
-    for(const [name, o] of [['ep-old', { only:['ep'], leg:{ ep:true } }], ['ep-new', { only:['ep'] }], ['gtr-old', { only:['gtr'], leg:{ gtr:true }, arp }], ['gtr-new', { only:['gtr'], arp }], ['bass', { only:['bass'] }], ['vib', { only:['vib'] }], ['drums', { only:['drum', 'pump'] }]]){
+    for(const [name, o] of [['ep-old', { only:['ep'], ep:'short' }], ['ep-new', { only:['ep'] }], ['gtr-old', { only:['gtr'], leg:{ gtr:true }, arp }], ['gtr-new', { only:['gtr'], arp }], ['bass', { only:['bass'] }], ['vib', { only:['vib'] }], ['drums', { only:['drum', 'pump'] }]]){
       const b=await bed(id0, 'full', 40, [], o); await send('solo-'+name, ...mix(b, null)); }
     /* (3) the hand's timbres alone: a phrase near (strong), then far (soft) */
     const v0=viewOf('lydian-penta'), N0=v0.iv.length, ph=[0, 2, 4, 3, 1, 2, 5, 4].map((s, k)=>({ t:0.3+k*0.55, d:k===7 ? 1.6 : 0.5, hz:S.chordRowFreq(s%N0, 1+Math.floor(s/N0), v0), v:1 }));
-    for(const n of ['e-piano', 'vibraphone', 'nylon']){ const a=await lead(recs[n], ph, 7, 0.8), b=await lead(recs[n], ph, 7, 0.3), L=new Float32Array(a[0].length*2), Rr=new Float32Array(L.length);
+    for(const n of ['e-piano', 'vibraphone', 'nylon', 'celesta']){ const a=await lead(recs[n], ph, 7, 0.8), b=await lead(recs[n], ph, 7, 0.3), L=new Float32Array(a[0].length*2), Rr=new Float32Array(L.length);
       L.set(a[0]); L.set(b[0], a[0].length); Rr.set(a[1]); Rr.set(b[1], a[1].length); await send('hand-'+n, L, Rr); }
   }, [RATE, SEC, PIECES, LEVELS]);
   await ctx.close();
@@ -84,12 +84,12 @@ try{
   const au=(f, cap, src=f+'.mp3')=>`<figure><figcaption>${cap}</figcaption><audio controls preload="none" src="${src}"></audio><small>${stats[f] ? `пик ${stats[f].peak} dBFS, RMS ${stats[f].rms} dBFS` : ''}</small></figure>`;
   const html=`<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Лоу-фай дождя</title>
 <style>:root{--bg:#0e1116;--fg:#e2e6ee;--mut:#97a0b0}body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,sans-serif;max-width:980px}h1{font-size:20px}h2{font-size:17px;margin:28px 0 8px}figure{margin:0 0 12px}figcaption{margin-bottom:4px}audio{width:100%}small{color:var(--mut)}p{color:var(--mut)}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:700px){.grid{grid-template-columns:1fr}}</style></head>
-<body><h1>RAIN-4d: лоу-фай комнаты «Дождь» — своё звучание</h1><p>Всё отрендерено офлайн тем же движком, что играет комната. Электропиано — тот же движок, что у руки (tine), гитара — физическая модель струны с корпусом; эффекты на дорожках. Музыка не повторяется: каждый такт вытягивается из правил пьесы.</p>
+<body><h1>RAIN-4e: лоу-фай комнаты «Дождь» — тянущееся электропиано, глубокая гитара, без щелчков</h1><p>Всё отрендерено офлайн тем же движком, что играет комната. Электропиано — тот же движок, что у руки (tine), гитара — физическая модель струны с корпусом; эффекты на дорожках. Музыка не повторяется: каждый такт вытягивается из правил пьесы.</p>
 ${PIECES.map(([id, cap, tn])=>`<h2>${cap}</h2>`+LEVELS.map(([lv, lc])=>au(`lofi-${id}-${lv}`, lc+' (около 3 минут)')).join('')+au(`lofi-${id}-full-melody`, 'Полно, с простой мелодией руки ('+TNAME[tn]+')')+au(`lofi-${id}-levels`, 'Смена уровней на тактовой черте')).join('')}
-<h2>Каждый инструмент отдельно (Вечерний бульвар, 40 с)</h2><div class="grid">${au('solo-ep-old', 'Электропиано: было (FM-сэмпл)')}${au('solo-ep-new', 'Электропиано: стало (движок руки, tine)')}${au('solo-gtr-old', 'Гитара: было (простая струна)')}${au('solo-gtr-new', 'Гитара: стало (физическая модель)')}</div>
+<h2>Каждый инструмент отдельно (Вечерний бульвар, 40 с)</h2><div class="grid">${au('solo-ep-old', 'Электропиано: RAIN-4d, короткое (?bedep=short)')}${au('solo-ep-new', 'Электропиано: RAIN-4e, тянется, педаль')}${au('solo-gtr-old', 'Гитара: было (простая струна, RAIN-4c)')}${au('solo-gtr-new', 'Гитара: RAIN-4e (две поляризации, глубокий корпус, комната)')}</div>
 ${au('solo-bass', 'Бас')}${au('solo-vib', 'Вибрафон (фразы)')}${au('solo-drums', 'Барабаны')}
 <p>Сравнение с записанной нейлоновой гитарой: свободного набора CC0 / CC-BY не нашлось (найденные — NC или GPL, нам нельзя). Вопрос в отчёте.</p>
-<h2>Тембры руки отдельно: близко, затем далеко</h2>${['e-piano', 'vibraphone', 'nylon'].map(n=>au('hand-'+n, TNAME[n])).join('')}
+<h2>Тембры руки отдельно: близко, затем далеко</h2>${['e-piano', 'vibraphone', 'nylon', 'celesta'].map(n=>au('hand-'+n, TNAME[n])).join('')}
 </body></html>`;
   await writeFile(path.join(OUT, 'index.html'), html); console.log('[rain-lofi] page → tools/design/rain/lofi/index.html');
 } finally { await browser.close(); srv.close(); }

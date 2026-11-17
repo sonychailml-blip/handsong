@@ -14,7 +14,9 @@
 import { row } from '../core/rows.js';
 import { cv } from '../../../core/palette.js';
 import { loadThree, setBackground, sceneInfo, setSceneLevel, sceneLevel, sceneRoomDbg, sceneSnapDbg, sceneProgramsDbg, sceneHeldDbg, sceneBedDbg, sceneClockDbg } from '../../../apps/night/scene/host.js';   // RUN 8: + the quality levels and the room (NIGHT forest picture)
-import { buildForest, forestAssets } from '../../../apps/night/rooms/forest/forest.js';
+import { buildForest as buildForest0, forestAssets, forestNewDbg, forestCullDbg } from '../../../apps/night/rooms/forest/forest.js';
+/* FULL CHECK (2026-11-17): the rows here count the forest's content — built without the cull (FOREST-2f's default: it re-packs the instance lists; its own row proves the frames the same) */
+const buildForest=(T, o)=>{ const c=forestCullDbg(); forestCullDbg(false); try{ return buildForest0(T, o); } finally { forestCullDbg(c); } };   // FULL CHECK (2026-11-17): forestNewDbg — the old rows build the forest they were written for
 import { fliesInit, fliesStep, FOREST_FLIES, depthDistance, forestGround } from '../../../apps/night/rooms/forest/pure/fireflies.js';   // NIGHT-9: + forestGround
 import { ANSWERS, noteRingAmp } from '../../../apps/night/rooms/forest/pure/answers.js';   // NIGHT-6 slice 1
 import { nightClockDbg } from '../../../apps/night/shell.js';
@@ -498,9 +500,9 @@ row({ night:true, at:1008.635, name:'FOREST melody', run:()=>checkForestMelody()
    own trunks and ferns), the plant sheet of its level reached it (high the 2048² master, medium the 1024² copy); the baseline override (every
    floor count 0) builds none; drawn (the opened forest at medium): the herbs and the fine ferns RENDER — one frame drawn twice, them hidden the
    second time — CONTROL the same frame twice differs by 0. */
-export async function checkForestFloor(){
+export async function checkForestFloor(){   // the laws of the forest before FOREST-2 (?forest=old): FOREST-2b–2f made new parts the default (organic roots, growers, spruces, …); the FOREST-2 rows judge those against these
   const d=[], notes=[]; let n=0; const miss=s=>d.push(s);
-  const was=profileCurrent(), keepLevel=sceneLevel();
+  const was=profileCurrent(), keepLevel=sceneLevel(), parts0=forestNewDbg(); forestNewDbg(false);
   try{
     const T=await loadThree(); const IMG=await forestAssets('full'); await forestAssets('reduced'); const w=844, h=390, rooms=[], mk=(lv, o={})=>{ const r=buildForest(T,{ C:cv, level:lv, w, h, ...o }); rooms.push(r); return r; };
     try{
@@ -521,7 +523,7 @@ export async function checkForestFloor(){
       if(!(Math.abs(ab[0]-ab[1])>0)) miss('the floor does not show in the picture'); if(cc[0]!==cc[1]) miss('CONTROL: one frame rendered twice differs by '+(cc[0]-cc[1])); }
     void IMG;
   } catch(e){ miss('error: '+(e&&e.stack||e)); }
-  finally{ try{ await setSceneLevel(keepLevel); }catch(e){} if(profileCurrent()!==was) profileApply(was); await setBackground('camera'); await sleep(30); }
+  finally{ forestNewDbg(parts0||false); try{ await setSceneLevel(keepLevel); }catch(e){} if(profileCurrent()!==was) profileApply(was); await setBackground('camera'); await sleep(30); }
   return { cases:n, total:d.length, differences:d, notes };
 }
 row({ night:true, at:1008.637, name:'FOREST floor', drawn:true, run:()=>checkForestFloor(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });
@@ -564,9 +566,9 @@ row({ night:true, at:1008.639, name:'FOREST stream', drawn:true, run:()=>checkFo
    moss, no contact shadows); today's mushrooms first and where they were, the wood's after them; today's ferns sway again (their material's
    shader has the sway — CONTROL a plain material has not); drawn (the opened forest at medium): the wood, the moss and the contact shadows
    RENDER (one frame drawn twice: each part hidden, the shadow map swapped for white) — CONTROL the same frame twice differs by 0. */
-export async function checkForestWood(){
+export async function checkForestWood(){   // the laws of the forest before FOREST-2 (?forest=old): FOREST-2b–2f made new parts the default (organic roots, growers, spruces, …); the FOREST-2 rows judge those against these
   const d=[], notes=[]; let n=0; const miss=s=>d.push(s);
-  const was=profileCurrent(), keepLevel=sceneLevel();
+  const was=profileCurrent(), keepLevel=sceneLevel(), parts0=forestNewDbg(); forestNewDbg(false);
   try{
     const T=await loadThree(); await forestAssets('full'); await forestAssets('reduced'); const w=844, h=390, rooms=[], mk=(lv, o={})=>{ const r=buildForest(T,{ C:cv, level:lv, w, h, ...o }); rooms.push(r); return r; };
     const stub=m=>{ const sh={ uniforms:{}, vertexShader:'#include <begin_vertex>\n#include <uv_vertex>', fragmentShader:'#include <map_fragment>\n#include <roughnessmap_fragment>' }; if(m.onBeforeCompile) m.onBeforeCompile(sh, null); return sh.vertexShader; };
@@ -615,7 +617,7 @@ export async function checkForestWood(){
       if(!(Math.abs(ab[0]-ab[1])>0)) miss(name+' do not show in the picture'); if(cc[0]!==cc[1]) miss('CONTROL: one frame rendered twice differs by '+(cc[0]-cc[1])); }
     white.dispose(); if(!SU) miss('the ground has no contact-shadow map');
   } catch(e){ miss('error: '+(e&&e.stack||e)); }
-  finally{ try{ await setSceneLevel(keepLevel); }catch(e){} if(profileCurrent()!==was) profileApply(was); await setBackground('camera'); await sleep(30); }
+  finally{ forestNewDbg(parts0||false); try{ await setSceneLevel(keepLevel); }catch(e){} if(profileCurrent()!==was) profileApply(was); await setBackground('camera'); await sleep(30); }
   return { cases:n, total:d.length, differences:d, notes };
 }
 row({ night:true, at:1008.6395, name:'FOREST wood', drawn:true, run:()=>checkForestWood(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });
@@ -685,9 +687,9 @@ row({ night:true, at:1008.6397, name:'FOREST gust', drawn:true, run:()=>checkFor
 /* NIGHT-6 slice 7: row «FOREST canopy» — the room built without a renderer: its leaves and stars are canopyPlaces' at each level, the baseline
    none (no stars, no dapple, no moon face); the crown leaves share the floor plants' shader program (the same key); drawn (medium): the leaves,
    the stars, the dappled moonlight and the moon's face RENDER (each hidden or swapped the second time) — CONTROL one frame twice differs by 0. */
-export async function checkForestCanopy(){
+export async function checkForestCanopy(){   // the laws of the forest before FOREST-2 (?forest=old): FOREST-2b–2f made new parts the default (organic roots, growers, spruces, …); the FOREST-2 rows judge those against these
   const d=[], notes=[]; let n=0; const miss=s=>d.push(s);
-  const was=profileCurrent(), keepLevel=sceneLevel();
+  const was=profileCurrent(), keepLevel=sceneLevel(), parts0=forestNewDbg(); forestNewDbg(false);
   try{
     const T=await loadThree(); await forestAssets('full'); await forestAssets('reduced'); const w=844, h=390, rooms=[], mk=(lv, o={})=>{ const r=buildForest(T,{ C:cv, level:lv, w, h, ...o }); rooms.push(r); return r; };
     try{
@@ -711,7 +713,7 @@ export async function checkForestCanopy(){
       if(!(Math.abs(ab[0]-ab[1])>0)) miss(name+' do not show in the picture'); if(cc[0]!==cc[1]) miss('CONTROL: one frame rendered twice differs by '+(cc[0]-cc[1])); }
     black.dispose(); n++; if(!moon) miss('no moon disc with the prepared face');
   } catch(e){ miss('error: '+(e&&e.stack||e)); }
-  finally{ sceneClockDbg(null); try{ await setSceneLevel(keepLevel); }catch(e){} if(profileCurrent()!==was) profileApply(was); await setBackground('camera'); await sleep(30); }
+  finally{ forestNewDbg(parts0||false); sceneClockDbg(null); try{ await setSceneLevel(keepLevel); }catch(e){} if(profileCurrent()!==was) profileApply(was); await setBackground('camera'); await sleep(30); }
   return { cases:n, total:d.length, differences:d, notes };
 }
 row({ night:true, at:1008.6398, name:'FOREST canopy', drawn:true, run:()=>checkForestCanopy(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });

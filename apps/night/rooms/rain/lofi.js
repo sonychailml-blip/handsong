@@ -23,9 +23,9 @@ import { JAZZ_N } from '../../pure/bedjazz.js';
 import { sampledLoad } from './sampled.js';
 
 /* levels and colours (by ear against the listening page; my choices) */
-export const LOFI_MIX=Object.freeze({ ep:0.06, epOld:0.075, bass:0.07, kick:0.1, snare:0.04, rim:0.05, ghost:0.04, hat:0.027, ohat:0.024, shaker:0.024, vib:0.03, gtr:0.12,
+export const LOFI_MIX=Object.freeze({ ep:0.06, epOld:0.075, bass:0.07, kick:0.1, snare:0.04, rim:0.05, ghost:0.04, hat:0.027, ohat:0.024, shaker:0.024, vib:0.03, gtr:0.075,
   crackle:0.02, roll:0.011, pump:Object.freeze({ keys:0.26, bass:0.12, tc:0.12 }),
-  wet:Object.freeze({ ep:0.3, bass:0.03, beat:0.07, vib:0.4, gtr:0.28 }),
+  wet:Object.freeze({ ep:0.3, bass:0.03, beat:0.07, vib:0.4, gtr:0.4 }),
   chorus:Object.freeze({ wet:0.42, d:0.014, depth:0.0026, hz:Object.freeze([0.62, 0.83]) }), trem:Object.freeze({ hz:3.6, depth:0.13, pan:0.32, panHz:0.17 }),
   delay:Object.freeze({ beats:0.75, fb:0.36, wet:0.3, lp:2400, hp:280 }),
   tape:Object.freeze({ base:0.006, wow:0.0009, wowHz:0.5, flutter:0.0001, flutterHz:6.1 }), keys:Object.freeze({ lp:4200, drive:1.5 }),
@@ -56,20 +56,29 @@ function pluckOld(ac, hz){ const sr=ac.sampleRate, N=Math.max(2, Math.round(sr/h
 /* THE NYLON STRING (a physical model): hz, vel 0…1 → a buffer. The excitation: noise of one period, darker when soft, through a pluck-position comb
    (plucked at beta of the string: its harmonics at multiples of 1/beta cancel); the loop: the integer delay, a two-point low-pass (half a sample), an
    all-pass for the fractional rest (exact tuning), and a loop gain from the decay time at that pitch (T60 3.6 s at 110 Hz, ∝ 1/√f); a 4-ms finger noise */
-export const NYLON=Object.freeze({ beta:0.17, t60:3.6, ref:110, sec:2.8, finger:0.06 });
-export function nylonBuffer(ac, hz, vel=0.6){ const sr=ac.sampleRate, N=sr/hz, D=Math.max(2, Math.floor(N-0.6)), dfr=N-D-0.5, C=(1-dfr)/(1+dfr), b=ac.createBuffer(1, Math.round(sr*NYLON.sec), sr), y=b.getChannelData(0);
-  const r=rng(Math.round(hz*1000)+Math.round(vel*7)), L=Math.round(N), ex=new Float32Array(L), soft=0.18+0.5*vel; let lp=0; for(let i=0;i<L;i++){ lp+=soft*((r()*2-1)-lp); ex[i]=lp; }
-  const P=Math.max(1, Math.round(NYLON.beta*N)); for(let i=L-1;i>=P;i--) ex[i]-=ex[i-P];
-  const g=Math.pow(10, -3/(NYLON.t60*Math.sqrt(NYLON.ref/hz)*hz)), M=D+2, line=new Float32Array(M); let w=0, prev=0, apIn=0, apOut=0;
-  for(let n=0;n<y.length;n++){ const a=line[(w-D+M)%M], lp2=0.5*(a+prev); prev=a; const ap=C*lp2+apIn-C*apOut; apIn=lp2; apOut=ap; const v=(n<L ? ex[n] : 0)+g*ap; line[w]=v; w=(w+1)%M; y[n]=v; }
-  const fr=rng(0x46494E+Math.round(hz)); for(let n=0;n<Math.min(y.length, Math.round(sr*0.004));n++) y[n]+=(fr()*2-1)*NYLON.finger*vel*(1-n/(sr*0.004));
-  let m=0; for(let i=0;i<y.length;i++) m=Math.max(m, Math.abs(y[i])); if(m>0) for(let i=0;i<y.length;i++) y[i]*=0.8*Math.pow(vel, 0.6)/m;
-  for(let i=y.length-Math.round(sr*0.05);i<y.length;i++) y[i]*=(y.length-i)/(sr*0.05);
+export const NYLON=Object.freeze({ beta:0.17, t60:5.2, ref:110, sec:4, finger:0.05, pol:Object.freeze({ cents:0.7, t60:0.72, mix:0.45 }) });
+/* one polarisation of the string (the loop above) into y, scaled by amp; k60 scales its decay time, cents its tuning */
+function nylonLoop(y, sr, hz, ex, k60, amp){ const N=sr/hz, D=Math.max(2, Math.floor(N-0.6)), dfr=N-D-0.5, C=(1-dfr)/(1+dfr), g=Math.pow(10, -3/(NYLON.t60*k60*Math.sqrt(NYLON.ref/hz)*hz)), M=D+2, line=new Float32Array(M), L=ex.length;
+  let w=0, prev=0, apIn=0, apOut=0; for(let n=0;n<y.length;n++){ const a=line[(w-D+M)%M], lp2=0.5*(a+prev); prev=a; const ap=C*lp2+apIn-C*apOut; apIn=lp2; apOut=ap; const v=(n<L ? ex[n] : 0)+g*ap; line[w]=v; w=(w+1)%M; y[n]+=v*amp; } }
+/* RAIN-4e: the string's TWO POLARISATIONS (across and along the top: the second a hair sharper and decaying faster — the slow beat a real string has),
+   one more to each side → a stereo buffer; a longer ring (T60 5.2 s at 110 Hz); the finger noise; the body and the room come after (the engine) */
+export function nylonBuffer(ac, hz, vel=0.6){ const sr=ac.sampleRate, b=ac.createBuffer(2, Math.round(sr*NYLON.sec), sr), A=new Float32Array(b.length), B=new Float32Array(b.length);
+  const r=rng(Math.round(hz*1000)+Math.round(vel*7)), Lx=Math.round(sr/hz), ex=new Float32Array(Lx), soft=0.18+0.5*vel; let lp=0; for(let i=0;i<Lx;i++){ lp+=soft*((r()*2-1)-lp); ex[i]=lp; }
+  const Pp=Math.max(1, Math.round(NYLON.beta*sr/hz)); for(let i=Lx-1;i>=Pp;i--) ex[i]-=ex[i-Pp];
+  nylonLoop(A, sr, hz, ex, 1, 1); nylonLoop(B, sr, hz*Math.pow(2, NYLON.pol.cents/1200), ex, NYLON.pol.t60, NYLON.pol.mix);
+  const fr=rng(0x46494E+Math.round(hz)), F=Math.round(sr*0.004); for(let n=0;n<Math.min(A.length, F);n++){ const e=(fr()*2-1)*NYLON.finger*vel*(1-n/F); A[n]+=e; B[n]+=e*0.6; }
+  const Lc=b.getChannelData(0), Rc=b.getChannelData(1); let m=0; for(let n=0;n<A.length;n++){ Lc[n]=A[n]*0.85+B[n]*0.45; Rc[n]=A[n]*0.5+B[n]*0.9; m=Math.max(m, Math.abs(Lc[n]), Math.abs(Rc[n])); }
+  const k=m>0 ? 0.8*Math.pow(vel, 0.6)/m : 0, fade=Math.round(sr*0.08); for(let n=0;n<A.length;n++){ const f= n>A.length-fade ? (A.length-n)/fade : 1; Lc[n]*=k*f; Rc[n]*=k*f; }
   return b; }
 /* the piano's three velocity tables from the hand's record: soft — the upper partials ×0.45 and the bark ×0.25; hard — ×1.35 and ×2.2 */
 const velTables=R=>['soft', 'mid', 'hard'].map(k=>({ ...R, partials:R.partials.map(([ratio, a, dec, w], i)=>[ratio, i===0 ? a : a*(k==='soft' ? (ratio>10 ? 0.25 : 0.45) : k==='hard' ? (ratio>10 ? 2.2 : 1.35) : 1), dec*(k==='soft' ? 0.9 : 1), w]) }));
+/* RAIN-4e: the bed's SUSTAINING piano (the default; ?bedep=short — RAIN-4d's, kept as it was): the hand's record with every decay ×2 and its bark
+   (the partial above 10×) left out — the bark's short high tick was what sounded like little glitches over the bed — soft: the upper partials ×0.5,
+   hard ×1.25 */
+const longTables=R=>['soft', 'mid', 'hard'].map(k=>({ ...R, partials:R.partials.filter(([ratio])=>ratio<=10 && Math.abs(ratio-1.003)>1e-6).map(([ratio, a, dec, w], i)=>[ratio, i===0 ? a*1.1 : a*(k==='soft' ? 0.5 : k==='hard' ? 1.25 : 1), dec*2, w]) }));   // the near-unison partial left out too (the chorus does its work; a third fewer oscillators)
+export const EP_LONG=Object.freeze({ gain:0.05, att:Object.freeze([0.03, 0.065]), hold:7, rel:0.32, tail:2.2, voices:32 });
 /* the engine in context ac, into dest; base: the room folder's URL → a promise of { play(ev, when, pv, k), layer, level, tempo(bpm), out, state() } */
-export async function lofiEngine(ac, dest, base, o={}){ const leg=o.legacy||{}, S=await sampledLoad(ac, base), G=generated(ac), M=LOFI_MIX, P=new Map();
+export async function lofiEngine(ac, dest, base, o={}){ const epMode=o.ep==='short' ? 'short' : 'long', leg=o.legacy||{}, S=await sampledLoad(ac, base), G=generated(ac), M=LOFI_MIX, P=new Map();
   const rec=await (await fetch(new URL('timbres/e-piano.json', base))).json();
   const g=v=>{ const n=ac.createGain(); n.gain.value=v; return n; }, flt=(type, hz, q=0.7, gain=0)=>{ const f=ac.createBiquadFilter(); f.type=type; f.frequency.value=hz; f.Q.value=q; f.gain.value=gain; return f; },
     sat=k=>{ const w=ac.createWaveShaper(); w.curve=curve(k); w.oversample='2x'; return w; }, lfo=(hz, depth, into, type='sine')=>{ const s=ac.createOscillator(), d=g(depth); s.type=type; s.frequency.value=hz; s.connect(d); d.connect(into); s.start(); return d; };
@@ -87,7 +96,7 @@ export async function lofiEngine(ac, dest, base, o={}){ const leg=o.legacy||{}, 
   const td=lfo(M.trem.hz, M.trem.depth, trem.gain); lfo(M.breath.hz[0], M.trem.depth*0.7, td.gain); lfo(M.trem.panHz, M.trem.pan, pan.pan);
   L.ep.connect(epIn); chorusOut.connect(trem); trem.connect(pan); pan.connect(keysLp); keysLp.connect(keysSat); keysSat.connect(pumpK); pumpK.connect(busLp);
   /* the guitar (its body) and the vibraphone, each with the tape delay: a beat-timed echo, its feedback darkened, its time wavering, its feedback breathing */
-  const body=[flt('highpass', 75, 0.7), flt('peaking', 100, 1.4, 7), flt('peaking', 205, 2.5, 5), flt('peaking', 420, 3, 3), flt('lowpass', 5600, 0.6)]; L.gtr.connect(body[0]); for(let i=1;i<body.length;i++) body[i-1].connect(body[i]);
+  const body=[flt('highpass', 62, 0.7), flt('peaking', 98, 2.4, 9), flt('peaking', 188, 4, 5), flt('peaking', 245, 5, 4), flt('peaking', 392, 4, 3), flt('peaking', 520, 5, 2), flt('lowshelf', 160, 0.7, 3), flt('lowpass', 6200, 0.6)]; L.gtr.connect(body[0]); for(let i=1;i<body.length;i++) body[i-1].connect(body[i]);   // RAIN-4e: the air resonance near 100 Hz and more body modes
   const dIn=g(1), dl=ac.createDelay(2), fb=g(M.delay.fb), dlp=flt('lowpass', M.delay.lp, 0.6), dhp=flt('highpass', M.delay.hp, 0.6), dWet=g(M.delay.wet);
   dl.delayTime.value=0.5; lfo(0.4, 0.0012, dl.delayTime); dIn.connect(dl); dl.connect(dlp); dlp.connect(dhp); dhp.connect(fb); fb.connect(dl); dhp.connect(dWet); dWet.connect(pumpK); lfo(M.breath.hz[1], 0.1, fb.gain);
   body[body.length-1].connect(pumpK); body[body.length-1].connect(dIn); L.vib.connect(pumpK); L.vib.connect(dIn);
@@ -99,15 +108,27 @@ export async function lofiEngine(ac, dest, base, o={}){ const leg=o.legacy||{}, 
   const E={ ac, build:{ banks:[], vib:null, hum:null, shim:null }, lfo:{}, nightLean:false }, TB=velTables(rec.recipe), banks=[];
   for(let v=0;v<3;v++) for(let i=0;i<10;i++){ const pre=g(1); E.build.banks=[]; buildTineBank(E, pre, TB[v], rec.id); const bk=E.build.banks[0]; bk.gain.gain.value=1; const env=g(0), p=ac.createStereoPanner(); pre.connect(env); env.connect(p); p.connect(L.ep); banks.push({ v, bk, env, p }); }
   const next=[0, 0, 0];
+  /* RAIN-4e: the sustaining voices (the default): their own pool, each bank free again once its release has died away */
+  const LT=longTables(rec.recipe), lbanks=[]; if(epMode!=='short') for(let v=0;v<3;v++) for(let i=0;i<EP_LONG.voices;i++){ const pre=g(1); E.build.banks=[]; buildTineBank(E, pre, LT[v], rec.id); const bk=E.build.banks[0]; bk.gain.gain.value=1; const env=g(0), p=ac.createStereoPanner(); pre.connect(env); env.connect(p); p.connect(L.ep); lbanks.push({ v, bk, env, p, free:0 }); }
+  let held=[], heldKey=null;
+  /* the pedal: a new chord lets the held one go (a soft release); the same chord struck again rings over its own tails */
+  const pedal=(key, t)=>{ if(key===heldKey) return; for(const b of held){ b.env.gain.setTargetAtTime(0, t, EP_LONG.rel); b.free=t+EP_LONG.rel*7; } held=[]; heldKey=key; };
+  const longVoice=(v, t)=>{ const pool=lbanks.filter(b=>b.v===v); let b=pool.filter(x=>x.free<=t).sort((x, y)=>x.free-y.free)[0];
+    if(!b){ b=pool.slice().sort((x, y)=>x.free-y.free)[0]; const at=Math.max(ac.currentTime, t-0.03); b.env.gain.cancelScheduledValues(at); b.env.gain.setTargetAtTime(0, at, 0.006); }   // all busy: the oldest fades in 30 ms first
+    return b; };
   const nearest=(list, hz)=>list.reduce((a, b)=>Math.abs(Math.log(b[0]/hz))<Math.abs(Math.log(a[0]/hz)) ? b : a);
   const one=(bufr, into, when, rate, gain, pan, dur, rel, vib)=>{ const s=ac.createBufferSource(), e=ac.createGain(), p=ac.createStereoPanner(); s.buffer=bufr; s.playbackRate.value=rate; p.pan.value=Math.max(-1, Math.min(1, pan||0));
     if(vib && dur>0.45){ const n=Math.ceil((dur-0.3)*40), c=new Float32Array(n); for(let i=0;i<n;i++) c[i]=rate*(1+0.0023*Math.sin(i/40*2*Math.PI*5.2)*Math.min(1, i/20)); try{ s.playbackRate.setValueCurveAtTime(c, when+0.3, dur-0.3); }catch(e){} }
-    e.gain.setValueAtTime(gain, when); if(dur!=null){ e.gain.setValueAtTime(gain, when+dur); e.gain.setTargetAtTime(0, when+dur, rel/4); } s.connect(e); e.connect(p); p.connect(into); s.start(when); s.stop(when+(dur!=null ? dur+rel : bufr.duration/rate)+0.02); };
+    e.gain.setValueAtTime(0, when); e.gain.linearRampToValueAtTime(gain, when+0.0015); if(dur!=null){ e.gain.setValueAtTime(gain, when+dur); e.gain.setTargetAtTime(0, when+dur, rel/4); } s.connect(e); e.connect(p); p.connect(into); s.start(when); s.stop(when+(dur!=null ? dur+Math.max(rel, 0.02)*2.6 : bufr.duration/rate)+0.02); };   // RAIN-4e: stopped once the release is below −90 dB (a step at the stop was a click)   // RAIN-4e: a 1.5-ms fade-in (a sample starting on a non-zero value clicked)
   let notes=0, beat=60/80; const det=rng(0x444554);
   function play(ev, when, pv, k=1){ const hz=s=>chordRowFreq(mod(s, JAZZ_N), Math.floor(s/JAZZ_N), pv); notes++;
     if(ev.kind==='ep'){ const n=ev.steps.length; ev.steps.forEach((s, i)=>{ const f=hz(s), t=when+i*M.roll, vel=ev.vel;
         if(leg.ep){ const [r0, nm]=nearest(S.notes.ep, f); one(S.buf[nm], L.ep, t, f/r0, k*M.epOld*vel/Math.sqrt(n), (ev.pan||0)+(i-(n-1)/2)*0.16, ev.dur, 0.6); return; }
-        const v= vel<0.36 ? 0 : vel<0.5 ? 1 : 2, b=banks.filter(x=>x.v===v)[next[v]++%10];
+        if(epMode!=='short'){ if(i===0) pedal(ev.steps.join(','), t); const v= vel<0.36 ? 0 : vel<0.5 ? 1 : 2, b=longVoice(v, t), L0=EP_LONG, A=L0.att[0]+(L0.att[1]-L0.att[0])*(1-Math.min(1, vel)), lv=L0.gain*Math.min(1.3, 0.55+vel);
+          b.bk.setFreq(f*Math.pow(2, (det()-0.5)*6/1200), 0, t); b.bk.strike(t, Math.min(1, k*vel*1.5/Math.sqrt(n)));
+          b.p.pan.setValueAtTime(Math.max(-1, Math.min(1, (ev.pan||0)+(i-(n-1)/2)*0.16)), t); const eg=b.env.gain; eg.cancelScheduledValues(t); eg.setValueAtTime(0, t); eg.linearRampToValueAtTime(lv, t+A); eg.setTargetAtTime(0, t+L0.hold, L0.rel*2);
+          b.free=t+L0.hold+L0.tail; held.push(b); return; }   // RAIN-4e: soft attack, held until the chord changes (the pedal) or L0.hold at most
+        const v= vel<0.36 ? 0 : vel<0.5 ? 1 : 2, b=banks.filter(x=>x.v===v)[next[v]++%10];   // ?bedep=short: RAIN-4d's piano, exactly
         b.bk.setFreq(f*Math.pow(2, (det()-0.5)*6/1200), 0, t); b.bk.strike(t, Math.min(1, k*vel*1.6/Math.sqrt(n)));
         b.p.pan.setValueAtTime(Math.max(-1, Math.min(1, (ev.pan||0)+(i-(n-1)/2)*0.16)), t); b.env.gain.cancelScheduledValues(t); b.env.gain.setValueAtTime(M.ep, t); b.env.gain.setValueAtTime(M.ep, t+ev.dur); b.env.gain.setTargetAtTime(0, t+ev.dur, 0.12);
         one(G.thunk, L.ep, t+ev.dur, 1+(det()-0.5)*0.2, k*0.012*vel, b.p.pan.value, null, 0); }); }
@@ -122,10 +143,10 @@ export async function lofiEngine(ac, dest, base, o={}){ const leg=o.legacy||{}, 
       else if(d==='hat') one(S.buf['hat-foot'], L.beat, when, 1.06, v*M.hat, ev.pan, 0.09, 0.04);
       else if(d==='ohat') one(G.ohat, L.beat, when, 1, v*M.ohat, ev.pan, null, 0);
       else if(d==='shaker') one(G.shaker, L.beat, when, 1, v*M.shaker, ev.pan, null, 0); }
-    else if(ev.kind==='pump'){ const a=Math.min(1, ev.vel||0); for(const [n, depth] of [[pumpK, M.pump.keys], [pumpB, M.pump.bass]]){ n.gain.setValueAtTime(1-depth*a, when); n.gain.setTargetAtTime(1, when+0.006, M.pump.tc); } }
+    else if(ev.kind==='pump'){ const a=Math.min(1, ev.vel||0); for(const [n, depth] of [[pumpK, M.pump.keys], [pumpB, M.pump.bass]]){ n.gain.setTargetAtTime(1-depth*a, when, 0.004); n.gain.setTargetAtTime(1, when+0.02, M.pump.tc); } }   // RAIN-4e: dips and returns smoothly (an instant drop clicked on the held piano)
     else if(ev.kind==='layer' && ev.layer==='crackle'){ const p=L.crackle.gain; p.setValueAtTime(p.value, when); p.linearRampToValueAtTime(ev.gain, when+ev.ramp); } }
   const layer=(name, v, when, ramp=0)=>{ if(!L[name]) return; const p=L[name].gain; p.cancelScheduledValues(when); p.setValueAtTime(ramp ? p.value : v, when); if(ramp) p.linearRampToValueAtTime(v, when+ramp); };
   const level=(v, when, tc=1.2)=>{ out.gain.setTargetAtTime(v, when, tc/3); };
   /* the piece's tempo: the tape delay's time (a dotted eighth) */
   const tempo=(bpm, when=ac.currentTime)=>{ beat=60/bpm; dl.delayTime.setTargetAtTime(Math.min(1.9, beat*M.delay.beats), when, 0.3); };
-  return { play, layer, level, tempo, out, state:()=>({ notes, plucks:P.size, banks:banks.length }) }; }
+  return { play, layer, level, tempo, out, state:()=>({ notes, plucks:P.size, banks:banks.length, long:lbanks.length, held:held.length, ep:epMode }) }; }

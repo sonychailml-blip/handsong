@@ -13,7 +13,7 @@
        forest's recipe (another object, the same numbers — the swap runs, the forest plays on) fails that bound. (The house
        measure alone, curvature over the local peak, could not tell an instant swap between two noise-like natures: 0.32, under 0.5.)
    (4) after 20 switches forest ↔ test room, the renderer's programs, geometries and textures and the contexts made and alive are back at
-       their baseline — CONTROL: the leaking test room is caught (a texture above the baseline).
+       their baseline (FULL CHECK: the textures counted in the test room, the 1st switch vs the 19th — exact) — CONTROL: the leaking test room is caught (a texture above).
    Lighter cases: a failed opening shows the room's 2D stand-in (no renderer, detection free); an opening past its deadline shows the stand-in
    and lets detection run; Dark → Room opens veiled and paused, then unveils; a switch moves the nature to the new recipe and the bed to the
    new room's recipes, playing again; the Room button shows with two rooms, switches, and hides with one; only a real room is remembered.
@@ -68,13 +68,16 @@ export async function checkNightRoomSwitch(){
     if($('nightRoom').querySelector('.night-val').textContent!==I18.L(FR.name)) miss(`the Room button reads «${$('nightRoom').querySelector('.night-val').textContent}», not the forest's name`);
     /* (4) leaks: 20 switches forest ↔ test room come back to the baseline */
     { const base=snap(), t0=performance.now();
-      let first=null; for(let k=0;k<20;k++){ await go(k%2 ? FOREST : TEST); if(k===1){ await frames(2); first=snap(); } }
+      let first=null, tA=null, tB=null; for(let k=0;k<20;k++){ await go(k%2 ? FOREST : TEST); if(k===1){ await frames(2); first=snap(); } if(k===0 || k===18){ await frames(2); if(k) tB=snap().textures; else tA=snap().textures; } }
       await frames(4); const after=snap(); n+=5;
-      notes.push(`20 switches in ${((performance.now()-t0)/1000).toFixed(1)} s: baseline ${JSON.stringify(base)} → after the first round ${JSON.stringify(first)} → after 20 ${JSON.stringify(after)}`);
-      for(const k of ['programs', 'geometries', 'textures', 'made', 'live']) if(after[k]!==base[k]) miss(`after 20 switches ${k} is ${after[k]}, the baseline ${base[k]}`);
-      TR.testRoomMode('leak'); await go(TEST); await go(FOREST); await frames(2); const leak=snap(); n++;
-      notes.push(`CONTROL the leaking test room: textures ${base.textures} → ${leak.textures}`);
-      if(!(leak.textures>base.textures)) miss(`CONTROL: the leaking test room left textures at ${leak.textures} (baseline ${base.textures}) — a leak is not caught`);
+      notes.push(`20 switches in ${((performance.now()-t0)/1000).toFixed(1)} s: baseline ${JSON.stringify(base)} → after the first round ${JSON.stringify(first)} → after 20 ${JSON.stringify(after)}; textures in the test room after the 1st switch ${tA}, after the 19th ${tB}`);
+      /* FULL CHECK (2026-11-17): the textures are counted in the TEST room — with the forest open the count holds what was drawn (a 256x128 canvas
+         uploaded on some visits only, freed with its forest), a lottery; in the test room nothing of the forest is drawn, and a leaked one stays */
+      for(const k of ['programs', 'geometries', 'made', 'live']) if(after[k]!==base[k]) miss(`after 20 switches ${k} is ${after[k]}, the baseline ${base[k]}`);
+      if(!Number.isFinite(tA) || tB!==tA) miss(`after 19 switches the test room holds ${tB} textures, after the first ${tA}`);
+      TR.testRoomMode('leak'); await go(TEST); await go(FOREST); TR.testRoomMode('plain'); await go(TEST); await frames(2); const leak=snap(); await go(FOREST); n++;   // the same exact measure: the plain test room's count
+      notes.push(`CONTROL the leaking test room: textures in the test room ${tA} → ${leak.textures}`);
+      if(!(leak.textures>tA)) miss(`CONTROL: the leaking test room left the test room at ${leak.textures} textures (${tA} before) — a leak is not caught`);
       TR.testRoomFreeLeaks(); TR.testRoomMode('plain'); await frames(2); }
     /* (1) detection pause: no frame taken inside an opening; CONTROL the old way takes some */
     { const rec=[]; H.sceneOpenDbg({ hook:(k, id)=>rec.push({ k, id, snapped:V.pumpStats().snapped }) });

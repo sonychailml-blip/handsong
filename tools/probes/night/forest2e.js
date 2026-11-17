@@ -37,5 +37,5 @@ export async function checkForestApart(){ const d=[], notes=[]; let n=0; const o
   ok('CONTROL: as at FOREST-2d the left pairs of the two levels were found the same — the check cannot see a difference', !same(L0.reduced, L0.full));
   notes.push(`the left pair on both levels: spruces ${JSON.stringify(L.full.spruces)}, big ferns ${JSON.stringify(L.full.ferns)}`);
   return { cases:n, total:d.length, differences:d, notes }; }
-row({ at:1009.95, night:true, name:'FOREST plants apart', drawn:true, run:()=>checkForestApart(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });
+row({ at:1009.9502, night:true, name:'FOREST plants apart', drawn:true, run:()=>checkForestApart(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });
 export default async function(){ return checkForestApart(); }
