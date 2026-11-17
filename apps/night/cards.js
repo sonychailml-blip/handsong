@@ -11,6 +11,7 @@
 import { t, onLangChange } from '../../core/i18n.js';
 import { svgIcon } from '../../core/icons.js';
 import { fsApi, fsStandalone } from './fullscreen.js';
+import { sceneRoom } from './scene/host.js';   // RAIN-R1: the cards follow the current room
 
 const $=id=>document.getElementById(id);
 /* a hand seen from the palm, its wrist at (x, y), scale s, mirrored for the left one; pinch: which finger (0 index … 3 little) touches the thumb */
@@ -46,11 +47,21 @@ const PICS=[
     <path d="M118,93 L140,93" class="np-dash"/><path d="M134,88 L140,93 L134,98" class="np-line"/><g class="np-ico" data-ico="add-home" transform="translate(146,79)"></g>
     <rect x="66" y="10" width="68" height="52" rx="8" class="np-line"/><circle cx="100" cy="36" r="5" class="np-glow"/>`,
 ];
-const BASE=['play','depth','fx','music'];
+/* RAIN-R1: the rain's own pictures — near: a hand close to the camera wiping a clear stroke through the mist on the glass; far: a small far hand,
+   the house opposite with one window lighting up */
+const PICS_RAIN={
+  rainNear:()=>`<rect x="104" y="14" width="88" height="94" rx="4" class="np-line"/><path d="M114,30 h68 M114,46 h68 M114,62 h68 M114,78 h68 M114,94 h68" class="np-dash np-faint"/>
+    <path d="M118,86 C136,60 150,52 178,40" class="np-hold"/>${handSvg(56, 114, 1.2, { pinch:0 })}`,
+  rainFar:()=>`<rect x="122" y="22" width="62" height="86" rx="2" class="np-line"/><rect x="132" y="32" width="12" height="12" class="np-line"/><rect x="162" y="32" width="12" height="12" class="np-line"/>
+    <rect x="132" y="56" width="12" height="12" class="np-line"/><rect x="162" y="56" width="12" height="12" class="np-glow"/><rect x="132" y="80" width="12" height="12" class="np-line"/><rect x="162" y="80" width="12" height="12" class="np-line"/>
+    ${handSvg(66, 98, 0.62, { pinch:0 })}<path d="M86,62 L150,62" class="np-dash"/><path d="M144,57 L150,62 L144,67" class="np-line"/>` };
+const PIC_OF={ play:0, depth:1, fx:2, rainFx:2, music:3, home:4 };
+const picOf=k=>PICS_RAIN[k] || PICS[PIC_OF[k]!=null ? PIC_OF[k] : 0];
+const BASE=['play','depth','fx','music'], RAIN_CARDS=['play','rainNear','rainFar','rainFx','music'];   // RAIN-R1: the rain's cards (near: wipe the mist; far: light the windows; the effects hand)
 let env=null;   // probe only: a made-up device for the home-screen card
 export const cardsEnvNow=()=>env || { ua:navigator.userAgent, platform:navigator.platform, touch:navigator.maxTouchPoints||0, standalone:fsStandalone(), fsApi:fsApi() };   // NIGHT-11: the coaching line's home-screen test reads it
 /* the cards this device gets: the four, and on iPhone Safari outside the home-screen app a fifth on how to get full screen (pure/homehint.js) */
-const cardList=()=> BASE;   // NIGHT-11 part 4: the home-screen card became a one-time coaching line after the first minute (coach.js); homeHintFor stays its test
+const cardList=()=> sceneRoom()==='room.rain' ? RAIN_CARDS : BASE;   // NIGHT-11 part 4: the home-screen card became a one-time coaching line after the first minute (coach.js); homeHintFor stays its test
 let CARDS=BASE;
 /* NIGHT-7b: due on a Begin unless this exact value is stored (a new card set raises CARDS_V); anything else stored — old, unknown — means due */
 export const CARDS_KEY='handsong.nightCards', CARDS_V='2';   // NIGHT-7c: 2 — the music card's words, the home-screen card
@@ -63,7 +74,7 @@ function render(){ const k=CARDS[i];
   $('nightCardText').textContent=t(`night.card.${k}.b`, { still:t('night.music.still'), drift:t('night.music.drift'), glimmer:t('night.music.glimmer') });
   $('nightCardStep').textContent=t('night.card.of', { n:i+1, m:CARDS.length });
   $('nightCardSkip').textContent=t('night.card.skip'); $('nightCardNext').textContent=t(i===CARDS.length-1 ? 'night.card.go' : 'night.card.next');
-  const pic=$('nightCardPic'); pic.innerHTML=`<svg viewBox="0 0 200 120" class="night-pic" role="presentation">${PICS[BASE.length>i ? i : 4]()}</svg>`;
+  const pic=$('nightCardPic'); pic.innerHTML=`<svg viewBox="0 0 200 120" class="night-pic" role="presentation">${picOf(k)()}</svg>`;
   for(const ico of pic.querySelectorAll('.np-ico')){ const g=svgIcon(document, ico.dataset.ico); if(g){ g.setAttribute('width', '28'); g.setAttribute('height', '28'); ico.appendChild(g); } }   // the icons' own svg, sized inside the picture
   for(const d of $('nightCardDots').children) d.classList.toggle('on', +d.dataset.i===i); }
 function close(){ if(!open) return; open=false; $('nightCards').hidden=true; document.body.classList.remove('night-cards-open'); const f=done; done=null; if(f) f(); }

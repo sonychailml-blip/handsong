@@ -181,7 +181,7 @@
     },
     {
       "id": "night-stills",
-      "name": "The start screen's stills of the night forest: a dim picture of the room behind the start card, one per picture level (DESIGN-1), and the shapes of its corner silhouettes (NIGHT-13)",
+      "name": "The start screen's stills of the night forest and of the rain room (RAIN-R1): a dim picture of the room behind the start card, one per picture level (DESIGN-1), and the shapes of the forest's corner silhouettes (NIGHT-13)",
       "class": "image",
       "use": "shipped",
       "version": "—",
@@ -190,9 +190,11 @@
       "files": [
         "apps/night/rooms/forest/still/still-full.webp",
         "apps/night/rooms/forest/still/still-reduced.webp",
-        "apps/night/rooms/forest/still/still-sil.webp"
+        "apps/night/rooms/forest/still/still-sil.webp",
+        "apps/night/rooms/rain/still/still-full.webp",
+        "apps/night/rooms/rain/still/still-reduced.webp"
       ],
-      "replace": "kept — our own generated material (regenerate: node tools/night-still.mjs whenever the forest's look changes)"
+      "replace": "kept — our own generated material (regenerate: node tools/night-still.mjs [--room rain] whenever a room's look changes)"
     },
     {
       "id": "stream-recording",

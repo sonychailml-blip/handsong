@@ -76,7 +76,7 @@ if(DUMP && !has('--quick') && !has('--all') && !has('--night')) QUICK=false;
 const EVAL=val('--eval',null);
 /* DESIGN-1: --ui-only (Night page only) — no P.night (its offline renders), no engine benchmark: only the start, cards, settings, coaching and texts
    checks with real input, plus the CSP, network and storage checks every session ends with (Level 1 changes on Night, CLAUDE.md «Check levels») */
-const UI_ONLY=has('--ui-only');
+const UI_ROW=val('--ui-row',null), UI_ONLY=has('--ui-only') || !!UI_ROW;   // RAIN-R1: --ui-row <words> — only the UI checks whose name holds them (iteration mode)
 if(UI_ONLY && APP!=='night'){ console.log('[probe-browser] --ui-only is for the Night page: add --app night'); process.exit(2); }
 const LEAK=has('--leak');
 if((EVAL||LEAK) && !has('--quick') && !has('--all')) QUICK=false;
@@ -862,7 +862,7 @@ async function uiNightHowTo(page, label){
    its label. NIGHT-13: THE CARD STANDS STILL — its box (top, left, width, height) is the same under all three tabs. Behaviour (English, laptop): the Lightweight
    switch and the note-field switch still do what they did (their state and the stored value), switched back. CONTROLS: every pane forced visible must fail
    «one pane»; a note pulled up over its row must fail the layout; the panes without their shared cell (a hidden pane taking no room) must fail «stands still». */
-const SET_TABS_WANT={ sound:{ show:['nightMusicVol','nightMusicAnswerTg'] }, picture:{ show:['nightBgSeg','nightQualSeg','nightLightTg','nightFieldTg'] },
+const SET_TABS_WANT={ sound:{ show:['nightMusicVol','nightMusicAnswerTg'] }, picture:{ show:['nightBgSeg','nightQualSeg','nightFieldTg'] },
   hands:{ show:['nightHandSeg','nightTravel','nightFxSens','nightDotsSeg','nightCalReset'] } };
 /* the card's box under each tab (real taps) → the differences from the first tab's box, px */
 async function setCardStill(p){ const box=[];
@@ -922,12 +922,12 @@ async function uiNightSettings(page, label){
           if(!b.layout.some(x=>/overlap/.test(x))) bad.push(`${at}: CONTROL a note pulled over its row was not caught — the layout check cannot fail`); else lines.push(`${at}: CONTROL a note pulled over its row is caught`); }
       }
       if(lang==='en'){ await c.p.setViewportSize({ width:1280, height:800 }); await c.p.click('#nightSetTabs [data-tab="picture"]'); await c.p.waitForTimeout(100);
-        const st=()=>c.p.evaluate(async ()=>{ const S=await import('/core/state.js'); return { light:document.getElementById('nightLightTg').classList.contains('on'), stored:localStorage.getItem('handsong.nightLight'), field:!!(S.nightView && S.nightView.fieldAll) }; });
-        const s0=await st(); await c.p.click('#nightLightTg'); await c.p.waitForTimeout(200); const s1=await st(); await c.p.click('#nightLightTg'); await c.p.waitForTimeout(200); const s2=await st();
+        const st=()=>c.p.evaluate(async ()=>{ const S=await import('/core/state.js'), on=document.querySelector('#nightQualSeg .on'); return { light:!!on && on.dataset.q==='light', q:on ? on.dataset.q : null, stored:localStorage.getItem('handsong.nightLight'), field:!!(S.nightView && S.nightView.fieldAll) }; });   // NIGHT-16: Light is a quality choice
+        const s0=await st(), back=s0.q||'reduced'; await c.p.click('#nightQualSeg [data-q="light"]'); await c.p.waitForTimeout(200); const s1=await st(); await c.p.click(`#nightQualSeg [data-q="${back}"]`); await c.p.waitForTimeout(200); const s2=await st();
         await c.p.click('#nightFieldTg'); await c.p.waitForTimeout(100); const f1=await st(); await c.p.click('#nightFieldTg'); await c.p.waitForTimeout(100); const f2=await st();
-        if(s1.light===s0.light || s1.stored!==(s1.light ? '1' : '0') || s2.light!==s0.light) bad.push('the Lightweight switch: '+JSON.stringify([s0, s1, s2]));
+        if(!s1.light || s1.stored!=='1' || s2.q!==back || s2.stored!=='0') bad.push('the quality choice Light and back: '+JSON.stringify([s0, s1, s2]));
         else if(f1.field===s0.field || f2.field!==s0.field) bad.push('the note-field switch: '+JSON.stringify([s0, f1, f2]));
-        else lines.push(`the Lightweight switch (on, stored «${s1.stored}», back off) and the note-field switch work from their tab as before`); }
+        else lines.push(`the quality choice Light (stored «${s1.stored}») and back to ${back}, and the note-field switch, work from their tab`); }
     } finally { await c.ctx.close().catch(()=>{}); } }
   return { pass:!bad.length, lines:[...lines.map(l=>`${label}: ${l}`), ...bad.map(b=>`${label}: NOT A PASS — ${b}`)] };
 }
@@ -1035,7 +1035,7 @@ async function stillMatchRun(page, vp, o={}){
     await c.p.setViewportSize(vp); await c.p.goto(c.url); await c.p.waitForFunction(()=>window.__nightBoot && window.__nightBoot.state().done, null, { timeout:60e3 });
     await c.p.evaluate(async ()=>{ window.__st=await import('/apps/night/still.js'); window.__host=await import('/apps/night/scene/host.js'); window.__st.stillDbg({ freeze:true }); });
     if(o.resize){ await c.p.setViewportSize(o.resize); vp=o.resize; }
-    const fitOk=await c.p.waitForFunction(old=>{ const d=window.__st.stillDbg(); return !!d.fit && d.fit.bw===innerWidth && d.fit.bh===innerHeight && (old || d.sprites && d.overDrawn>0); }, !!o.old, { timeout:20e3, polling:100 }).then(()=>true, ()=>false);
+    const fitOk=await c.p.waitForFunction(old=>{ const d=window.__st.stillDbg(); return !!d.fit && d.fit.bw===innerWidth && d.fit.bh===innerHeight && (old || d.sprites && d.overDrawn>0); }, !!(o.old || o.bare), { timeout:20e3, polling:100 }).then(()=>true, ()=>false);   // RAIN-R1: bare — a still without a corner layer
     if(!fitOk) return { err:'the still was not placed for this screen within 20 s' };
     await c.p.addStyleTag({ content:MATCH_HIDE_A }); await c.p.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
     const A=(await c.p.screenshot({ animations:'disabled' })).toString('base64'); const fit=await c.p.evaluate(()=>window.__st.stillDbg().fit);
@@ -1043,21 +1043,38 @@ async function stillMatchRun(page, vp, o={}){
     await tapAt(c.p, '#nightBegin'); await c.p.waitForFunction(()=>!document.getElementById('start').classList.contains('on'), null, { timeout:LIMIT_START });
     const done=await c.p.waitForFunction(()=>window.__st.stillDbg().phase==='done', null, { timeout:90e3, polling:50 }).then(()=>true, ()=>false);
     if(!done) return { err:'the reveal did not end within 90 s' };
-    const rest=await c.p.evaluate(old=>{ if(!old) window.__host.sceneRest(true); return window.__host.sceneRestDbg().room; }, !!o.old);   // the camera as at the hand-over (the first live frame's pose); the old way: as it is
+    const rest=await c.p.evaluate(old=>{ if(!old) window.__host.sceneRest(true); return window.__host.sceneRestDbg().room; }, !!o.old), room=await c.p.evaluate(()=>window.__host.sceneRoom());   // the camera as at the hand-over (the first live frame's pose); the old way: as it is
     await c.p.addStyleTag({ content:MATCH_HIDE_B }); await c.p.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>requestAnimationFrame(r)))));
     const B=(await c.p.screenshot({ animations:'disabled' })).toString('base64');
     const m=await c.p.evaluate(MATCH_FN, [A, B]);
-    return { ...m, fit, rest, vp };
+    return { ...m, fit, rest, vp, room };
   } finally { await c.ctx.close().catch(()=>{}); }
 }
 const matchOk=m=>!m.err && Math.abs(m.scale-1)<=0.006 && Math.abs(m.dx)<=1 && Math.abs(m.dy)<=1 && m.peak>m.off3+0.02;
 const matchTxt=m=>m.err ? m.err : `scale ${m.scale.toFixed(4)}, shift ${m.dx.toFixed(2)}, ${m.dy.toFixed(2)} px of ${m.w}, edge match ${m.peak.toFixed(3)} (at ±3 % ${m.off3.toFixed(3)})`;
 async function uiNightStillMatch(page, label){
   const lines=[], bad=[];
+  /* RAIN-R1: THE RANDOM START — the visit's draw (pinned by ?probe&rnd) opens that room, with its own still and life on the start screen; each judged against
+     the other room's still too (the CONTROL that the reading can fail) */
+  for(const [rnd, want, life] of [[0.2, 'room.forest', 'fireflies'], [0.8, 'room.rain', 'drops']]){
+    const c=await freshPage(page, { q:`&room=random&rnd=${rnd}`, init:[()=>{ try{ localStorage.setItem('handsong.nightBg','forest'); localStorage.setItem('handsong.sceneLevel','reduced'); }catch(e){} }, null] });
+    try{ await c.p.setViewportSize({ width:1280, height:800 }); await c.p.goto(c.url); await c.p.waitForFunction(()=>window.__nightBoot && window.__nightBoot.state().done, null, { timeout:90e3 });
+      const R=await c.p.evaluate(async ()=>{ const H=await import('/apps/night/scene/host.js'), S=await import('/apps/night/still.js'), d=S.stillDbg(); return { host:H.sceneRoom(), html:document.documentElement.getAttribute('data-room'), still:d.room, life:d.life, lights:d.lights, bg:getComputedStyle(document.getElementById('nightStill')).backgroundImage }; });
+      const mine=want==='room.rain' ? 'rooms/rain/still/still-reduced.webp' : 'rooms/forest/still/still-reduced.webp', other=want==='room.rain' ? 'rooms/forest/still/' : 'rooms/rain/still/';
+      if(R.host!==want || R.html!==want || R.still!==want || R.life!==life || !(R.lights>0) || !R.bg.includes(mine)) bad.push(`the draw ${rnd}: ${JSON.stringify({ ...R, bg:R.bg.slice(-90) })} (${want} with its ${life} and its own still wanted)`);
+      else if(R.bg.includes(other)) bad.push(`CONTROL the draw ${rnd}: the start screen also shows the other room's still`);
+      else lines.push(`the draw ${rnd}: ${want} — its still (not the other room's), ${R.lights} ${life} on the start screen`); }
+    finally { await c.ctx.close().catch(()=>{}); } }
   for(const [vp, o, name] of [[{ width:1536, height:730 }, {}, 'laptop window'], [{ width:1920, height:1080 }, {}, 'full HD full screen'], [{ width:1280, height:800 }, {}, 'the old shape'],
     [{ width:390, height:844 }, {}, 'phone upright'], [{ width:844, height:390 }, {}, 'phone on its side'], [{ width:1280, height:800 }, { resize:{ width:1700, height:860 } }, 'resized before Begin']]){
     const m=await stillMatchRun(page, vp, o), at=`${name} ${(o.resize||vp).width}×${(o.resize||vp).height}`;
     if(!matchOk(m)) bad.push(`${at}: the still and the first live frame do not line up — ${matchTxt(m)}`); else lines.push(`${at}: ${matchTxt(m)}`); }
+  /* RAIN-R1: the rain's start still lines up with its first live frame (the visit's draw gives the rain: ?room=random&rnd=0.8) */
+  for(const [vp, name] of [[{ width:1536, height:730 }, 'the rain, laptop window'], [{ width:390, height:844 }, 'the rain, phone upright']]){
+    const m=await stillMatchRun(page, vp, { q:'&room=random&rnd=0.8', bare:true }), at=`${name} ${vp.width}×${vp.height}`;
+    if(m.err || m.room!=='room.rain') bad.push(`${at}: ${m.err || 'the start room is '+m.room+', not the rain'}`); else if(!matchOk(m)) bad.push(`${at}: the still and the first live frame do not line up — ${matchTxt(m)}`); else lines.push(`${at}: ${matchTxt(m)}`); }
+  { const k=await stillMatchRun(page, { width:1536, height:730 }, { q:'&room=random&rnd=0.8&oldstill', old:true });   // RAIN-R1: CONTROL — the rain's still placed the old way must fail
+    if(k.err || matchOk(k)) bad.push(`CONTROL: the rain's still with DESIGN-1's fit ${k.err ? 'did not run: '+k.err : 'lined up — the check cannot fail ('+matchTxt(k)+')'}`); else lines.push(`CONTROL: the rain's still with DESIGN-1's fit is caught — ${matchTxt(k)}`); }
   const k=await stillMatchRun(page, { width:1536, height:730 }, { q:'&oldstill', old:true });
   if(k.err || matchOk(k)) bad.push(`CONTROL: DESIGN-1's fit on the laptop window ${k.err ? 'did not run: '+k.err : 'lined up — the check cannot fail ('+matchTxt(k)+')'}`); else lines.push(`CONTROL: DESIGN-1's fit on the laptop window is caught — ${matchTxt(k)}`);
   return { pass:!bad.length, lines:[...lines.map(l=>`${label}: ${l}`), ...bad.map(b=>`${label}: NOT A PASS — ${b}`)] };
@@ -1085,12 +1102,19 @@ async function dotRun(page, o){
     await c.p.evaluate(async ()=>{ window.__st=await import('/apps/night/still.js'); }); await c.p.waitForTimeout(600);
     const z=await c.p.evaluate(()=>{ const n=e=>+getComputedStyle(document.getElementById(e)).zIndex||0; return { dot:n('nightStillDot'), trail:n('nightDotTrail'), start:n('start'), still:n('nightStill'), mist:n('nightStillMist') }; });
     await c.p.evaluate(DOT_REC); await tapAt(c.p, '#nightBegin');
+    if(o.rain){ await c.p.waitForFunction(()=>{ const r=window.__st && window.__st.stillDbg(); return r && (r.dotSt==='fly' || r.dotSt==='done'); }, null, { timeout:120e3, polling:50 }).catch(()=>{});
+      o.litBefore=await c.p.evaluate(async ()=>{ const H=await import('/apps/night/scene/host.js'), r=H.sceneRoomDbg(); return r && r.state ? r.state().lit : null; }); }   // the windows as the flight begins
     if(o.from) await c.p.setViewportSize(o.vp);   // the layout changes in the tap (as a full screen entered there)
     if(o.mid){ await c.p.waitForFunction(()=>window.__st.stillDbg().dotSt==='fly', null, { timeout:120e3, polling:50 }); await c.p.waitForTimeout(1000); await c.p.setViewportSize(o.mid); }
     const done=await c.p.waitForFunction(()=>window.__st.stillDbg().dotSt==='done', null, { timeout:150e3, polling:100 }).then(()=>true, ()=>false);
     await c.p.waitForTimeout(200); await c.p.evaluate(()=>{ window.__drStop=true; });
     const F=await c.p.evaluate(()=>window.__dr.slice()), D=await c.p.evaluate(()=>{ const d=window.__st.stillDbg(); return { peak:d.dotPeak, log:d.dotLog }; });
-    return { F, D, z, done };
+    /* RAIN-R1: in the rain the dot lands on a window of the house opposite and lights it (it was dark before the landing: the CONTROL that the check can fail) */
+    const W= o.rain ? await c.p.evaluate(async before=>{ const H=await import('/apps/night/scene/host.js'), r=H.sceneRoomDbg(); if(!r || !r.windowAt) return { err:'no rain room' };
+      const st=r.state(), to=(window.__dr.filter(f=>f.dot && f.dot.to).pop()||{}).dot; if(!to) return { err:'no landing place' };
+      let k=-1, bd=Infinity; for(let i=0;i<st.windows;i++){ const q=r.windowAt(i); const dd=Math.hypot(q.x-to.to.x, q.y-to.to.y); if(dd<bd){ bd=dd; k=i; } }
+      const w=r.windowsDbg()[k]; return { room:H.sceneRoom(), k, side:w && w.side, lit:st.lit[k], before:before ? before[k] : null, off:bd }; }, o.litBefore||null) : null;
+    return { F, D, z, done, W };
   } finally { await c.ctx.close().catch(()=>{}); }
 }
 function dotJudge(R){
@@ -1117,8 +1141,13 @@ async function uiNightDot(page, label){
   const CASES=[['phone upright, full screen before', { vp:{ width:390, height:844 } }], ['phone upright, full screen at Begin', { from:{ width:390, height:760 }, vp:{ width:390, height:844 } }],
     ['phone on its side, before', { vp:{ width:844, height:390 } }], ['phone on its side, at Begin', { from:{ width:844, height:340 }, vp:{ width:844, height:390 } }],
     ['laptop, before', { vp:{ width:1280, height:800 } }], ['laptop, at Begin', { from:{ width:1280, height:720 }, vp:{ width:1280, height:800 } }],
-    ['laptop, resized mid-flight', { vp:{ width:1280, height:800 }, mid:{ width:1536, height:864 } }]];
+    ['laptop, resized mid-flight', { vp:{ width:1280, height:800 }, mid:{ width:1536, height:864 } }],
+    ['the rain, phone upright', { vp:{ width:390, height:844 }, q:'&room=rain', rain:true }], ['the rain, laptop', { vp:{ width:1280, height:800 }, q:'&room=rain', rain:true }]];   // RAIN-R1
   for(const [name, o] of CASES){ const r=await dotRun(page, o), J=dotJudge(r);
+    if(o.rain){ const W=r.W||{ err:'no reading' }; if(W.err) J.bad.push('the rain: '+W.err);   // RAIN-R1: the landing lights a window of the house opposite, dark before (CONTROL)
+      else { if(W.room!=='room.rain') J.bad.push('the room is '+W.room); if(W.side!=='opp') J.bad.push(`the dot landed on a window of side ${W.side}, not the house opposite`);
+        if(!(W.before!=null && W.before<=0.05)) J.bad.push(`CONTROL: the window was already lit (${W.before}) before the landing — the check cannot fail`); if(!(W.lit>0.3)) J.bad.push(`the window is not lit after the landing (${W.lit})`); }
+      if(!J.bad.length) lines.push(`${name}: the window #${W.k} of the house opposite — dark before (${(+W.before).toFixed(2)}), lit after (${(+W.lit).toFixed(2)})`); }
     if(J.bad.length) bad.push(`${name}: ${J.bad.join('; ')}`);
     else lines.push(`${name}: on the emblem within ${J.off.toFixed(2)} px, largest step ${J.jump.toFixed(1)} px, flare ${J.peak.toFixed(2)}×, flight ${(J.flyMs/1000).toFixed(2)} s (${J.holds} holds), landed on a firefly, above the card and the mist, the controls came while it flew`); }
   const k=await dotRun(page, { from:{ width:390, height:760 }, vp:{ width:390, height:844 }, q:'&dotnogate' }), K=dotJudge(k);
@@ -1484,7 +1513,7 @@ async function session(port, plan, label){
         ['NIGHT start timeline', uiNightTimeline, (THROTTLE ? 25 : 8)*60e3, false],   // NIGHT-12, NIGHT-11 part 3
         ['NIGHT first contact order', uiNightOrder, 4*LIMIT_START, true]];   // NIGHT-11 part 4
       const all=[];
-      for(const [name, fn, lim, ui] of ROWS){ if(UI_ONLY && !ui) continue;
+      for(const [name, fn, lim, ui] of ROWS){ if(UI_ROW ? !name.includes(UI_ROW) : (UI_ONLY && !ui)) continue;
         const r=await within(fn(page, `[${label}] ${name}`), lim, `the check «${name}»`).catch(e=>({ pass:false, lines:[`[${label}] ${name}: ERROR — ${e&&e.message||e}`] }));
         for(const l of r.lines) out(l); all.push(r); }
       if(UI_ONLY) out(`[${label}] --ui-only: ${all.length} UI checks (P.night, the music, full screen, the camera choice and the start timeline not run)`);

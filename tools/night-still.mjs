@@ -8,6 +8,7 @@
    textures, in the silhouette colour, hard-edged at the material's alpha test 0.45).
      node tools/night-still.mjs                      both levels of the forest
      node tools/night-still.mjs --level reduced      one level
+     node tools/night-still.mjs --room rain          the rain room (RAIN-R1: its record's still; no silhouettes, no vignette)
    Register entry «night-stills» (tools/licences.json: own work). Never runs in the app. */
 import http from 'node:http';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
@@ -17,7 +18,7 @@ import { chromium } from 'playwright-core';
 
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const argv=process.argv.slice(2), val=f=>{ const i=argv.indexOf(f); return i>=0 ? argv[i+1] : null; };
-const LEVELS=val('--level') ? [val('--level')] : ['reduced', 'full'];
+const LEVELS=val('--level') ? [val('--level')] : ['reduced', 'full'], ROOM=val('--room')||'forest';   // RAIN-R1: --room rain
 const BUDGET=96*1024, DIM=0.62;   // the still sits behind the start card: dim (DIM × the room's own light)
 const SIZE={ reduced:840, full:1188 };   // NIGHT-13: the still's height — the live density on a 1920 × 1080 screen (reduced 0.6, full 0.85 of 1080 over 55° → over 68°)
 const MIME={ '.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.mjs':'text/javascript; charset=utf-8', '.json':'application/json; charset=utf-8', '.css':'text/css; charset=utf-8',
@@ -32,14 +33,14 @@ function serve(){
 const srv=await serve(), port=srv.address().port;
 const browser=await chromium.launch({ channel:'chrome', headless:true, args:['--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream','--autoplay-policy=no-user-gesture-required','--disable-background-timer-throttling','--disable-renderer-backgrounding'] });
 try{
-  const RM=(await import(new URL('../apps/night/rooms/forest/pure/room.js', import.meta.url).href)).FOREST_ROOM, ST=RM.still;   // the first room's still lens (the only real room)
+  const RM= ROOM==='rain' ? (await import(new URL('../apps/night/rooms/rain/pure/room.js', import.meta.url).href)).RAIN_ROOM : (await import(new URL('../apps/night/rooms/forest/pure/room.js', import.meta.url).href)).FOREST_ROOM, ST=RM.still;   // the room's still lens
   for(const lv of LEVELS){
     const H=SIZE[lv], W=Math.round(H*ST.aspect), VH=Math.round(H/0.99)+1, VW=Math.round(VH*ST.aspect);   // the viewport a touch larger; the scene's ratio brings the frame to W × H
     const ctx=await browser.newContext({ viewport:{ width:VW, height:VH }, deviceScaleFactor:1, locale:'en-US' });
     await ctx.grantPermissions(['camera','microphone'], { origin:`http://127.0.0.1:${port}` });
     await ctx.addInitScript(l=>{ try{ localStorage.setItem('handsong.nightBg','forest'); localStorage.setItem('handsong.sceneLevel', l); localStorage.setItem('handsong.night.lang','en'); }catch(e){} }, lv);
     const p=await ctx.newPage();
-    await p.goto(`http://127.0.0.1:${port}/apps/night/index.html?probe`);
+    await p.goto(`http://127.0.0.1:${port}/apps/night/index.html?probe&room=${ROOM}`);
     await p.waitForFunction(()=>window.P && window.__nightBoot && window.__nightBoot.state().done, null, { timeout:120e3 });
     await p.click('#nightBegin');
     await p.waitForFunction(()=>!document.getElementById('start').classList.contains('on'), null, { timeout:180e3 });
@@ -56,11 +57,12 @@ try{
       return out; }, ST.over ? ST.over.sil : []);
     const view=await p.evaluate(async ([fov, H0])=>{ const S=await import('/apps/night/scene/host.js'), room=S.sceneRoomDbg();
       S.sceneOptDbg({ scale:H0/innerHeight }); S.sceneGuardDbg({ reset:true });
-      room.viewDbg({ rest:true, fov }); for(const m of room.detailDbg.sils) m.visible=false; room.paintDbg.set({ uVig:0 });
+      room.viewDbg({ rest:true, fov }); if(room.rest) room.rest(true); if(room.detailDbg) for(const m of room.detailDbg.sils) m.visible=false; if(room.paintDbg) room.paintDbg.set({ uVig:0 });
       return { fov:room.restDbg().fov, buf:S.sceneInfo().guard.buffer }; }, [ST.fov, H]);
     if(Math.abs(view.fov-ST.fov)>1e-9) throw new Error(`the room's lens is ${view.fov}°, the still's ${ST.fov}°`);
     if(!rec.file) throw new Error(`the room ${rec.id} names no still for «${lv}» (its record's still)`);
     if(rec.level!==lv) throw new Error(`the room opened at «${rec.level}», wanted «${lv}»`);
+    if(rec.id!==RM.id) throw new Error(`the room ${rec.id} opened, wanted ${RM.id}`);
     await p.waitForTimeout(5000);   // the mist and the fireflies settled
     /* the frame drawn to W × H (cover: the viewport's aspect is the still's within a pixel) */
     const out=await p.evaluate(async ([W,H,BUDGET,DIM])=>{ const S=await import('/apps/night/scene/host.js'), url=await S.sceneShotDbg(); if(!url) return null;

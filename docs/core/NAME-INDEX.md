@@ -49,7 +49,7 @@ NIGHT-7 — THE FIRST CARDS: after the calibration offer on a first start (and f
 
 ## apps/night/coach.js
 NIGHT-11 part 4 — PLAY FIRST, TEACH INSIDE: the DOM side of the one coaching line (the law: pure/coach.js).
-- const (3): `coachShown`, `coachDbg`, `coachSpeedDbg`
+- const (4): `coachTextOf`, `coachShown`, `coachDbg`, `coachSpeedDbg`
 - fn (5): `coachBegin`, `coachTick`, `coachWire`, `coachShowDbg`, `coachResetDbg`
 
 ## apps/night/early.js
@@ -84,7 +84,7 @@ NIGHT-11 part 1 — WHEN THE PHONE LOOKS AWAY (audit W1, W2, W3).
 
 ## apps/night/main.js
 SPLIT-2: the Night app's entry: its shell, its rooms, its profile (NIGHT-7b: the ghost light is gone — the first cards replace it).
-- exports: none
+- const (2): `START_ROOM_MS`, `startRoomDbg`
 
 ## apps/night/migrate.js
 SPLIT-2: one-time move of this app's old setting names, on one origin only (plan §5.3).
@@ -181,7 +181,7 @@ RAIN-3: A ROOM's LAYERED RECORDINGS — near and far, crossfaded by the focus �
 ## apps/night/pure/lofi.js
 RAIN-4c / RAIN-4d: THE ROOM'S MUSIC AS LO-FI (pure, rule #36; data row «RAIN lo-fi bed (app)»).
 - const (8): `LOFI_FORMAT`, `LOFI_DRUMS`, `LOFI_LAYERS`, `LOFI_LEVELS`, `LOFI_REG`, `LOFI_GEN`, `lofiBarSec`, `lofiChords`
-- fn (10): `lofiCheck`, `lofiVoice`, `lofiSafe`, `lofiInit`, `lofiBarAt`, `lofiGain`, `lofiLevel`, `lofiStop`, `lofiFadeIn`, `lofiStep`
+- fn (12): `lofiCheck`, `lofiVoice`, `lofiComp`, `passStep`, `lofiSafe`, `lofiInit`, `lofiBarAt`, `lofiGain`, `lofiLevel`, `lofiStop`, `lofiFadeIn`, `lofiStep`
 
 ## apps/night/pure/passes.js
 RAIN-1: PASSING VEHICLES — one law for the picture and the sound (pure, rule #36; data row «RAIN car passes (app)»).
@@ -198,10 +198,19 @@ NIGHT-11 part 5 — THE SCENE'S PIXEL BUDGET (audit P4).
 - const (6): `PIX_LEVELS`, `PIX_STEP`, `GUARD`, `ratioOld`, `bufferOf`, `guardNew`
 - fn (3): `sceneRatio`, `stepsOf`, `guardNext`
 
+## apps/night/pure/quality.js
+NIGHT-16 — THE QUALITY CHOICE: one control, heaviest to lightest.
+- const (3): `QUALITIES`, `qualityFrom`, `qualityState`
+
 ## apps/night/pure/room.js
 NIGHT-3: THE ROOM RECORD's shape and validator (pure, rule #36; data row «NIGHT room records» with controls).
-- const (10): `ROOM_FORMAT`, `ROOM_IDS`, `ROOM_LEVELS`, `ROOM_ACOUSTICS`, `TINT_INK`, `contrastOf`, `roomLook`, `roomModes`, `roomFov`, `ROOM_DAMAGES`
+- const (11): `ROOM_FORMAT`, `STILL_LIFE`, `ROOM_IDS`, `ROOM_LEVELS`, `ROOM_ACOUSTICS`, `TINT_INK`, `contrastOf`, `roomLook`, `roomModes`, `roomFov`, `ROOM_DAMAGES`
 - fn (1): `checkRoom`
+
+## apps/night/pure/startdrops.js
+RAIN-R1 — THE RAIN'S START SCREEN IS ALIVE: a few drops slide down the glass over the start still (the forest has its fireflies).
+- const (1): `START_DROPS`
+- fn (2): `startDrops`, `startDropAt`
 
 ## apps/night/pure/still.js
 DESIGN-1 part D: THE START SCREEN'S STILL AND THE REVEAL — the law (pure, rule #36; data row «NIGHT start still (app)»).
@@ -212,11 +221,6 @@ DESIGN-1 part D: THE START SCREEN'S STILL AND THE REVEAL — the law (pure, rule
 RAIN-4: A ROOM'S OWN MUSIC — the shell's doors (core/legacy-ui/ui.js shellDoors) seen through the current room.
 - const (1): `roomDoorsDbg`
 - fn (4): `roomTimbresInstall`, `roomDoors`, `roomMusicApply`, `roomMusicNote`
-
-## apps/night/rooms/dev.js
-RAIN-0: THE DEVELOPMENT ROOMS' DOOR — a room the founder has not approved yet stays out of the players' edition: it is not in ROOMS, its id is not pinned, and its code is loaded only here, only in …
-- const (1): `DEV_ROOMS`
-- fn (2): `devRoomWord`, `devRoomInstall`
 
 ## apps/night/rooms/forest/forest-answers.js
 NIGHT-6 slice 1 — THE FOREST ANSWERS (parts of the night forest room; forest.js builds them; the numbers are ./pure/answers.js): - DEW: points on the low leaves in view, one draw; each twinkles on …
@@ -408,9 +412,9 @@ NIGHT-15: THE RAIN ROOM HEARD WITHOUT ITS PICTURE (Dark, Camera, the 2D stand-in
 - fn (1): `rainHeard`
 
 ## apps/night/rooms/rain/install.js
-RAIN-0: THE RAIN ROOM JOINS THE APP — loaded only by the development rooms' door (apps/night/rooms/dev.js: the development edition and «?room=rain» in the address).
+RAIN-R1: THE RAIN ROOM, A REAL ROOM (the founder: the free part is the forest AND the rain).
 - const (1): `RAIN`
-- fn (1): `rainInstall`
+- fn (1): `rainSetup`
 
 ## apps/night/rooms/rain/lofi.js
 RAIN-4c / RAIN-4d: THE LO-FI BED'S SOUND (the rain room's; the player is apps/night/pure/lofi.js, the driver apps/night/bed2.js).
@@ -487,8 +491,8 @@ RAIN-5c: THE SKY OVER THE CITY — a pure seeded law of time (rule #36; data row
 
 ## apps/night/rooms/rain/pure/windows.js
 RAIN-0: THE WINDOWS — their places, which one a note lights, and how a lit window fades (pure, rule #36; data rows «RAIN window pick (app)», «RAIN window fade (app)»).
-- const (11): `RAIN_SEED`, `windowsLayout`, `winQuad`, `winCover`, `PICK_REACH`, `TRACE`, `AMB_LEVEL`, `windowLight`, `WINLIFE`, `winGarland`, `winOnOff`
-- fn (6): `winQuadSd`, `farLights`, `windowPick`, `traceLevel`, `winEvents`, `winEventAt`
+- const (12): `RAIN_SEED`, `windowsLayout`, `winQuad`, `winCover`, `PICK_REACH`, `TRACE`, `AMB_LEVEL`, `windowLight`, `WINLIFE`, `winGarland`, `winOnOff`, `FLY_SHAPES`
+- fn (8): `winQuadSd`, `farLights`, `windowPick`, `traceLevel`, `winEvents`, `winEventAt`, `flyCommon`, `flyWindow`
 
 ## apps/night/rooms/rain/rain-city.js
 RAIN-0b: THE STAND-IN CITY's prepared picture and its DEPTH MAP, painted ONCE on the GPU (an opening, a resize, a mood): one ray per pixel through the view law (pure/city.js — this shader is its po…
@@ -497,12 +501,12 @@ RAIN-0b: THE STAND-IN CITY's prepared picture and its DEPTH MAP, painted ONCE on
 
 ## apps/night/rooms/rain/rain-glass.js
 RAIN-0: THE RAIN ROOM'S SHADERS (our own, written from the physics: a drop is a small strong lens that shows the view upside down and wide, darker at its rim; a running drop leaves a wet lane and b…
-- const (12): `QUAD_V`, `BLUR_F`, `VIEW_F`, `WIN_V`, `WIN_F`, `LIGHT_V`, `LIGHT_F`, `DROP_V`, `DROP_F`, `glassShader`, `LIFE_V`, `LIFE_F`
+- const (13): `QUAD_V`, `BLUR_F`, `DOWN_F`, `VIEW_F`, `WIN_V`, `WIN_F`, `LIGHT_V`, `LIGHT_F`, `DROP_V`, `DROP_F`, `glassShader`, `LIFE_V`, `LIFE_F`
 
 ## apps/night/rooms/rain/rain.js
 RAIN-0 — THE RAIN ROOM's picture (docs/night/design/RAIN/CONCEPT.md; the plan and what is still a placeholder: PLAN.md).
 - const (3): `RAIN_LEVELS`, `FINGER_GAP`, `BOKEH`
-- fn (2): `rainAssets`, `buildRain`
+- fn (3): `rainAssets`, `rainHas`, `buildRain`
 
 ## apps/night/rooms/rain/sampled.js
 RAIN-4b: THE RECORDED VERSION of the rain room's pieces — the score's events played on CC0 recordings (rooms/rain/samples/: VSCO-2 CE's contrabass pizzicato, VCSL's TX81Z FM piano and soft-mallet v…
@@ -524,7 +528,7 @@ CORE-20: Night fetches only the modes it plays — every room's moods and the pa
 
 ## apps/night/scene/host.js
 THE SCENE HOST and Night's BACKGROUNDS (VIS1b, RUN 6; Night's own since CORE-8 — the shared UI reaches it through hooks.scene).
-- const (33): `BACKGROUNDS`, `sceneRoomAdd`, `sceneRoomRemove`, `sceneRooms`, `sceneRoom`, `sceneRoomSet`, `SCENE_LEVEL_DEFAULT`, `SCENE_FADE`, `scenePausing`, `COMPILE_LOG`, `sceneFlyPick`, `sceneFlyAt`, `sceneFlyLand`, `sceneRestDbg`, `sceneLitDbg`, `sceneHeardDbg`, `backgroundOf`, `sceneLevel`, `sceneShadowDbg`, `sceneOptDbg`, `sceneInfo`, `sceneRoomDbg`, `sceneLostDbg`, `sceneStartNote`, `sceneStartLevelDbg`, `sceneHoldDbg`, `sceneGuardDbg`, `sceneLevelDbg`, `sceneHeldDbg`, `sceneProgramsDbg`, `sceneClockDbg`, `sceneBedDbg`, `sceneOpenDbg`
+- const (34): `BACKGROUNDS`, `sceneRoomAdd`, `sceneRoomRemove`, `sceneRooms`, `sceneRoom`, `sceneRoomSet`, `SCENE_LEVEL_DEFAULT`, `SCENE_FADE`, `scenePausing`, `COMPILE_LOG`, `sceneFlyPick`, `sceneFlyAt`, `sceneFlyLand`, `sceneRestDbg`, `sceneLitDbg`, `sceneHeardDbg`, `backgroundOf`, `setSceneLight`, `sceneLevel`, `sceneShadowDbg`, `sceneOptDbg`, `sceneInfo`, `sceneRoomDbg`, `sceneLostDbg`, `sceneStartNote`, `sceneStartLevelDbg`, `sceneHoldDbg`, `sceneGuardDbg`, `sceneLevelDbg`, `sceneHeldDbg`, `sceneProgramsDbg`, `sceneClockDbg`, `sceneBedDbg`, `sceneOpenDbg`
 - fn (10): `loadThree`, `sceneOpen`, `sceneSwitch`, `sceneClose`, `sceneRest`, `setBackground`, `setSceneLevel`, `sceneSnapDbg`, `sceneShotDbg`, `sceneLoseDbg`
 
 ## apps/night/settabs.js
@@ -534,8 +538,8 @@ DESIGN-1 part C: THE SETTINGS IN THREE SHORT TABS — Sound · Picture · Hands 
 
 ## apps/night/shell.js
 RUN 7 (C6 + C11, Night plan §5; docs/night/QUALITY.md points 4, 5, 6, 9, 10) — THE NIGHT SHELL (DOM side; the logic is core/nightui.js).
-- const (8): `LEAN_PATH`, `MUSIC_KEYS`, `musicModeOf`, `REACH`, `nightEarlyDbg`, `nightClockDbg`, `nightShellDbg`, `nightSleepDbg`
-- fn (3): `nightShellWire`, `nightShellFace`, `nightMusicHoldDbg`
+- const (9): `LEAN_PATH`, `MUSIC_KEYS`, `musicModeOf`, `REACH`, `nightEarlyDbg`, `qualityOf`, `nightClockDbg`, `nightShellDbg`, `nightSleepDbg`
+- fn (4): `nightShellWire`, `nightShellFace`, `nightMusicHoldDbg`, `qualitySet`
 
 ## apps/night/sound/ambience.js
 THE ROOMS' AMBIENCE (RUN 7, C4c; Night's own since CORE-7): drone + wind + distant crickets + one soft echo (NIGHT-8: + the stream), built from a room's NATURE recipe (the forest's: apps/night/room…
@@ -559,7 +563,7 @@ NIGHT-11 part 2 — THE START'S OWN WORDS (audit W4, W9).
 
 ## apps/night/still.js
 DESIGN-1 part D: THE START SCREEN'S STILL, ITS LIGHTS AND THE REVEAL (the law: pure/still.js).
-- fn (2): `stillWire`, `stillDbg`
+- fn (3): `stillRoomSet`, `stillWire`, `stillDbg`
 
 ## apps/night/texts.js
 NIGHT-7 — NIGHT'S OWN TEXTS, both languages.
@@ -1551,7 +1555,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 - const (5): `TEST_ROOM_ID`, `TEST_ROOM`, `testRoomMode`, `testRoomInfo`, `testRoomFreeLeaks`
 - fn (2): `testRoomInstall`, `testRoomRemove`
 
-_308 modules, 3104 exported names._
+_309 modules, 3122 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 
@@ -1579,3 +1583,5 @@ NIGHT-7c (2026-11-11): storage `handsong.nightMusic` and `handsong.nightMusicVol
 NIGHT-8b (2026-11-11): `apps/night/fullscreen.js` `fsFlowTap` and `fsFlowEnd` deleted (the page's own tap listener asks for full screen once the camera runs; the flow needs no end); the full-screen icon paths moved to `apps/night/pure/fsicons.js` (`FS_ENTER`, `FS_EXIT`); the bark's program key `handsong.bark7` → `handsong.bark8`.
 
 RAIN-0b (2026-11-14): `apps/night/rooms/rain/pure/windows.js` `HOUSES`, `HILL`, `hillAt` deleted (the placeholder houses; the windows now come from `pure/city.js cityWindows`, the far lights from `sceneAt`); `apps/night/rooms/rain/rain-glass.js` `PT_V`, `PT_F` deleted (the point lights became the instanced `LIGHT_V`/`LIGHT_F`); `buildRain`'s `depthReadDbg` became `rtReadDbg`; the rain record's levels `drops` (layers) → `drops` (the simulation's cap), `rivulets` → `fine` (procedural fine-droplet layers), + `cars`.
+
+NIGHT-16 (2026-11-17): the Lightweight switch `#nightLightTg` deleted (Light is the third choice of `#nightQualSeg`); texts `night.set.light`, `night.set.lightNote`, `night.set.level` and the old unused `night.set.quality` ('Picture') replaced by `night.set.quality` ('Quality'), `night.q.light`, `night.q.lightNote`; storage `handsong.nightLightScene` no longer read (removed at load). RAIN-R1 (2026-11-17): `apps/night/rooms/dev.js` deleted with `devRoomWord`, `devRoomInstall`, `DEV_ROOMS` (the rain is a real room); `apps/night/rooms/rain/install.js` `rainInstall` → `rainSetup` (the one-time setup; the room is listed in `rooms/index.js`); storage `handsong.nightRoom` no longer read (a random start room every visit; removed at load); the data row «RAIN stays out of the players' edition (app)» → «NIGHT two rooms (app)».

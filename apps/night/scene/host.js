@@ -179,7 +179,7 @@ export async function sceneOpen(id=roomId, opt={}){
   if(level!=='minimal' && !renderer) renderer=makeRenderer();
   if(!renderer) level='minimal';
   if(renderer){ const tb=performance.now();
-    try{ room=build(THREE, { C:cv, level, w:innerWidth, h:innerHeight, reduce:REDUCE, mood:(READ.get('nightSky')||{}).mood, shadow:shadowOn(), lv:optOver && optOver.lv, gl2:renderer.capabilities.isWebGL2 }); if(room.rest) room.rest(restWant); resize(); }   // NIGHT-6: gl2 — soft edges need WebGL2
+    try{ room=build(THREE, { C:cv, level, light:lightOn, w:innerWidth, h:innerHeight, reduce:REDUCE, mood:(READ.get('nightSky')||{}).mood, shadow:shadowOn(), lv:optOver && optOver.lv, gl2:renderer.capabilities.isWebGL2 }); if(room.rest) room.rest(restWant); resize(); }   // NIGHT-6: gl2 — soft edges need WebGL2
     catch(e){ openFail(op, e); return sceneInfo(); }   // a failed build: the renderer goes, the room's 2D stand-in shows (never black)
     last=0; info.t0=0; info.frames=0;
     /* RUN 9 (slice 5): compile every shader NOW (inside the opening, not inside a frame later: a 1–4-s frame) */
@@ -301,6 +301,9 @@ export function setSceneLevel(v){
   if(room){ room.dispose(); room=null; } dropRenderer(true); stackSet('scene', false);
   return sceneOpen(roomId).catch(e=>{ errors.push(String(e&&e.message||e)); level='minimal'; return sceneInfo(); });
 }
+/* RAIN-R1: the Light quality (the shell): a room may draw less under it (its record's `light`); read at each build — the shell rebuilds through setSceneLevel */
+let lightOn=false;
+export const setSceneLight=v=>{ lightOn=!!v; return lightOn; };
 export const sceneLevel=()=>held||level;   // NIGHT-14c: the player's choice (a held Detailed included); sceneInfo().level is what is drawn
 const shadowOn=()=> shadowOver!=null ? shadowOver : LV[level].shadow;
 export const sceneShadowDbg=v=>{ shadowOver= v==null ? null : !!v; return shadowOver; };

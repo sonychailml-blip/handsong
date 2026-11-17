@@ -11,6 +11,11 @@ export const BLUR_F=`precision highp float; uniform sampler2D uTex; uniform vec2
 void main(){ vec3 c=texture2D(uTex, vUv).rgb*0.2270;
   c+=(texture2D(uTex, vUv+uDir*1.3846).rgb+texture2D(uTex, vUv-uDir*1.3846).rgb)*0.3162;
   c+=(texture2D(uTex, vUv+uDir*3.2308).rgb+texture2D(uTex, vUv-uDir*3.2308).rgb)*0.0703; gl_FragColor=vec4(c, 1.); }`;
+/* small fixes (2026-11-17): THE MIST'S SOFT COPY STARTS WITH A TRUE 4 × 4 BOX — four bilinear taps one full-size texel off the quarter texel's centre, each
+   averaging 2 × 2: a far car's light (2–3 px) is never missed or gridded by sparse taps (the old first pass sampled the full picture 4.8 px apart) */
+export const DOWN_F=`precision highp float; uniform sampler2D uTex; uniform vec2 uTexel; varying vec2 vUv;
+void main(){ vec3 c=texture2D(uTex, vUv+uTexel*vec2(-1., -1.)).rgb+texture2D(uTex, vUv+uTexel*vec2(1., -1.)).rgb+texture2D(uTex, vUv+uTexel*vec2(-1., 1.)).rgb+texture2D(uTex, vUv+uTexel*vec2(1., 1.)).rgb;
+  gl_FragColor=vec4(c*0.25, 1.); }`;
 /* the blur radius (view-angle units) of a thing at depth d: uFoc = (focus depth, K, the widest radius) */
 const RAD=`float radAt(float d){ return uFoc.z*min(1., max(0., abs(d-uFoc.x)-uFoc.w)*uFoc.y); }`;   // RAIN-5e: uFoc.w — the sharp plateau's half-width
 /* THE VIEW's ground: the prepared picture (uBase) and its three blurred copies (uL1…uL3, their radii uRad), chosen per pixel by the depth map's

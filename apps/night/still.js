@@ -21,6 +21,7 @@ import { STILL, DOT, stillPhase, stillLook, stillDot, dotFlight, dotFlare, dotGa
 import { fsAsking } from './fullscreen.js';   // NIGHT-13b: a full screen asked in the Begin tap — the dot waits for it to settle
 import { silScreen } from './rooms/forest/pure/sil.js';
 import { tintApply, tintNow } from './tint.js';
+import { startDrops, startDropAt } from './pure/startdrops.js';   // RAIN-R1: the rain's start screen — drops on the glass
 
 const $=id=>document.getElementById(id);
 const load=k=>{ try{ return localStorage.getItem(k); }catch(e){ return null; } };
@@ -30,9 +31,10 @@ const S={ tapped:false, ended:null, readyAt:null, dot0:null, room:null, rec:null
   state:()=>'other', rest:null, fly:null, flyI:null, raf:0, lights:null, fit:null, fitKey:'', sprites:null, overDrawn:0,
   d:{ st:'off', tapAt:null, last:null, flareT:0, flyT:0, home:null, from:null, vw:0, vh:0, dirty:false, landed:false, trail:[], peak:0, log:[] }, lastChange:null };   // NIGHT-13b: the dot
 
-/* the room the start screen shows: the remembered real room, else the first; its still for the stored level; its tint on the interface at once */
+/* the room the start screen shows: the visit's start room (guard.js: html[data-room]; RAIN-R1), else the first; its still for the stored level; its tint
+   on the interface at once */
 function pick(){
-  const id=load('handsong.nightRoom'), R=(id && ROOM_IDS.includes(id) && roomById(id)) || ROOMS[0], lv=load('handsong.sceneLevel');
+  const id=document.documentElement.getAttribute('data-room'), R=(id && ROOM_IDS.includes(id) && roomById(id)) || ROOMS[0], lv=load('handsong.sceneLevel');
   S.room=R.record.id; S.rec=R.record; S.base=R.base; S.level= lv==='full' ? 'full' : 'reduced'; S.file=stillFile(R.record, S.level);
   const el=$('nightStill'); if(el && S.file){ const url=new URL(S.file, R.base).href, cs=getComputedStyle(el).backgroundImage;
     if(!cs.includes(url)) el.style.backgroundImage=`${getComputedStyle(document.documentElement).getPropertyValue('--night-still-veil').trim()||'none'}, url("${url}")`; }   // the CSS default (the first room's) already shows it otherwise: no second request
@@ -62,12 +64,18 @@ function overDraw(bw, bh, a){
     g.save(); g.translate(P.x*k, P.y*k); g.rotate(-P.rot); g.scale(P.flip ? -1 : 1, 1); g.drawImage(S.sprites, q[0], q[1], q[2], q[3], -P.w*k/2, -P.h*k/2, P.w*k, P.h*k); g.restore(); }
   S.overDrawn++;
 }
+/* RAIN-R1: the start room changed before Begin (the rain's files could not come: the forest instead) — its still, tint, place and life */
+export function stillRoomSet(id){ if(!ROOM_IDS.includes(id) || !roomById(id) || S.tapped) return false; document.documentElement.setAttribute('data-room', id);
+  const el=$('nightStill'); if(el) el.style.backgroundImage=''; S.sprites=null; pick(); S.fitKey=''; layout(); lifeMake(); S.draws=0; return true; }
+/* what moves over the still: the room's record says (still.life — RAIN-R1: the rain's drops; else the fireflies) */
+function lifeMake(){ S.life= S.rec && S.rec.still && S.rec.still.life==='drops' ? 'drops' : 'fireflies'; S.lights= S.life==='drops' ? startDrops() : lightsMake(); }
 /* THE LIGHTS: a few soft points in the room's tint, each on its own slow loop; 30 frames a second at most, drawn once in reduced motion */
 function seeded(seed){ let s=seed>>>0; return ()=>{ s=(s*1664525+1013904223)>>>0; return s/4294967296; }; }
 function lightsMake(){ const r=seeded(0x4e494748), L=[]; for(let i=0;i<9;i++) L.push({ x:0.08+0.84*r(), y:0.35+0.55*r(), rad:1.3+1.3*r(), ax:10+22*r(), ay:6+14*r(), px:7+8*r(), py:9+9*r(), pb:3+3.5*r(), ph:6.28*r() }); return L; }
 function lightsDraw(t){
   const c=$('nightStillLights'); if(!c) return; const g=c.getContext('2d'); if(!g) return;
   const k=Math.min(1.5, window.devicePixelRatio||1), w=Math.round(innerWidth*k), h=Math.round(innerHeight*k); if(c.width!==w || c.height!==h){ c.width=w; c.height=h; }
+  if(S.life==='drops'){ dropsDraw(g, t/1000, w, h, k); return; }
   const m=tintNow().match(/\d+(\.\d+)?/g)||[200,245,106], rgb=m.slice(0,3).map(Number).join(',');
   g.clearRect(0,0,w,h); S.draws++;
   for(const q of S.lights){ const s=t/1000, x=(q.x*innerWidth+q.ax*Math.sin(s*6.283/q.px+q.ph))*k, y=(q.y*innerHeight+q.ay*Math.sin(s*6.283/q.py+q.ph*1.7))*k;
@@ -75,6 +83,17 @@ function lightsDraw(t){
     gr.addColorStop(0, `rgba(${rgb},${(0.42*b).toFixed(3)})`); gr.addColorStop(0.18, `rgba(${rgb},${(0.16*b).toFixed(3)})`); gr.addColorStop(1, `rgba(${rgb},0)`);
     g.fillStyle=gr; g.beginPath(); g.arc(x, y, R, 0, 6.2832); g.fill();
     g.fillStyle=`rgba(255,255,240,${(0.7*b).toFixed(3)})`; g.beginPath(); g.arc(x, y, q.rad*k*0.7, 0, 6.2832); g.fill(); }
+}
+/* RAIN-R1: THE DROPS — water beads on the glass over the rain's still: a soft dark rim below, a light catch above, a faint trail where one just slid */
+function dropsDraw(g, s, w, h, k){
+  g.clearRect(0, 0, w, h); S.draws++;
+  for(const d of S.lights){ const q=startDropAt(d, s), x=q.x*w, y=q.y*h, r=q.r*k;
+    if(q.trail>0.002){ const y0=y-q.trail*h, gr=g.createLinearGradient(x, y0, x, y); gr.addColorStop(0, 'rgba(220,226,235,0)'); gr.addColorStop(1, 'rgba(220,226,235,0.16)');
+      g.strokeStyle=gr; g.lineWidth=Math.max(1, r*0.55); g.beginPath(); g.moveTo(x, y0); g.lineTo(x, y-r*0.6); g.stroke(); }
+    g.fillStyle='rgba(8,10,16,0.30)'; g.beginPath(); g.ellipse(x, y+r*0.18, r*0.95, r*1.12, 0, 0, 6.2832); g.fill();
+    const body=g.createRadialGradient(x-r*0.25, y-r*0.35, r*0.1, x, y, r); body.addColorStop(0, 'rgba(235,238,245,0.30)'); body.addColorStop(0.55, 'rgba(160,170,190,0.10)'); body.addColorStop(1, 'rgba(160,170,190,0.02)');
+    g.fillStyle=body; g.beginPath(); g.ellipse(x, y, r*0.85, r, 0, 0, 6.2832); g.fill();
+    g.fillStyle='rgba(255,250,240,0.62)'; g.beginPath(); g.arc(x-r*0.3, y-r*0.4, Math.max(0.6*k, r*0.22), 0, 6.2832); g.fill(); }
 }
 /* the start's end: the start card's own class; the emblem's dot noted at the Begin tap (its place and radius on the card) */
 const glowEl=()=>document.querySelector('.night-start-head .emblem-glow');
@@ -157,7 +176,7 @@ function loop(now){
 export function stillWire(state, o={}){ if(typeof state==='function') S.state=state; if(o.rest && !OLD && !NONE){ S.rest=o.rest; restSet(S.phase!=='done'); } if(o.fly) S.fly=o.fly; }
 /* probe only: freeze (the lights held still), pin (the reveal held at progress 0…1 — captures at fixed moments; null releases it); → the state */
 export function stillDbg(o={}){ if('freeze' in o) S.freeze=!!o.freeze; if('pin' in o) S.pin= o.pin==null ? null : Math.max(0, Math.min(1, +o.pin));
-  const el=$('nightStill'); return { phase:S.phase, ended:S.ended, readyAt:S.readyAt, room:S.room, level:S.level, file:S.file, plain:PLAIN, none:NONE, old:OLD, nogate:NOGATE, look:S.look, dot:S.dot, draws:S.draws,
+  const el=$('nightStill'); return { phase:S.phase, ended:S.ended, readyAt:S.readyAt, room:S.room, level:S.level, file:S.file, life:S.life, lights:S.lights ? S.lights.length : 0, plain:PLAIN, none:NONE, old:OLD, nogate:NOGATE, look:S.look, dot:S.dot, draws:S.draws,
     dotSt:S.d.st, dotPeak:S.d.peak, dotLog:S.d.log.slice(), emblem:dotHome(),
     shown:!!el && !el.hidden, image:el ? getComputedStyle(el).backgroundImage : '', state:S.state(), fit:S.fit, sprites:!!S.sprites, overDrawn:S.overDrawn, flyI:S.flyI,
     pulse:S.d.peak>=DOT.glowPeak*0.95 }; }
@@ -167,7 +186,7 @@ export function stillDbg(o={}){ if('freeze' in o) S.freeze=!!o.freeze; if('pin' 
   if(!$('nightStill')) return;
   try{ pick(); layout(); }catch(e){ console.warn('[night] the start still:', e); }   // eslint-disable-line no-console
   addEventListener('resize', ()=>{ S.fitKey=''; layout(); });
-  S.lights=lightsMake(); if(PLAIN) lightsDraw(performance.now());
+  lifeMake(); if(PLAIN) lightsDraw(performance.now());
   const sc=$('start'), begin=$('nightBegin');
   if(begin) begin.addEventListener('click', ()=>{ S.dot0=dotHome(); S.tapped=true; if(!PLAIN && !NONE && S.d.st==='off'){ S.d.st='gate'; S.d.tapAt=performance.now(); S.d.log.push({ t:Math.round(S.d.tapAt), ev:'tap', home:S.dot0 }); if(S.raf===0) S.raf=requestAnimationFrame(loop); } }, true);   // NIGHT-13b: the dot's gate, then its flare
   const changed=()=>{ S.lastChange=performance.now(); if(S.d.st!=='off' && S.d.st!=='done') S.d.log.push({ t:Math.round(S.lastChange), ev:'change', w:innerWidth, h:innerHeight }); };

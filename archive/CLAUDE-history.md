@@ -2113,6 +2113,24 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
     3. The far cars' lights on the hill road round, never square.
     4. The far lights a little livelier, still calm.
     5. The Poco at Standard. (No timing was measured.)
+181. One quality control after NIGHT-16 (Settings → Picture). Five checks:
+    1. «Quality / Качество» shows Detailed · Standard · Light, and the old «Lightweight mode» switch is gone.
+    2. Light: the echo lighter, the picture without the glass blur; Standard back: the full echo again.
+    3. Reload: the choice is kept. A device that had «Lightweight mode» on opens with Light chosen.
+    4. A fresh profile (a new browser profile) opens at Standard.
+    5. Russian: «Подробная · Обычная · Лёгкая» and its note.
+182. The rain room for players after RAIN-R1 (the players' build is not published yet). Five checks:
+    1. Reload several times: sometimes the forest, sometimes the rain, each with its own start still (the rain's with drops sliding down the glass).
+    2. The rain chosen on a first visit (a new browser profile): Begin shows its loading look until the rain is in, then the reveal without a jump.
+    3. Begin in the rain: the dot flies through the glass and lights a window of the house opposite (laptop and a phone upright).
+    4. The Room button in both rooms; «How to play» in the rain: near — wipe the mist; far — light the windows; the other hand. Russian too.
+    5. Light in the rain: fewer drops, the pane still; the Poco.
+183. Small fixes (2026-11-17). Five checks:
+    1. The rain's bed piano comps like a pianist: chords voiced and rolled differently, the top note moving, some hits left out; the rhythm the same.
+    2. The far cars on the hill road: round lights through the mist and through a wiped spot.
+    3. The forest at Standard starts as before; Detailed's spruces come in after the start (a first visit at Detailed on the Poco).
+    4. The guitar unchanged (the founder's decision).
+    5. The Poco at Standard in the rain. (No timing was measured.)
 ## Superseded at DOC1 (old lines verbatim, replaced in place above by a later slice)
 - NIGHT-2 stage 3 (2026-11-03, the rule of at most five manual checks) updated this line of CLAUDE.md's report format:
   probe verdict lines and fix rounds; what was left undone; docs found stale; the user's remaining steps (ear, camera, phone).

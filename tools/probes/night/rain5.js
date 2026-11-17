@@ -2,7 +2,7 @@
    own life shader (rooms/rain/rain-glass.js LIFE_V / LIFE_F) draws every kind of item — people (RAIN-5c: with their gear, groups, the cyclist's lamp), birds, leaves,
    steam, rings, the bunting, the lit signs and the crossing's lights — at three sizes and
    three focus blurs on a transparent canvas; on a ring two pixels inside each quad's border the alpha must stay at most 2 / 255 (no edge can show).
-   CONTROL: the same with the border window off (uWin 0) must show an edge somewhere. */
+   CONTROL: the same with the border window off (uWin 0) must show an edge somewhere. Small fixes (2026-11-17): + the mist's soft copy of a far light is round. */
 import { row } from '../core/rows.js';
 
 export async function checkRainQuads(){ const d=[], notes=[]; let n=0; const miss=x=>d.push(x);
@@ -41,6 +41,26 @@ export async function checkRainQuads(){ const d=[], notes=[]; let n=0; const mis
     n++; const okL=ring(1); if(okL.worst>2) miss(`a point light's quad edge shows: ${okL.worst} / 255 on light ${okL.at} (size ${L[okL.at][0]}, depth ${L[okL.at][1]})`); notes.push(`the point lights' border ring at most ${okL.worst} / 255 over ${L.length} lights`);
     n++; const badL=ring(0); if(badL.worst<=8) miss('CONTROL: without the round window no point light showed its quad'); else notes.push(`CONTROL: without the window a point light shows its quad (${badL.worst} / 255)`);
     g2.dispose(); m2.dispose(); }
+  catch(e){ miss('the point lights check: '+(e && e.message || e)); }
+  /* small fixes (2026-11-17): THE MIST'S SOFT COPY — the far cars' lights were still square for the founder: not the drawing (above) but the city seen through
+     the misty glass, the room's soft chain (rain.js soft). The real room is built and its own chain run on a round 21-px light at the centre; the soft copy must be
+     ROUND — the brightness at the same distance in 16 directions agrees within 6 % of the peak (my guess), wherever the mean is above 2 % of it; CONTROL the
+     old chain (sparse taps) is not round */
+  try{ const RM=await import('../../../apps/night/rooms/rain/rain.js'), { cv }=await import('../../../core/palette.js'), city=await RM.rainAssets('reduced');
+    const room=RM.buildRain(T, { C:cv, level:'reduced', w:W, h:Hh, city }); r.setSize(W, Hh, false);
+    try{ room.update(1/30, 1, [], null, {}); room.render(r);
+      const aniso=o=>{ const S=room.softDbg(o); if(!S) return null; const { n, v }=S; let pk=0, sx=0, sy=0, sw=0; v.forEach((x, i)=>{ pk=Math.max(pk, x); sx+=x*(i%n); sy+=x*Math.floor(i/n); sw+=x; });
+        if(!sw) return { a:1, pk:0 }; const cx=sx/sw, cy=sy/sw, at=(x, y)=>{ const x0=Math.floor(x), y0=Math.floor(y), fx=x-x0, fy=y-y0, g=(i, j)=>(i<0 || j<0 || i>=n || j>=n) ? 0 : v[j*n+i];
+          return g(x0, y0)*(1-fx)*(1-fy)+g(x0+1, y0)*fx*(1-fy)+g(x0, y0+1)*(1-fx)*fy+g(x0+1, y0+1)*fx*fy; };
+        let a=0, atR=0; for(let rr=0.75;rr<S.R-1;rr+=0.25){ const ring=[]; for(let k=0;k<16;k++){ const th=k*Math.PI/8; ring.push(at(cx+rr*Math.cos(th), cy+rr*Math.sin(th))); }
+          const mean=ring.reduce((p, q)=>p+q, 0)/16; if(mean<0.02*pk) continue; const sp=(Math.max(...ring)-Math.min(...ring))/pk; if(sp>a){ a=sp; atR=rr; } }
+        return { a, atR, pk }; };
+      const now=aniso({ size:21 }), old=aniso({ size:21, old:true }); n+=2;   // a round 21-px light: a 3-px one peaks at 1 / 255 in the soft copy, a 9-px one at 8 — too faint to judge in 8 bits
+      if(!now || !(now.pk>8)) miss('the soft copy of a far light is empty: '+JSON.stringify(now)); else if(now.a>0.06) miss(`the mist's soft copy of a far light is not round: ${(now.a*100).toFixed(1)} % of its peak between directions (at ${now.atR} quarter px)`);
+      else notes.push(`the mist's soft copy of a round 21-px light: round — the directions agree within ${(now.a*100).toFixed(1)} % of the peak`);
+      if(!old || old.a<=0.06) miss(`CONTROL: the old soft chain is round (${old && (old.a*100).toFixed(1)} %) — the check cannot fail`); else notes.push(`CONTROL: the old soft chain is not round (${(old.a*100).toFixed(1)} % between directions)`); }
+    finally{ room.dispose(); } }
+  catch(e){ miss('the soft chain check: '+(e && e.message || e)); }
   finally{ r.dispose(); r.forceContextLoss(); }
   return { cases:n, total:d.length, differences:d, notes }; }
 row({ at:1009.98705, night:true, name:'RAIN no quad edges', drawn:true, run:()=>checkRainQuads(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });

@@ -8,7 +8,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statS
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { precachePaths, writePrecache, NIGHT_SKIP, NIGHT_LATER, NIGHT_INCLUDE } from './precache.mjs';   // NIGHT-14
+import { precachePaths, writePrecache, NIGHT_SKIP, NIGHT_LATER, NIGHT_INCLUDE, NIGHT_DEMAND } from './precache.mjs';   // NIGHT-14
 import { renderNightLicences } from './check-licences.mjs';   // NIGHT-15: Night's «Licences» page
 
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), argv=process.argv.slice(2), posix=path.posix;
@@ -31,12 +31,9 @@ copyFileSync(path.join(ROOT,'THIRD-PARTY-LICENSES.md'),path.join(OUT,'THIRD-PART
 const nightLicences=()=>{ rmSync(path.join(OUT,'apps/night/licences.html'),{ force:true });
   writeFileSync(path.join(OUT,'licences.html'), renderNightLicences(JSON.parse(readFileSync(path.join(ROOT,'tools/licences.json'),'utf8')), f=>existsSync(path.join(OUT,f)))); };
 if(RELEASE) writeFileSync(path.join(OUT,'core/edition.js'),"export const EDITION='release';\n");
-/* NIGHT-14: the development rooms stay out of a players' build — their folder is not copied and the door (rooms/dev.js) loses its import() of them
-   (the door is shut in the release edition anyway: data row «RAIN stays out of the players' edition (app)»). A door that changed shape fails the build. */
-const DEV_DOOR="import('./rain/install.js').then(m=>m.rainInstall())";
-if(RELEASE && app==='night'){ rmSync(path.join(OUT,'apps/night/rooms/rain'),{ recursive:true, force:true });
-  const f=path.join(OUT,'apps/night/rooms/dev.js'), t=readFileSync(f,'utf8'); if(t.split(DEV_DOOR).length!==2) die("apps/night/rooms/dev.js: the rain room's import() is not where the build expects it (NIGHT-14)");
-  writeFileSync(f, t.replace(DEV_DOOR, 'Promise.resolve(null)')); }
+/* RAIN-R1: the rain is a real room — a players' build carries it (its media are listed on demand: tools/precache.mjs NIGHT_DEMAND); only its recorded A/B
+   (rooms/rain/samples/, «?bedrec=on», a development tool) stays out */
+if(RELEASE && app==='night') rmSync(path.join(OUT,'apps/night/rooms/rain/samples'),{ recursive:true, force:true });
 if(app==='night') nightLicences();
 
 /* the page: its references gain the app's folder; page-level ones and addresses stay. Production loses the probes tag */
@@ -73,8 +70,9 @@ const all=listAll(OUT).map(f=>path.relative(OUT,f).replace(/\\/g,'/')).sort();
 if(!PREVIEW){ if(existsSync(path.join(OUT,'tools'))) bad.push('production holds tools/'); if(/handsong-probes/.test(page)) bad.push('production keeps the probes tag'); if(existsSync(path.join(OUT,'apps',other))) bad.push('production holds the other app'); }
 else if(existsSync(path.join(OUT,'apps',other)) && (other==='full' || all.some(f=>f.startsWith('apps/night/')&&f!=='apps/night/data/night.json'))) bad.push('a preview holds more of the other app than the probes need');
 if(!/rel="handsong-profile"/.test(page)) bad.push('the page declares no profile');
-if(RELEASE && app==='night'){ if(existsSync(path.join(OUT,'apps/night/rooms/rain'))) bad.push("a players' build holds the rain room");
-  if(/\/rain\//.test(stripComments(readFileSync(path.join(OUT,'apps/night/rooms/dev.js'),'utf8')))) bad.push("a players' build still names the rain room in rooms/dev.js"); }
+if(RELEASE && app==='night'){ for(const f of ['apps/night/rooms/rain/rain.js', 'apps/night/rooms/rain/install.js', 'apps/night/rooms/rain/still/still-reduced.webp', 'apps/night/rooms/rain/still/still-full.webp', 'apps/night/rooms/rain/city/windows.json'])
+    if(!existsSync(path.join(OUT, f))) bad.push(`a players' build lacks the rain room's ${f} (RAIN-R1: a real room)`);
+  if(existsSync(path.join(OUT,'apps/night/rooms/rain/samples'))) bad.push("a players' build holds the rain's development samples"); }
 if(bad.length){ for(const b of bad.slice(0,30)) console.error('  '+b); die(bad.length+' problem(s)'); }
 /* CORE-20 (audit P5 item 3): the page's module script and its STATIC closure (import … from / import '…' / export … from; never import()) as
    <link rel="modulepreload"> before </head>, so the built page fetches its modules in one wave instead of one per import depth */
@@ -86,6 +84,6 @@ for(const m of page.matchAll(/<script\b[^>]*\btype="module"[^>]*\bsrc="([^"]+)"/
   if(!closure.length || !html.includes('</head>')) die('no module closure to preload, or the page has no </head>');
   writeFileSync(path.join(OUT,'index.html'), html.replace('</head>', `<!-- CORE-20: the static module closure, preloaded (written by tools/build.mjs) -->\n${tags}\n</head>`)); }
 /* NIGHT-14: Night's precache list, written into its sw.js last (after every change to the tree, so the hashes are the shipped bytes) */
-let pc=null; if(app==='night') pc=writePrecache(OUT, precachePaths(OUT, seen, NIGHT_SKIP, NIGHT_INCLUDE), NIGHT_LATER);
+let pc=null; if(app==='night') pc=writePrecache(OUT, precachePaths(OUT, seen, NIGHT_SKIP, NIGHT_INCLUDE), NIGHT_LATER, NIGHT_DEMAND);   // RAIN-R1: the rain's media on demand
 const bytes=all.reduce((n,f)=>n+statSync(path.join(OUT,f)).size,0), h=createHash('sha256'); for(const f of all){ h.update(f); h.update(readFileSync(path.join(OUT,f))); }
-console.log(`[build] PASS — ${app}${PREVIEW?' · preview: ?probe kept':' · production: no probes'}${RELEASE?' · release edition':''} · ${all.length} files, ${(bytes/1048576).toFixed(1)} MB, ${seen.size} loads resolved, ${closure.length} modules preloaded${pc ? ` · precache ${pc.version}: ${pc.n} files, ${(pc.simdBytes/1048576).toFixed(1)} MB cached, ${(pc.startBytes/1048576).toFixed(1)} MB of it to start (${(pc.bytes/1048576).toFixed(1)} MB listed with both MediaPipe builds)` : ''} · tree ${h.digest('hex').slice(0,16)} → ${path.relative(ROOT,OUT).replace(/\\/g,'/')}`);
+console.log(`[build] PASS — ${app}${PREVIEW?' · preview: ?probe kept':' · production: no probes'}${RELEASE?' · release edition':''} · ${all.length} files, ${(bytes/1048576).toFixed(1)} MB, ${seen.size} loads resolved, ${closure.length} modules preloaded${pc ? ` · precache ${pc.version}: ${pc.n} files, ${(pc.simdBytes/1048576).toFixed(1)} MB cached, ${(pc.startBytes/1048576).toFixed(1)} MB of it to start, ${(pc.demandBytes/1048576).toFixed(1)} MB on demand (${(pc.bytes/1048576).toFixed(1)} MB listed with both MediaPipe builds)` : ''} · tree ${h.digest('hex').slice(0,16)} → ${path.relative(ROOT,OUT).replace(/\\/g,'/')}`);

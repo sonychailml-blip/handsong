@@ -6,11 +6,14 @@
 import { BUS } from '../../core/pure/bus.js';
 import { t, onLangChange } from '../../core/i18n.js';
 import { coachNew, coachStep, coachSeen, COACH_KEY } from './pure/coach.js';
+import { sceneRoom } from './scene/host.js';   // RAIN-R1: the rain's own lines
 
 const $=id=>document.getElementById(id), READ=BUS.reader();
 const load=k=>{ try{ return localStorage.getItem(k); }catch(e){ return null; } };
 const save=(k,v)=>{ try{ localStorage.setItem(k,v); }catch(e){} };
 const TEXT={ raise:'night.coach.raise', pinch:'night.coach.pinch', fingers:'night.coach.fingers', depth:'night.coach.depth', fx:'night.fxHint', calib:'night.coach.calib', home:'night.coach.home' };
+const TEXT_RAIN={ depth:'night.rain.coach.depth', fx:'night.rain.fxHint' };   // RAIN-R1: in the rain, near wipes the glass and far lights a window; Wave brings cars
+export const coachTextOf=(id, room=sceneRoom())=>(room==='room.rain' && TEXT_RAIN[id]) || TEXT[id];
 let st=null, seq=-1, last=0, shown=null, calYes=null, calNo=null, speed=1, vnow=0, pin=null;   // pin: probe only — a line held on screen (coachShowDbg)
 const LOG=[];   // probe: { t, kind:'show'|'note', id }
 /* a session's coaching begins (a person's Begin or the app's start): the stored list read once, the notes counted from now */
@@ -30,7 +33,7 @@ function render(){
   const el=$('nightCoach'); if(!el) return;
   el.hidden=!shown; document.body.classList.toggle('night-coach-on', !!shown); el.classList.toggle('night-coach-ask', shown==='calib');
   if(!shown) return;
-  $('nightCoachText').textContent=t(TEXT[shown]);
+  $('nightCoachText').textContent=t(coachTextOf(shown));
   const b=$('nightCoachBtns'); b.hidden= shown!=='calib';
   if(shown==='calib'){ $('nightCoachYes').textContent=t('night.coach.calibYes'); $('nightCoachNo').textContent=t('night.coach.calibNo'); }
 }

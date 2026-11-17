@@ -6,6 +6,7 @@
    and the fade stay. */
 import { seeded } from '../../../../../core/pure/dsp.js';
 import { cityWindows, sceneAt, vanishing } from './city.js';
+import { roomFov } from '../../../pure/room.js';   // RAIN-R1: the lens law (the dot's window seen on every screen shape)
 
 export const RAIN_SEED=0x5241494E;
 /* every window: { x, y (its centre), hw, hh, depth, side, floor, z, amb (0…1: lit by the city itself when under the mood's share), warm } */
@@ -63,3 +64,16 @@ export function winEventAt(t, cand, seed=WINLIFE.seed){ if(!cand || !cand.length
   for(const e of s.list){ if(e.t>t) break; if(t<=e.t+e.dur) return { i:cand[Math.min(cand.length-1, Math.floor(e.pick*cand.length))], kind:e.kind, u:(t-e.t)/e.dur }; } return null; }
 /* the onoff event's light through it: on, out from 55 %, back at 92 % */
 export const winOnOff=u=>u<0.55 ? 1 : u<0.92 ? Math.max(0, 1-(u-0.55)*10) : Math.min(1, (u-0.92)*12.5);
+/* RAIN-R1: THE DOT'S WINDOW — the start's dot flies through the glass and lights the first window of the house opposite (side 'opp'). It must be seen
+   on EVERY screen shape, a phone upright (9 : 19.5) to a wide screen (2.4 : 1): only the part of the world every shape shows counts (the room's lens law,
+   FLY_MARGIN inside its edges); of the dark windows there, the nearest. flyCommon → that part's half extents (view-angle units) */
+export const FLY_SHAPES=Object.freeze([9/19.5, 2.4]), FLY_MARGIN=0.92;
+export function flyCommon(view, shapes=FLY_SHAPES){ let tw=Infinity, th=Infinity;
+  for(const a of [shapes[0], view.tall, shapes[1]]) if(a>=shapes[0] && a<=shapes[1]){ const t=Math.tan(roomFov(view, a, 1)*Math.PI/360); tw=Math.min(tw, t*a); th=Math.min(th, t); }
+  return { tw, th }; }
+/* → the window's index, or -1 (none qualifies: a stand-in city has no side) */
+export function flyWindow(W, view, dark=()=>true, shapes=FLY_SHAPES){ const C=flyCommon(view, shapes); let best=-1;
+  for(let i=0;i<W.length;i++){ const w=W[i]; if(w.side!=='opp' || !dark(i)) continue;
+    if(Math.abs(w.x)+w.hw>C.tw*FLY_MARGIN || Math.abs(w.y)+w.hh>C.th*FLY_MARGIN) continue;
+    if(best<0 || w.dist<W[best].dist) best=i; }
+  return best; }

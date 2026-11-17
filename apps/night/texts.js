@@ -7,7 +7,6 @@ import { DICTS } from '../../core/i18n.js';
 export const NIGHT_TEXTS=Object.freeze({
   en:Object.freeze({
     'night.privacyLine':'Your camera picture never leaves this device.',
-    'night.set.quality':'Picture',
     'night.q.standard':'Standard',
     'night.q.detailed':'Detailed — for strong devices',
     'night.set.camera':'Camera', 'night.cam.front':'Front', 'night.cam.back':'Back', 'night.cam.n':'Camera {n}',   // NIGHT-10
@@ -46,8 +45,8 @@ export const NIGHT_TEXTS=Object.freeze({
     /* DESIGN-1 part C: the settings' three tabs, the «More» line, short labels with their notes under them */
     'night.tab.sound':'Sound', 'night.tab.picture':'Picture', 'night.tab.hands':'Hands',
     'night.set.answer':'Music answers my notes', 'night.set.answerNote':'Its next chord leans toward what I played.',
-    'night.set.level':'Detail', 'night.q.detailedShort':'Detailed', 'night.q.detailedNote':'Detailed is for strong devices.',
-    'night.set.light':'Lightweight mode', 'night.set.lightNote':'For older computers and phones: a lighter echo, simpler music, fewer ringing notes, a simpler picture.',
+    'night.q.detailedShort':'Detailed', 'night.q.detailedNote':'Detailed is for strong devices.',
+    'night.set.quality':'Quality', 'night.q.light':'Light', 'night.q.lightNote':'Light is for older computers and phones: a lighter echo, simpler music, fewer ringing notes, a simpler picture.',   // NIGHT-16: one quality choice
     'night.card.skip':'Skip',
     'night.card.next':'Next',
     'night.card.go':'Play',
@@ -60,6 +59,14 @@ export const NIGHT_TEXTS=Object.freeze({
     'night.card.fx.b':'Your other hand shapes the sound: touch a finger to your thumb and move it up or down — index Echo, middle Warm or Bright, ring Wave. The sound stays where you leave it.',
     'night.card.music.t':'Music',
     'night.card.music.b':'The quiet music you hear plays under your notes. The Music button below changes it — {still}, {drift}, {glimmer} — or turns it off.',
+    'night.card.rainNear.t':'Near: the glass',   // RAIN-R1: the rain's cards and lines
+    'night.card.rainNear.b':'Bring your playing hand close to the camera: you are at the glass. Hold the touch and move — your finger wipes the mist away. Each note clears a little spot.',
+    'night.card.rainFar.t':'Far: the city',
+    'night.card.rainFar.b':'Move your hand away: the city comes into focus. Point at a window and play — it lights up. Farther away, you hear more of the street.',
+    'night.card.rainFx.t':'Your other hand',
+    'night.card.rainFx.b':'Your other hand shapes the sound: touch a finger to your thumb and move it up or down — index Echo, middle Warm or Bright, ring Wave: more cars on the street. It stays where you leave it.',
+    'night.rain.coach.depth':'Close to the camera: wipe the glass. Farther away: light a window.',
+    'night.rain.fxHint':'Your other hand: touch a finger to your thumb and move it — index Echo, middle Warm or Bright, ring Wave: more cars below.',
     'night.card.home.t':'Full screen',
     'night.card.home.b':'On iPhone and iPad, full screen comes from the Home Screen: tap Share, then “Add to Home Screen”. Handsong Night then opens from its own icon, without Safari’s bars.',
     'night.fs.enter':'Full screen',
@@ -69,7 +76,6 @@ export const NIGHT_TEXTS=Object.freeze({
   }),
   ru:Object.freeze({
     'night.privacyLine':'Изображение с камеры никогда не покидает это устройство.',
-    'night.set.quality':'Картинка',
     'night.q.standard':'Обычная',
     'night.q.detailed':'Подробная — для мощных устройств',
     'night.set.camera':'Камера', 'night.cam.front':'Передняя', 'night.cam.back':'Задняя', 'night.cam.n':'Камера {n}',   // NIGHT-10
@@ -107,8 +113,8 @@ export const NIGHT_TEXTS=Object.freeze({
     'night.howTo':'Как играть', 'night.licences':'Лицензии',
     'night.tab.sound':'Звук', 'night.tab.picture':'Картинка', 'night.tab.hands':'Руки',
     'night.set.answer':'Музыка отвечает моим нотам', 'night.set.answerNote':'Её следующий аккорд склоняется к сыгранному.',
-    'night.set.level':'Детализация', 'night.q.detailedShort':'Подробная', 'night.q.detailedNote':'«Подробная» — для мощных устройств.',
-    'night.set.light':'Облегчённый режим', 'night.set.lightNote':'Для старых компьютеров и телефонов: эхо легче, музыка проще, меньше звенящих нот, картинка проще.',
+    'night.q.detailedShort':'Подробная', 'night.q.detailedNote':'«Подробная» — для мощных устройств.',
+    'night.set.quality':'Качество', 'night.q.light':'Лёгкая', 'night.q.lightNote':'«Лёгкая» — для старых компьютеров и телефонов: эхо легче, музыка проще, меньше звенящих нот, картинка проще.',
     'night.card.skip':'Пропустить',
     'night.card.next':'Дальше',
     'night.card.go':'Играть',
@@ -121,6 +127,14 @@ export const NIGHT_TEXTS=Object.freeze({
     'night.card.fx.b':'Другая рука меняет звук: прижмите палец к большому и ведите вверх или вниз — указательный: эхо, средний: тепло или яркость, безымянный: волна. Звук остаётся таким, как вы оставили.',
     'night.card.music.t':'Музыка',
     'night.card.music.b':'Тихая музыка, которую вы слышите, звучит под вашими нотами. Кнопка «Музыка» внизу меняет её — {still}, {drift}, {glimmer} — или выключает.',
+    'night.card.rainNear.t':'Близко: стекло',
+    'night.card.rainNear.b':'Поднесите играющую руку ближе к камере — вы у самого стекла. Держите касание и ведите — палец стирает туман. Каждая нота протирает пятнышко.',
+    'night.card.rainFar.t':'Далеко: город',
+    'night.card.rainFar.b':'Отведите руку дальше — город становится резким. Наведите на окно и сыграйте — оно загорится. Чем дальше рука, тем больше слышно улицу.',
+    'night.card.rainFx.t':'Вторая рука',
+    'night.card.rainFx.b':'Другая рука меняет звук: прижмите палец к большому и ведите вверх или вниз — указательный: эхо, средний: тепло или яркость, безымянный: волна — больше машин на улице. Звук остаётся, где вы его оставили.',
+    'night.rain.coach.depth':'Ближе к камере — протрите стекло. Дальше — зажгите окно.',
+    'night.rain.fxHint':'Вторая рука: прижмите палец к большому и ведите — указательный: эхо, средний: тепло или яркость, безымянный: волна — больше машин внизу.',
     'night.card.home.t':'Во весь экран',
     'night.card.home.b':'На iPhone и iPad весь экран даёт экран «Домой»: нажмите «Поделиться», затем «На экран „Домой“». Тогда Handsong Night откроется со своего значка, без панелей Safari.',
     'night.fs.enter':'Во весь экран',

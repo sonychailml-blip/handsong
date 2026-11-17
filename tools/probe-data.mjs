@@ -940,11 +940,12 @@ async function nightBed2Law(){
 async function nightRooms(){
   const d=[]; let n=0; const miss=s=>d.push(s), fs=await import('node:fs'), rd=f=>fs.readFileSync(new URL('../'+f, import.meta.url),'utf8');
   const V=await import(new URL('../apps/night/pure/room.js', import.meta.url).href), F=(await import(new URL('../apps/night/rooms/forest/pure/room.js', import.meta.url).href)).FOREST_ROOM;
-  const known={ modes:JSON.parse(rd('core/data/index.json')).modes }, prof=JSON.parse(rd('apps/night/data/night.json')), css=rd('apps/night/night.css'), recs=[F];
+  const RN=(await import(new URL('../apps/night/rooms/rain/pure/room.js', import.meta.url).href)).RAIN_ROOM;   // RAIN-R1: the rain a real room
+  const known={ modes:JSON.parse(rd('core/data/index.json')).modes }, prof=JSON.parse(rd('apps/night/data/night.json')), css=rd('apps/night/night.css'), recs=[F, RN];
   n++; if(JSON.stringify(recs.map(r=>r.id))!==JSON.stringify(V.ROOM_IDS)) miss(`the rooms ${recs.map(r=>r.id)} are not the pinned ids ${V.ROOM_IDS}`);
   for(const r of recs){ n++; const why=V.checkRoom(r, known); if(why) miss(r.id+': '+why);
     for(const [k,L] of Object.entries(r.looks)) for(const tn of Object.values(L.tokens)){ n++; if(!new RegExp('--cv-'+tn+':').test(css)) miss(`${r.id} look ${k}: no token --cv-${tn} in night.css`); }
-    for(const m of prof.moods){ n++; if(!r.moods[m]) miss(`${r.id}: the Night mood ${m} has no look`); }
+    for(const m of r.music ? Object.keys(r.moods) : prof.moods){ n++; if(!r.moods[m] || !r.looks[r.moods[m]]) miss(`${r.id}: the mood ${m} has no look`); }   // RAIN-R1: a room with its own music offers its own moods
     n++; if(V.roomLook(r,'no-such-mood')!==r.looks[r.look]) miss(`CONTROL ${r.id}: an unknown mood does not fall back to the default look`); }
   for(const [field, dmg] of V.ROOM_DAMAGES){ const r=JSON.parse(JSON.stringify(F)); dmg(r); n++; const why=V.checkRoom(r, known);
     if(!why || !why.startsWith(field)) miss(`CONTROL: the damage «${field}» was ${why ? 'refused as «'+why+'»' : 'accepted'}`); }
@@ -1686,7 +1687,7 @@ const loadMs=Math.round(performance.now()-T00);
 /* CORE-20: NIGHT LOADS ONLY ITS OWN MODES — core/scaleload.js loadScaleSubset (the very loader the page runs, reading core/data/ from disk) with Night's
    rooms (apps/night/rooms/index.js, through pure/room.js roomModes) and its profile's moods (apps/night/data/night.json): every mode Night names is
    loaded with what it needs, nothing else, no problem; the files asked are the index, the menu, those modes and what they name; each record equals
-   the full loader's value for value. CONTROLS: (A) a room naming a mode the loading never saw («dorian») fails the «named ⊆ loaded» check; (B) the
+   the full loader's value for value. CONTROLS: (A) a room naming a mode the loading never saw (the first such built-in; RAIN-R1) fails the «named ⊆ loaded» check; (B) the
    same room given to the loading gets it (adding a mode = naming it in a room); (C) a room naming a mode that does not exist fails; (D) a profile
    mood alone gets its mode loaded. */
 async function nightScalesLoad(){
@@ -1712,8 +1713,9 @@ async function nightScalesLoad(){
   { const F=await SL.loadScaleData(); for(const [sect, ids] of [['modes', L.D.manifest.modes], ['tunings', L.D.manifest.tunings], ['chordModeSets', L.D.manifest.chordModeSets], ['palettes', L.D.manifest.palettes]]) for(const id of ids){ n++;
       if(JSON.stringify(L.D[sect][id])!==JSON.stringify(F[sect][id])) miss(`${sect} ${id}: not the full loader's record`); } }
   /* CONTROLS */
-  { const room={ ...recs[0], moods:{ ...recs[0].moods, dorian:recs[0].look } }, ri=PR.roomModes([...recs, room]);
-    n++; if(!lacks(named(ri), L).includes('dorian')) miss('CONTROL A: a room naming a mode the loading never saw passed the check');
+  { const all=JSON.parse(await readFile(new URL('../core/data/index.json', import.meta.url), 'utf8')).modes, unseen=all.find(id=>!L.D.manifest.modes.includes(id) && id!=='phrygian');   // RAIN-R1: the rain's moods load «dorian» (a parent): the control takes a mode never loaded
+    const room={ ...recs[0], moods:{ ...recs[0].moods, [unseen]:recs[0].look } }, ri=PR.roomModes([...recs, room]);
+    n++; if(!unseen || !lacks(named(ri), L).includes(unseen)) miss(`CONTROL A: a room naming a mode the loading never saw (${unseen}) passed the check`);
     n++; const B=await load(ri, prof); if(lacks(named(ri), B).length) miss('CONTROL B: a mode named in a room was not loaded: '+lacks(named(ri), B).join(', '));
     n++; const ghost={ ...recs[0], moods:{ ...recs[0].moods, 'no-such-mode':recs[0].look } }, gi=PR.roomModes([...recs, ghost]), C=await load(gi, prof);
     if(!lacks(named(gi), C).includes('no-such-mode') || !C.problems.some(p=>/no-such-mode/.test(p.file))) miss('CONTROL C: a room naming a mode that does not exist was not caught');
@@ -1783,7 +1785,7 @@ async function coreMpOwn(){
    a tree whose sw.js lost its PRECACHE line fails (CONTROL). (2) The skip list against the forest's own tables: no file a level fetches (FOREST_TEX's set
    for the level, minus the floor it does not draw — FOREST_LEVELS groundScan) is skipped, and every skipped file is one no level fetches (CONTROL: a skip
    catching a level's file is caught). (3) The repository's sw.js caches nothing (PRECACHE null, the fetch handler returns at once); the build writes the
-   list for Night only and takes the rain room out of the players' edition through the door's exact import() (rooms/dev.js holds it once). */
+   list for Night only (RAIN-R1: with the on-demand stage — the rain's media last, stage 2; «NIGHT two rooms» judges which files). */
 async function nightPrecacheList(){
   const d=[], notes=[]; let n=0; const miss=s=>d.push(s), fs=await import('node:fs'), os=await import('node:os'), path=await import('node:path');
   const PC=await import(new URL('./precache.mjs', import.meta.url).href), rd=f=>readFile(new URL('../'+f, import.meta.url), 'utf8');
@@ -1793,21 +1795,22 @@ async function nightPrecacheList(){
   try{
     for(const p of ['index.html','manifest.json','icons/i.png','core/a.js','core/data/m.json','core/vendor/mediapipe/9/vision_bundle.mjs','core/vendor/mediapipe/9/wasm/vision_wasm_internal.wasm','core/vendor/mediapipe/9/wasm/vision_wasm_nosimd_internal.wasm',
       'core/vendor/mediapipe/9/LICENSE','core/vendor/mediapipe/9/README.md','tools/probes/x.js','apps/night/rooms/rain/r.js','apps/night/rooms/forest/tex/ground-1024.png','apps/night/rooms/forest/tex/groundm-1024.png','THIRD-PARTY-LICENSES.md',
-      'apps/night/rooms/forest/sound/s.mp3','apps/night/rooms/forest/still/s.webp','apps/night/rooms/rain/still/r.webp']) put(p, p);   // NIGHT-14b: a room's still/ and sound/ (named by its record) listed; the development room's not
+      'apps/night/rooms/forest/sound/s.mp3','apps/night/rooms/forest/still/s.webp','apps/night/rooms/rain/still/r.webp','apps/night/rooms/rain/city/c.webp','apps/night/rooms/rain/sound/r.mp3']) put(p, p);   // NIGHT-14b: a room's still/ and sound/ (named by its record) listed; RAIN-R1: the rain's too, its city by its own pattern
     put('sw.js', sw);
     const L=PC.precachePaths(T, ['core/a.js','tools/probes/x.js','apps/night/rooms/rain/r.js','sw.js','apps/night/rooms/forest/tex/ground-1024.png','apps/night/rooms/forest/tex/groundm-1024.png','core/missing.js'], PC.NIGHT_SKIP, PC.NIGHT_INCLUDE);
     const want=['core/a.js','core/data/m.json','core/vendor/mediapipe/9/vision_bundle.mjs','core/vendor/mediapipe/9/wasm/vision_wasm_internal.wasm','core/vendor/mediapipe/9/wasm/vision_wasm_nosimd_internal.wasm','apps/night/rooms/forest/tex/groundm-1024.png','icons/i.png','index.html','manifest.json',
-      'apps/night/rooms/forest/sound/s.mp3','apps/night/rooms/forest/still/s.webp'].sort();
+      'apps/night/rooms/forest/sound/s.mp3','apps/night/rooms/forest/still/s.webp','apps/night/rooms/rain/r.js','apps/night/rooms/rain/still/r.webp','apps/night/rooms/rain/city/c.webp','apps/night/rooms/rain/sound/r.mp3'].sort();
     n++; if(JSON.stringify(L)!==JSON.stringify(want)) miss('the list of a made-up tree: '+JSON.stringify(L)+' (expected '+JSON.stringify(want)+')');
-    const r1=PC.writePrecache(T, L, [/^icons\//]), P1=PC.readPrecache(T);
+    const r1=PC.writePrecache(T, L, [/^icons\//], PC.NIGHT_DEMAND), P1=PC.readPrecache(T);
     n++; if(!P1 || P1.version!==r1.version || P1.files.length!==L.length) miss('the list does not round-trip through sw.js');
     n++; { const g=Object.fromEntries(P1.files.map(f=>[f[0], f[3]])); if(g['core/vendor/mediapipe/9/wasm/vision_wasm_internal.wasm']!=='simd' || g['core/vendor/mediapipe/9/wasm/vision_wasm_nosimd_internal.wasm']!=='nosimd' || g['core/a.js']!=='') miss('MediaPipe\'s groups are wrong: '+JSON.stringify(g)); }
-    /* NIGHT-14b: stage 1 = the later patterns' files, last; within stage 0 MediaPipe last */
-    n++; { const ord=P1.files.map(f=>f[0]), st=P1.files.map(f=>f[4]), v=ord.map(p=>p.startsWith('core/vendor/')), iv=v.indexOf(true);
-      if(st[ord.indexOf('icons/i.png')]!==1 || st.filter(x=>x===1).length!==1 || ord[ord.length-1]!=='icons/i.png' || iv<1 || v.slice(iv, -1).some(x=>!x) || st.slice(0,-1).some(x=>x!==0)) miss('the stages or the order are wrong: '+JSON.stringify(P1.files.map(f=>[f[0], f[4]]))); }
+    /* NIGHT-14b: stage 1 = the later patterns' files, after the start files; RAIN-R1: stage 2 = on demand, last; within stage 0 MediaPipe last */
+    n++; { const ord=P1.files.map(f=>f[0]), st=P1.files.map(f=>f[4]), z=st.filter(x=>x===0).length, v=ord.slice(0, z).map(p=>p.startsWith('core/vendor/')), iv=v.indexOf(true), at=p=>st[ord.indexOf(p)];
+      if(at('icons/i.png')!==1 || st.filter(x=>x===1).length!==1 || at('apps/night/rooms/rain/city/c.webp')!==2 || at('apps/night/rooms/rain/sound/r.mp3')!==2 || st.filter(x=>x===2).length!==2
+        || st.some((x, i)=>i && x<st[i-1]) || iv<1 || v.slice(iv).some(x=>!x) || at('apps/night/rooms/rain/r.js')!==0 || at('apps/night/rooms/rain/still/r.webp')!==0) miss('the stages or the order are wrong: '+JSON.stringify(P1.files.map(f=>[f[0], f[4]]))); }
     fs.appendFileSync(path.join(T,'core/a.js'), ' '); const r2=PC.rehashPrecache(T);
     n++; if(r2.version===r1.version) miss('one changed byte did not change the version');
-    n++; { const P2=PC.readPrecache(T), f=P2 && P2.files.find(x=>x[0]==='icons/i.png'); if(!f || f[4]!==1) miss('a re-hash lost the stages'); }
+    n++; { const P2=PC.readPrecache(T), f=P2 && P2.files.find(x=>x[0]==='icons/i.png'), g=P2 && P2.files.find(x=>x[0]==='apps/night/rooms/rain/city/c.webp'); if(!f || f[4]!==1 || !g || g[4]!==2) miss('a re-hash lost the stages'); }
     n++; if((fs.readFileSync(path.join(T,'sw.js'),'utf8').match(/^const PRECACHE=/gm)||[]).length!==1) miss('a re-hash left more than one PRECACHE line');
     fs.writeFileSync(path.join(T,'sw.js'), sw.replace('const PRECACHE=null;', 'const LIST=null;'));
     n++; let threw=false; try{ PC.writePrecache(T, L); }catch(e){ threw=true; } if(!threw) miss('CONTROL: a sw.js without its PRECACHE line was filled anyway'); else notes.push('CONTROL: a sw.js without its PRECACHE line fails the build');
@@ -1828,9 +1831,13 @@ async function nightPrecacheList(){
   const SF=(await import(new URL('../apps/night/pure/still.js', import.meta.url).href)).stillFile, FB='apps/night/rooms/forest/', std=new Set();
   { const Lv=R.levels.reduced, skip=Lv.groundScan ? BAKED : SCAN; for(const [k, name] of Object.entries(sets.reduced||{})) if(!skip.includes(k)) std.add(texOf[name]); }
   if(SF(R,'reduced')) std.add(FB+SF(R,'reduced')); if(R.still && R.still.over && R.still.over.sprites) std.add(FB+R.still.over.sprites);
+  /* small fixes (2026-11-17): the FOREST-2 pictures (forest-natural.js NATURAL_TEX, files in forest/new/) — Standard's are start files, every level's are real */
+  const NT=(await import(new URL('../apps/night/rooms/forest/forest-natural.js', import.meta.url).href)).NATURAL_TEX, newDir=fs.readdirSync(new URL('../apps/night/rooms/forest/new/', import.meta.url));
+  const natFile=nm=>{ const f=newDir.find(x=>x.replace(/\.[a-z]+$/, '')===nm); return f ? FB+'new/'+f : null; }, natAll=[...new Set(Object.values(NT).flatMap(L=>Object.values(L)).map(natFile).filter(Boolean))];
+  for(const nm of Object.values(NT.reduced)){ const f=natFile(nm); if(f) std.add(f); }
   const judgeLater=later=>[...std].filter(p=>later.some(r=>r.test(p)));
   n++; if(std.size<8 || !SF(R,'full')) miss(`the Standard level's files could not be read (${std.size})`); else { const b=judgeLater(PC.NIGHT_LATER); if(b.length) miss('the Standard level would wait for the top-up: '+b.join(', ')); else notes.push(`none of the Standard level's ${std.size} files waits for the top-up`); }
-  n++; { const real=[...Object.values(texOf), FB+SF(R,'full'), FB+SF(R,'reduced')], stale=PC.NIGHT_LATER.filter(r=>!r.source.startsWith('^icons') && !real.some(p=>r.test(p))); if(stale.length) miss('a later pattern matches no forest file (stale?): '+stale.map(String).join(', ')); }
+  n++; { const real=[...Object.values(texOf), FB+SF(R,'full'), FB+SF(R,'reduced'), ...natAll], stale=PC.NIGHT_LATER.filter(r=>!r.source.startsWith('^icons') && !real.some(p=>r.test(p))); if(stale.length) miss('a later pattern matches no forest file (stale?): '+stale.map(String).join(', ')); }
   n++; if(!judgeLater([...PC.NIGHT_LATER, /litter-col-1024\.jpg$/]).length) miss('CONTROL: a later pattern catching a Standard file passed'); else notes.push('CONTROL: a later pattern catching a Standard file is caught');
   /* NIGHT-14c: every level's still is a start file (the start screen shows the chosen level's still first — a Detailed player offline included) */
   const stills=['full','reduced'].map(lv=>SF(R, lv)).filter(Boolean).map(s=>FB+s), stillLater=later=>stills.filter(p=>later.some(r=>r.test(p)));
@@ -1843,7 +1850,7 @@ async function nightPrecacheList(){
       miss('the held Detailed lost a link (host holdCheck / the room\'s has / main.js passing it / the worker\'s word / update.js relaying it)'); }
   /* (2c) NIGHT-14b: every media file a room record names (an address made at run time, unseen by the build's walk) is listed through NIGHT_INCLUDE */
   const roomsDir=new URL('../apps/night/rooms/', import.meta.url), named=[], tex=new Set(Object.values(texOf));
-  for(const e of fs.readdirSync(roomsDir,{ withFileTypes:true })) if(e.isDirectory() && e.name!=='rain'){ const f=new URL(e.name+'/pure/room.js', roomsDir); if(!fs.existsSync(f)) continue;
+  for(const e of fs.readdirSync(roomsDir,{ withFileTypes:true })) if(e.isDirectory()){ const f=new URL(e.name+'/pure/room.js', roomsDir); if(!fs.existsSync(f)) continue;   // RAIN-R1: the rain's records too
     for(const m of fs.readFileSync(f,'utf8').matchAll(/'([\w./-]+\.(?:mp3|webp|png|jpg|wav|ogg))'/g)) named.push(`apps/night/rooms/${e.name}/${m[1]}`); }
   const judgeInc=list=>list.filter(p=>!PC.NIGHT_INCLUDE.some(r=>r.test(p)) && !tex.has(p));
   n++; if(named.length<4) miss(`the room records name ${named.length} media files (the read is stale?)`); else { const b=judgeInc(named); if(b.length) miss('named by a room record but not listed: '+b.join(', ')); else notes.push(`every media file the room records name is listed (${named.length})`); }
@@ -1852,9 +1859,8 @@ async function nightPrecacheList(){
   n++; if((sw.match(/^const PRECACHE=null;/gm)||[]).length!==1 || !/if\(!PRECACHE\) return;/.test(sw)) miss('the repository\'s sw.js is not the no-cache worker (PRECACHE null, fetch passed on)');
   n++; if(!sw.includes('await fill(FILES.filter(f=>!f[4]));') || !sw.includes("for(const mode of ['force-cache', 'reload'])") || !sw.includes("t==='handsong-night-topup'") || !(await rd('apps/night/update.js')).includes("type:'handsong-night-topup'"))
     miss('the worker lost NIGHT-14b\'s install (the start files only, the browser\'s copy first, the top-up at the page\'s word)');
-  const B=await rd('tools/build.mjs'), door=(/const DEV_DOOR="([^"]+)"/.exec(B)||[])[1], dev=await rd('apps/night/rooms/dev.js');
-  n++; if(!/if\(app==='night'\) pc=writePrecache\(OUT, precachePaths\(OUT, seen, NIGHT_SKIP, NIGHT_INCLUDE\), NIGHT_LATER\)/.test(B)) miss('the build does not write Night\'s list (and only Night\'s)');
-  n++; if(!door || dev.split(door).length!==2 || !/if\(RELEASE && app==='night'\)\{ rmSync\(path\.join\(OUT,'apps\/night\/rooms\/rain'\)/.test(B)) miss('the build cannot take the rain room out of the players\' edition (its folder, or the door\'s exact import())');
+  const B=await rd('tools/build.mjs');
+  n++; if(!/if\(app==='night'\) pc=writePrecache\(OUT, precachePaths\(OUT, seen, NIGHT_SKIP, NIGHT_INCLUDE\), NIGHT_LATER, NIGHT_DEMAND\)/.test(B)) miss('the build does not write Night\'s list (and only Night\'s)');
   return { cases:n, total:d.length, differences:d, notes };
 }
 /* DESIGN-1 part B — «NIGHT room tint (app)»: every real room names a tint token whose colour (night.css --cv-<token>) is light enough for the
@@ -1876,7 +1882,7 @@ async function nightRoomTint(){
     if(tokOf(c, 'night-on-tint')!==RV.TINT_INK) bad.push(`night.css's --night-on-tint ${tokOf(c, 'night-on-tint')} is not the ink the contrast is judged against (${RV.TINT_INK})`);
     if(tokOf(c, 'night-base')!==RV.TINT_BASE) bad.push(`night.css's --night-base ${tokOf(c, 'night-base')} is not the base the contrast is judged against (${RV.TINT_BASE})`);
     return bad; };
-  const rooms=RV.ROOM_IDS.map(id=>[F].find(r=>r.id===id)); n+=rooms.length;
+  const RN=(await import(new URL('../apps/night/rooms/rain/pure/room.js', import.meta.url).href)).RAIN_ROOM, rooms=RV.ROOM_IDS.map(id=>[F, RN].find(r=>r.id===id)); n+=rooms.length;   // RAIN-R1
   if(rooms.some(r=>!r)) miss('a pinned room has no record here: '+RV.ROOM_IDS.join(', '));
   else { n+=4; for(const b of judge(css, rooms)) miss(b);
     const ctl=[['a dark tint', css.replace(/--cv-forest-tint\s*:\s*#[0-9a-fA-F]{6}/, '--cv-forest-tint:#3a4a6a'), r=>/too dark/.test(r)],
@@ -1943,6 +1949,29 @@ async function nightHandLight(){
    far, the whole street to the hills sharp at once and the glass soft; a hand in the middle: the street (near and far) sharper than the glass AND the hills; the depth law (pure/city.js
    depthOf) is monotone and lands on its anchors. CONTROLS: an un-eased law breaks the speed limit; a two-plane focus (one blur for the whole city)
    fails the middle. */
+/* NIGHT-16 — «NIGHT quality (app)»: ONE quality choice, heaviest to lightest (Detailed · Standard · Light); the stored pair (the old Lightweight flag,
+   the scene level) reads on — Lightweight on = Light whatever the level, an unknown level = Standard, nothing stored (a first visit) = Standard; every
+   choice round-trips; Light draws Standard's picture. The page: the segment holds exactly the three choices in that order, the old Lightweight switch
+   is gone, the three texts exist in English and Russian. CONTROLS: the old two-control reading (the level alone) fails «Lightweight on = Light»;
+   a page with the old switch planted is caught. */
+async function nightQuality(){
+  const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); };
+  const Q=await import(new URL('../apps/night/pure/quality.js', import.meta.url).href), fs=await import('node:fs');
+  ok('the order is not heaviest to lightest: '+Q.QUALITIES.join(','), Q.QUALITIES.join(',')==='full,reduced,light');
+  for(const q of Q.QUALITIES){ const S=Q.qualityState(q); ok(`${q} does not round-trip (${JSON.stringify(S)})`, Q.qualityFrom(S.light, S.level)===q); }
+  ok('Light does not draw the Standard picture', Q.qualityState('light').level==='reduced' && Q.qualityState('light').light==='1');
+  const MIG=[[['1','reduced'],'light'], [['1','full'],'light'], [['0','full'],'full'], [['0','reduced'],'reduced'], [[null,null],'reduced'], [['maybe','full'],'full'], [['0','ultra'],'reduced'], [[null,'full'],'full']];
+  const judge=f=>MIG.filter(([a, w])=>f(...a)!==w).map(([a, w])=>`${JSON.stringify(a)} → ${f(...a)} (${w} wanted)`);
+  { const bad=judge(Q.qualityFrom); ok('saved settings misread: '+bad.join('; '), !bad.length); }
+  { const bad=judge((light, level)=>level==='full' ? 'full' : 'reduced'); ok('CONTROL: the old two-control reading passes the migration — the check cannot fail', bad.length>0); notes.push(`CONTROL the old reading: ${bad.length} saved setting(s) misread (${bad[0]})`); }
+  const html=fs.readFileSync(new URL('../apps/night/index.html', import.meta.url),'utf8'), tx=fs.readFileSync(new URL('../apps/night/texts.js', import.meta.url),'utf8');
+  const page=h=>{ const m=h.match(/<div id="nightQualSeg"[^>]*>([\s\S]*?)<\/div>/), qs=m ? [...m[1].matchAll(/data-q="([^"]+)"/g)].map(x=>x[1]) : []; return { qs, old:/id="nightLightTg"/.test(h) }; };
+  { const P=page(html); ok(`the page's quality choices ${P.qs.join(',')} (wanted ${Q.QUALITIES.join(',')})`, P.qs.join(',')===Q.QUALITIES.join(',')); ok('the old Lightweight switch is still on the page', !P.old); }
+  ok('CONTROL: a page with the old switch planted is not caught', page(html.replace('<div id="nightQualSeg"', '<button id="nightLightTg"></button><div id="nightQualSeg"')).old);
+  for(const k of ['night.set.quality', 'night.q.light', 'night.q.lightNote', 'night.q.standard', 'night.q.detailedShort']){ const c=tx.split(`'${k}':`).length-1; ok(`the text ${k} appears ${c} time(s) (English and Russian: 2)`, c===2); }
+  notes.push('Detailed · Standard · Light; saved settings: '+MIG.map(([a, w])=>`${a.join('/')}→${w}`).join(', '));
+  return { cases:n, total:d.length, differences:d, notes };
+}
 async function rainFocus(){
   const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); };
   const F=await import(new URL('../apps/night/rooms/rain/pure/focus.js', import.meta.url).href), C=F.FOCUS, CT=await import(new URL('../apps/night/rooms/rain/pure/city.js', import.meta.url).href);
@@ -2245,36 +2274,100 @@ async function rainNature(){
     ok('the forest has a layers part (its sound would build new nodes)', !('layers' in FR.nature)); }
   return { cases:n, total:d.length, differences:d, notes };
 }
-/* «RAIN stays out of the players' edition (app)»: the rain room is a DEVELOPMENT room until the founder approves it. (1) Its record is valid as a
-   development room and refused as a real one (its id is not pinned, so it is never remembered); it is not in ROOMS. (2) The door (rooms/dev.js): closed in
-   the release edition whatever the address says, closed without the word, open only for «room=rain» in the development edition. (3) No module outside the
-   room's folder imports it except the door, and the door only by import() (never in a build's preloaded closure); the page does not name it; main.js opens
-   the door. (4) Its tint is readable and every token its looks name is defined. CONTROLS: a static import of the room, a dark tint. */
-async function rainGate(){
-  const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); }, fs=await import('node:fs');
+/* RAIN-R1 — «NIGHT two rooms (app)»: the forest AND the rain are real rooms (the founder). (1) ROOM_IDS pins both, ROOMS lists their records in that order,
+   each passes as a real room. (2) The rain's SCENE (rain.js, install.js and what they load) is loaded only by import() from rooms/index.js — its record,
+   stand-in and small laws may be static (the start set's 0.04 MB); CONTROL: a static import of rain.js is caught. (3) THE VISIT'S START ROOM (guard.js
+   startRoom, run here on made-up addresses): the address's word wins; an automated browser starts in the forest unless asked «room=random»; otherwise the
+   draw — both rooms reachable; CONTROL: a draw that always gives the forest fails «both reachable». (4) The first paint: night.css shows the rain's two
+   stills under html[data-room="room.rain"] exactly as its record names them. (5) Begin waits for the start room with an upper limit and falls back to
+   the first room. (6) The players' build keeps the rain (removes only its development samples); its media are stage 2 «on demand», its code and stills
+   not; CONTROL: a demand pattern catching a still is caught. (7) THE DOT'S WINDOW (pure/windows.js flyWindow): on the house opposite, inside the view
+   of every screen shape 9 : 19.5 … 2.4 : 1 by the lens law, dark in the first look; CONTROL: a pick that ignores the shared view (the house opposite's
+   nearest dark window) is outside a phone upright's view. (8) The start drops (pure/startdrops.js): seeded, inside the screen's band, each holding still
+   and slipping (stick-slip); CONTROL: a law that never holds fails. (9) The rain's tint is readable, every look token defined; CONTROL a dark tint.
+   (10) The rain's texts (name, cards, coaching) in both languages, the cards and lines following the room; CONTROL a made-up text is missing. */
+async function nightTwoRooms(){
+  const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); }, fs=await import('node:fs'), rd=f=>readFile(new URL('../'+f, import.meta.url), 'utf8');
   const RV=await import(new URL('../apps/night/pure/room.js', import.meta.url).href), RR=(await import(new URL('../apps/night/rooms/rain/pure/room.js', import.meta.url).href)).RAIN_ROOM;
-  const RI=await import(new URL('../apps/night/rooms/index.js', import.meta.url).href), DV=await import(new URL('../apps/night/rooms/dev.js', import.meta.url).href);
-  const prof=JSON.parse(await readFile(new URL('../apps/night/data/night.json', import.meta.url), 'utf8'));
-  { const allModes=JSON.parse(await readFile(new URL('../core/data/index.json', import.meta.url), 'utf8')).modes, why=RV.checkRoom(RR, { ids:[RR.id], modes:allModes }); ok('the record is refused as a development room: '+why, why===null);   // RAIN-4: a room brings its own moods (scalepick fetches them): each must be a real mode of the data; prof stays for the rows below
-    ok('the record passes as a real room (its id must not be pinned yet)', /not a pinned room id/.test(RV.checkRoom(RR)||'') && !RV.ROOM_IDS.includes(RR.id));
-    ok('the room is in ROOMS', !RI.ROOMS.some(R=>R.record.id===RR.id) && RI.roomById(RR.id)===null); }
-  { const W=DV.devRoomWord; ok('the door is open in the release edition', W('release', '?room=rain')===null && W('release', '?probe&room=rain')===null);
-    ok('the door opens without the word, or for another word', W('dev', '')===null && W('dev', '?probe')===null && W('dev', '?room=forest')===null && W('dev', '?room=')===null);
-    ok('the door does not open for «room=rain» in the development edition (the room cannot be reached)', W('dev', '?room=rain')==='rain' && W('dev', '?probe&room=rain')==='rain' && DV.DEV_ROOMS.rain===RR.id); }
-  { const strip=t=>t.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/[^\n]*$/gm, ' '), users=[];
-    const scan=t=>{ const c=strip(t), st=/(?:\bfrom|\bimport)\s*['"][^'"\n]*\/rain\/[^'"\n]*['"]/.test(c), dy=/\bimport\s*\(\s*['"][^'"\n]*\/rain\/[^'"\n]*['"]\s*\)/.test(c); return st ? 'static' : dy ? 'dynamic' : null; };
+  const RI=await import(new URL('../apps/night/rooms/index.js', import.meta.url).href), allModes=JSON.parse(await rd('core/data/index.json')).modes;
+  /* (1) */
+  ok('the pinned ids are not the forest and the rain: '+RV.ROOM_IDS.join(','), RV.ROOM_IDS.join(',')==='room.forest,room.rain');
+  ok('ROOMS do not list the pinned rooms in order: '+RI.ROOMS.map(R=>R.record.id).join(','), RI.ROOMS.map(R=>R.record.id).join(',')===RV.ROOM_IDS.join(','));
+  for(const R of RI.ROOMS){ const why=RV.checkRoom(R.record, { modes:allModes }); ok(`${R.record.id} is refused as a real room: ${why}`, why===null); }
+  ok('the rain entry lacks a door (ready, load, prefetch, has, heard)', ['ready','load','prefetch','has','heard'].every(k=>typeof (RI.roomById('room.rain')||{})[k]==='function'));
+  /* (2) */
+  { const strip=t=>t.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/[^\n]*$/gm, ' '), SCENE=/\/rain\/(rain|install|lofi|rain-glass|rain-city|sampled)\.js/, users=[];
+    const scan=t=>{ const c=strip(t); let st=false, dy=false; for(const m of c.matchAll(/(?:\bfrom|\bimport)\s*['"]([^'"\n]+)['"]/g)) if(SCENE.test(m[1])) st=true; for(const m of c.matchAll(/\bimport\s*\(\s*['"]([^'"\n]+)['"]\s*\)/g)) if(SCENE.test(m[1])) dy=true; return st ? 'static' : dy ? 'dynamic' : null; };
     const walk=dir=>{ for(const e of fs.readdirSync(dir, { withFileTypes:true })){ const f=new URL(e.name+(e.isDirectory() ? '/' : ''), dir); if(e.isDirectory()){ if(!/\/(vendor|rooms\/rain)\/$/.test(f.pathname)) walk(f); }
       else if(e.name.endsWith('.js')){ const k=scan(fs.readFileSync(f, 'utf8')); if(k) users.push([f.pathname.replace(/^.*\/(core|apps)\//, '$1/'), k]); } } };
     walk(new URL('../core/', import.meta.url)); walk(new URL('../apps/night/', import.meta.url)); walk(new URL('../apps/full/', import.meta.url));
-    ok('the room is imported by '+JSON.stringify(users)+' (only rooms/dev.js, by import())', users.length===1 && users[0][0]==='apps/night/rooms/dev.js' && users[0][1]==='dynamic');
-    const page=await readFile(new URL('../apps/night/index.html', import.meta.url), 'utf8'), main=await readFile(new URL('../apps/night/main.js', import.meta.url), 'utf8');
-    ok('the page names the room, or main.js does not open the door', !/rooms\/rain|room\.rain/.test(page) && /devRoomInstall\(\)/.test(strip(main)));
-    n++; if(scan("import { RAIN_ROOM } from './rooms/rain/pure/room.js';")!=='static') d.push('CONTROL: a static import of the room is not seen — the check cannot fail'); else notes.push('CONTROL: a static import of the room is caught'); }
-  { const css=(await readFile(new URL('../apps/night/night.css', import.meta.url), 'utf8')).replace(/\/\*[\s\S]*?\*\//g, ''), tok=name=>{ const m=css.match(new RegExp('(?<![\\w-])--cv-'+name+'\\s*:\\s*(#[0-9a-fA-F]{6})\\b')); return m ? m[1].toLowerCase() : null; };
+    ok('the rain\'s scene is imported by '+JSON.stringify(users)+' (only rooms/index.js, by import())', users.length>=1 && users.every(u=>u[0]==='apps/night/rooms/index.js' && u[1]==='dynamic'));
+    ok('CONTROL: a static import of rain.js is not seen — the check cannot fail', scan("import { buildRain } from './rain/rain.js';")==='static'); }
+  /* (3) */
+  { const G=await rd('apps/night/guard.js'), fn=(/function startRoom\(\)\{[\s\S]*?\n    return r<0\.5 \? ROOMS\.forest : ROOMS\.rain; \}/.exec(G)||[])[0], rooms=(/var ROOMS=(\{[^}]*\});/.exec(G)||[])[1];
+    ok('guard.js has no startRoom or no room list', !!fn && !!rooms);
+    if(fn && rooms){ const make=src=>(q, wd, rnd)=>{ const M={ random:()=>rnd }; return new Function('q', 'navigator', 'Math', 'var ROOMS='+rooms+'; '+src+' return startRoom();')(q, { webdriver:wd }, M); }, SR=make(fn);
+      ok('guard.js names other rooms than the pinned ones: '+rooms, JSON.stringify(Object.values(new Function('return '+rooms)()))===JSON.stringify(RV.ROOM_IDS));
+      const cases=[['?room=rain', true, 0.1, 'room.rain'], ['?room=forest', false, 0.9, 'room.forest'], ['?probe', true, 0.9, 'room.forest'], ['', true, 0.9, 'room.forest'], ['?probe&room=random&rnd=0.8', true, 0.1, 'room.rain'], ['?probe&room=random&rnd=0.2', true, 0.9, 'room.forest'], ['?room=cave', false, 0.2, 'room.forest']];
+      const bad=cases.filter(([q, wd, r, w])=>SR(q, wd, r)!==w).map(([q, wd, r, w])=>`${q||'(none)'} webdriver ${wd} draw ${r} → ${SR(q, wd, r)} (${w} wanted)`); ok('the start room: '+bad.join('; '), !bad.length);
+      const reach=f=>new Set([0.05, 0.3, 0.49, 0.5, 0.7, 0.95].map(r=>f('', false, r)));
+      ok('a player\'s visit does not reach both rooms: '+[...reach(SR)].join(','), reach(SR).size===2);
+      ok('CONTROL: a draw that always gives the forest passes «both reachable»', reach(make(fn.replace("return r<0.5 ? ROOMS.forest : ROOMS.rain;", "return ROOMS.forest;"))).size===1);
+      notes.push('the start room: the address\'s word, the forest for an automated browser, else the draw (both reachable)'); } }
+  /* (4) */
+  { const css=(await rd('apps/night/night.css')).replace(/\/\*[\s\S]*?\*\//g, '');
+    ok('night.css lacks the rain\'s Standard still as its record names it', css.includes(`html[data-room="room.rain"] .night-still{ background-image:linear-gradient(transparent, transparent), url(rooms/rain/${RR.still.reduced}); }`));
+    ok('night.css lacks the rain\'s Detailed still as its record names it', css.includes(`html[data-room="room.rain"][data-still="full"] .night-still{ background-image:linear-gradient(transparent, transparent), url(rooms/rain/${RR.still.full}); }`));
+    for(const lv of ['full', 'reduced']){ const f=new URL('../apps/night/rooms/rain/'+RR.still[lv], import.meta.url); ok(`the rain's ${lv} still is missing or over 100 KB`, fs.existsSync(f) && fs.statSync(f).size<=100*1024); } }
+  /* (5) */
+  { const M=(await rd('apps/night/main.js')).replace(/\/\*[\s\S]*?\*\//g, ' '), lim=+((/export const START_ROOM_MS=(\d+);/.exec(M)||[])[1]);
+    ok(`Begin's wait for the start room has no upper limit (${lim})`, lim>0 && lim<=60000 && /setTimeout\(\(\)=>r\('late'\), START_ROOM_MS\)/.test(M));
+    ok('a start room that fails or is late does not fall back to the first room', /if\(how==='failed' \|\| how==='late'\)\{[^\n]*\n\s*await roomSwitch\(ROOMS\[0\]\.record\.id, \{ fast:true \}\); stillRoomSet\(ROOMS\[0\]\.record\.id\); \}/.test(M));
+    ok('Begin works before the start room is settled', /startRoomReady\(\)\.catch\(\(\)=>'failed'\)\.then\(how=>\{ startRoomHow=how; if\(window\.__nightBoot\) window\.__nightBoot\.ready\(\); \}\);/.test(M)); }
+  /* (6) */
+  { const B=await rd('tools/build.mjs'), PC=await import(new URL('./precache.mjs', import.meta.url).href);
+    ok('the players\' build does not keep the rain (or removes more than its samples)', /if\(RELEASE && app==='night'\) rmSync\(path\.join\(OUT,'apps\/night\/rooms\/rain\/samples'\)/.test(B) && !/rmSync\(path\.join\(OUT,'apps\/night\/rooms\/rain'\)/.test(B) && /a players' build lacks the rain room's/.test(B));
+    ok('the build does not write the on-demand stage', /writePrecache\(OUT, precachePaths\(OUT, seen, NIGHT_SKIP, NIGHT_INCLUDE\), NIGHT_LATER, NIGHT_DEMAND\)/.test(B));
+    const R='apps/night/rooms/rain/', judge=pats=>{ const dem=p=>pats.some(r=>r.test(p)); const bad=[];
+      for(const p of [R+'city/reduced/late.webp', R+'city/windows.json', R+'sound/pane.mp3', R+'timbres/e-piano.json']) if(!dem(p)) bad.push(p+' is not on demand');
+      for(const p of [R+'rain.js', R+'pure/room.js', R+'still/still-reduced.webp', R+'still/still-full.webp', 'apps/night/rooms/forest/still/still-reduced.webp', 'apps/night/rooms/forest/tex/floor-1024.png']) if(dem(p)) bad.push(p+' is on demand (a start file)');
+      return bad; };
+    { const b=judge(PC.NIGHT_DEMAND); ok('the on-demand stage: '+b.join('; '), !b.length); }
+    ok('CONTROL: a demand pattern catching a still passed', judge([...PC.NIGHT_DEMAND, /\/still\//]).length>0);
+    ok('the rain\'s city and timbres are not listed (their addresses are made at run time)', PC.NIGHT_INCLUDE.some(r=>r.test(R+'city/full/lit.webp')) && PC.NIGHT_INCLUDE.some(r=>r.test(R+'timbres/nylon.json')));
+    const sw=await rd('apps/night/sw.js'); ok('the worker tops up or installs the on-demand files, or does not keep them when fetched', sw.includes('fill(FILES.filter(f=>f[4]!==2), { strict:false })') && sw.includes('if(f[4]!==2) return fetch(q);') && /c\.put\(url, new Response\(body/.test(sw)); }
+  /* (7) */
+  { const W=await import(new URL('../apps/night/rooms/rain/pure/windows.js', import.meta.url).href), WIN=JSON.parse(await rd('apps/night/rooms/rain/city/windows.json'));
+    const first=RV.roomLook(RR, Object.keys(RR.moods)[0]), dark=i=>WIN[i].amb>=first.lit, k=W.flyWindow(WIN, RR.view, dark), w=WIN[k];
+    const shown=(w, a)=>{ const th=Math.tan(RV.roomFov(RR.view, a, 1)*Math.PI/360), tw=th*a; return Math.abs(w.x)+w.hw<tw && Math.abs(w.y)+w.hh<th; };
+    const shapes=[]; for(let a=9/19.5;a<=2.4+1e-9;a+=0.01) shapes.push(a);
+    ok('the dot\'s window: none', k>=0);
+    if(k>=0){ ok(`the dot's window is not on the house opposite (${w.side})`, w.side==='opp'); ok('the dot\'s window is lit at the start', dark(k));
+      const out=shapes.filter(a=>!shown(w, a)); ok(`the dot's window is not seen on ${out.length} screen shapes (first ${out[0] && out[0].toFixed(2)})`, !out.length);
+      notes.push(`the dot's window: #${w.id}, house opposite, floor ${w.floor}, at (${w.x.toFixed(3)}, ${w.y.toFixed(3)}) — seen from 9 : 19.5 to 2.4 : 1`); }
+    { let best=-1; WIN.forEach((q, i)=>{ if(q.side==='opp' && dark(i) && (best<0 || q.dist<WIN[best].dist)) best=i; });   // CONTROL: the house opposite's nearest dark window, the shared view ignored
+      ok('CONTROL: a pick that ignores the shared view is seen on a phone upright — the check cannot fail', best>=0 && !shown(WIN[best], 9/19.5)); notes.push(`CONTROL a pick ignoring the shared view (#${best>=0 ? WIN[best].id : '—'}) is outside a phone upright's view`); } }
+  /* (8) */
+  { const SD=await import(new URL('../apps/night/pure/startdrops.js', import.meta.url).href), A=SD.startDrops(), B=SD.startDrops(), C=SD.START_DROPS;
+    ok('the start drops differ between two calls', JSON.stringify(A)===JSON.stringify(B)); ok(`the start drops are ${A.length}, not ${C.n}`, A.length===C.n);
+    const judgeDrops=at=>{ let holds=0, slips=0, out=0; for(const dr of A){ let prev=null; for(let t=0;t<30;t+=0.05){ const q=at(dr, t); if(q.y<-C.over-1e-9 || q.y>1+C.over+1e-9 || q.x<0 || q.x>1) out++; if(prev){ const dy=q.y-prev.y; if(Math.abs(dy)<1e-12) holds++; else if(dy>0) slips++; } prev=q; } } return { holds, slips, out }; };
+    { const J=judgeDrops(SD.startDropAt); ok(`the drops leave the band ${J.out} time(s)`, !J.out); ok(`the drops do not hold and slip (${J.holds} holds, ${J.slips} slips)`, J.holds>J.slips && J.slips>0); }
+    { const J=judgeDrops((dr, t)=>({ x:dr.x, y:((dr.y0+t*0.05)%1.16)-0.08 })); ok('CONTROL: drops that never hold passed «hold and slip»', !(J.holds>J.slips && J.slips>0)); } }
+  /* (9) */
+  { const css=(await rd('apps/night/night.css')).replace(/\/\*[\s\S]*?\*\//g, ''), tok=name=>{ const m=css.match(new RegExp('(?<![\\w-])--cv-'+name+'\\s*:\\s*(#[0-9a-fA-F]{6})\\b')); return m ? m[1].toLowerCase() : null; };
     const light=v=>!!v && RV.contrastOf(v, RV.TINT_INK)>=RV.TINT_CONTRAST && RV.contrastOf(v, RV.TINT_BASE)>=RV.TINT_CONTRAST, t=tok(RR.tint);
-    ok(`the room's tint ${t} is missing or too dark for the interface`, light(t)); notes.push(`tint ${t}: ${t ? RV.contrastOf(t, RV.TINT_INK).toFixed(1) : '—'} : 1 against the ink`);
+    ok(`the rain's tint ${t} is missing or too dark for the interface`, light(t));
     const miss=[...new Set(Object.values(RR.looks).flatMap(L=>Object.values(L.tokens)))].filter(x=>!tok(x)); ok('tokens the looks name are not defined in night.css: '+miss.join(', '), !miss.length);
-    n++; if(light('#3a4a6a')) d.push('CONTROL: a dark tint passed — the check cannot fail'); else notes.push('CONTROL: a dark tint is caught'); }
+    ok('CONTROL: a dark tint passed — the check cannot fail', !light('#3a4a6a')); }
+  /* (10) the rain's texts: its name, its cards (near: wipe the mist; far: light the windows; the other hand) and coaching lines, in English and Russian */
+  { const tx=await rd('apps/night/texts.js'), cards=await rd('apps/night/cards.js'), coach=await rd('apps/night/coach.js');
+    const keys=['night.card.rainNear.t', 'night.card.rainNear.b', 'night.card.rainFar.t', 'night.card.rainFar.b', 'night.card.rainFx.t', 'night.card.rainFx.b', 'night.rain.coach.depth', 'night.rain.fxHint'];
+    const missing=list=>list.filter(k=>tx.split(`'${k}':`).length-1!==2);
+    ok('the rain texts are not in both languages: '+missing(keys).join(', '), !missing(keys).length);
+    ok('CONTROL: a made-up text passed', missing([...keys, 'night.card.rainNone.t']).length===1);
+    ok('the rain name is not in English and Russian', RR.name.en==='Rain' && RR.name.ru==='Дождь');
+    ok('the cards do not follow the room (the rain list)', /RAIN_CARDS=\['play','rainNear','rainFar','rainFx','music'\]/.test(cards) && /sceneRoom\(\)==='room\.rain' \? RAIN_CARDS : BASE/.test(cards));
+    ok('the coaching lines do not follow the room', /TEXT_RAIN=\{ depth:'night\.rain\.coach\.depth', fx:'night\.rain\.fxHint' \}/.test(coach)); }
   return { cases:n, total:d.length, differences:d, notes };
 }
 /* DESIGN-1 part D — «NIGHT start still (app)»: (1) THE FILES — every real room names a still per level, each a WebP in its folder of at most 100 KB
@@ -2588,6 +2681,44 @@ async function rainTimbres(){ const d=[], notes=[]; let n=0; const miss=x=>d.pus
    in the parent's degrees, the bass always inside its register and below the playing register, the glints in theirs, tempo 60…76, walking
    only at Evening. CONTROLS: Lydian's set with its G is caught; a chord tone outside the mode (degree 7) is caught; a bass register reaching
    the playing register is caught. */
+/* small fixes (2026-11-17) — «RAIN piano comping (app)»: the bed's electric piano comps like a pianist, not the same chord struck the same way. Over 10 minutes
+   of every piece (pure/lofi.js lofiStep + lofiComp): (1) the rhythm stays — every hit on a step of its bar's rhythm (or the push at 14, a passing note on
+   the step after the last hit); (2) the hits of a bar differ (voicing, roll or velocity) in most bars; (3) the top line moves inside bars now and then and
+   the voicings are led smoothly between chords (each voice moves ≤ 2 steps on average); (4) each roll ≤ 30 ms, not all notes together in most hits;
+   (5) every note its own velocity, the top the loudest; (6) hits are skipped now and then (never the first of a bar); (7) passing notes are safe over their
+   chord and anticipations happen; (8) every other note is a tone of its bar's chord (or the next one's, for the push). Thresholds: my guesses.
+   CONTROL: the player with no chance at all (lofiInit fixed — the probes' control) fails «the hits of a bar differ». */
+async function rainComp(){ const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); }, fs=await import('node:fs');
+  const LF=await import(new URL('../apps/night/pure/lofi.js', import.meta.url).href), RR=(await import(new URL('../apps/night/rooms/rain/pure/room.js', import.meta.url).href)).RAIN_ROOM, L=RR.bed2.lofi;
+  const mode=id=>JSON.parse(fs.readFileSync(new URL('../core/data/modes/'+id+'.json', import.meta.url), 'utf8')), m7=x=>((x%7)+7)%7;
+  const judge=(Pc, Pd, fixed)=>{ const st=LF.lofiInit(Pc, 'quiet', { at:0.1, pc:Pd, fixed }), evs=LF.lofiStep(st, 0, 600), B=LF.lofiBarSec(Pc), s16=B/16, bars=new Map(), chordOf=new Map(), J={ bad:[], bars:0, multi:0, differ:0, moves:0, skips:0, pass:0, push:0, rolls:0, together:0, lead:[] };
+    for(const e of evs){ if(e.kind==='chord') chordOf.set(e.n, { ch:Pc.chords[Pc.progs[e.prog][e.bar]], steps:e.steps }); if(e.kind==='ep') (bars.get(e.n)||bars.set(e.n, []).get(e.n)).push(e); }
+    const pos=e=>{ const T=0.1+e.n*B, x=(e.t-T)/s16; let best=0, bd=Infinity; for(let p=0;p<16;p++){ const e2=Math.floor(p/2)*2, odd=p-e2, tp=(e2+(odd ? 2*Pc.swing*odd : 0)); if(Math.abs(tp-x)<bd){ bd=Math.abs(tp-x); best=p; } } return best; };
+    let prevVoice=null;
+    for(const [bar, H] of bars){ const c=chordOf.get(bar); if(!c) continue; J.bars++; const main=H.filter(e=>!e.push && !e.pass), rh=main.length ? Pc.ep[main[0].rh] : null;
+      if(!rh || main.some(e=>e.rh!==main[0].rh || !rh.some(h=>h[0]===pos(e)))) J.bad.push(`bar ${bar}: a hit off its rhythm (${main.map(pos).join(',')})`);
+      else if(main.length<rh.length){ J.skips++; if(pos(main[0])!==rh[0][0]) J.bad.push(`bar ${bar}: its first hit was skipped`); }
+      const sig=e=>JSON.stringify([e.steps, (e.offs||[]).map(x=>Math.round(x*1000)), (e.vels||[]).map(x=>Math.round(x/e.vel*100))]); if(main.length>1){ J.multi++; if(new Set(main.map(sig)).size>1) J.differ++; }
+      if(new Set(main.map(e=>e.steps[e.steps.length-1])).size>1) J.moves++;
+      const tones=new Set([c.ch.root, ...c.ch.tones].map(m7));
+      for(const e of H){ if(e.push){ J.push++; continue; }
+        if(e.pass){ J.pass++; if(!LF.lofiSafe(c.ch, Pd).includes(m7(e.steps[0]))) J.bad.push(`bar ${bar}: a passing note ${e.steps[0]} is not safe`); continue; }
+        if(e.steps.some(x=>!tones.has(m7(x)))) J.bad.push(`bar ${bar}: a note outside its chord (${e.steps})`);
+        const offs=e.offs||[], vels=e.vels||[]; if(offs.length!==e.steps.length || vels.length!==e.steps.length){ J.bad.push(`bar ${bar}: a hit without its roll or velocities`); continue; }
+        if(Math.max(...offs)>0.0305) J.bad.push(`bar ${bar}: a roll of ${Math.round(Math.max(...offs)*1000)} ms`); if(Math.max(...offs)-Math.min(...offs)<0.003) J.together++; J.rolls++;
+        if(vels.length>1 && vels[vels.length-1]<Math.max(...vels)-1e-12) J.bad.push(`bar ${bar}: the top is not the loudest`); if(new Set(vels.map(v=>v.toFixed(4))).size<Math.min(2, vels.length)) J.bad.push(`bar ${bar}: one velocity for every note`); }
+      if(prevVoice && c.steps.length===prevVoice.length) J.lead.push(c.steps.reduce((a, s2, i)=>a+Math.abs(s2-prevVoice[i]), 0)/c.steps.length); prevVoice=c.steps; }
+    return J; };
+  for(const [id] of Object.entries(RR.moods)){ const Pc=L.pieces[id]; if(!Pc){ ok(`${id}: no lo-fi piece`, false); continue; } const Pd=mode(Pc.parent).degrees, J=judge(Pc, Pd, false), lead=J.lead.reduce((a, b)=>a+b, 0)/Math.max(1, J.lead.length);
+    ok(`${id}: ${J.bad.length} problem(s): ${J.bad.slice(0, 3).join('; ')}`, !J.bad.length);
+    ok(`${id}: the hits of a bar differ in ${J.differ} of ${J.multi} bars with two hits or more`, J.differ>=0.6*J.multi);
+    ok(`${id}: the top line moves in ${J.moves} bars`, J.moves>=0.15*J.bars); ok(`${id}: the voicings move ${lead.toFixed(2)} steps a voice between chords`, lead<=2);
+    ok(`${id}: ${J.together} of ${J.rolls} hits struck together`, J.together<=0.4*J.rolls); ok(`${id}: ${J.skips} skipped hit(s)`, J.skips>0); ok(`${id}: ${J.pass} passing note(s), ${J.push} anticipation(s)`, J.pass>0 && J.push>0);
+    notes.push(`${id}: ${J.bars} bars — hits differ in ${J.differ} of ${J.multi}, the top moves in ${J.moves}, ${J.skips} skipped, ${J.pass} passing, ${J.push} pushed, rolled ${J.rolls-J.together}/${J.rolls}, leading ${lead.toFixed(2)} steps`); }
+  { const id=Object.keys(RR.moods).find(k=>L.pieces[k] && L.pieces[k].ep[0].length>1), Pc=L.pieces[id], J=judge(Pc, mode(Pc.parent).degrees, true);   // a piece whose fixed rhythm has two hits or more
+    ok(`CONTROL: the player with no chance at all passes «the hits differ» (${id}: ${J.differ} of ${J.multi})`, J.multi>0 && J.differ<0.6*J.multi); notes.push(`CONTROL no chance: hits differ in ${J.differ} of ${J.multi} bars with two hits or more`); }
+  return { cases:n, total:d.length, differences:d, notes };
+}
 /* RAIN-4c / RAIN-4d — «RAIN lo-fi bed (app)»: the rain room's lo-fi pieces (apps/night/rooms/rain/pure/lofi/, the generative player apps/night/pure/lofi.js)
    — each valid (lofiCheck: 2–4 progressions with their flow, grooves, lines, rhythms, motifs), one per mood; EVERY CHORD WITHIN ITS MODE (degrees of the
    parent, the mood's notes a subset) and safe under the playing hand (no melody note a semitone above a chord tone unless it is one); over ten minutes
@@ -3083,6 +3214,7 @@ const ROWS=[
   ['NIGHT room tint (app)',     ()=>nightRoomTint(),    r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // DESIGN-1 part B
   ['NIGHT start still (app)',   ()=>nightStartStill(),  r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // DESIGN-1 part D
   ['NIGHT hand light anchor (app)', ()=>nightHandLight(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-13
+  ["NIGHT quality (app)", ()=>nightQuality(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-16
   ["RAIN focus law (app)", ()=>rainFocus(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-0
   ["RAIN view law (app)", ()=>rainView(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-0b
   ["RAIN window pick (app)", ()=>rainPick(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-0
@@ -3091,7 +3223,7 @@ const ROWS=[
   ["RAIN files (app)", ()=>rainFiles(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-1
   ["RAIN car passes (app)", ()=>rainPasses(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-1
   ["RAIN nature (app)", ()=>rainNature(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-3
-  ["RAIN stays out of the players' edition (app)", ()=>rainGate(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-0
+  ["NIGHT two rooms (app)", ()=>nightTwoRooms(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-0
   ['NIGHT music bed law (app)', ()=>nightBedLaw(),     r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // NIGHT-3 stage 4
   ['NIGHT music bed v2 law (app)', ()=>nightBed2Law(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-4
   ['VIS1c fireflies (core)',    ()=>fliesCore(),    r=>({ cases:r.cases, diff:r.total, list:r.differences })],
@@ -3109,6 +3241,7 @@ const ROWS=[
   ['FOREST natural (app)',     ()=>forestNatural(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // FOREST-2
   ['RAIN timbres (app)',       ()=>rainTimbres(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-4
   ['RAIN jazz bed (app)',      ()=>rainJazz(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-4
+  ['RAIN piano comping (app)', ()=>rainComp(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // small fixes (2026-11-17)
   ['RAIN lo-fi bed (app)',     ()=>rainLofi(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-4c
   ['RAIN life law (app)',      ()=>rainLife(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-5
   ['RAIN sky law (app)',       ()=>rainSky(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-5c

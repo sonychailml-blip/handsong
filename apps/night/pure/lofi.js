@@ -21,7 +21,8 @@ export const LOFI_LEVELS=Object.freeze({ quiet:Object.freeze(['ep']), groove:Obj
 export const LOFI_REG=Object.freeze({ ep:Object.freeze([2, 12]), bass:Object.freeze([-12, -3]), vib:Object.freeze([11, 19]), gtr:Object.freeze([6, 15]) });
 /* the arrangement's chances (my choices): a section main / thin / break; the phrase chance per 4 bars (full level) */
 export const LOFI_GEN=Object.freeze({ section:Object.freeze({ main:0.62, thin:0.26, brk:0.12 }), phrase:0.5, kickAlt:0.35, kickDrop:0.12, ghost:0.6, hatGhost:0.45, open:0.22, fillMid:0.3,
-  bassApp:0.4, bassOct:0.2, bassRest:0.12, push:0.28, spread:0.22 });
+  bassApp:0.4, bassOct:0.2, bassRest:0.12, push:0.28, spread:0.22,
+  comp:Object.freeze({ skip:0.12, thin:0.3, topMove:0.38, roll:Object.freeze([8, 28]), rollDown:0.2, together:0.14, pass:0.3, jitter:0.004 }) });   // small fixes (2026-11-17): a pianist's comping — my guesses
 const TOK=Object.freeze({ R:0, 2:1, 3:2, 4:3, 5:4, 6:5, 7:6, 8:7, 9:8 });
 const mod=(s, n)=>((s%n)+n)%n;
 /* the seeded hash: (seed, bar, k) → 0…1; fixed → always 0.5 (the probes' CONTROL: a piece that never varies) */
@@ -49,6 +50,24 @@ export function lofiVoice(tones, prev, lo=LOFI_REG.ep[0], hi=LOFI_REG.ep[1]){ co
   if(!cands.length) return T.map(d=>lo+mod(d-lo, JAZZ_N)).sort((a, b)=>a-b);
   const mid=(lo+hi)/2, cost=v=>prev && prev.length ? v.reduce((a, s, i)=>a+Math.abs(s-prev[Math.min(i, prev.length-1)]), 0) : Math.abs(v.reduce((a, s)=>a+s, 0)/v.length-mid);
   return cands.reduce((a, b)=>cost(b)<cost(a)-1e-9 ? b : a); }
+/* small fixes (2026-11-17): ONE HIT OF THE PIANIST'S COMPING — voice (the chord's led voicing), top (the top line so far), hi (the hit's index in the bar),
+   ch (the chord), r (k → 0…1, the bar's chance), C (LOFI_GEN.comp) → { steps, top, vels (relative: the top sings, the inner voices softer), offs (s: the
+   roll) }, or null (the hit skipped — never the first); lighter = the bottom or the lowest inner voice left out. The top moves only to a tone of the chord, inside the piano's register, above the next voice */
+export function lofiComp(voice, top, hi, ch, r, C){
+  if(hi>0 && r(40+hi)<C.skip) return null;
+  let v=voice.slice(); const chordPc=new Set([ch.root, ...ch.tones].map(k=>mod(k, JAZZ_N)));
+  if(hi>0 && r(70+hi)<C.topMove && v.length>=3){ const below=v[v.length-2], up=r(75+hi)<0.5, c=[];
+    for(let d=1;d<=4;d++){ const s=top+(up ? d : -d); if(chordPc.has(mod(s, JAZZ_N)) && s>below && s<=LOFI_REG.ep[1]+2 && s>=LOFI_REG.ep[0]){ c.push(s); break; } }
+    if(c.length) v[v.length-1]=c[0]; else v[v.length-1]=top; }
+  else if(hi>0) v[v.length-1]=top>v[v.length-2] && chordPc.has(mod(top, JAZZ_N)) ? top : v[v.length-1];
+  if(hi>0 && r(50+hi)<C.thin && v.length>=4) v= r(60+hi)<0.5 ? v.slice(1) : [v[0], ...v.slice(2)];   // lighter: the bottom or the lowest inner voice left out (the top line kept)
+  const n=v.length, down=r(80+hi)<C.rollDown, together=r(90+hi)<C.together, spread=together ? 0 : (C.roll[0]+(C.roll[1]-C.roll[0])*r(100+hi))/1000;
+  const offs=v.map((_, i)=>Math.max(0, spread*(down ? n-1-i : i)/Math.max(1, n-1)+(r(110+hi*7+i)-0.5)*C.jitter));
+  const vels=v.map((_, i)=>i===n-1 ? 1.1 : i===0 ? 0.9 : 0.76+0.12*r(120+hi*7+i));
+  return { steps:v, top:v[n-1], vels, offs }; }
+/* a passing note from the top `a` toward the next chord's top `b`: the safe step between them nearest the middle (null: none, or they are a step apart) */
+export function passStep(a, b, safe){ if(Math.abs(b-a)<2) return null; const lo=Math.min(a, b), hi=Math.max(a, b), mid=(a+b)/2; let best=null;
+  for(let s=lo+1;s<hi;s++) if(safe.includes(mod(s, JAZZ_N)) && (best==null || Math.abs(s-mid)<Math.abs(best-mid))) best=s; return best; }
 /* the safe notes over a chord: its own tones, and the mode's others unless a semitone above one of them (pc: the parent's pitch classes) */
 export function lofiSafe(ch, pc){ const own=[ch.root, ...ch.tones].map(k=>mod(k, JAZZ_N)), pcs=own.map(k=>pc[k]);
   return [0, 1, 2, 3, 4, 5, 6].filter(k=>own.includes(k) || !pcs.some(q=>mod(pc[k]-q, 12)===1)); }
@@ -83,8 +102,16 @@ export function lofiStep(st, t0, t1){ const out=[], P=st.P, B=lofiBarSec(P), s16
     if(T>=t0-1e-9){ out.push({ t:T, kind:'chord', steps:voice.slice(), root:ch.root, prog:st.prog, bar:st.pi, n:bar, sec:sec.kind });
       /* the piano: a rhythm per two bars from the pool; the bar's last off-beat may push the next chord in */
       if(bar%2===0) st.epRh=st.fixed ? 0 : Math.floor(r(21)*P.ep.length); const rh=P.ep[st.epRh], push=!last && r(22)<G.push && !rh.some(h=>h[0]>=13);
-      for(const [p, len, vel] of rh){ const t=t16(P, T, p)+hum(1, p, 7), g=gn('ep', t); if(g>0) out.push({ t, kind:'ep', layer:'ep', n:bar, steps:voice.slice(), vel:vel*vh(1, p)*g, dur:len*s16, pan:-0.12 }); }
-      if(push){ const nv=lofiVoice(nx.tones, voice), t=t16(P, T, 14)+hum(1, 14, 6), g=gn('ep', t); if(g>0) out.push({ t, kind:'ep', layer:'ep', n:bar, steps:nv, vel:0.42*g, dur:4*s16, pan:-0.12, push:true }); }
+      /* small fixes (2026-11-17): A PIANIST'S COMPING — the rhythm stays (the pool's hits at their steps); each hit is voiced and struck on its own
+         (lofiComp): the first in full, a later one now and then lighter (its bottom or an inner voice left out) or its top voice stepping to a neighbouring chord tone
+         (a moving top line), a later hit skipped now and then, the chord rolled a little, every note its own velocity; before a chord change the last hit's
+         top may pass through a safe note toward the next chord's top. ped: the chord's own voicing (the engine's pedal holds through the top's moves) */
+      let top=voice[voice.length-1];
+      rh.forEach(([p, len, vel], hi)=>{ const c=lofiComp(voice, top, hi, ch, k=>r(k), G.comp); if(!c) return; top=c.top;
+        const t=t16(P, T, p)+hum(1, p, 7), g=gn('ep', t); if(g>0) out.push({ t, kind:'ep', layer:'ep', n:bar, rh:st.epRh, steps:c.steps, vel:vel*vh(1, p)*g, vels:c.vels.map(x=>x*vel*vh(1, p)*g), offs:c.offs, ped:voice.join(','), dur:len*s16, pan:-0.12 });
+        if(hi===rh.length-1 && !push && nx!==ch && r(140)<G.comp.pass && p<15 && !rh.some(h=>h[0]===p+1)){ const want=lofiVoice(nx.tones, voice), to=want[want.length-1], safe=lofiSafe(ch, st.pc);
+          const pass=passStep(c.top, to, safe); if(pass!=null){ const tp=t16(P, T, p+1)+hum(1, p+1, 5), gp=gn('ep', tp); if(gp>0) out.push({ t:tp, kind:'ep', layer:'ep', n:bar, steps:[pass], vel:0.3*gp, vels:[0.3*gp], offs:[0], ped:voice.join(','), dur:1.6*s16, pan:-0.12, pass:true }); } } });
+      if(push){ const nv=lofiVoice(nx.tones, voice), t=t16(P, T, 14)+hum(1, 14, 6), g=gn('ep', t), c=lofiComp(nv, nv[nv.length-1], 0, nx, k=>r(150+k), G.comp); if(g>0) out.push({ t, kind:'ep', layer:'ep', n:bar, steps:nv, vel:0.42*g, vels:c.vels.map(x=>x*0.42*g), offs:c.offs, ped:nv.join(','), dur:4*s16, pan:-0.12, push:true }); }
       /* the bass: a line from its pool (kept two bars), varied: an approach into the next root, an octave pop, a rest */
       if(sec.bass && !brkNow){ const line=P.bass[st.fixed ? 0 : Math.floor(hsh(st.seed, bar>>1, 31)*P.bass.length)];
         for(const [p, tok, len, vel] of line){ if(p>0 && r(40+p)<G.bassRest) continue; const t=t16(P, T, p)+hum(2, p, 5), g=gn('bass', t); const deg= tok==='app' ? nx.root-1 : tok==='app+' ? nx.root+1 : ch.root+TOK[tok];

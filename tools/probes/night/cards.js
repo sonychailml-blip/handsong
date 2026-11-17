@@ -58,6 +58,7 @@ export async function checkNightCards(){
       cardsEnvDbg({ ...IPH, ua:IPH.ua.replace('Version/17.5', 'CriOS/126.0') }); cardsShow(); ok('Chrome on iPhone gets the card', cardsDbg().n===4); $('nightCardSkip').click();
       cardsEnvDbg(null); }
     $('nightInfoBtn').click(); $('nightHowTo').click(); ok('«How to play» did not open them from Settings', cardsOpen() && $('nightInfo').hidden);
+    await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));   // the shell sets its class once a frame: read it after its next frame (read at once it was the state before the click)
     ok('the controls show over the cards', !$('nightShell').classList.contains('show')); $('nightCardSkip').click();
     /* NIGHT-12: Settings keep «How to play» and no longer carry the privacy or headphones lines (the privacy line: the start screen only) */
     ok('Settings still carry a privacy or headphones line', !$('nightInfo').querySelector('[data-i18n="night.privacy"],[data-i18n="night.phones"]') && !!$('nightInfo').querySelector('#nightHowTo'));

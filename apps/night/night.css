@@ -375,6 +375,9 @@ body.night-cards-start #start .startCard{ visibility:hidden; }   /* DESIGN-1: th
 .night-still{ position:fixed; left:0; top:0; width:100vw; height:100vh; z-index:var(--z-night-still); pointer-events:none; background-color:var(--night-base);
   background-image:var(--night-still-veil), url(rooms/forest/still/still-reduced.webp); background-repeat:no-repeat; background-position:0 0, 50% 50%; background-size:100% 100%, auto 129.5719%; }
 html[data-still="full"] .night-still{ background-image:var(--night-still-veil), url(rooms/forest/still/still-full.webp); }
+/* RAIN-R1: the visit's start room is the rain (guard.js: html[data-room]) — its own still per level; no film vignette (the rain's picture has none) */
+html[data-room="room.rain"] .night-still{ background-image:linear-gradient(transparent, transparent), url(rooms/rain/still/still-reduced.webp); }
+html[data-room="room.rain"][data-still="full"] .night-still{ background-image:linear-gradient(transparent, transparent), url(rooms/rain/still/still-full.webp); }
 @media not all and (min-aspect-ratio: 4/5){ .night-still{ background-size:100% 100%, auto 100%; } }
 @media (min-aspect-ratio: 12/5){ .night-still{ background-size:100% 100%, 100% auto; } }
 .night-still-mist{ position:fixed; inset:0; z-index:var(--z-night-still); background:var(--night-mist); opacity:var(--still-mist, 0); pointer-events:none; }   /* over the still AND the live room: the room comes out through it */

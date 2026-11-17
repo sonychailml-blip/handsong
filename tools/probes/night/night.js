@@ -585,14 +585,14 @@ export async function checkNightLowPower(){
     const why=PR.profileApply('profile.night'); n++; if(why){ miss('Night did not apply: '+why); return { cases:n, total:d.length, differences:d, notes }; }
     try{ localStorage.setItem('handsong.nightLight','0'); }catch(e){}
     await D.setSceneLevel('full'); await D.setBackground('forest');
-    const E=A.engineCtx(), I=A.fxInstance(key,'fdepth'), tg=document.getElementById('nightLightTg'), lvl0=D.sceneLevel();
+    const E=A.engineCtx(), I=A.fxInstance(key,'fdepth'), seg=q=>document.querySelector(`#nightQualSeg [data-q="${q}"]`), lvl0=D.sceneLevel();   // NIGHT-16: Light is a quality choice
     const settle=async()=>{ const t0=A.AC.currentTime; for(let k=0;k<60 && A.AC.currentTime<t0+0.3;k++) await wait(30); await wait(300); };
-    tg.click(); await settle(); n+=4;
+    seg('light').click(); await settle(); n+=4;
     if(!E.lowPower) miss('Lighter forest on: the engine is not in low power');
     if(!(I && I.light && I.light())) miss('Lighter forest on: Forest depth does not play the light room');
     if(!(I && I.nodes.convIn.gain.value===0)) miss('Lighter forest on: the convolution input is '+(I&&I.nodes.convIn.gain.value)+' (exactly 0 expected — else the room keeps computing)');
     if(!(D.sceneLevel()==='reduced' && document.body.classList.contains('night-plain'))) miss(`Lighter forest on: picture ${D.sceneLevel()}, plain glass ${document.body.classList.contains('night-plain')}`);
-    tg.click(); await settle(); n+=3;
+    seg('full').click(); await settle(); n+=3;   // NIGHT-16: Detailed again (was: the switch off, back to the level before)
     if(E.lowPower || (I && I.light && I.light())) miss('Lighter forest off: still in low power / the light room');
     if(!(I && I.nodes.convIn.gain.value===1)) miss('Lighter forest off: the convolution input is '+(I&&I.nodes.convIn.gain.value)+' (1 expected)');
     if(D.sceneLevel()!==lvl0) miss(`Lighter forest off: the picture is ${D.sceneLevel()} (was ${lvl0})`);

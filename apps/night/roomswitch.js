@@ -16,7 +16,6 @@ import { buildAmbience, ambienceSchedule, ambienceTune, ambienceSet, ambienceRoo
 export const ROOM_KEY='handsong.nightRoom';
 export const ROOM_NAME_MS=1500, ROOM_QUIET_MS=2500;   // the name's time on screen; without the room's picture, the bed waits out the nature crossfade
 const load=k=>{ try{ return localStorage.getItem(k); }catch(e){ return null; } };
-const save=(k,v)=>{ try{ localStorage.setItem(k,v); }catch(e){} };
 const wait=ms=>new Promise(r=>setTimeout(r, ms));
 let seq=0, nameT=0, last=null, liveAmb=null, brookLight=false;
 /* the current room's record (the host's current room; the first room before any is set) */
@@ -77,8 +76,10 @@ export function natureFocus(f){ if(liveAmb && liveAmb.layers) ambienceLayersFocu
 export const natureLayersDbg=()=> liveAmb && liveAmb.layers ? ambienceLayersStats(null, liveAmb).then(st=>st && { ...st, rec:{ ...liveAmb.layers.rec }, playing:liveAmb.layers.on }) : Promise.resolve(null);
 /* the Lighter mode (the shell): fewer bubbles, the nearest voices only */
 export function natureLight(v){ brookLight=!!v; if(liveAmb && liveAmb.brook) ambienceBrookLight(null, liveAmb, brookLight); }
-/* at the start, before the first picture: the remembered room, if it is a real one this app has */
-export function roomRestore(){ const id=load(ROOM_KEY); if(id && ROOM_IDS.includes(id) && roomById(id)) sceneRoomSet(id); tintApply(roomCurrent(), { now:true }); return sceneRoom(); }   // DESIGN-1: its tint at once
+/* at the start, before the first picture: the visit's start room (guard.js: html[data-room] — random, or the address's), if it is a real one this app has.
+   RAIN-R1: no room is remembered any more (a random room every visit): the old key is dropped */
+try{ localStorage.removeItem(ROOM_KEY); }catch(e){}
+export function roomRestore(){ const id=typeof document!=='undefined' ? document.documentElement.getAttribute('data-room') : null; if(id && ROOM_IDS.includes(id) && roomById(id)) sceneRoomSet(id); tintApply(roomCurrent(), { now:true }); return sceneRoom(); }   // DESIGN-1: its tint at once
 /* the next room in order (the Room button) */
 export const roomNext=()=>{ const ids=sceneRooms(); return ids.length ? ids[(ids.indexOf(sceneRoom())+1)%ids.length] : null; };
 function nameShow(rec){ const el=document.getElementById('nightRoomName'); if(!el) return;
@@ -88,7 +89,6 @@ function nameShow(rec){ const el=document.getElementById('nightRoomName'); if(!e
 export async function roomSwitch(id, o={}){
   const R=roomById(id); if(!R || id===sceneRoom()) return false;
   const my=++seq, rec=R.record, t0=performance.now();
-  if(ROOM_IDS.includes(id)) save(ROOM_KEY, id);
   bedHold(rec.bed, rec.bed2);
   const pic=sceneSwitch(id, { fast:o.fast });   // sets the host's current room at once (its synchronous part)
   roomMusicApply();   // RAIN-4: the room's own mood and timbre (or the forest's back)

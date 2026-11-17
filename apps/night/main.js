@@ -11,21 +11,19 @@ import { nightShellWire, nightShellFace } from './shell.js';
 import { roomDoors, roomMusicApply } from './roomdoors.js';   // RAIN-4: a room with its own music offers its moods and timbres
 import { calTick } from './calib.js';
 import { ROOMS } from './rooms/index.js';
-import { devRoomInstall } from './rooms/dev.js';   // RAIN-0: a development room, only when the address asks and never in the players' edition
 import { soundModAdd } from '../../core/soundmods.js';
-import { natureModule, roomRestore } from './roomswitch.js';
+import { natureModule, roomRestore, roomSwitch } from './roomswitch.js';
 import { camRestore } from './camera.js';   // NIGHT-10: the camera kept on this device
 import { startWire, startFailText, startSay, START_OLD } from './start.js';
-import { stillWire } from './still.js';   // DESIGN-1 part D: the start still waits for the live room
+import { stillWire, stillRoomSet } from './still.js';   // DESIGN-1 part D: the start still waits for the live room
 import { updateWire } from './update.js';   // NIGHT-14: «A new version is ready» (a build's precache)
 import { QUICK_DENY_MS } from './pure/inapp.js';   // CORE-23: the model's build holds while a camera request is younger than this
 import { persistSoon } from './persist.js';   // NIGHT-15: ask once to keep the files, after the first successful start
 import { forestLabelWire } from './forestlabel.js';   // FOREST-2: «level · forest» in the corner, only with ?forest=…
 import { fsCamera } from './fullscreen.js';   // NIGHT-11 part 3: full screen when the camera runs, while the Begin tap still counts   // NIGHT-11 part 2: the start's own words
 
-for(const R of ROOMS) sceneRoomAdd(R.record.id, { load:R.load, has:R.has, standIn:R.standIn, three:()=>import('./vendor/three-r128/three.min.js') });   // NIGHT-3: the rooms, by id
-roomRestore();   // NIGHT-3 stage 5 part 2: the room remembered on this device, before the first picture
-devRoomInstall().catch(e=>console.warn('[night] the development room was not added:', e));   // RAIN-0: «?room=rain», the development edition only (rooms/dev.js)   // eslint-disable-line no-console
+for(const R of ROOMS) sceneRoomAdd(R.record.id, { load:R.load, has:R.has, standIn:R.standIn, heard:R.heard, three:()=>import('./vendor/three-r128/three.min.js') });   // NIGHT-3: the rooms, by id (RAIN-R1: the rain's heard)
+roomRestore();   // RAIN-R1: the visit's start room (guard.js chose it: random, or the address's), before the first picture
 forestLabelWire();   // FOREST-2: only with ?forest=… in the address (otherwise it does nothing)
 camRestore();   // NIGHT-10: before the start — the start opens the kept camera (the default when it is gone)
 /* NIGHT-6 (the user): the current room's code and the files of its level are fetched while the start card shows, so the first opening finds them ready */
@@ -50,5 +48,19 @@ boot({ profile:'profile.night', afterDraw:()=>calTick(),
   parallel:!START_OLD, earlyModel:!START_OLD, onCamera:()=>{ fsCamera(); persistSoon(); }, freshRetry:true, handFiles:'own', camHold:QUICK_DENY_MS });   // CORE-22: MediaPipe's files from our own origin (the CSP names only 'self')   // CORE-20: a retry never takes a failed preload of early.js   // CORE-19: the camera beside the model, the model before the tap   // CORE-18: Night's start words; ?probe&modelstall=MS the runner's short stall
 startWire();
 updateWire();   // NIGHT-14
-/* NIGHT-11 part 2: Begin works from here — the loading look goes (apps/night/guard.js) */
-if(window.__nightBoot) window.__nightBoot.ready();
+/* RAIN-R1: THE START ROOM READY BEFORE BEGIN — a room whose files are not here yet (the rain on a first visit: its files come on demand, then stay
+   cached) loads while the start screen shows, and Begin keeps its loading look until they are in, START_ROOM_MS at most. They fail (offline, an error)
+   or the time runs out: the forest instead (its still, tint and music) — Begin is never held for ever. The forest's files are the start set's: Begin
+   never waits for them. */
+export const START_ROOM_MS=25000;
+async function startRoomReady(){
+  const R=ROOMS.find(r=>r.record.id===sceneRoom()), lv=sceneLevel(); if(!R || R===ROOMS[0] || lv==='minimal' || !R.prefetch) return 'first';
+  const got=(async ()=>{ if(R.has && await R.has({ level:lv })){ R.prefetch({ level:lv }).catch(()=>{}); return 'cached'; } return (await R.prefetch({ level:lv }))!=null ? 'loaded' : 'failed'; })().catch(()=>'failed');
+  const how=await Promise.race([got, new Promise(r=>setTimeout(()=>r('late'), START_ROOM_MS))]);
+  if(how==='failed' || how==='late'){ console.warn('[night] the start room '+R.record.id+' did not load ('+how+') — the forest instead');   // eslint-disable-line no-console
+    await roomSwitch(ROOMS[0].record.id, { fast:true }); stillRoomSet(ROOMS[0].record.id); }
+  return how; }
+let startRoomHow=null;
+export const startRoomDbg=()=>({ room:sceneRoom(), how:startRoomHow, limitMs:START_ROOM_MS });
+/* NIGHT-11 part 2: Begin works from here — the loading look goes (apps/night/guard.js); RAIN-R1: once the start room is ready */
+startRoomReady().catch(()=>'failed').then(how=>{ startRoomHow=how; if(window.__nightBoot) window.__nightBoot.ready(); });

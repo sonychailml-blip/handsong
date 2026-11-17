@@ -13,6 +13,15 @@
   try{ document.documentElement.setAttribute('lang', lang()); }catch(e){}
   /* DESIGN-1 part D: which level's still the start screen shows from the first paint (night.css: html[data-still]) — the stored picture level */
   try{ document.documentElement.setAttribute('data-still', localStorage.getItem('handsong.sceneLevel')==='full' ? 'full' : 'reduced'); }catch(e){}
+  /* RAIN-R1: THE VISIT'S START ROOM — a random real room on every visit (the founder: sometimes the forest, sometimes the rain), or the one the address
+     names (?room=forest|rain); an automated browser (navigator.webdriver: the runners) starts in the forest unless the address names a room or asks
+     ?room=random (?probe&rnd=0…1 fixes the draw). html[data-room]: the still from the first paint (night.css), the start (roomswitch.js), still.js */
+  var ROOMS={ forest:'room.forest', rain:'room.rain' };
+  function startRoom(){ var w=(/[?&]room=(\w+)/.exec(q)||[])[1], r=Math.random(), f=/[?&]probe\b/.test(q) && /[?&]rnd=([0-9.]+)/.exec(q); if(f) r=+f[1];
+    if(w && ROOMS[w]) return ROOMS[w];
+    if(navigator.webdriver && w!=='random') return ROOMS.forest;
+    return r<0.5 ? ROOMS.forest : ROOMS.rain; }
+  try{ document.documentElement.setAttribute('data-room', startRoom()); }catch(e){}
   var done=false, failed=false, slow=false, t0=Date.now();
   function el(id){ return document.getElementById(id); }
   function show(kind){ var L=T[lang()], box=el('nightBootMsg'); if(!box) return false; el('nightBootText').textContent=L[kind]; var b=el('nightBootReload'); b.textContent=L.reload; b.hidden=false; box.hidden=false; box.setAttribute('data-kind', kind); return true; }

@@ -122,9 +122,9 @@ export async function lofiEngine(ac, dest, base, o={}){ const epMode=o.ep==='sho
     e.gain.setValueAtTime(0, when); e.gain.linearRampToValueAtTime(gain, when+0.0015); if(dur!=null){ e.gain.setValueAtTime(gain, when+dur); e.gain.setTargetAtTime(0, when+dur, rel/4); } s.connect(e); e.connect(p); p.connect(into); s.start(when); s.stop(when+(dur!=null ? dur+Math.max(rel, 0.02)*2.6 : bufr.duration/rate)+0.02); };   // RAIN-4e: stopped once the release is below −90 dB (a step at the stop was a click)   // RAIN-4e: a 1.5-ms fade-in (a sample starting on a non-zero value clicked)
   let notes=0, beat=60/80; const det=rng(0x444554);
   function play(ev, when, pv, k=1){ const hz=s=>chordRowFreq(mod(s, JAZZ_N), Math.floor(s/JAZZ_N), pv); notes++;
-    if(ev.kind==='ep'){ const n=ev.steps.length; ev.steps.forEach((s, i)=>{ const f=hz(s), t=when+i*M.roll, vel=ev.vel;
+    if(ev.kind==='ep'){ const n=ev.steps.length, t0=when+(ev.offs ? Math.min(...ev.offs) : 0); ev.steps.forEach((s, i)=>{ const f=hz(s), t=when+(ev.offs ? ev.offs[i] : i*M.roll), vel=ev.vels ? ev.vels[i] : ev.vel;   // small fixes: the pianist's roll and each note's velocity (pure/lofi.js lofiComp)
         if(leg.ep){ const [r0, nm]=nearest(S.notes.ep, f); one(S.buf[nm], L.ep, t, f/r0, k*M.epOld*vel/Math.sqrt(n), (ev.pan||0)+(i-(n-1)/2)*0.16, ev.dur, 0.6); return; }
-        if(epMode!=='short'){ if(i===0) pedal(ev.steps.join(','), t); const v= vel<0.36 ? 0 : vel<0.5 ? 1 : 2, b=longVoice(v, t), L0=EP_LONG, A=L0.att[0]+(L0.att[1]-L0.att[0])*(1-Math.min(1, vel)), lv=L0.gain*Math.min(1.3, 0.55+vel);
+        if(epMode!=='short'){ if(i===0) pedal(ev.ped||ev.steps.join(','), t0); const v= vel<0.36 ? 0 : vel<0.5 ? 1 : 2, b=longVoice(v, t), L0=EP_LONG, A=L0.att[0]+(L0.att[1]-L0.att[0])*(1-Math.min(1, vel)), lv=L0.gain*Math.min(1.3, 0.55+vel);
           b.bk.setFreq(f*Math.pow(2, (det()-0.5)*6/1200), 0, t); b.bk.strike(t, Math.min(1, k*vel*1.5/Math.sqrt(n)));
           b.p.pan.setValueAtTime(Math.max(-1, Math.min(1, (ev.pan||0)+(i-(n-1)/2)*0.16)), t); const eg=b.env.gain; eg.cancelScheduledValues(t); eg.setValueAtTime(0, t); eg.linearRampToValueAtTime(lv, t+A); eg.setTargetAtTime(0, t+L0.hold, L0.rel*2);
           b.free=t+L0.hold+L0.tail; held.push(b); return; }   // RAIN-4e: soft attack, held until the chord changes (the pedal) or L0.hold at most

@@ -4,10 +4,11 @@ import { BED_PRESETS } from './bed.js';
 import { NATURE_CRICKETS } from './ambience.js';
 import { checkBrookVoices } from './brook.js';   // NIGHT-8: the stream's voices
 export const ROOM_FORMAT='handsong/room', ROOM_VERSION=1;
-export const ROOM_IDS=Object.freeze(['room.forest']);   // pinned: never renamed or reused
+export const STILL_LIFE=Object.freeze(['fireflies', 'drops']);   // RAIN-R1: what moves over a room's start still
+export const ROOM_IDS=Object.freeze(['room.forest', 'room.rain']);   // pinned: never renamed or reused (RAIN-R1: the rain a real room)
 export const ROOM_LEVELS=Object.freeze(['full','reduced']);   // the WebGL levels; «minimal» is the 2D stand-in
 export const ROOM_ACOUSTICS=Object.freeze(['fdepth']);
-const FIELDS=['format','version','id','name','icon','tint','still','view','tokens','levels','looks','moods','look','nature','acoustic','bed','bed2','music'];   // DESIGN-1: tint — the room's light on the interface   // NIGHT-8: icon — the room's own picture for its Room-sounds slider
+const FIELDS=['format','version','id','name','icon','tint','still','view','tokens','levels','light','looks','moods','look','nature','acoustic','bed','bed2','music'];   // RAIN-R1: light — counts over Standard's under the Light quality   // DESIGN-1: tint — the room's light on the interface   // NIGHT-8: icon — the room's own picture for its Room-sounds slider
 const NATURE=['id','drone','wind','crickets','echo','stream','layers','level','master','ahead'];   // RAIN-3: layers (optional: the layered recordings near / far)   // NIGHT-8: stream (optional: a room without water has none)
 const plain=o=> o!==null && typeof o==='object' && !Array.isArray(o);
 /* DESIGN-1: a room's TINT (a token of the room, its colour in night.css) colours the interface's small accents (--night-tint) with dark ink on it (a
@@ -60,10 +61,11 @@ export function checkRoom(r, known={}){
   if(typeof r.tokens!=='string' || !/^[a-z][a-z0-9-]*-$/.test(r.tokens)) return 'tokens: a token prefix like «forest-»';
   if(typeof r.tint!=='string' || !/^[a-z][a-z0-9-]*$/.test(r.tint) || !r.tint.startsWith(r.tokens)) return `tint: the token of the room's light on the interface («${r.tokens}…»; its colour in night.css, checked by the data row «NIGHT room tint»)`;
   const webp=f=>typeof f==='string' && /^[a-z0-9_-]+(\/[a-z0-9_-]+)*\.webp$/.test(f);
-  if(!plain(r.still) || Object.keys(r.still).some(k=>![...ROOM_LEVELS, 'fov', 'aspect', 'over'].includes(k)) || ROOM_LEVELS.some(l=>!webp(r.still[l])))
+  if(!plain(r.still) || Object.keys(r.still).some(k=>![...ROOM_LEVELS, 'fov', 'aspect', 'over', 'life'].includes(k)) || ROOM_LEVELS.some(l=>!webp(r.still[l])))
     return 'still: {'+ROOM_LEVELS.join(', ')+'} — a «….webp» in the room folder for each level (the start screen’s prepared still)';   // DESIGN-1 part D
   if(!num(r.still.fov) || r.still.fov<20 || r.still.fov>120 || !num(r.still.aspect) || r.still.aspect<0.5 || r.still.aspect>4)
     return 'still: fov (the vertical field of view of the still, 20…120°) and aspect (its width over height, 0.5…4)';   // NIGHT-13
+  if(r.still.life!=null && !STILL_LIFE.includes(r.still.life)) return 'still.life: '+STILL_LIFE.join(' | ')+' (what moves over the start still; absent: fireflies)';   // RAIN-R1
   if(r.still.over!=null){ const O=r.still.over, V=O.vignette, rect=q=>Array.isArray(q) && q.length===4 && q.every(v=>num(v) && v>=0);
     if(!plain(O) || !webp(O.sprites) || !plain(O.rects) || !Object.values(O.rects).every(rect) || !Array.isArray(O.sil) || !plain(V) || !['cx','cy','rx','ry','from','k'].every(k=>num(V[k]))
       || O.sil.some(o=>!plain(o) || !O.rects[o.kind] || !['nx','ny','h','rot','gw'].every(k=>num(o[k])) || typeof o.flip!=='boolean'))
@@ -73,6 +75,8 @@ export function checkRoom(r, known={}){
   if(!plain(r.levels) || Object.keys(r.levels).join()!==ROOM_LEVELS.join()) return 'levels: {'+ROOM_LEVELS.join(', ')+'}';
   for(const [lv,L] of Object.entries(r.levels)){ if(!plain(L) || !Object.keys(L).length) return `levels.${lv}: a table of counts`;
     for(const [k,v] of Object.entries(L)) if(!(typeof v==='boolean' || (num(v) && v>=0))) return `levels.${lv}.${k}: a count ≥ 0 or a switch`; }
+  if(r.light!=null){ if(!plain(r.light) || !Object.keys(r.light).length) return 'light: a table of counts over the Standard level (the Light quality)';   // RAIN-R1
+    for(const [k,v] of Object.entries(r.light)) if(!(k in r.levels.reduced) || !(typeof v==='boolean' || (num(v) && v>=0))) return `light.${k}: one of Standard's counts, ≥ 0 or a switch`; }
   if(!plain(r.looks) || !Object.keys(r.looks).length) return 'looks: at least one look';
   for(const [k,L] of Object.entries(r.looks)){
     if(!plain(L) || typeof L.pre!=='string' || !L.pre.startsWith(r.tokens) || !num(L.fog) || !num(L.mist) || !num(L.flies) || !plain(L.tokens)) return `looks.${k}: { pre (the room's tokens), fog, mist, flies, tokens }`;

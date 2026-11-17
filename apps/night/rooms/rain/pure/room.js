@@ -21,10 +21,11 @@ import LOFI_EVENING from './lofi/evening-boulevard.js';
 import LOFI_AFTER from './lofi/after-the-rain.js';
 export const RAIN_ROOM=F({
   format:'handsong/room', version:1, id:'room.rain', name:F({ en:'Rain', ru:'Дождь' }), icon:'depth', tint:'rain-tint', tokens:'rain-',
-  still:F({ full:'still/still-full.webp', reduced:'still/still-reduced.webp', fov:68, aspect:1.85 }),
+  still:F({ full:'still/still-full.webp', reduced:'still/still-reduced.webp', fov:68, aspect:1.85, life:'drops' }),   // RAIN-R1: the start still's life — drops sliding down the glass
   view:F({ fov:55, tallFov:68, tall:0.8 }),
   /* what each picture level draws (RAIN-0b): the most simulated drops on the pane, the procedural fine-droplet layers, the far lights, the most cars */
-  levels:F({ full:F({ drops:420, fine:2, farLights:260, cars:16, lean:true }), reduced:F({ drops:260, fine:1, farLights:120, cars:16, lean:true }) }),   // RAIN-1: cars ≥ the most the law can put on the road (every car in the picture is heard)
+  levels:F({ full:F({ drops:420, fine:2, farLights:260, cars:16, lean:true }), reduced:F({ drops:260, fine:1, farLights:120, cars:16, lean:true }) }),
+  light:F({ drops:140, farLights:60, lean:false }),   // RAIN-R1: the Light quality — over Standard's: fewer drops on the glass, fewer far lights, the pane still (every car stays: each is heard)   // RAIN-1: cars ≥ the most the law can put on the road (every car in the picture is heard)
   looks:F({
     late:LOOK('rain-', 0.95, 0.4, 0.1, 0.4),       // Late night: drizzle, a few windows, almost no cars
     evening:LOOK('rain-eve-', 0.7, 0.65, 0.42, 1.15),   // Evening boulevard: steady rain, many windows, busy

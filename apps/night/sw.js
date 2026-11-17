@@ -11,6 +11,8 @@
    - top-up (NIGHT-14b): once in control, at the page's word (update.js, every visit), every listed file still missing is fetched and checked the
      same way; a file that does not match is left out (asked of the network if ever needed), never cached.
    - fetch: a GET of a listed file (the search ignored) and a navigation to the page come from the cache; everything else goes to the network.
+   - RAIN-R1, stage 2 (ON DEMAND: the rain room's media): never installed nor topped up; the first time the page fetches one, it comes from the network,
+     is checked against its hash and kept in this version's cache (copied on an update like the later files), so a room met once opens offline.
    - activate: older precaches are deleted. A build without the list (PRECACHE null) clears every precache of this app: the way back. */
 const PRECACHE=null;
 const PREFIX='handsong-night-precache-', POOL=6;
@@ -47,7 +49,7 @@ async function fill(files, { fetch:get=true, strict=true }={}){
 }
 let topping=null;
 /* NIGHT-14c: a top-up that leaves nothing missing tells the pages ('handsong-night-files-in': a held Detailed may come back, scene/host.js) */
-const topUp=()=>topping || (topping=fill(FILES, { strict:false }).then(async failed=>{ if(!failed.length) for(const c of await self.clients.matchAll({ type:'window' })) c.postMessage({ type:'handsong-night-files-in' }); return failed; })
+const topUp=()=>topping || (topping=fill(FILES.filter(f=>f[4]!==2), { strict:false }).then(async failed=>{ if(!failed.length) for(const c of await self.clients.matchAll({ type:'window' })) c.postMessage({ type:'handsong-night-files-in' }); return failed; })
   .catch(()=>[]).finally(()=>{ topping=null; }));
 self.addEventListener('install', e=>{ if(!PRECACHE){ self.skipWaiting(); return; }
   e.waitUntil((async ()=>{
@@ -69,5 +71,10 @@ self.addEventListener('fetch', e=>{
   let p=decodeURIComponent(u.pathname.slice(new URL(SCOPE).pathname.length));
   if(q.mode==='navigate'){ if(p!=='' && p!=='index.html') return; p='index.html'; }
   const f=LIST.get(p); if(!f || !wanted(f)) return;
-  e.respondWith(caches.open(NAME).then(c=>c.match(new URL(p, SCOPE).href)).then(r=>r || fetch(q)));
+  e.respondWith(caches.open(NAME).then(async c=>{ const url=new URL(p, SCOPE).href, hit=await c.match(url); if(hit) return hit;
+    if(f[4]!==2) return fetch(q);
+    const r=await fetch(q); if(!r.ok) return r;   // RAIN-R1: an on-demand file — kept once its bytes match the list
+    const body=await r.clone().arrayBuffer();
+    if(hex(await crypto.subtle.digest('SHA-256', body))===f[1]) await c.put(url, new Response(body, { headers:{ 'content-type':r.headers.get('content-type')||'application/octet-stream', 'x-handsong-sha256':f[1], 'x-handsong-at':String(Date.now()) } }));
+    return r; }));
 });

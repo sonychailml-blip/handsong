@@ -4,6 +4,20 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`, `archive/NIGHT-RUN-LOG-2026-10.md`. New runs start at `NIGHT-1`.
 
+# Small fixes (NIGHT track, 2026-11-17): a pianist's comping, round far lights through the mist, Detailed's spruces later
+Tree hashes: NIGHT-16, RAIN-R1 and the small fixes were built in one daytime batch — before (the FULL CHECK's after): core 36450d3d646be550 · apps/full 0148bb454440c3e3 · apps/night c22d498b2c97e188. After: core and Full unchanged · apps/night 21ca2b48812ad90f.
+- `pure/lofi.js` lofiComp / passStep (+ `rh` on each hit), `rooms/rain/lofi.js` (per-note roll and velocity, the pedal by the chord's voicing); `rain-glass.js` DOWN_F, `rain.js` soft() (box + 1.2/1.55/1.9) and softDbg; `tools/precache.mjs` foliage-1024 later. Rows: data «RAIN piano comping (app)», P.night «RAIN no quad edges» + the mist.
+- Verdicts: [probe-data] PASS — 93 checks, 0 differences; RAIN no quad edges 6/0 (round 2.7 %, CONTROL old 12.2 %). Fix rounds: 4 (the judge's rhythm guess; a 3-px light too faint in 8 bits; two comments that swallowed code — caught by the swallow scan).
+
+# RAIN-R1 (NIGHT track, 2026-11-17): the rain a real room
+Tree hashes: see the small fixes (one pair for the batch).
+- Registry (`pure/room.js` ROOM_IDS, `rooms/index.js`, `rooms/rain/install.js` rainSetup, `rooms/dev.js` deleted), the start (`guard.js` draw, `roomswitch.js`, `still.js` + `pure/startdrops.js`, `main.js` the wait and fallback, night.css), the stills (`tools/night-still.mjs --room rain`), the dot (`pure/windows.js` flyWindow), texts (`cards.js`, `coach.js`, `texts.js`), Light (`scene/host.js` setSceneLight, the record's `light`), build/precache/worker (stage 2 on demand).
+- Verdicts: [probe-data] PASS — 93 checks (NIGHT two rooms 43/0, precache list 23/0); UI: the random start (draw 0.2 → forest + fireflies, 0.8 → rain + drops, each its own still), still match — the rain 1.0000 / 0 px on two screens (+ CONTROL), settings tabs PASS, NIGHT first cards 43/0 (its read now after the shell's frame: a race, not the app); the forest's full-HD case timed out waiting for the reveal (90 s) twice on the busy laptop — for the night run; dot flight — the rain phone upright: window #113 dark → lit; three laptop flights 4.3–4.9 s (timing on a busy laptop: load noise, for the night run). Fix rounds: 3.
+
+# NIGHT-16 (NIGHT track, 2026-11-17): one quality control
+Tree hashes: see the small fixes.
+- `index.html`, `shell.js` (quality, qualitySet), `pure/quality.js`, `texts.js`; rows: data «NIGHT quality (app)» 15/0; NIGHT low power 16/0 through the segment; settings-tabs check updated.
+
 # FULL CHECK (NIGHT track, 2026-11-17): the forest's publish to night-release
 Tree hashes before (RAIN-5d's after): core 36450d3d646be550 · apps/full 0148bb454440c3e3 · apps/night 73685d357da03d5f. After (with RAIN-4e and RAIN-5e): core and Full unchanged · apps/night c22d498b2c97e188.
 - Real failures fixed at the source: the forest's shadow map never freed on leaving (`rooms/forest/forest.js`: one render target per build); RAIN-4's room memory brought chosen sounds and moods back after a profile apply (`roomdoors.js` + `main.js`: a profile applied starts fresh; the app applies one only at boot).

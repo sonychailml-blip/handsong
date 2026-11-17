@@ -22,7 +22,7 @@ import { profileOf } from '../../core/profile.js';
 import { fsBegin, fsStarted, fsToggle, fsOn, fsOnChange, fsCanToggle } from './fullscreen.js';   // NIGHT-7c: full screen (NIGHT-8b: never while the camera is undecided)
 import { devItems } from './edition.js';   // NIGHT-7b: the release edition (a players' build, or ?release) hides the development items
 import { calWire, calOfferIfNew, calActive, calSideApply, calSideSet, calSettingsRender, calAbort, calDueNow, calOffered, calStep } from './calib.js';   // NIGHT-2: the hand's calibration (its picture is drawn by the loop: main.js afterDraw)
-import { setSceneLevel, sceneLevel, setBackground, backgroundOf, sceneInfo, sceneRoom, sceneRooms, sceneOptDbg, sceneStartNote } from './scene/host.js';   // RUN 8 (slice 4): the scene's quality (development switch); C8 the measurement
+import { setSceneLevel, setSceneLight, sceneLevel, setBackground, backgroundOf, sceneInfo, sceneRoom, sceneRooms, sceneOptDbg, sceneStartNote } from './scene/host.js';   // RUN 8 (slice 4): the scene's quality (development switch); C8 the measurement
 import { roomSwitch, roomNext, natureLight } from './roomswitch.js';
 import { setTabsWire } from './settabs.js';   // DESIGN-1 part C: the settings in three tabs (revert: docs/night/design/DESIGN-1-settings-before.html)   // NIGHT-3 stage 5 part 2: the Room button
 import { persistInfo } from './persist.js';   // NIGHT-15: whether the browser keeps Night's files
@@ -37,11 +37,12 @@ import { homeHintFor } from './pure/homehint.js';
 import { scenePausing } from './scene/host.js';
 import { noticeOf, noticeShow, noticeHide } from './notice.js';
 import { roomMusicNote } from './roomdoors.js';   // RAIN-4
+import { QUALITIES, qualityFrom, qualityState } from './pure/quality.js';   // NIGHT-16: one quality choice
 
 const $=id=>document.getElementById(id), READ=BUS.reader();
 /* NIGHT-1 stage 2: what this app never plays leaves the graph (the sound stays the same to rounding; row «NIGHT lean path»). Its chain has no drive, brightness or tremolo; its one role is solo */
 export const LEAN_PATH=Object.freeze({ expr:true, voice:true, roles:true, closedFx:true, park:true });
-const KEY={ field:'handsong.nightField', roomSound:'handsong.nightForest', fxHint:'handsong.nightFxHint', joints:'handsong.nightJoints', light:'handsong.nightLight', lightScene:'handsong.nightLightScene',
+const KEY={ field:'handsong.nightField', roomSound:'handsong.nightForest', fxHint:'handsong.nightFxHint', joints:'handsong.nightJoints', light:'handsong.nightLight',
   musicAnswer:'handsong.nightMusicAnswer' };   // NIGHT-3 stage 4: the bed's response (its mode and volume: MUSIC_KEYS)
 /* NIGHT-7c: THE MUSIC IS ON until the person turns it off (that choice is remembered). New names: an «off» or a volume of 0 that development runs
    left under the old names («handsong.nightMusic», «…MusicVol») never silences a new player; anything unknown reads as the default */
@@ -49,6 +50,11 @@ export const MUSIC_KEYS=Object.freeze({ mode:'handsong.nightMusicMode', vol:'han
 export const musicModeOf=v=> v==='off' || BED_PRESETS.includes(v) ? v : MUSIC_DEFAULT;
 const load=k=>{ try{ return localStorage.getItem(k); }catch(e){ return null; } };
 const save=(k,v)=>{ try{ localStorage.setItem(k,v); }catch(e){} };
+/* NIGHT-16: ONE quality choice, heaviest to lightest — 'full' (Detailed) · 'reduced' (Standard) · 'light' (Light = the old Lightweight mode: Standard's
+   picture without the glass blur, plus the lighter sound). Light is stored under the old Lightweight key ('1'), the picture level under the scene's
+   own key; the level remembered «before Lightweight» has no meaning in one choice and is dropped (migration) */
+const quality=()=>qualityFrom(load(KEY.light), sceneLevel());
+try{ localStorage.removeItem('handsong.nightLightScene'); }catch(e){}
 const STORE={ getItem:load, setItem:save };   // the cards' key through the same guarded doors
 let D=null, on=false, st=null, raf=0, info=false, sleep={ mins:0, t0:0 }, asleep=false, lastFade=1, amb=false;
 let begun=false, firstRun=false, startDue=false, defHand='right';   // NIGHT-2: a person's Begin, the cards due on it (NIGHT-7b), the offer due on the next frame, the profile's playing hand
@@ -86,7 +92,7 @@ export function nightShellFace(p){
   defHand= p && p.handFn && p.handFn.ld && p.handFn.ld.R==='fx' ? 'left' : 'right';
   if(on){ calSideApply(); coachBegin(); if(begun){ begun=false; startDue=true; } }   // NIGHT-11 part 4: the coaching line runs once the app does   // NIGHT-2: a calibrated side sets the roles; the offer follows a person's own Begin
   else calAbort();   // RUN 8: Night's gentler left-to-right volume (Full: its own curve)   // RUN 8: Night's strike caps and cheaper strikes (Full: RUN 7's strike exactly)
-  if(on){ reachSet(REACH); lightApply(load(KEY.light)==='1', true); lifeStart();
+  if(on){ reachSet(REACH); lightApply(load(KEY.light)==='1'); lifeStart();
     if(sceneStartNote()==='detailed-crash'){ noticeShow('info', 'night.q.crashNote', ()=>noticeHide('info')); setTimeout(()=>noticeHide('info'), 9000); } }   // NIGHT-11 part 5: said once   // NIGHT-11: once the app runs   // the hand's reach: the whole range (NIGHT-5); C8 the person's «Lighter forest»
   else setLowPower(false);
   if(on){ st=null; render(); if(!raf) raf=requestAnimationFrame(tick); }
@@ -105,14 +111,14 @@ function render(){
   const nm=D.noteMode(); val('nightNotes', t(nm==='hold' ? 'night.notesStay' : 'night.notesFollow')); setIcon('nightNotes', nm==='hold' ? 'note-stay' : 'note-follow');
   sleepLabel(performance.now());
   $('nightFieldTg').classList.toggle('on', !!(nightView && nightView.fieldAll));
-  $('nightLightTg').classList.toggle('on', load(KEY.light)==='1'); $('nightMeasure').hidden=!devItems(); if(!devItems()) $('nightMeasureOut').hidden=true;
+  $('nightMeasure').hidden=!devItems(); if(!devItems()) $('nightMeasureOut').hidden=true;
   $('nightToSound').hidden=!devItems();
   { const bgs=D.backgrounds(), bg=D.bg(); for(const b of $('nightBgSeg').children){ b.hidden=!bgs.includes(b.dataset.bg); b.classList.toggle('on', b.dataset.bg===bg); } }   // NIGHT-2: settings
   for(const b of $('nightDotsSeg').children) b.classList.toggle('on', (b.dataset.dots==='tips')===!!(nightView && nightView.tips));
   for(const b of $('nightHandSeg').children) b.classList.toggle('on', b.dataset.hand===D.hand());   // NIGHT-2 stage 3: «Play with» moved here from the main screen
   calSettingsRender();
   $('nightSceneTg').hidden=!devItems(); $('nightSceneTg').textContent=t('night.scene', { lvl:t('night.scene.'+sceneLevel()) });
-  for(const b of $('nightQualSeg').children) b.classList.toggle('on', b.dataset.q===sceneLevel());   // NIGHT-7: the players' picture choice
+  { const q=quality(); for(const b of $('nightQualSeg').children) b.classList.toggle('on', b.dataset.q===q); }   // NIGHT-16: one quality choice
   $('nightQualNote').hidden=!SMALL_TOUCH;   // NIGHT-11 part 5: Detailed stays offered (a phone may drive a TV); a note on small touch screens
   $('nightRoomSoundRow').hidden= !amb; $('nightRoomSound').value=String(roomSound());
   { const ic=$('nightRoomSoundRow').querySelector('.night-vico'), name=room().icon||'forest';   // NIGHT-8: the room gives its own Room-sounds icon (the forest keeps the leaf)
@@ -148,10 +154,9 @@ function wire(){
   $('nightMusicAnswerTg').onclick=()=>{ const v=!bedAnswerOf(); save(KEY.musicAnswer, v ? '1' : '0'); bedSetAnswer(v); render(); };
   $('nightRoomSound').oninput=e=>{ const v=+e.target.value; save(KEY.roomSound, String(v)); if(amb) ambienceOn(true, v); };   // the room's sound only (NIGHT-3 stage 5)
   $('nightSceneTg').onclick=()=>{ const L=['full','reduced','minimal'], v=L[(L.indexOf(sceneLevel())+1)%L.length]; setSceneLevel(v).then(()=>render()); };
-  $('nightLightTg').onclick=()=>{ const v=load(KEY.light)!=='1'; save(KEY.light, v ? '1' : '0'); lightApply(v, false); render(); };
   $('nightMeasure').onclick=()=>{ measure(); };
-  /* NIGHT-7: the picture's quality (Detailed ends the Lightweight mode, which keeps the picture standard); the first cards again */
-  for(const b of $('nightQualSeg').children) b.onclick=()=>{ const q=b.dataset.q; if(q==='full' && load(KEY.light)==='1'){ save(KEY.light, '0'); lightApply(false, false); } setSceneLevel(q).then(()=>render()); render(); };
+  /* NIGHT-16: one quality choice, remembered (Light = Standard's picture + the lighter sound); the first cards again */
+  for(const b of $('nightQualSeg').children) b.onclick=()=>{ qualitySet(b.dataset.q).then(()=>render()); render(); };
   $('nightHowTo').onclick=()=>{ infoShow(false); cardsShow(); };
   cardsWire(); noticeWire(); coachWire(); setTabsWire();
   /* NIGHT-2: the background and the hand's points in settings (fingertips only, the default, or all points) */
@@ -262,11 +267,16 @@ function bars(now, hv, fxv){
    (user answer E1). On: the room from the delay network instead of the convolution (Forest depth's `light` — the convolution was Night's
    largest fixed cost), struck sounds ring at most 60 % of their caps (audio.setLowPower), the forest picture at medium (the level chosen
    before is remembered and comes back when it is off), no glass blur. `boot` = applied with the face (the scene level only if it differs). */
-function lightApply(v, boot){
+function lightApply(v){
   setLowPower(v); bedSetLight(v || WEAK); natureLight(v || WEAK); const I=fxInstance(chainKeyOf('ld'),'fdepth'); if(I && I.params[4]) I.params[4].setNorm(v ? 1 : 0);   // NIGHT-4: the music bed's lighter variant too (also on a weak device); NIGHT-8 the stream's
-  if(v){ const cur=sceneLevel(); if(cur==='full'){ if(!boot || load(KEY.lightScene)==null) save(KEY.lightScene, cur); setSceneLevel('reduced'); } }
-  else if(!boot){ const back=load(KEY.lightScene); if(back && sceneLevel()==='reduced') setSceneLevel(back); }
+  setSceneLight(v);   // RAIN-R1: a room may draw less under Light (read at its next build)
+  if(v && sceneLevel()==='full') setSceneLevel('reduced');   // NIGHT-16: Light draws Standard's picture
 }
+/* NIGHT-16: the player's quality choice → the Light flag, the sound, the picture level (a promise: the level may load its pictures) */
+export function qualitySet(q){ if(!QUALITIES.includes(q)) return Promise.resolve(false);
+  const S=qualityState(q); save(KEY.light, S.light); lightApply(S.light==='1');
+  return Promise.resolve(setSceneLevel(S.level)).then(()=>true); }
+export const qualityOf=()=>quality();
 /* NIGHT-6 slice 1: THE AUDIO CLOCK on the bus — the audio time being output and the page time it comes out at (the output timestamp: the
    output latency is in it), and the current time with the page time it was read at (apps/night/pure/heard.js). Without an output timestamp
    (a suspended context) the latency the context reports stands in. clockOver — probe only (nightClockDbg): a synthetic clock */
@@ -288,9 +298,9 @@ async function measure(){
   const keep={ bg:backgroundOf(), level:sceneLevel(), light:load(KEY.light)==='1' }, i=timbreIdx('ld', D.timbre()), rows=[];
   const pb=()=>{ try{ return AC.playbackStats ? AC.playbackStats.underrunEvents : NaN; }catch(e){ return NaN; } };
   let k=0; const notes=setInterval(()=>{ const own='measure:'+(k%2); leadOn(own, 330*Math.pow(2,(k%5)/5), 0.6, i); setTimeout(()=>leadOff(own), 300); k++; }, 500);
-  const steps=[['dark', async()=>{ lightApply(false,false); await setBackground('dark'); }], ['forest high', async()=>{ await setSceneLevel('full'); await setBackground('forest'); }],
+  const steps=[['dark', async()=>{ lightApply(false); await setBackground('dark'); }], ['forest high', async()=>{ await setSceneLevel('full'); await setBackground('forest'); }],
     ['forest medium', async()=>{ await setSceneLevel('reduced'); }], ['forest medium, before NIGHT-6', async()=>{ sceneOptDbg({ lv:BEFORE_N6 }); await setSceneLevel('reduced'); }],
-    ['lighter forest', async()=>{ sceneOptDbg(null); await setSceneLevel('reduced'); lightApply(true,false); }]];
+    ['lighter forest', async()=>{ sceneOptDbg(null); await setSceneLevel('reduced'); lightApply(true); }]];
   try{
     out.hidden=false;
     for(let s=0;s<steps.length;s++){ out.textContent=t('night.measuring', { n:s+1, m:steps.length }); await steps[s][1](); await wait(3000);
@@ -306,7 +316,7 @@ async function measure(){
       `device: ${navigator.deviceMemory||'?'} GB, ${navigator.hardwareConcurrency||'?'} cores, ${devicePixelRatio} device px per CSS px, screen ${screen.width}×${screen.height}`, await persistInfo()].join('\n');   // NIGHT-15: the storage line
     out.textContent=t('night.measured')+'\n'+text; try{ await navigator.clipboard.writeText(text); }catch(e){}
   } finally { clearInterval(notes); for(const o of ['measure:0','measure:1']) leadOff(o); sceneOptDbg(null);
-    lightApply(keep.light,false); await setSceneLevel(keep.level); await setBackground(keep.bg); measuring=false; render(); }
+    lightApply(keep.light); await setSceneLevel(keep.level); await setBackground(keep.bg); measuring=false; render(); }
 }
 /* the room's reach (Forest depth, its 4th parameter) — set on the instance like a fixed value (the hand never aims at it) */
 function reachSet(v){ const I=fxInstance(chainKeyOf('ld'),'fdepth'); if(I && I.params[3]) I.params[3].setNorm(Math.max(0, Math.min(1, +v||0))); }

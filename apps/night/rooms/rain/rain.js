@@ -18,7 +18,7 @@ import { heardMs } from '../../pure/heard.js';
 import { MOOD_TC } from '../../pure/cycle.js';
 import { RAIN_ROOM } from './pure/room.js';
 import { FOCUS, focusTarget, focusStep, focusBlur, focusDepth, focusPlateau, blurAt } from './pure/focus.js';
-import { RAIN_SEED, windowsLayout, farLights, windowPick, windowLight } from './pure/windows.js';
+import { RAIN_SEED, windowsLayout, farLights, windowPick, windowLight, flyWindow } from './pure/windows.js';
 import { GLASS, wipeNew, wipeStamp, wipeStroke, wipeStep, wipeAt, wipeCell } from './pure/glass.js';
 import { DROPS, dropsNew, dropsRegion, dropAdd, dropsStep, dropStretch, dropsLedger, laneAt } from './pure/drops.js';
 import { winQuad } from './pure/windows.js';   // RAIN-2: a window's projected quad
@@ -30,7 +30,7 @@ import { FAR_LIFE, hillTop, slope, farCars, blink, twinkle, cableAt, farEventAt,
 const frac1=x=>x-Math.floor(x);
 import { winGarland, winEventAt, winOnOff } from './pure/windows.js';   // RAIN-5c: life in the windows   // RAIN-5c: the sky's clouds, moon, searchlight and aircraft   // RAIN-5: the people and the street's small life
 import { showDue, flashOf, breathOf, SHOWN } from './pure/shown.js';   // RAIN-5: the music shown when heard
-import { QUAD_V, BLUR_F, VIEW_F, WIN_V, WIN_F, LIGHT_V, LIGHT_F, DROP_V, DROP_F, LIFE_V, LIFE_F, glassShader } from './rain-glass.js';
+import { QUAD_V, BLUR_F, DOWN_F, VIEW_F, WIN_V, WIN_F, LIGHT_V, LIGHT_F, DROP_V, DROP_F, LIFE_V, LIFE_F, glassShader } from './rain-glass.js';
 import { cityUniforms, CITY_F, BAKED_F } from './rain-city.js';
 
 export const RAIN_LEVELS=RAIN_ROOM.levels;
@@ -51,9 +51,18 @@ export function rainAssets(level='full'){
   CITY.set(lv, p); return p;
 }
 
+/* RAIN-R1: the level's city files here without the network? (a build's precache lists them «on demand»: cached once fetched). No precache (the
+   repository, no worker) → true: the network serves them. The start waits on this, or on the prefetch, before Begin works (main.js) */
+const RAIN_PRECACHE_PREFIX='handsong-night-precache-';   // sw.js PREFIX
+export async function rainHas(level='full'){
+  if(typeof navigator==='undefined' || !navigator.serviceWorker || !navigator.serviceWorker.controller || typeof caches==='undefined') return true;
+  if(!(await caches.keys()).some(k=>k.startsWith(RAIN_PRECACHE_PREFIX))) return true;
+  const lv= level==='full' ? 'full' : 'reduced', at=f=>new URL(`./city/${f}`, import.meta.url).href;
+  for(const f of [...CITY_MOODS.map(m=>`${lv}/${m}.webp`), `${lv}/lit.webp`, `${lv}/depth.png`, 'windows.json']) if(!(await caches.match(at(f)))) return false;
+  return true; }
 /* T — the THREE namespace; opt: { C (palette.cv), level, w, h, reduce, mood, lv (measurement overrides) } */
 export function buildRain(T, opt){
-  const C=opt.C, Lv={ ...(RAIN_LEVELS[opt.level]||RAIN_LEVELS.full), ...(opt.lv||{}) }, reduce=!!opt.reduce, own=[];
+  const C=opt.C, Lv={ ...(RAIN_LEVELS[opt.level]||RAIN_LEVELS.full), ...(opt.light && RAIN_ROOM.light ? RAIN_ROOM.light : {}), ...(opt.lv||{}) }, reduce=!!opt.reduce, own=[];
   const col=n=>new T.Color(C('rain-'+n));
   /* the mood's look: its colours (tokens) and amounts, eased towards a new mood's (τ MOOD_TC); a new look repaints the city once */
   const looks=new Map(), lookCols=L=>{ let c=looks.get(L.pre); if(!c){ c={}; for(const [k, n] of Object.entries(L.tokens)) c[k]=new T.Color(C(n)); looks.set(L.pre, c); } return c; };
@@ -76,11 +85,12 @@ export function buildRain(T, opt){
   const bakedM= BK ? mat({ uniforms:{ uCity:{ value:null }, uDepthMap:{ value:depTex }, uTan:{ value:UT }, uExt:{ value:EXT } }, vertexShader:QUAD_V, fragmentShader:BAKED_F }) : null;
   const moodOfLook=L=>Object.keys(RAIN_ROOM.looks).find(k=>RAIN_ROOM.looks[k]===L)||'late';
   const blurM=mat({ uniforms:{ uTex:{ value:null }, uDir:{ value:new T.Vector2() } }, vertexShader:QUAD_V, fragmentShader:BLUR_F });
+  const downM=mat({ uniforms:{ uTex:{ value:null }, uTexel:{ value:new T.Vector2() } }, vertexShader:QUAD_V, fragmentShader:DOWN_F });   // small fixes: the mist's box downsample
   const viewM=mat({ uniforms:{ uBase:{ value:null }, uL1:{ value:null }, uL2:{ value:null }, uL3:{ value:null }, uDepth:{ value:null }, uRad:{ value:new T.Vector3(0.004, 0.012, 0.04) }, uFoc:{ value:FOC },
     uTan:{ value:UT }, uLight:{ value:new T.Vector3() }, uLightCol:{ value:LIGHT },
     uSkyA:{ value:new T.Vector4() }, uMoon:{ value:new T.Vector4() }, uMoonPh:{ value:0.5 }, uBeam:{ value:new T.Vector4() }, uPlane:{ value:new T.Vector4() }, uPlaneC:{ value:new T.Vector3() },   // RAIN-5c: the sky (pure/sky.js)
     uCloudLit:{ value:new T.Color() }, uCloudDark:{ value:new T.Color() }, uMoonCol:{ value:col('moon') }, uBeamCol:{ value:col('beam') }, uRedCol:{ value:col('nav-red') }, uGreenCol:{ value:col('nav-green') }, uWhiteCol:{ value:col('nav-white') } }, vertexShader:QUAD_V, fragmentShader:VIEW_F });
-  const qCity=add(new T.Mesh(quad, bakedM||cityM), 0), qBlur=add(new T.Mesh(quad, blurM), 0), qView=add(new T.Mesh(quad, viewM), 0);
+  const qCity=add(new T.Mesh(quad, bakedM||cityM), 0), qBlur=add(new T.Mesh(quad, blurM), 0), qDown=add(new T.Mesh(quad, downM), 0), qView=add(new T.Mesh(quad, viewM), 0);
   const unitQuad=()=>{ const g=new T.InstancedBufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute([-1,-1,0, 1,-1,0, 1,1,0, -1,1,0], 3)); g.setIndex([0,1,2, 0,2,3]); own.push(g); return g; };
   const dyn=(arr, n)=>{ const a=new T.InstancedBufferAttribute(arr, n); a.setUsage(T.DynamicDrawUsage); return a; };
 
@@ -193,10 +203,19 @@ export function buildRain(T, opt){
   const glassM=mat({ uniforms:{ uView:{ value:null }, uSoft:{ value:null }, uDrop:{ value:null }, uWipe:{ value:mapTex }, uTan:{ value:UT }, uOff:{ value:UOFF }, uExt:{ value:new T.Vector2(GLASS.ext[0], GLASS.ext[1]) },
     uFloor:{ value:new T.Vector3(0, GLASS.mid[0], GLASS.mid[1]) }, uLight:{ value:new T.Vector2() }, uTime:UTIME, uRain:{ value:rainK }, uMist:{ value:mistK }, uG:{ value:0 }, uLightK:{ value:0 },
     uLightCol:{ value:LIGHT }, uMistCol:{ value:mistCol } }, vertexShader:QUAD_V, fragmentShader:glassShader(Lv.fine) });
-  const qGlass=add(new T.Mesh(quad, glassM), 0), ALL=[qCity, qBlur, qView, lifeMesh, wins, lights, dropsMesh, qGlass];
+  const qGlass=add(new T.Mesh(quad, glassM), 0), ALL=[qCity, qBlur, qDown, qView, lifeMesh, wins, lights, dropsMesh, qGlass];
   const show=(...on)=>{ for(const m of ALL) m.visible=on.includes(m); };
   const pass=(r, target, ...on)=>{ show(...on); r.setRenderTarget(target); r.render(scene, camera); };
   const blur=(r, from, to, dx, dy)=>{ blurM.uniforms.uTex.value=from; blurM.uniforms.uDir.value.set(dx, dy); pass(r, to, qBlur); };
+  /* small fixes (2026-11-17): THE MIST'S SOFT COPY (the city seen through the misty glass) — a true box down to a quarter, then three dense rounds (1.2, 1.55,
+     1.9 quarter texels; together as wide as the old 1.2 + 2.4: √(1.2²+1.55²+1.9²) = 2.73 vs 2.68) so a point stays ROUND. The old chain (old: the probes'
+     CONTROL) sampled the full picture 4.8 px apart and its second round 2.4 texels apart: a far light came out as a 5 × 5 grid of copies — a square */
+  const SOFT_ROUNDS=[1.2, 1.55, 1.9];
+  function soft(r, src, sw, sh, old){
+    if(old){ blur(r, src, RT.s1, 1.2/RT.s1.width, 0); blur(r, RT.s1.texture, RT.s2, 0, 1.2/RT.s2.height); blur(r, RT.s2.texture, RT.s1, 2.4/RT.s1.width, 0); blur(r, RT.s1.texture, RT.s2, 0, 2.4/RT.s2.height); return; }
+    downM.uniforms.uTex.value=src; downM.uniforms.uTexel.value.set(1/sw, 1/sh); pass(r, RT.s2, qDown);
+    for(const k of SOFT_ROUNDS){ blur(r, RT.s2.texture, RT.s1, k/RT.s1.width, 0); blur(r, RT.s1.texture, RT.s2, 0, k/RT.s2.height); } }
+  let softOld=false;   // probes only (softDbg): the old chain
   const size=new T.Vector2(), keepClear=new T.Color();
   function targets(r){
     r.getDrawingBufferSize(size); const w=size.x, h=size.y; if(w===bw && h===bh) return; bw=w; bh=h;
@@ -227,7 +246,7 @@ export function buildRain(T, opt){
     rr=r; targets(r); const keep=r.getRenderTarget();
     if(dirty){ dirty=false; paint(r); }
     pass(r, RT.view, qView, lifeMesh, wins, lights);
-    blur(r, RT.view.texture, RT.s1, 1.2/RT.s1.width, 0); blur(r, RT.s1.texture, RT.s2, 0, 1.2/RT.s2.height); blur(r, RT.s2.texture, RT.s1, 2.4/RT.s1.width, 0); blur(r, RT.s1.texture, RT.s2, 0, 2.4/RT.s2.height);
+    soft(r, RT.view.texture, RT.view.width, RT.view.height, softOld);
     r.getClearColor(keepClear); const ka=r.getClearAlpha(); r.setClearColor(0x000000, 0); show(dropsMesh); r.setRenderTarget(RT.drop); r.clear(true, false, false); r.render(scene, camera); r.setClearColor(keepClear, ka);
     pass(r, keep, qGlass); show(...ALL); frames++;
   }
@@ -290,8 +309,9 @@ export function buildRain(T, opt){
     if(focus<0.55){ wipeStamp(wipe, light.x+off.x, light.y+off.y, clamp((vel==null ? 0.6 : vel)*1.4, 0.5, 1)*(1-0.6*focus)); wipes++; } }
   /* a window on the screen (the view's px): its centre and half size */
   const windowAt=i=>{ const w=WIN[i]; return w ? { i, x:(w.x/tw*0.5+0.5)*W, y:(0.5-w.y/th*0.5)*H, r:w.hw/(2*tw)*W, inView:Math.abs(w.x)+w.hw<tw && Math.abs(w.y)+w.hh<th } : null; };
-  /* the start's dot becomes the first lit window (the host's fly doors): a dark one near the deep middle of the picture */
-  function flyPick(){ let best=null, bd=Infinity; WIN.forEach((w, i)=>{ const q=windowAt(i); if(!q.inView || lit[i]>0.05) return; const d=Math.hypot(q.x/W-0.6, q.y/H-0.5); if(d<bd){ bd=d; best=i; } }); return best; }
+  /* the start's dot becomes the first lit window (the host's fly doors). RAIN-R1: a window of the house opposite seen on every screen shape (flyWindow);
+     without the bake's window map (the stand-in city), the old way: a dark one near the deep middle of the picture */
+  function flyPick(){ const k=flyWindow(WIN, RAIN_ROOM.view, i=>lit[i]<=0.05); if(k>=0) return k; let best=null, bd=Infinity; WIN.forEach((w, i)=>{ const q=windowAt(i); if(!q.inView || lit[i]>0.05) return; const d=Math.hypot(q.x/W-0.6, q.y/H-0.5); if(d<bd){ bd=d; best=i; } }); return best; }
   const state=()=>({ now, focus, target, focusDepth:focusDepth(focus), blur:focusBlur(focus), light:{ ...light }, off:{ ...off }, windows:WIN.length, lit:Array.from(lit), litNow:lit.reduce((n, v)=>n+(v>0.05 ? 1 : 0), 0), lastPick, picks, pickLog:pickLog.slice(), wipes, strokes,
     wipe:{ live:wipe.live, wiped:wipe.wiped, floor:wipe.floorK, max:wipe.a.reduce((a, b)=>Math.max(a, b), 0) }, drops:{ n:SIM.list.length, running:SIM.list.filter(d=>d.mv).length, cap:SIM.cap, ledger:dropsLedger(SIM), t:SIM.t },
     mood:moodId, look:look.pre, mist:mistK, rain:rainK, share:litK, tan:[tw, th], buffer:[bw, bh], repaints, frames, fine:Lv.fine, far:FAR.length, lights:nLights,
@@ -316,5 +336,13 @@ export function buildRain(T, opt){
       const i=clamp(Math.round((x/BAKE_EXT[0]*0.5+0.5)*depthPx.w-0.5), 0, depthPx.w-1), j=clamp(Math.round((0.5-y/BAKE_EXT[1]*0.5)*depthPx.h-0.5), 0, depthPx.h-1); return depthPx.d[(j*depthPx.w+i)*4]/255; },   // the baked depth map at a view place
     rtReadDbg:(name, pts)=>{ const r=rr, T0=RT[name]; if(!T0 || !r) return null; const px=new Uint8Array(4); return pts.map(([x, y])=>{ const i=Math.round((x/tw*0.5+0.5)*T0.width-0.5), j=Math.round((y/th*0.5+0.5)*T0.height-0.5);
       r.readRenderTargetPixels(T0, clamp(i, 0, T0.width-1), clamp(j, 0, T0.height-1), 1, 1, px); return Array.from(px, v=>v/255); }); },
-    radDbg:()=>({ rad:viewM.uniforms.uRad.value.toArray(), foc:FOC.toArray(), buffer:[bw, bh] }) };
+    radDbg:()=>({ rad:viewM.uniforms.uRad.value.toArray(), foc:FOC.toArray(), buffer:[bw, bh] }),
+    /* small fixes: the mist's soft chain (new, or old: the CONTROL) on one round light (size px across) at the picture's centre → the soft
+       copy's red channel around its centre ((2R+1)², row by row from the bottom) */
+    softDbg:(o={})=>{ const r=rr; if(!r || !RT.s2 || !RT.view) return null; const w=RT.view.width, h=RT.view.height, k=o.size||3, data=new Uint8Array(w*h*4), cx=w>>1, cy=h>>1;
+      for(let y=cy-k;y<=cy+k;y++) for(let x=cx-k;x<=cx+k;x++){ if(Math.hypot(x-cx, y-cy)>k/2) continue; const i=(y*w+x)*4; data[i]=data[i+1]=data[i+2]=255; data[i+3]=255; }   // a round light, size px across
+      const tx=new T.DataTexture(data, w, h, T.RGBAFormat); tx.minFilter=tx.magFilter=T.LinearFilter; tx.needsUpdate=true; const keep=r.getRenderTarget();
+      try{ soft(r, tx, w, h, !!o.old); } finally { r.setRenderTarget(keep); }
+      const W2=RT.s2.width, H2=RT.s2.height, R=o.r||12, n=2*R+1, px=new Uint8Array(n*n*4); r.readRenderTargetPixels(RT.s2, Math.round(W2*cx/w)-R, Math.round(H2*cy/h)-R, n, n, px); tx.dispose();
+      return { R, n, v:Array.from({ length:n*n }, (_, i)=>px[i*4]), quarter:[W2, H2], full:[w, h] }; } };
 }
