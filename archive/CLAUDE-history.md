@@ -2131,6 +2131,12 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
     3. The forest at Standard starts as before; Detailed's spruces come in after the start (a first visit at Detailed on the Poco).
     4. The guitar unchanged (the founder's decision).
     5. The Poco at Standard in the rain. (No timing was measured.)
+184. Small interface fixes after UI-1. Five checks:
+    1. Settings → Picture → Quality: just the three names, no lines under them.
+    2. In the rain, Settings → Sound has no «music follows my notes» switch; in the forest it is back.
+    3. Switch forest → rain → forest a few times: Sound, Music and Mood always read what plays; the rain's Music reads Drizzle · Rain · Downpour (Морось · Дождь · Ливень).
+    4. The rain's interface amber everywhere — Begin, the emblem's dot, the links, the switches, the sliders, the tabs; the forest's lime unchanged. (The hands' firefly dots and the note field's glow are still lime: a CORE change, not done.)
+    5. The hills far, focus far: every small light a soft round dot (compare tools/.ui-snap/ui1/index.html); the Poco.
 ## Superseded at DOC1 (old lines verbatim, replaced in place above by a later slice)
 - NIGHT-2 stage 3 (2026-11-03, the rule of at most five manual checks) updated this line of CLAUDE.md's report format:
   probe verdict lines and fix rounds; what was left undone; docs found stale; the user's remaining steps (ear, camera, phone).

@@ -27,6 +27,7 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 - **Step 145, music and full screen** (five checks; covers step 144's and 143's phone parts): `archive/CLAUDE-history.md`, step 145. Steps 143 (1), (3) and 144 (1)–(4) still stand on the laptop.
 - **Step 146, the forest closer to real** (five checks: the two stream samples by ear, the stream in the app, the water, the ground and rocks, the Poco): `archive/CLAUDE-history.md`, step 146.
 - **Step 157, MediaPipe from our origin and the second visit with no network** (four checks: the Poco offline on its second visit, an iPhone likewise, the «new version» line, Full and Night on Live Server as before; only a BUILD precaches — a preview or night.handsong.app): `archive/CLAUDE-history.md`, step 157.
+- **Step 184, UI-1** (five checks: Quality without notes, the rain's settings, labels on switches and the rain's music names, amber everywhere, round hill lights): step 184.
 - **Step 183, small fixes** (five checks: the piano comps, round far lights, Detailed's spruces after the start, the guitar unchanged, the Poco): step 183.
 - **Step 182, the rain for players** (five checks: random rooms with their stills, a first visit in the rain, the dot's window, the Room button and the rain's cards, Light and the Poco): step 182.
 - **Step 181, one quality control** (five checks: three choices, Light and back, kept on reload and migrated, a fresh profile at Standard, Russian): step 181.
@@ -68,15 +69,14 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 5. The falling star passes in front of the trees. Natural?
 
 ## Records (English, at most about 15 lines each; older ones go to `archive/HANDOFF-history.md`)
+### UI-1 (2026-11-17): the founder's interface fixes; round hill lights. Log: `docs/night/WORK-LOG.md`
+- No notes under Quality; the «music follows the chord» switch hidden in the rain; labels redrawn when a room's music is applied (P.night «NIGHT labels follow the room» 6/0); the rain's Music names; `--night-brand` = the room's tint (amber in the rain); the hills' little rectangles were the BAKED distant windows — now a round Gaussian at far depth (`BAKED_F`), the cable car, church window and a far car's two headlights round points («RAIN no quad edges» 10/0). Open: the hands' fireflies and the note-field glow (core canvas, cached lime) — a CORE run. Waiting for step 184.
 ### NIGHT-16 (2026-11-17): one quality control. Log: `docs/night/WORK-LOG.md`
 - Settings → Picture: «Quality» Detailed · Standard · Light (Light = the old Lightweight mode, picture and sound); a first visit at Standard; saved settings read on (`pure/quality.js`). Data row «NIGHT quality (app)» 15/0. Waiting for step 181.
 ### RAIN-R1 (2026-11-17): the rain a real room (not published yet). Log: `docs/night/WORK-LOG.md`
 - `room.rain` pinned and listed; a random start room every visit (guard.js), its own still (drops on the glass), Begin waits ≤ 25 s for the rain's files (else the forest); the rain's media on demand (precache stage 2); the dot lights a window of the house opposite seen on every screen; its cards and coaching EN/RU; Light in the rain. «NIGHT two rooms (app)» 43/0; still match: the rain scale 1.0000 shift 0. Waiting for step 182 and a full check before night-release.
 ### Small fixes (2026-11-17): the piano comps, round far lights, Detailed spruces later. Log: `docs/night/WORK-LOG.md`
 - `pure/lofi.js` lofiComp (voicing per hit, rolls, velocities, skips, passing notes); the mist's soft copy round (DOWN_F + three dense rounds); foliage-1024 in NIGHT_LATER (start ≈ 27.6 MB forest-only, ≈ 28.0 with the rain's code). «RAIN piano comping (app)» 22/0, «RAIN no quad edges» 6/0. Waiting for step 183.
-### FULL CHECK (2026-11-17): ready to publish the forest. Log: `docs/night/WORK-LOG.md`
-- Fixed: the forest's shadow map is freed on leaving (a leak per build at Detailed); a profile apply starts the room memory fresh (RAIN-4's memory leaked chosen sounds between rows; players unaffected). Old rows judge the old forest; «NIGHT room switch» counts textures in the test room (exact).
-- P.night 68/0, Night UI PASS, P.quick 93/0, smoke with builds PASS, data 91/0. Start set 28.6 MB (was 26.6). No rain room in the players' build.
 ### RAIN-5e (2026-11-16): a wider depth of field; round far lights. Log: `docs/night/WORK-LOG.md`
 - Focus law: a sharp plateau (0.03 + 0.43 f) round the focus depth (span 0.82), fall-off 1.7 — far, street to hills sharp at once, the glass soft; near, the glass sharp. Point lights round (2 px room, the glow faded 1.2 px before the quad's edge). Far lights ×1.2–1.3. Rows: focus law 20/0 (CONTROL the old band), quad edges 4/0 (+ lights), RAIN room 47/0 (its far-hand case rewritten to the new law). Waiting for step 180.
 ### RAIN-4e (2026-11-16): the bed's sound. Log: `docs/night/WORK-LOG.md`

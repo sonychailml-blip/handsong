@@ -8845,3 +8845,8 @@ not a control · run a "random" failure many times and print WHERE and HOW MUCH 
 ### RAIN-4d (2026-11-16): the rain room's lo-fi with our own sound. Log: `docs/night/WORK-LOG.md`
 - The bed's electric piano is core's tine engine (`buildTineBank`, the hand's own record) with velocity tables, detune and a release noise; the guitar a physical model (extended Karplus–Strong: pluck position, damping by frequency, all-pass tuning, finger noise, a body, vibrato). Effects: the piano's chorus, tremolo, auto-pan; a tape delay on guitar and vibraphone; drums high-cut and saturated; a shared warm reverb; master tape, saturation, a gentle compressor (the bed's own bus); slow breathing.
 - `apps/night/pure/lofi.js` rewritten as a generative player (2–4 progressions and their flow, sections with breaks, drums varied bar to bar with generated fills, bass and piano variations, generated phrases inside the safe notes). No CC0 / CC-BY sampled nylon guitar found (the free ones are NC or GPL): the A/B waits for the founder. Rows: «RAIN lo-fi bed (app)» rewritten (no two consecutive 16-bar spans identical; CONTROL a fixed loop); music bed 46/0; forest bed 4/0. Waiting for step 177.
+
+## Moved from docs/night/HANDOFF.md at UI-1 (2026-11-17)
+### FULL CHECK (2026-11-17): ready to publish the forest. Log: `docs/night/WORK-LOG.md`
+- Fixed: the forest's shadow map is freed on leaving (a leak per build at Detailed); a profile apply starts the room memory fresh (RAIN-4's memory leaked chosen sounds between rows; players unaffected). Old rows judge the old forest; «NIGHT room switch» counts textures in the test room (exact).
+- P.night 68/0, Night UI PASS, P.quick 93/0, smoke with builds PASS, data 91/0. Start set 28.6 MB (was 26.6). No rain room in the players' build.

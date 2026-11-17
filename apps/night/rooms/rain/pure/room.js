@@ -37,7 +37,8 @@ export const RAIN_ROOM=F({
   /* RAIN-4: what the room plays with — its own four timbres for the playing hand (Night's session records, apps/night/rooms/rain/timbres/; never in
      Full's lists), each with its level (dB) and its strike cap (a fast phrase stays gentle on a phone), and the moods' names */
   music:F({ timbres:F([F({ id:'rain/e-piano', level:0, voices:6 }), F({ id:'rain/vibraphone', level:-11, voices:4 }), F({ id:'rain/nylon', level:0, voices:5 }), F({ id:'rain/celesta', level:-6, voices:4 })]),   // RAIN-4e: the celesta back (four, like the forest)
-    names:F({ late:F({ en:'Late night', ru:'Поздняя ночь' }), evening:F({ en:'Evening boulevard', ru:'Вечерний бульвар' }), after:F({ en:'After the rain', ru:'После дождя' }) }) }),
+    names:F({ late:F({ en:'Late night', ru:'Поздняя ночь' }), evening:F({ en:'Evening boulevard', ru:'Вечерний бульвар' }), after:F({ en:'After the rain', ru:'После дождя' }) }),
+    bedNames:F({ still:F({ en:'Drizzle', ru:'Морось' }), drift:F({ en:'Rain', ru:'Дождь' }), glimmer:F({ en:'Downpour', ru:'Ливень' }) }) }),   // UI-1: the Music button's names here (quiet · groove · full)
   nature:F({ id:'ambience.rain',
     drone:F({ root:0.07, fifth:0.035, tc:1.4, send:0.2 }),
     wind:F({ hz:2600, q:0.35, sweep:500, rate:0.045, gain:0.012, send:0.1, sec:2, seed:0x5241494E }),   // RAIN-3: only a breath of air now (the layers carry the rain; it stays if they cannot play)

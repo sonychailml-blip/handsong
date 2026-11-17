@@ -58,9 +58,37 @@ export async function checkRainQuads(){ const d=[], notes=[]; let n=0; const mis
       const now=aniso({ size:21 }), old=aniso({ size:21, old:true }); n+=2;   // a round 21-px light: a 3-px one peaks at 1 / 255 in the soft copy, a 9-px one at 8 — too faint to judge in 8 bits
       if(!now || !(now.pk>8)) miss('the soft copy of a far light is empty: '+JSON.stringify(now)); else if(now.a>0.06) miss(`the mist's soft copy of a far light is not round: ${(now.a*100).toFixed(1)} % of its peak between directions (at ${now.atR} quarter px)`);
       else notes.push(`the mist's soft copy of a round 21-px light: round — the directions agree within ${(now.a*100).toFixed(1)} % of the peak`);
-      if(!old || old.a<=0.06) miss(`CONTROL: the old soft chain is round (${old && (old.a*100).toFixed(1)} %) — the check cannot fail`); else notes.push(`CONTROL: the old soft chain is not round (${(old.a*100).toFixed(1)} % between directions)`); }
+      if(!old || old.a<=0.06) miss(`CONTROL: the old soft chain is round (${old && (old.a*100).toFixed(1)} %) — the check cannot fail`); else notes.push(`CONTROL: the old soft chain is not round (${(old.a*100).toFixed(1)} % between directions)`);
+      /* UI-1: EVERY KIND OF SMALL LIGHT — the room's own list this frame (far lights, hill road, masts, tower, cable car, church, bridge, lamps, cars, the tram,
+         signals; not kind 1, the wet street's reflection streaks): each drawn less than 4 px across must be a round point (kind 0); CONTROL a planted 2-px rectangle light is caught */
+      for(let k=0;k<6;k++){ room.update(1/30, 30+k*7.3, [], null, {}); room.render(r); }
+      const judgeL=list=>list.filter(q=>q[5]!==1 && Math.max(q[2], q[3])*2*L0.px<4 && q[5]!==0);   // kind 1: the wet street's reflection streaks (a fading streak by design, not a light)
+      const L0=room.lightsDbg(); n+=2;
+      { const bad=judgeL(L0.list); if(!L0.list.length) miss('the room drew no lights'); else if(bad.length) miss(`${bad.length} small light(s) drawn as rectangles: ${bad.slice(0, 3).map(q=>`kind ${q[5]} ${(q[2]*2*L0.px).toFixed(1)}×${(q[3]*2*L0.px).toFixed(1)} px at depth ${q[4].toFixed(2)}`).join('; ')}`);
+        else notes.push(`every small light of ${L0.list.length} drawn is a round point`); }
+      if(!judgeL([...L0.list, [0, 0.1, 0.0022, 0.0015, 0.95, 2, 1]]).length) miss('CONTROL: a planted 2-px rectangle light passed'); else notes.push('CONTROL: a planted 2-px rectangle light is caught'); }
     finally{ room.dispose(); } }
   catch(e){ miss('the soft chain check: '+(e && e.message || e)); }
+  /* UI-1: THE FAR CITY'S BAKED WINDOWS (the founder's screenshot: little rectangles on the hills) — the room's own baked-city shader (rain-city.js BAKED_F) on a
+     made-up bake: one 2 × 1 px window at far depth; it must come out round (directions within 15 % of its peak, my guess — a 2-px source keeps about 9 % of its shape on the room's 113-tap Gaussian);
+     CONTROL the same window at near depth (the house opposite: drawn exactly as baked) is not round */
+  try{ const C=await import('../../../apps/night/rooms/rain/rain-city.js'), G2=await import('../../../apps/night/rooms/rain/rain-glass.js'), B=64, cv2=document.createElement('canvas'), r2=new T.WebGLRenderer({ canvas:cv2, antialias:false, preserveDrawingBuffer:true });
+    r2.setPixelRatio(1); r2.setSize(B, B, false);
+    try{ const roundOf=depth=>{ const col=new Uint8Array(B*B*4), dep=new Uint8Array(B*B*4); for(let i=0;i<B*B;i++){ col[i*4+3]=255; dep[i*4]=Math.round(depth*255); dep[i*4+3]=255; }
+        for(const x of [32, 33]){ const i=(32*B+x)*4; col[i]=col[i+1]=col[i+2]=255; }
+        const tx=(a, lin)=>{ const t=new T.DataTexture(a, B, B, T.RGBAFormat); t.minFilter=t.magFilter= lin ? T.LinearFilter : T.NearestFilter; t.needsUpdate=true; return t; }, tc=tx(col, true), td=tx(dep, false);
+        const m=new T.ShaderMaterial({ uniforms:{ uCity:{ value:tc }, uDepthMap:{ value:td }, uTan:{ value:new T.Vector2(1, 1) }, uExt:{ value:new T.Vector2(1, 1) }, uTexel:{ value:new T.Vector2(1/B, 1/B) } }, vertexShader:G2.QUAD_V, fragmentShader:C.BAKED_F });
+        const sc=new T.Scene(), q=new T.Mesh(new T.PlaneGeometry(2, 2), m); q.frustumCulled=false; sc.add(q); r2.render(sc, new T.OrthographicCamera(-1, 1, 1, -1, 0, 1));
+        const gl=r2.getContext(), px=new Uint8Array(B*B*4); gl.readPixels(0, 0, B, B, gl.RGBA, gl.UNSIGNED_BYTE, px); tc.dispose(); td.dispose(); m.dispose(); q.geometry.dispose();
+        const v=(x, y)=>{ const x0=Math.floor(x), y0=Math.floor(y), fx=x-x0, fy=y-y0, g=(i, j)=>px[(j*B+i)*4]; return g(x0, y0)*(1-fx)*(1-fy)+g(x0+1, y0)*fx*(1-fy)+g(x0, y0+1)*(1-fx)*fy+g(x0+1, y0+1)*fx*fy; };
+        let pk=0, sx=0, sy=0, sw=0; for(let y=24;y<41;y++) for(let x=24;x<42;x++){ const w=px[(y*B+x)*4]; pk=Math.max(pk, w); sx+=w*x; sy+=w*y; sw+=w; } const cx=sx/sw, cy=sy/sw; let a=0;
+        for(let rr=0.75;rr<3.5;rr+=0.25){ const ring=[]; for(let k=0;k<16;k++){ const th=k*Math.PI/8; ring.push(v(cx+rr*Math.cos(th), cy+rr*Math.sin(th))); } const mean=ring.reduce((p, w)=>p+w, 0)/16; if(mean<0.05*pk) continue; a=Math.max(a, (Math.max(...ring)-Math.min(...ring))/pk); }
+        return { a, pk }; };
+      const far=roundOf(0.95), near=roundOf(0.5); n+=2;
+      if(!(far.pk>10) || far.a>0.15) miss(`a far baked window is not round: ${(far.a*100).toFixed(1)} % between directions (peak ${far.pk})`); else notes.push(`a far baked 2 × 1 px window: round — directions within ${(far.a*100).toFixed(1)} % of its peak`);
+      if(near.a<=0.15) miss(`CONTROL: the same window at near depth came out round (${(near.a*100).toFixed(1)} %) — the check cannot fail`); else notes.push(`CONTROL: at near depth it stays as baked (${(near.a*100).toFixed(1)} % between directions)`); }
+    finally{ r2.dispose(); r2.forceContextLoss(); } }
+  catch(e){ miss('the baked windows check: '+(e && e.message || e)); }
   finally{ r.dispose(); r.forceContextLoss(); }
   return { cases:n, total:d.length, differences:d, notes }; }
 row({ at:1009.98705, night:true, name:'RAIN no quad edges', drawn:true, run:()=>checkRainQuads(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });

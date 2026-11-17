@@ -64,8 +64,6 @@ let begun=false, firstRun=false, startDue=false, defHand='right';   // NIGHT-2: 
 const room=()=>(roomById(sceneRoom())||ROOMS[0]).record, nature=()=>room().nature;
 const roomSound=()=>{ const v=parseFloat(load(KEY.roomSound)); return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : nature().level; };
 /* NIGHT-4: a weak device (≤ 2 GB or ≤ 2 cores, as the browser reports) gets the music bed's lighter variant whatever the setting */
-/* NIGHT-11 part 5: a small touch screen (a phone) — Detailed gets a short note there */
-const SMALL_TOUCH=(()=>{ try{ return matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height)<=820; }catch(e){ return false; } })();
 const WEAK=!!((navigator.deviceMemory && navigator.deviceMemory<=2) || (navigator.hardwareConcurrency && navigator.hardwareConcurrency<=2));
 export const REACH=1;   // the hand's reach in the room (Forest depth's `reach`): always the whole range, whatever the calibration and settings (user, NIGHT-5)
 
@@ -105,7 +103,8 @@ function setIcon(id, name){ const c=$(id).querySelector('.night-circ'); if(c.dat
 function render(){
   if(!D || !on) return;
   $('nightRoom').hidden=sceneRooms().length<2; val('nightRoom', L(room().name));   // NIGHT-3 stage 5 part 2: the Room button only with two rooms or more
-  val('nightMusic', t('night.music.'+bedModeOf()));
+  { const m=bedModeOf(), BN=room().music && room().music.bedNames; val('nightMusic', BN && BN[m] ? L(BN[m]) : t('night.music.'+m)); }   // UI-1: a room with its own music names its levels (the rain: Drizzle · Rain · Downpour)
+  $('nightMusicAnswerTg').hidden=!!room().music;   // UI-1: the settings show only what works here — a room's own composed music does not follow the played chord
   val('nightSound', D.timbreName(D.timbre()));
   val('nightMood', D.moodName ? D.moodName(D.mood()) : t('night.mood.'+D.mood()));   // RAIN-4: a room with its own music names its moods
   const nm=D.noteMode(); val('nightNotes', t(nm==='hold' ? 'night.notesStay' : 'night.notesFollow')); setIcon('nightNotes', nm==='hold' ? 'note-stay' : 'note-follow');
@@ -119,7 +118,6 @@ function render(){
   calSettingsRender();
   $('nightSceneTg').hidden=!devItems(); $('nightSceneTg').textContent=t('night.scene', { lvl:t('night.scene.'+sceneLevel()) });
   { const q=quality(); for(const b of $('nightQualSeg').children) b.classList.toggle('on', b.dataset.q===q); }   // NIGHT-16: one quality choice
-  $('nightQualNote').hidden=!SMALL_TOUCH;   // NIGHT-11 part 5: Detailed stays offered (a phone may drive a TV); a note on small touch screens
   $('nightRoomSoundRow').hidden= !amb; $('nightRoomSound').value=String(roomSound());
   { const ic=$('nightRoomSoundRow').querySelector('.night-vico'), name=room().icon||'forest';   // NIGHT-8: the room gives its own Room-sounds icon (the forest keeps the leaf)
     if(ic && ic.dataset.svg!==name){ const g=svgIcon(document, name); if(g){ ic.dataset.svg=name; ic.replaceChildren(g); } } }
@@ -159,6 +157,7 @@ function wire(){
   for(const b of $('nightQualSeg').children) b.onclick=()=>{ qualitySet(b.dataset.q).then(()=>render()); render(); };
   $('nightHowTo').onclick=()=>{ infoShow(false); cardsShow(); };
   cardsWire(); noticeWire(); coachWire(); setTabsWire();
+  document.addEventListener('night-room-music', ()=>{ if(!labelsStale) render(); });   // UI-1: a room's music applied (a switch, the start) — Sound, Music and Mood read what plays
   /* NIGHT-2: the background and the hand's points in settings (fingertips only, the default, or all points) */
   for(const b of $('nightBgSeg').children) b.onclick=()=>{ if(!D) return; D.setBg(b.dataset.bg); render(); };
   for(const b of $('nightHandSeg').children) b.onclick=()=>{ if(!D) return; calSideSet(b.dataset.hand); render(); };   // saved: the last choice wins
@@ -277,6 +276,12 @@ export function qualitySet(q){ if(!QUALITIES.includes(q)) return Promise.resolve
   const S=qualityState(q); save(KEY.light, S.light); lightApply(S.light==='1');
   return Promise.resolve(setSceneLevel(S.level)).then(()=>true); }
 export const qualityOf=()=>quality();
+/* UI-1, probes only: the labels of Sound, Music and Mood against what plays; stale (the CONTROL): the room-music word ignored (the old way) */
+let labelsStale=false;
+export function nightLabelsDbg(o={}){ if('stale' in o) labelsStale=!!o.stale; if(!D) return null; const lab=id=>{ const e=$(id) && $(id).querySelector('.night-val'); return e ? e.textContent : null; };
+  const m=bedModeOf(), BN=room().music && room().music.bedNames;
+  return { stale:labelsStale, room:sceneRoom(), labels:{ sound:lab('nightSound'), music:lab('nightMusic'), mood:lab('nightMood') },
+    want:{ sound:D.timbreName(D.timbre()), music:BN && BN[m] ? L(BN[m]) : t('night.music.'+m), mood:D.moodName ? D.moodName(D.mood()) : t('night.mood.'+D.mood()) }, timbre:D.timbre(), mood:D.mood(), musicMode:m }; }
 /* NIGHT-6 slice 1: THE AUDIO CLOCK on the bus — the audio time being output and the page time it comes out at (the output timestamp: the
    output latency is in it), and the current time with the page time it was read at (apps/night/pure/heard.js). Without an output timestamp
    (a suspended context) the latency the context reports stands in. clockOver — probe only (nightClockDbg): a synthetic clock */

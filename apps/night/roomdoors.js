@@ -38,7 +38,7 @@ export async function roomMusicApply(fresh){ if(!D0 || applying) return; applyin
     const want=last.get(key) || (R ? { mood:Object.keys(R.moods)[0], timbre:(R.music.timbres.find(x=>installed.has(x.id))||{}).id } : null);
     if(want){ if(want.mood && want.mood!==D0.mood()) D0.setMood(want.mood); if(want.timbre && want.timbre!==D0.timbre()) D0.setTimbre(want.timbre); }
     levelsApply(); }
-  finally{ applying=false; } }
+  finally{ applying=false; if(typeof document!=='undefined') document.dispatchEvent(new Event('night-room-music')); } }   // UI-1: the shell's labels show what now plays (the timbre comes after its install)
 /* the shell tells what was chosen in the current room (so returning brings it back) */
 export function roomMusicNote(){ if(!D0) return; const R=musicOf(); last.set(R ? R.id : 'profile', { mood:D0.mood(), timbre:D0.timbre() }); }
 export const roomDoorsDbg=()=>({ installed:[...installed], last:Object.fromEntries(last), room:sceneRoom(), music:!!musicOf() });

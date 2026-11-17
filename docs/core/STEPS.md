@@ -86,6 +86,7 @@ THERE in full and here as one index entry):
   181 One quality control: Detailed · Standard · Light, remembered, old settings migrated (NIGHT-16)
   182 The rain for players: a random start room, the rain's start still with drops, the dot lights a window, its cards (RAIN-R1)
   183 Small fixes: the piano comps like a pianist, round far lights through the mist, Detailed's spruces after the start
+  184 UI-1: no notes under Quality, forest-only settings hidden in the rain, labels follow the room, the rain's music names, amber everywhere, round hill lights
   163 Fixes after the backlog audit: an in-app browser's refusal, the Lighter stream, the rain room's sound on Dark, Licences, keeping the files (NIGHT-15, CORE-23)
 
 ## Moved to `archive/CLAUDE-history.md` at DOC1 (grep by title; read only what the slice needs)

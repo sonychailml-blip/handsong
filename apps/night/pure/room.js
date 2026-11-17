@@ -52,7 +52,9 @@ export function checkRoom(r, known={}){
   for(const k of Object.keys(r)) if(!FIELDS.includes(k)) return `unknown field «${k}»`;
   if(r.music!=null){ const M=r.music; if(!plain(M) || !Array.isArray(M.timbres) || !M.timbres.length || !plain(M.names)) return 'music: { timbres:[{ id, level, voices }…], names:{ look:{ en, ru } } }';   // RAIN-4: a room's own timbres and mood names
     for(const T of M.timbres) if(!plain(T) || typeof T.id!=='string' || !Number.isFinite(T.level) || T.level>0 || !Number.isInteger(T.voices) || T.voices<1 || T.voices>6) return `music.timbres: «${T && T.id}» needs an id, a level of at most 0 dB and a strike cap 1…6`;
-    for(const [k, nm] of Object.entries(M.names)) if(!plain(nm) || typeof nm.en!=='string' || typeof nm.ru!=='string') return `music.names.${k}: {en, ru}`; }
+    for(const [k, nm] of Object.entries(M.names)) if(!plain(nm) || typeof nm.en!=='string' || typeof nm.ru!=='string') return `music.names.${k}: {en, ru}`;
+    if(M.bedNames!=null){ if(!plain(M.bedNames)) return 'music.bedNames: { still, drift, glimmer: { en, ru } } (the names of the Music button in this room)';   // UI-1
+      for(const k of ['still', 'drift', 'glimmer']){ const nm=M.bedNames[k]; if(!plain(nm) || typeof nm.en!=='string' || typeof nm.ru!=='string') return `music.bedNames.${k}: {en, ru}`; } } }
   if(r.format!==ROOM_FORMAT) return 'format: '+JSON.stringify(r.format);
   if(r.version!==ROOM_VERSION) return 'version: '+JSON.stringify(r.version);
   if(!(known.ids||ROOM_IDS).includes(r.id)) return `id: «${r.id}» is not a pinned room id`;

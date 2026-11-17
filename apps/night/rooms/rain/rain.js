@@ -82,7 +82,7 @@ export function buildRain(T, opt){
      windows, the depth map; raw values (the bake wrote the screen's colours), no mipmaps */
   const BK=opt.city || null, imgTex=(img, lum)=>{ const t=new T.Texture(img); t.minFilter=t.magFilter=T.LinearFilter; t.generateMipmaps=false; t.wrapS=t.wrapT=T.ClampToEdgeWrapping; if(lum) t.format=T.LuminanceFormat; t.needsUpdate=true; own.push(t); return t; };
   const litTex= BK ? imgTex(BK.lit) : null, depTex= BK ? imgTex(BK.depth, true) : null, EXT=new T.Vector2(BAKE_EXT[0], BAKE_EXT[1]); let moodTex=null, moodKey=null;
-  const bakedM= BK ? mat({ uniforms:{ uCity:{ value:null }, uDepthMap:{ value:depTex }, uTan:{ value:UT }, uExt:{ value:EXT } }, vertexShader:QUAD_V, fragmentShader:BAKED_F }) : null;
+  const bakedM= BK ? mat({ uniforms:{ uCity:{ value:null }, uDepthMap:{ value:depTex }, uTan:{ value:UT }, uExt:{ value:EXT }, uTexel:{ value:new T.Vector2(1/BK.depth.width, 1/BK.depth.height) } }, vertexShader:QUAD_V, fragmentShader:BAKED_F }) : null;   // UI-1: uTexel — the far windows read round
   const moodOfLook=L=>Object.keys(RAIN_ROOM.looks).find(k=>RAIN_ROOM.looks[k]===L)||'late';
   const blurM=mat({ uniforms:{ uTex:{ value:null }, uDir:{ value:new T.Vector2() } }, vertexShader:QUAD_V, fragmentShader:BLUR_F });
   const downM=mat({ uniforms:{ uTex:{ value:null }, uTexel:{ value:new T.Vector2() } }, vertexShader:QUAD_V, fragmentShader:DOWN_F });   // small fixes: the mist's box downsample
@@ -136,12 +136,12 @@ export function buildRain(T, opt){
      bridge; the smoker's glow and the scooter's lamp (the rare events) */
   function farLights2(i, t){ const ev=farEventAt(t), P=(u, f)=>slope(u, f, topAt, HOR), dark= ev && ev.kind==='hillwin' && ev.u>0.15 && ev.u<0.85 ? Math.floor(ev.k*FAR.length) : -1;
     FAR.forEach((q, j)=>put(j, q.x, q.y, 0.0017+0.0012*q.k, 0, FARC[j], j===dark ? 0 : (0.66+0.7*q.k)*twinkle(t, j), q.depth, 0));   // RAIN-5e: ×1.2
-    for(const c of farCars(t)){ const p=P(c.u, c.f); if(!onHill(p) || i>NL-4) continue; if(c.head){ put(i++, p[0]-0.0011, p[1], 0.0018, 0, HEAD, 1.4, farDepth, 0); put(i++, p[0]+0.0011, p[1], 0.0018, 0, HEAD, 1.4, farDepth, 0); } else put(i++, p[0], p[1], 0.0017, 0, TAIL, 1.35, farDepth, 0); }   // RAIN-5e: a little more visible
+    for(const c of farCars(t)){ const p=P(c.u, c.f); if(!onHill(p) || i>NL-4) continue; if(c.head) put(i++, p[0], p[1], 0.0022, 0, HEAD, 1.9, farDepth, 0); else put(i++, p[0], p[1], 0.0017, 0, TAIL, 1.35, farDepth, 0); }   // RAIN-5e: a little more visible; UI-1: the two headlights one round point (2 px apart they merged into a dash)
     for(const m of FAR_LIFE.masts){ const tp=topAt(m.u); if(tp!=null && sceneAt(m.u, tp+0.003).kind==='sky') put(i++, m.u, tp+0.003, 0.0017, 0, TAIL, 1.4*blink(t, m.hz, m.duty, m.ph), farDepth, 0); }
     { const T=FAR_LIFE.tower, tp=topAt(T.u); if(tp!=null) T.h.forEach((h, k)=>{ put(i++, T.u, tp+h, 0.0013, 0, TAIL, k===T.h.length-1 ? 1.2*blink(t, T.hz, T.duty) : 0.45, farDepth, 0); }); }
-    for(const c of cableAt(t)){ const p=P(c.u, c.f); if(onHill(p)) put(i++, p[0], p[1], 0.0022, 0.0015, HONEY, 1.25, farDepth, 2); }
+    for(const c of cableAt(t)){ const p=P(c.u, c.f); if(onHill(p)) put(i++, p[0], p[1], 0.0022, 0, HONEY, 1.25, farDepth, 0); }   // UI-1: a round point (it was a 2-px rectangle light)
     for(const e of [FAR_LIFE.cable.a, FAR_LIFE.cable.b]){ const p=P(e[0], e[1]); if(onHill(p)) put(i++, p[0], p[1], 0.0015, 0, LAMP, 0.7, farDepth, 0); }
-    { const C=FAR_LIFE.church, p=P(C.u, C.f); if(onHill(p)){ put(i++, p[0], p[1], 0.006, 0, AMBER, 0.42, farDepth, 0); put(i++, p[0]+0.012, p[1]+0.006, 0.0012, 0.006, HONEY, 0.55, farDepth, 2); } }
+    { const C=FAR_LIFE.church, p=P(C.u, C.f); if(onHill(p)){ put(i++, p[0], p[1], 0.006, 0, AMBER, 0.42, farDepth, 0); put(i++, p[0]+0.012, p[1]+0.006, 0.0012, 0, HONEY, 0.55, farDepth, 0); } }   // UI-1: the church window a round point too
     for(const p of BRIDGE) put(i++, p[0], p[1], 0.0011, 0, LAMP, 0.6, farDepth, 0);
     if(ev && ev.kind==='bridge' && BRIDGE.length>1){ const a=BRIDGE[0], b=BRIDGE[BRIDGE.length-1], q=ev.k<0.5 ? ev.u : 1-ev.u; put(i++, a[0]+(b[0]-a[0])*q, a[1]+(b[1]-a[1])*q+0.001, 0.0012, 0, ev.k<0.5 ? TAIL : HEAD, 0.8, farDepth, 0); }
     if(ev && ev.kind==='smoker'){ const S=FAR_LIFE.smoker; i=lightAt(i, [S.x, S.y, S.z], 0.035, EMBER, smokerGlow(ev.u, FAR_LIFE.events.dur.smoker, ev.k), false); }
@@ -339,6 +339,8 @@ export function buildRain(T, opt){
     radDbg:()=>({ rad:viewM.uniforms.uRad.value.toArray(), foc:FOC.toArray(), buffer:[bw, bh] }),
     /* small fixes: the mist's soft chain (new, or old: the CONTROL) on one round light (size px across) at the picture's centre → the soft
        copy's red channel around its centre ((2R+1)², row by row from the bottom) */
+    /* UI-1: every light drawn this frame: [x, y, hw, hh (view-angle units), depth, kind, brightness] (lit ones only), and px per unit */
+    lightsDbg:()=>({ px:UPX.value, list:Array.from({ length:nLights }, (_, j)=>[lRect[j*4], lRect[j*4+1], lRect[j*4+2], lRect[j*4+3], lDK[j*2], lDK[j*2+1], lCol[j*4+3]]).filter(q=>q[6]>0) }),
     softDbg:(o={})=>{ const r=rr; if(!r || !RT.s2 || !RT.view) return null; const w=RT.view.width, h=RT.view.height, k=o.size||3, data=new Uint8Array(w*h*4), cx=w>>1, cy=h>>1;
       for(let y=cy-k;y<=cy+k;y++) for(let x=cx-k;x<=cx+k;x++){ if(Math.hypot(x-cx, y-cy)>k/2) continue; const i=(y*w+x)*4; data[i]=data[i+1]=data[i+2]=255; data[i+3]=255; }   // a round light, size px across
       const tx=new T.DataTexture(data, w, h, T.RGBAFormat); tx.minFilter=tx.magFilter=T.LinearFilter; tx.needsUpdate=true; const keep=r.getRenderTarget();

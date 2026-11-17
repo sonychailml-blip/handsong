@@ -496,7 +496,7 @@ RAIN-0: THE WINDOWS — their places, which one a note lights, and how a lit win
 
 ## apps/night/rooms/rain/rain-city.js
 RAIN-0b: THE STAND-IN CITY's prepared picture and its DEPTH MAP, painted ONCE on the GPU (an opening, a resize, a mood): one ray per pixel through the view law (pure/city.js — this shader is its po…
-- const (2): `BAKED_F`, `CITY_F`
+- const (3): `FAR_SOFT`, `BAKED_F`, `CITY_F`
 - fn (1): `cityUniforms`
 
 ## apps/night/rooms/rain/rain-glass.js
@@ -539,7 +539,7 @@ DESIGN-1 part C: THE SETTINGS IN THREE SHORT TABS — Sound · Picture · Hands 
 ## apps/night/shell.js
 RUN 7 (C6 + C11, Night plan §5; docs/night/QUALITY.md points 4, 5, 6, 9, 10) — THE NIGHT SHELL (DOM side; the logic is core/nightui.js).
 - const (9): `LEAN_PATH`, `MUSIC_KEYS`, `musicModeOf`, `REACH`, `nightEarlyDbg`, `qualityOf`, `nightClockDbg`, `nightShellDbg`, `nightSleepDbg`
-- fn (4): `nightShellWire`, `nightShellFace`, `nightMusicHoldDbg`, `qualitySet`
+- fn (5): `nightShellWire`, `nightShellFace`, `nightMusicHoldDbg`, `qualitySet`, `nightLabelsDbg`
 
 ## apps/night/sound/ambience.js
 THE ROOMS' AMBIENCE (RUN 7, C4c; Night's own since CORE-7): drone + wind + distant crickets + one soft echo (NIGHT-8: + the stream), built from a room's NATURE recipe (the forest's: apps/night/room…
@@ -1427,6 +1427,7 @@ SPLIT-2: the probe entry of the Night page: its own rows and the core rows flagg
 - → ./night/scales.js (1): `checkNightScales`
 - → ./night/stream.js (1): `checkNightStream`
 - → ./night/testroom.js (3): `testRoomInstall`, `testRoomRemove`, `testRoomMode`
+- → ./night/ui1.js (1): `checkNightLabels`
 
 ## tools/probes/night/bed.js
 NIGHT-3 stage 4: row «NIGHT music bed» (P.night).
@@ -1555,7 +1556,11 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 - const (5): `TEST_ROOM_ID`, `TEST_ROOM`, `testRoomMode`, `testRoomInfo`, `testRoomFreeLeaks`
 - fn (2): `testRoomInstall`, `testRoomRemove`
 
-_309 modules, 3122 exported names._
+## tools/probes/night/ui1.js
+UI-1 — «NIGHT labels follow the room»: the founder entered the rain and the Sound button still read «Firefly» while another timbre played.
+- fn (1): `checkNightLabels`
+
+_310 modules, 3126 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

@@ -4,6 +4,11 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`, `archive/NIGHT-RUN-LOG-2026-10.md`. New runs start at `NIGHT-1`.
 
+# UI-1 (NIGHT track, 2026-11-17): the founder's interface fixes, round hill lights
+Tree hashes before: core 36450d3d646be550 · apps/full 0148bb454440c3e3 · apps/night 21ca2b48812ad90f. After: core and Full unchanged · apps/night 1ff8babf09bfa022.
+- `index.html`, `texts.js`, `shell.js` (no quality notes; the answer switch by room; the rain's Music names; labels on «night-room-music»; nightLabelsDbg), `roomdoors.js` (the word), `rooms/rain/pure/room.js` (music.bedNames), `pure/room.js` (checked), `night.css` (--night-brand = the tint), `calib.js` (the tint), `rain-city.js` BAKED_F (far windows round), `rain.js` (cable car, church window, far headlights as points; lightsDbg). Rows: P.night «NIGHT labels follow the room» (new), «RAIN no quad edges» +2 parts, «NIGHT quality (app)» +1; the settings-tabs layout CONTROL.
+- Verdicts: [probe-data] PASS — 93 checks, 0 differences; NIGHT labels 6/0; RAIN no quad edges 10/0 (far window round 9.1 %, CONTROL 50 %); settings tabs PASS. Fix rounds: 5 (a swallowed line twice; the far disc: 12, 32, 48 taps too coarse — a CPU simulation chose the 113-tap grid).
+
 # Small fixes (NIGHT track, 2026-11-17): a pianist's comping, round far lights through the mist, Detailed's spruces later
 Tree hashes: NIGHT-16, RAIN-R1 and the small fixes were built in one daytime batch — before (the FULL CHECK's after): core 36450d3d646be550 · apps/full 0148bb454440c3e3 · apps/night c22d498b2c97e188. After: core and Full unchanged · apps/night 21ca2b48812ad90f.
 - `pure/lofi.js` lofiComp / passStep (+ `rh` on each hit), `rooms/rain/lofi.js` (per-note roll and velocity, the pedal by the chord's voicing); `rain-glass.js` DOWN_F, `rain.js` soft() (box + 1.2/1.55/1.9) and softDbg; `tools/precache.mjs` foliage-1024 later. Rows: data «RAIN piano comping (app)», P.night «RAIN no quad edges» + the mist.

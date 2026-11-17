@@ -1968,7 +1968,10 @@ async function nightQuality(){
   const page=h=>{ const m=h.match(/<div id="nightQualSeg"[^>]*>([\s\S]*?)<\/div>/), qs=m ? [...m[1].matchAll(/data-q="([^"]+)"/g)].map(x=>x[1]) : []; return { qs, old:/id="nightLightTg"/.test(h) }; };
   { const P=page(html); ok(`the page's quality choices ${P.qs.join(',')} (wanted ${Q.QUALITIES.join(',')})`, P.qs.join(',')===Q.QUALITIES.join(',')); ok('the old Lightweight switch is still on the page', !P.old); }
   ok('CONTROL: a page with the old switch planted is not caught', page(html.replace('<div id="nightQualSeg"', '<button id="nightLightTg"></button><div id="nightQualSeg"')).old);
-  for(const k of ['night.set.quality', 'night.q.light', 'night.q.lightNote', 'night.q.standard', 'night.q.detailedShort']){ const c=tx.split(`'${k}':`).length-1; ok(`the text ${k} appears ${c} time(s) (English and Russian: 2)`, c===2); }
+  { const qNotes=h=>[...h.matchAll(/class="night-row-note"[^>]*data-i18n="(night\.q\.[^"]+)"/g)].map(m=>m[1]);   // UI-1: the names are enough — no explanatory line under the levels
+    ok('the quality row still has explanatory lines: '+qNotes(html).join(', '), !qNotes(html).length);
+    ok('CONTROL: a planted line under the levels passed', qNotes(html.replace('<div id="nightQualSeg"', '<p class="night-row-note" data-i18n="night.q.heavy">x</p><div id="nightQualSeg"')).length===1); }
+  for(const k of ['night.set.quality', 'night.q.light', 'night.q.standard', 'night.q.detailedShort']){ const c=tx.split(`'${k}':`).length-1; ok(`the text ${k} appears ${c} time(s) (English and Russian: 2)`, c===2); }
   notes.push('Detailed · Standard · Light; saved settings: '+MIG.map(([a, w])=>`${a.join('/')}→${w}`).join(', '));
   return { cases:n, total:d.length, differences:d, notes };
 }

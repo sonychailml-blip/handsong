@@ -918,8 +918,8 @@ async function uiNightSettings(page, label){
           await c.p.addStyleTag({ content:'#nightShell .night-pane[hidden]{ visibility:visible !important; } /*ctl-a*/' }); const a=await c.p.evaluate(setJudge, SET_TABS_WANT); await dropStyle(c.p, 'ctl-a');
           if(a.panes.length===1) bad.push(`${at}: CONTROL every pane forced visible still read as one pane — the check cannot fail`); else lines.push(`${at}: CONTROL every pane forced visible is caught (${a.panes.length} panes)`);
           await c.p.click('#nightSetTabs [data-tab="picture"]'); await c.p.waitForTimeout(100);
-          await c.p.addStyleTag({ content:'.night-card p.night-row-note{ margin-top:-2.4em !important; } /*ctl-b*/' }); const b=await c.p.evaluate(setJudge, SET_TABS_WANT); await dropStyle(c.p, 'ctl-b');
-          if(!b.layout.some(x=>/overlap/.test(x))) bad.push(`${at}: CONTROL a note pulled over its row was not caught — the layout check cannot fail`); else lines.push(`${at}: CONTROL a note pulled over its row is caught`); }
+          await c.p.addStyleTag({ content:'.night-card #nightFieldTg{ margin-top:-2.4em !important; } /*ctl-b*/' }); const b=await c.p.evaluate(setJudge, SET_TABS_WANT); await dropStyle(c.p, 'ctl-b');   // UI-1: the quality notes are gone — the note-field switch pulled over the row above
+          if(!b.layout.some(x=>/overlap/.test(x))) bad.push(`${at}: CONTROL a switch pulled over its row was not caught — the layout check cannot fail`); else lines.push(`${at}: CONTROL a switch pulled over its row is caught`); }
       }
       if(lang==='en'){ await c.p.setViewportSize({ width:1280, height:800 }); await c.p.click('#nightSetTabs [data-tab="picture"]'); await c.p.waitForTimeout(100);
         const st=()=>c.p.evaluate(async ()=>{ const S=await import('/core/state.js'), on=document.querySelector('#nightQualSeg .on'); return { light:!!on && on.dataset.q==='light', q:on ? on.dataset.q : null, stored:localStorage.getItem('handsong.nightLight'), field:!!(S.nightView && S.nightView.fieldAll) }; });   // NIGHT-16: Light is a quality choice

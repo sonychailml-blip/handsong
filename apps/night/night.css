@@ -10,7 +10,7 @@
      and the ink on it; tint: THE CURRENT ROOM'S light (its record's `tint`, set by apps/night/tint.js; eased over a room switch's fades) — every
      small accent of the interface (icon dots, switches, slider fills, links, a chosen segment, the bars, the card pictures' light) — and the ink on it. */
   --night-base:#060a12; --night-ink:#e6ecf5; --night-ink-dim:#8f9bb0;
-  --night-brand:#c8f56a; --night-on-brand:#0b1205;
+  --night-brand:var(--night-tint); --night-on-brand:var(--night-on-tint);   /* UI-1: the brand's light IS the room's tint (Begin, the emblem's dot, the subtitle, the start's dot): lime in the forest, amber in the rain */
   --night-tint:#c8f56a; --night-on-tint:#0b1205;   /* the forest's tint (its record); a room's own replaces it at run time */
   --night-accent:var(--night-tint);   /* the accent parts of the drawn icons (core/icons.js reads this name): they follow the room */
   --night-surface:rgba(20,28,44,.52); --night-surface-plain:rgba(12,17,28,.94); --night-hairline:rgba(200,215,240,.20); --night-raised:rgba(255,255,255,.06);

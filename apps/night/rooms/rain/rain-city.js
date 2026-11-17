@@ -8,8 +8,19 @@ import { CAM, camBasis, STREET, BLOCKS, FLOOR, FAR, DEPTH, cityLamps } from './p
 const N=8;   // blocks per row the shader holds (BLOCKS has at most 8 per row)
 /* RAIN-1: THE BAKED CITY (tools/rain-bake.mjs --city): its colour for the mood and its depth map, both in view-angle units over ±uExt — the screen's
    pixel p (view-angle units, ±uTan) reads them at p / uExt; rgb = the colour, a = the depth (as the stand-in writes it) */
-export const BAKED_F=`precision highp float; varying vec2 vUv; uniform sampler2D uCity, uDepthMap; uniform vec2 uTan, uExt;
-void main(){ vec2 q=clamp((vUv*2.-1.)*uTan/uExt*0.5+0.5, 0., 1.); gl_FragColor=vec4(texture2D(uCity, q).rgb, texture2D(uDepthMap, q).r); }`;
+/* UI-1: THE FAR CITY'S WINDOWS ARE ROUND DOTS — beyond the house opposite (the baked depth from FAR_SOFT[0], fully at [1]) the baked picture is read
+   through a small round Gaussian (a fine grid every 0.5 baked texel out to FAR_SOFT[2], 113 taps — a sparser spiral left the 2-px windows 13-26 %
+   out of round: tools/.ui-snap/ui1, measured), only from far samples (the hills' and roofs' outline against the sky stays crisp): a distant
+   window of 1-3 px, lit or dark, comes out a soft round dot, never a little rectangle (the founder's «square lights» on the hills). Painted once per
+   mood or screen size, so the taps cost nothing per frame. The street and the house opposite stay exactly as baked. */
+export const FAR_SOFT=Object.freeze([0.8, 0.84, 3.0]);
+export const BAKED_F=`precision highp float; varying vec2 vUv; uniform sampler2D uCity, uDepthMap; uniform vec2 uTan, uExt, uTexel;
+void main(){ vec2 q=clamp((vUv*2.-1.)*uTan/uExt*0.5+0.5, 0., 1.); float d=texture2D(uDepthMap, q).r; vec3 c=texture2D(uCity, q).rgb;
+  if(d>${FAR_SOFT[0].toFixed(3)}){ vec3 s=vec3(0.); float w=0.;
+    for(int j=-6;j<=6;j++) for(int i=-6;i<=6;i++){ vec2 o=vec2(float(i), float(j))*0.5; float r=length(o); if(r>${FAR_SOFT[2].toFixed(2)}) continue;
+      float dk=texture2D(uDepthMap, q+o*uTexel).r; if(dk>${FAR_SOFT[0].toFixed(3)}){ float g=exp(-r*r/3.2); s+=texture2D(uCity, q+o*uTexel).rgb*g; w+=g; } }
+    if(w>0.) c=mix(c, s/w, smoothstep(${FAR_SOFT[0].toFixed(3)}, ${FAR_SOFT[1].toFixed(3)}, d)); }
+  gl_FragColor=vec4(c, d); }`;
 /* the uniforms of the painting (T the THREE namespace); the palette is set per look by the caller */
 export function cityUniforms(T){
   const B=camBasis(), V=a=>new T.Vector3(a[0], a[1], a[2]), rows=side=>Array.from({ length:N }, (_, i)=>{ const b=BLOCKS[side][i]; return b ? new T.Vector4(b[0], b[1], b[2], b[3]) : new T.Vector4(0, 0, 0, 0); });

@@ -39,14 +39,13 @@ export const NIGHT_TEXTS=Object.freeze({
     'night.coach.calibYes':'Set up', 'night.coach.calibNo':'Not now',
     'night.coach.home':'For full screen: tap Share, then “Add to Home Screen”.',
     /* NIGHT-11 part 5 */
-    'night.q.heavy':'Detailed may be heavy on some phones.',
     'night.q.crashNote':'The picture opened at Standard: last time Detailed seemed too heavy for this device.',
     'night.howTo':'How to play', 'night.licences':'Licences',
     /* DESIGN-1 part C: the settings' three tabs, the «More» line, short labels with their notes under them */
     'night.tab.sound':'Sound', 'night.tab.picture':'Picture', 'night.tab.hands':'Hands',
     'night.set.answer':'Music answers my notes', 'night.set.answerNote':'Its next chord leans toward what I played.',
-    'night.q.detailedShort':'Detailed', 'night.q.detailedNote':'Detailed is for strong devices.',
-    'night.set.quality':'Quality', 'night.q.light':'Light', 'night.q.lightNote':'Light is for older computers and phones: a lighter echo, simpler music, fewer ringing notes, a simpler picture.',   // NIGHT-16: one quality choice
+    'night.q.detailedShort':'Detailed',
+    'night.set.quality':'Quality', 'night.q.light':'Light',   // NIGHT-16: one quality choice
     'night.card.skip':'Skip',
     'night.card.next':'Next',
     'night.card.go':'Play',
@@ -108,13 +107,12 @@ export const NIGHT_TEXTS=Object.freeze({
     'night.coach.calibYes':'Настроить', 'night.coach.calibNo':'Не сейчас',
     'night.coach.home':'Во весь экран: «Поделиться», затем «На экран „Домой“».',
     /* NIGHT-11 part 5 */
-    'night.q.heavy':'На некоторых телефонах «Подробная» может работать тяжело.',
     'night.q.crashNote':'Картинка открылась как «Обычная»: в прошлый раз «Подробная» оказалась слишком тяжёлой для этого устройства.',
     'night.howTo':'Как играть', 'night.licences':'Лицензии',
     'night.tab.sound':'Звук', 'night.tab.picture':'Картинка', 'night.tab.hands':'Руки',
     'night.set.answer':'Музыка отвечает моим нотам', 'night.set.answerNote':'Её следующий аккорд склоняется к сыгранному.',
-    'night.q.detailedShort':'Подробная', 'night.q.detailedNote':'«Подробная» — для мощных устройств.',
-    'night.set.quality':'Качество', 'night.q.light':'Лёгкая', 'night.q.lightNote':'«Лёгкая» — для старых компьютеров и телефонов: эхо легче, музыка проще, меньше звенящих нот, картинка проще.',
+    'night.q.detailedShort':'Подробная',
+    'night.set.quality':'Качество', 'night.q.light':'Лёгкая',
     'night.card.skip':'Пропустить',
     'night.card.next':'Дальше',
     'night.card.go':'Играть',

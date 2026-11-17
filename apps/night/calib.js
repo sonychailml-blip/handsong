@@ -10,6 +10,7 @@ import { BUS } from '../../core/pure/bus.js';
 import { t, onLangChange } from '../../core/i18n.js';
 import { cv } from '../../core/palette.js';
 import { sx, sy, viewRect, mirrored } from '../../core/state.js';
+import { tintNow } from './tint.js';   // UI-1: the locked hand in the room's tint
 import { devItems } from './edition.js';   // NIGHT-7b: the side's vote count is a development line
 
 const $=id=>document.getElementById(id);
@@ -127,7 +128,7 @@ export function calTick(){
     if(mirrored()){ g.save(); g.scale(-1,1); g.drawImage(src,x0,y0,w,h,-W,0,W,H); g.restore(); } else g.drawImage(src,x0,y0,w,h,0,0,W,H); pic.drawn++; }catch(e){}
   if(mode!=='step'){ g.fillStyle=cv('night-a38'); g.fillRect(0,0,W,H); }
   const res=BUS.get('hands'), hands=(res&&res.landmarks)||[], lock=handCalState().hand, u=Math.max(1, Math.min(W,H)/600);
-  for(const lm of hands){ const mine=!lock || (lm[0].x===lock.x && lm[0].y===lock.y), col=cv(mine ? 'hn-glow' : 'hn-amber');
+  for(const lm of hands){ const mine=!lock || (lm[0].x===lock.x && lm[0].y===lock.y), col= mine ? (tintNow()||cv('hn-glow')) : cv('hn-amber');
     g.strokeStyle=col; g.fillStyle=col; g.lineWidth=1.5*u; g.globalAlpha=0.55; g.beginPath();
     for(const [a,b] of BONES){ g.moveTo(sx(lm[a].x,W), sy(lm[a].y,H)); g.lineTo(sx(lm[b].x,W), sy(lm[b].y,H)); } g.stroke();
     g.globalAlpha=1; for(const p of lm){ g.beginPath(); g.arc(sx(p.x,W), sy(p.y,H), 3*u, 0, 7); g.fill(); } }
