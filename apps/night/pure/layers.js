@@ -63,6 +63,8 @@ export function layersDensity(st, d, at=null, now=0){ d=Math.max(0, +d||0); st.d
 export function layersFocus(st, f){ st.f=Math.max(0, Math.min(1, +f||0)); }
 /* RAIN-6: the rain's sound with Echo — the near and far gains' factors (exactly 1 at rest) */
 export function layersRain(st, near, far){ st.rk={ near:Math.max(0, +near||0), far:Math.max(0, +far||0) }; }
+/* AUDIO-3 (development lab): parts of the layers left out (not computed): { near, far, cars } */
+export function layersSkip(st, k){ st.skip={ near:!!(k && k.near), far:!!(k && k.far), cars:!!(k && k.cars) }; }
 export function layersOn(st, on){ st.on=!!on; if(on) st.sleep=false; }
 /* one layer's grains added into L, R (from index o, n frames), times the per-frame gain array G */
 function layerAdd(st, Y, L, R, o, n, G){
@@ -85,8 +87,9 @@ export function layersOut(st, t0, nL, nR, fL, fR, o=0, n=nL.length-o){
   const P=st.L, rk=st.rk, gnB=(P.near ? P.near.gain : 0)*(rk ? rk.near : 1), gfB=(P.far ? P.far.gain : 0)*(rk ? rk.far : 1); let fs=st.fs, g=st.g; const kf=st.kf, tg=st.on ? 1 : 0, dg=st.dg;   // RAIN-6: rk — Echo's factors
   for(let i=0;i<n;i++){ fs+=(st.f-fs)*kf; g= g<tg ? Math.min(tg, g+dg) : Math.max(tg, g-dg); const q=fs*Math.PI/2, w=g*g*(3-2*g); GN[i]=Math.cos(q)*w*gnB; GF[i]=Math.sin(q)*w*gfB; }
   st.fs=fs; st.g=g;
-  if(st.near) layerAdd(st, st.near, nL, nR, o, n, GN); else if(P.near) synthAdd(st, st.syn.n, nL, nR, o, n, GN, P.near.synth==null ? LAYERS.synth : P.near.synth);
-  if(st.far) layerAdd(st, st.far, fL, fR, o, n, GF); else if(P.far) synthAdd(st, st.syn.f, fL, fR, o, n, GF, P.far.synth==null ? LAYERS.synth : P.far.synth);
+  const SK=st.skip||{};   // AUDIO-3
+  if(SK.near){} else if(st.near) layerAdd(st, st.near, nL, nR, o, n, GN); else if(P.near) synthAdd(st, st.syn.n, nL, nR, o, n, GN, P.near.synth==null ? LAYERS.synth : P.near.synth);
+  if(SK.far){} else if(st.far) layerAdd(st, st.far, fL, fR, o, n, GF); else if(P.far) synthAdd(st, st.syn.f, fL, fR, o, n, GF, P.far.synth==null ? LAYERS.synth : P.far.synth);
   /* the events: new ones from the schedule, then every sounding voice synthesised */
   const rate=st.rate, t1=t0+n/rate, E=P.events;
   if(E){ const from=st.evT==null ? t0 : st.evT; for(const e of layersEvents(E, st.seed, from, t1)) st.voices.push({ ...e, at:Math.round((e.t-t0)*rate), ph:0, z:0, y1:0, y2:0 }); st.evT=t1;
@@ -100,7 +103,7 @@ export function layersOut(st, t0, nL, nR, fL, fR, o=0, n=nL.length-o){
       if(V.done || i>=n && V.at+end<=n) st.voices.splice(v, 1); else V.at-=n; } }
   /* RAIN-1: the passes — new ones scheduled ahead (their peak on the law's moment), then every sounding one read out (linear interpolation) */
   const PS=P.passes;
-  if(PS && st.cars){ const lead=PS.lead||9, from= st.pT==null ? t0 : st.pT, to=t1+lead, rt=st.rate;
+  if(PS && st.cars && !SK.cars){ const lead=PS.lead||9, from= st.pT==null ? t0 : st.pT, to=t1+lead, rt=st.rate;
     for(const e of passEvents(PS.traffic, PS.ear, from, to, st.book||st.dens)){ const seg=PS.segs[Math.floor(hash(e.lane*977+5, e.slot)*PS.segs.length)], r=Math.max(PS.rate[0], Math.min(PS.rate[1], e.v/PS.vRef));
       st.pv.push({ s:seg[0]*rt, n:seg[1]*rt, at:(e.t-seg[2]/r-t0)*rt, r, k:PS.gain*st.cars.norm*Math.max(0.3, Math.min(1.4, PS.dRef/e.dist)), pl:Math.cos((e.pan+1)*Math.PI/4), pr:Math.sin((e.pan+1)*Math.PI/4) });
       st.passes++; st.passLog.push({ t:e.t, lane:e.lane, slot:e.slot }); if(st.passLog.length>64) st.passLog.shift(); }

@@ -4,6 +4,11 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`. Checkpoints A–E of SPLIT-2 are its last sections.
 
+# CORE-27 (2026-11-18): the output buffer, the no-hand search cadence, the master tap — for AUDIO-3 (opt-in, Night's development lab)
+Tree hashes before (RAIN-6 part 1's after): core a2cea689ad5773c4 · apps/full 0148bb454440c3e3 · apps/night fdec03c565bb2ee0 (+ AUDIO-2/LANG-FIX). After: core 8b4b3eac7543581e · apps/full unchanged · apps/night 514a801fd00c9ad7.
+- `core/audio.js` `setLatencyHint(h)` ('interactive' default — the creation is exactly as before when never set), `masterOut()` (the node that feeds the speakers). `core/pure/handsched.js` `schedPlan(s, policy, idleEvery)` — the search's cadence only while NO hand is tracked (default HAND_SEARCH_EVERY: the old schedule). `core/vision.js` `setIdleSearchEvery(n)`.
+- Checks: data «LAT2 search schedule (core)» 15/0, new «CORE-27 idle search cadence (core)» 4/0 (CONTROL the default); Full: FULL untouched 9/0, AUD1 census 19/0, LAT2a/LAT2b rows; static PASSED (surface listed).
+
 # CORE-26 (2026-11-18): an app adds languages — for LANG-1 (opt-in, Night only)
 Tree hashes before (STATS-1's after): core 4024c67e47e20bce · apps/full 0148bb454440c3e3 · apps/night 64f248ae4700c4e1. After: see LANG-1 (Night's log).
 - `core/i18n.js` `langsAdd(codes)`: pushes two-letter codes into `LANGS` (an empty `DICTS` entry each) and reads the first choice again (the stored one if valid, else the device's language). `LANG_LABEL` gains pt, fr, it, ka (endonyms). Never called (Full): `LANGS` stays en, ru and `lang` as before.

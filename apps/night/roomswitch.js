@@ -74,6 +74,7 @@ export function natureDensity(d, at=null){ if(liveAmb && liveAmb.layers) ambienc
 /* RAIN-3: the focus (0 the glass … 1 the far city), the picture's own eased number, for the layers' near / far balance (no layers: nothing) */
 export function natureFocus(f){ if(liveAmb && liveAmb.layers) ambienceLayersFocus(null, liveAmb, f); }
 export const natureLayersDbg=()=> liveAmb && liveAmb.layers ? ambienceLayersStats(null, liveAmb).then(st=>st && { ...st, rec:{ ...liveAmb.layers.rec }, playing:liveAmb.layers.on }) : Promise.resolve(null);
+export function natureSkip(k){ if(liveAmb && liveAmb.layers) liveAmb.layers.node.port.postMessage([{ k:'skip', v:k }]); return !!(liveAmb && liveAmb.layers); }   // AUDIO-3: the lab's nature switches { near, far, cars }
 export function natureRain(g){ if(liveAmb && liveAmb.layers) ambienceLayersRain(null, liveAmb, g); }   // RAIN-6: Echo — the rain's sound, { near, far } gains (1 at rest)
 /* probe: the live layers' node — its counters, its recordings' state and whether it plays → a promise (null without the node) */
 /* the Lighter mode (the shell): fewer bubbles, the nearest voices only */

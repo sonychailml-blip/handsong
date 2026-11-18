@@ -69,6 +69,10 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 5. The falling star passes in front of the trees. Natural?
 
 ## Records (English, at most about 15 lines each; older ones go to `archive/HANDOFF-history.md`)
+### RAIN-6c (2026-11-18): Warm ↔ Bright on the light sources, Wave as wind. Log: `docs/night/WORK-LOG.md`
+- Lamps, lights, windows tungsten ↔ LED, neon down ↔ up, more windows when bright; the whole-screen tint gone; Wave slants the rain. Rows 12/0 and 9/0. Next: umbrellas / flags with Wave, then RAIN-6 items 6, 8, 1–3, 5, 4.
+### AUDIO-3 (+ CORE-27, 2026-11-18): the development audio lab. Log: `docs/night/WORK-LOG.md`
+- Settings → «Audio lab (development)»: glitch counter, record what you hear (WAV), output buffer, no-hand search cadence, 18 bypass switches, log. P.night «NIGHT audio lab» 9/0. Waiting for the founder's findings.
 ### RAIN-6 part 1 (2026-11-18): the effects hand in the rain; LANG-FIX. Log: `docs/night/WORK-LOG.md`
 - Echo = the rain's strength (drops, falling streaks in the lights, its sound), Warm ↔ Bright = the city light's colour; exactly today's at rest. Rows «RAIN effects hand (app)» 8/0, P.night «RAIN effects hand» 9/0. LANG-FIX: the language list readable open (`lang-snap --select`). Next: RAIN-6 items 6, 8, 1–3, 5, 4.
 ### AUDIO-2 (2026-11-18): the rain's dropouts. Log: `docs/night/WORK-LOG.md`
@@ -77,7 +81,3 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 - The bed's 30 unused short-piano banks no longer built; its master high-cut breath at block rate. P.night «RAIN bed null test» (slow): within the renders' own noise (−108 dBFS). Worst moment: up to 37 sustaining piano voices; options with audible risk listed for the founder.
 ### LANG-1 (+ CORE-26, 2026-11-18): six more languages. Log: `docs/night/WORK-LOG.md`
 - Spanish, Portuguese, German, French, Italian, Georgian (`apps/night/lang/*.js`, 94 player keys used + the rest of Night's own, timbre names `tname.<id>`, the rooms' names, moods and music levels, guard.js, the Licences intro); core `langsAdd` (opt-in): the first visit follows the device, a stored choice wins. Georgian letters: Noto Sans Georgian (OFL, registered), only for the Georgian range. Night's own privacy text (`night.privacyBody`: the shared one still names the CDN). Data row «NIGHT texts in every language (app)»; `tools/lang-snap.mjs` captures + overflow check → `tools/.ui-snap/lang1/index.html`. A native speaker should read each language before the launch.
-### STATS-1 (2026-11-18): anonymous visits and «Write to us». Log: `docs/night/WORK-LOG.md`
-- The Vercel counter was already on the page (same origin, cookieless, outside the precache); the privacy notice now says so in Night's words (`night.privacyCount`); Settings → «Write to us»: hello@handsong.app selectable, Copy, Open mail. Data row «NIGHT visits and Write to us (app)» 14/0. Founder: switch Analytics on in the `handsong-night` Vercel project.
-### UI-1 (2026-11-17): the founder's interface fixes; round hill lights. Log: `docs/night/WORK-LOG.md`
-- No notes under Quality; the «music follows the chord» switch hidden in the rain; labels redrawn when a room's music is applied (P.night «NIGHT labels follow the room» 6/0); the rain's Music names; `--night-brand` = the room's tint (amber in the rain); the hills' little rectangles were the BAKED distant windows — now a round Gaussian at far depth (`BAKED_F`), the cable car, church window and a far car's two headlights round points («RAIN no quad edges» 10/0). Open: the hands' fireflies and the note-field glow (core canvas, cached lime) — a CORE run. Waiting for step 184.

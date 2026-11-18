@@ -20,6 +20,7 @@ export const BED2_AHEAD=0.6, BED2_PARK_S=14;
    than LOFI_LATE_S is skipped instead of bunched (sustained notes still play). lofiAheadDbg(s): the probe's CONTROL (0.6 = the old way). */
 export const LOFI_AHEAD=2, LOFI_LATE_S=0.08;
 let lofiAhead=LOFI_AHEAD;
+export const bed2LofiEngine=()=>LF.eng;   // AUDIO-3: the lab's bypass switches reach the bed's engine
 export const lofiAheadDbg=s=>{ lofiAhead= s==null ? LOFI_AHEAD : +s; return lofiAhead; };
 const mod=(s, n)=>((s%n)+n)%n;
 const hzOf=(s, n, v)=>chordRowFreq(mod(s, n), Math.floor(s/n), v);

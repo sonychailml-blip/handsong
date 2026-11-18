@@ -21,6 +21,11 @@ SPLIT-2: the Full app's entry.
 ================= ОБУЧЕНИЕ (список уроков + интерактивные шаги) ================= «Обучение» открывает СПИСОК коротких уроков (меню возможностей инструмента).
 - fn (2): `wireStarter`, `openLessons`
 
+## apps/night/audiolab.js
+AUDIO-3 — THE AUDIO LAB (development edition only; the founder hunts the rain's dropouts).
+- const (4): `LAB_LATENCY`, `labDbg`, `labWavDbg`, `labRecNodeDbg`
+- fn (2): `labOpen`, `labWire`
+
 ## apps/night/bed.js
 NIGHT-3 stage 4: THE MUSIC BED's DOOR AND ITS v1 DRIVER (live) — the state the Music button and the settings set (off / still / drift / glimmer, the volume, the response switch, all remembered by t…
 - const (11): `BED_SEED`, `BED_ENGINES`, `bedEngineReady`, `bedTakesDrone`, `bedModeOf`, `bedVolumeOf`, `bedAnswerOf`, `bedEngineOf`, `bedPaletteOf`, `bedLightOf`, `bedDbg`
@@ -28,7 +33,7 @@ NIGHT-3 stage 4: THE MUSIC BED's DOOR AND ITS v1 DRIVER (live) — the state the
 
 ## apps/night/bed2.js
 NIGHT-4: THE MUSIC BED v2's DRIVER (live and offline).
-- const (15): `BED2_AHEAD`, `LOFI_AHEAD`, `lofiAheadDbg`, `bedBrushDbg`, `jazzMoodOf`, `bedJazzDbg`, `bed2LofiSet`, `bed2LofiDbg`, `bed2ViewOver`, `bed2Failed`, `bed2SamplerSet`, `bed2Dbg`, `bed2StatsLive`, `bed2NodeDbg`, `bed2ViewDbg`
+- const (16): `BED2_AHEAD`, `LOFI_AHEAD`, `bed2LofiEngine`, `lofiAheadDbg`, `bedBrushDbg`, `jazzMoodOf`, `bedJazzDbg`, `bed2LofiSet`, `bed2LofiDbg`, `bed2ViewOver`, `bed2Failed`, `bed2SamplerSet`, `bed2Dbg`, `bed2StatsLive`, `bed2NodeDbg`, `bed2ViewDbg`
 - fn (6): `bed2Load`, `bed2On`, `bed2Off`, `bed2Volume`, `bed2Tick`, `bed2Plan`
 - → ./sound/bed2.js (1): `bed2Stats`
 
@@ -205,7 +210,7 @@ NIGHT-11 part 2 — LINKS OPENED INSIDE A MESSENGER (audit W4).
 ## apps/night/pure/layers.js
 RAIN-3: A ROOM's LAYERED RECORDINGS — near and far, crossfaded by the focus — and its EVENT SOUNDS on a seeded schedule (pure, rule #36; data row «RAIN nature (app)»), run unchanged by the nature w…
 - const (3): `LAYERS`, `layerMinLen`, `layersStats`
-- fn (9): `layersEvents`, `layersNew`, `layersRec`, `layersPasses`, `layersDensity`, `layersFocus`, `layersRain`, `layersOn`, `layersOut`
+- fn (10): `layersEvents`, `layersNew`, `layersRec`, `layersPasses`, `layersDensity`, `layersFocus`, `layersRain`, `layersSkip`, `layersOn`, `layersOut`
 
 ## apps/night/pure/lofi.js
 RAIN-4c / RAIN-4d: THE ROOM'S MUSIC AS LO-FI (pure, rule #36; data row «RAIN lo-fi bed (app)»).
@@ -472,7 +477,7 @@ RAIN-0: DEPTH IS FOCUS — the law (pure, rule #36; data row «RAIN focus law (a
 
 ## apps/night/rooms/rain/pure/fxlaw.js
 RAIN-6 (item 7): THE EFFECTS HAND IN THE RAIN — pure (rule #36; data row «RAIN effects hand (app)»).
-- const (6): `RAIN_FX`, `rainOf`, `streakOf`, `soundOf`, `tintOf`, `easeTo`
+- const (9): `RAIN_FX`, `rainOf`, `streakOf`, `soundOf`, `lampOf`, `neonOf`, `windowsOf`, `tintOf`, `easeTo`
 
 ## apps/night/rooms/rain/pure/glass.js
 RAIN-0: THE GLASS's law (pure, rule #36; data row «RAIN glass law (app)») — THE WIPE MAP: a grid over the pane (view-angle units, as the windows) holding how much of the MIST (inside, on the room's…
@@ -553,7 +558,7 @@ RAIN-0: the rain room's 2D STAND-IN — the «low» level and the fallback witho
 ## apps/night/roomswitch.js
 NIGHT-3 stage 5 part 2: THE ROOM SWITCH — one door for everything a room change touches, in this order: the music bed fades out and holds (it takes the new room's recipes while silent); the picture…
 - const (10): `ROOM_KEY`, `ROOM_NAME_MS`, `roomCurrent`, `roomNature`, `natureModule`, `natureLayersDbg`, `glowFollowDbg`, `roomNext`, `roomSwitchDbg`, `natureAmbDbg`
-- fn (10): `natureLoad`, `natureRecOf`, `natureRecPcm`, `natureRecStereo`, `natureDensity`, `natureFocus`, `natureRain`, `natureLight`, `roomRestore`, `roomSwitch`
+- fn (11): `natureLoad`, `natureRecOf`, `natureRecPcm`, `natureRecStereo`, `natureDensity`, `natureFocus`, `natureSkip`, `natureRain`, `natureLight`, `roomRestore`, `roomSwitch`
 
 ## apps/night/scalepick.js
 CORE-20: Night fetches only the modes it plays — every room's moods and the page profile's moods (core/scalepick.js reads the profile) — and what they need.
@@ -616,6 +621,10 @@ NIGHT-14 — «A NEW VERSION IS READY».
 NIGHT-4: THE MUSIC BED v2 — one AudioWorklet processor «night-bed» holding every voice of the bed and its own reverb (design: docs/night/design/NIGHT-3-rooms/PLAN.md §4b; the law apps/night/pure/be…
 - exports: none
 
+## apps/night/worklets/lab-worklet.js
+AUDIO-3 — THE AUDIO LAB's two processors (development edition only; loaded by apps/night/audiolab.js when the founder opens the lab): «night-glitch»: no input, no output (an automatically pulled no…
+- exports: none
+
 ## apps/night/worklets/nature-worklet.js
 NIGHT-8: THE NATURE WORKLET «night-nature» — the stream's murmur (the law and the synthesis: apps/night/pure/brook.js, imported unchanged, so the listening render tools/brook-render.mjs hears exact…
 - exports: none
@@ -631,7 +640,7 @@ handsong.app (SITE-1): the language.
 
 ## core/audio.js
 (no head comment)
-- const (54): `outputFadeLevel`, `setLowPower`, `leanInfo`, `setPartialFloor`, `ambienceInfo`, `bendTapSet`, `leadHold`, `chordHold`, `bassHold`, `droneHz`, `sympBase`, `LEAD_INSTR`, `CHORD_INSTR`, `BASS_INSTR`, `DRUM_NAMES`, `DRUM_ROWS`, `DRUM_KITS`, `hitOwner`, `masterLevel`, `renderStateOf`, `timbresOf`, `timbreIdOf`, `timbreById`, `timbreReg`, `timbreKey`, `timbreIdx`, `timbreSnapshot`, `timbreRecord`, `timbreForgetDbg`, `FX_FACTORY`, `fxPerm`, `fxHandRange`, `fxIsPerNote`, `fxNoteField`, `fxNoteFollows`, `fxVoiceIdsFor`, `fxAddableIds`, `FX_AMT`, `fxBriOf`, `FX_GLIDE_KEY`, `fxDipLog`, `frzStoreDel`, `frzStoreDbg`, `poolDbg`, `poolSizes`, `setTrackRouteOf`, `routeOfOwner`, `LEAD_KS_FROM`, `leadIsKs`, `masterDyn`, `ffInfo`, `masterDelayMs`, `masterProbeNodes`, `engineCtx`
+- const (56): `outputFadeLevel`, `setLowPower`, `leanInfo`, `setPartialFloor`, `ambienceInfo`, `bendTapSet`, `leadHold`, `chordHold`, `bassHold`, `droneHz`, `sympBase`, `LEAD_INSTR`, `CHORD_INSTR`, `BASS_INSTR`, `DRUM_NAMES`, `DRUM_ROWS`, `DRUM_KITS`, `hitOwner`, `masterLevel`, `renderStateOf`, `timbresOf`, `timbreIdOf`, `timbreById`, `timbreReg`, `timbreKey`, `timbreIdx`, `timbreSnapshot`, `timbreRecord`, `timbreForgetDbg`, `FX_FACTORY`, `fxPerm`, `fxHandRange`, `fxIsPerNote`, `fxNoteField`, `fxNoteFollows`, `fxVoiceIdsFor`, `fxAddableIds`, `FX_AMT`, `fxBriOf`, `FX_GLIDE_KEY`, `fxDipLog`, `frzStoreDel`, `frzStoreDbg`, `poolDbg`, `poolSizes`, `setTrackRouteOf`, `routeOfOwner`, `LEAD_KS_FROM`, `leadIsKs`, `masterDyn`, `ffInfo`, `masterDelayMs`, `masterProbeNodes`, `setLatencyHint`, `masterOut`, `engineCtx`
 - fn (89): `outputFade`, `setTimbreTrim`, `setNightStrikes`, `setLeanPath`, `leadParkTick`, `ambienceOn`, `ambienceRetune`, `ambienceTick`, `initAudio`, `setLeadInstr`, `applyFx`, `applyExpr`, `scheduleBend`, `leadCancel`, `metroClick`, `leadOn`, `leadSet`, `leadOff`, `leadAllOff`, `chordOn`, `chordGlide`, `chordOff`, `setBassInstr`, `bassOn`, `bassSet`, `bassOff`, `drumHit`, `setDrumKit`, `droneOn`, `droneOff`, `droneRetune`, `droneUse`, `createRecordingTap`, `setTrackGainOf`, `ownerGain`, `trackGainRetune`, `setMasterLevel`, `masterMeter`, `setTrackPanOf`, `ownerPan`, `trackPanRetune`, `dronePan`, `renderReset`, `timbreInstall`, `fxInstance`, `fxSetActive`, `fxChainResplice`, `fxSnapshot`, `fxChordBri`, `fxCaptureChain`, `fxCaptureWalk`, `fxPlaySet`, `fxPlayPath`, `fxParamKeysOf`, `fxRestoreAim`, `fxParamMetaOf`, `fxDefaultsOf`, `fxAimSet`, `fxAimGet`, `makeFrozenBus`, `fxRenderPath`, `fxGateAt`, `setDbg`, `dbgExprBypass`, `fxGlideOf`, `probeCapture`, `probeCaptureReady`, `xfRamp`, `voicesCut`, `frzStorePut`, `frzReader`, `frzStoreCount`, `fxDenormOf`, `offlineTapMaster`, `engVoices`, `engLevels`, `engLoad`, `setOffline`, `setRnd`, `chainStateOf`, `masterDynSet`, `offlineMasterDyn`, `forestData`, `noteOn`, `noteSet`, `noteOff`, `bend`, `hit`, `drone`
 - let (4): `AC`, `frzReady`, `ksReady`, `dynReady`
 - → ./modules/timbres/stages.js (1): `panGains`
@@ -1211,7 +1220,7 @@ Vercel Web Analytics queue stub — a classic script, not a module: calls made b
 
 ## core/vision.js
 (no head comment)
-- const (14): `video`, `canvas`, `ctx`, `handFilesOf`, `camHoldInfo`, `camLabel`, `modelInfo`, `visionOpts`, `VISION_DEF`, `lowInfo`, `pathInfo`, `pumpStats`, `camStats`, `setCameraPick`
+- const (15): `video`, `canvas`, `ctx`, `handFilesOf`, `camHoldInfo`, `camLabel`, `modelInfo`, `visionOpts`, `VISION_DEF`, `lowInfo`, `pathInfo`, `pumpStats`, `setIdleSearchEvery`, `camStats`, `setCameraPick`
 - fn (26): `initVision`, `initDetector`, `camHoldOf`, `startCamera`, `switchCamera`, `setHandsSink`, `pollFrame`, `camInfo`, `setHandsTracked`, `setModelDelegate`, `setCamFps`, `setDetectPath`, `setLowLight`, `pumpDbg`, `pumpStepDbg`, `detRunDbg`, `lowDbg`, `camSimDbg`, `camOpenDbg`, `camStatsDbg`, `cameraSwitch`, `cameraList`, `cameraPickInfo`, `cameraWatch`, `cameraWatchRetry`, `cameraWatchDbg`
 
 ## tools/probes/core/calpanel.js
@@ -1439,6 +1448,7 @@ SPLIT-2: the probe entry of the Night page: its own rows and the core rows flagg
 - → ./core/vis.js (1): `checkVisStack`
 - → ./night/audio1.js (1): `checkBedNull`
 - → ./night/audio2.js (1): `checkRainHands`
+- → ./night/audio3.js (1): `checkNightLab`
 - → ./night/bed.js (1): `checkNightBed`
 - → ./night/calib.js (1): `checkNightCalib`
 - → ./night/cards.js (1): `checkNightCards`
@@ -1477,6 +1487,11 @@ AUDIO-2 — «RAIN hand events and the bed» (slow): the founder hears the rain'
 - const (1): `HAND`
 - default (1): `default`
 - fn (1): `checkRainHands`
+
+## tools/probes/night/audio3.js
+AUDIO-3 — «NIGHT audio lab» (slow, development edition): the founder's tools for the rain's dropouts work in the rain with its music playing: the lab opens; the render-timing probe reports; «Record…
+- default (1): `default`
+- fn (1): `checkNightLab`
 
 ## tools/probes/night/bed.js
 NIGHT-3 stage 4: row «NIGHT music bed» (P.night).
@@ -1618,7 +1633,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 UI-1 — «NIGHT labels follow the room»: the founder entered the rain and the Sound button still read «Firefly» while another timbre played.
 - fn (1): `checkNightLabels`
 
-_322 modules, 3166 exported names._
+_325 modules, 3184 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

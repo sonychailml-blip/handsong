@@ -692,9 +692,22 @@
       <!-- NIGHT-7b: the development items below are hidden in the release edition (apps/night/edition.js; ?release shows it locally) -->
       <button id="nightSceneTg" class="night-lnk night-dev" hidden>Room picture: high (development)</button>
       <button id="nightMeasure" class="night-lnk night-dev" data-i18n="night.measure" hidden>Measure this device (about 2 minutes, development)</button>
+      <!-- AUDIO-3: the development audio lab (apps/night/audiolab.js) -->
+      <button id="nightLabBtn" class="night-lnk night-dev" hidden>Audio lab (development)</button>
       <pre id="nightMeasureOut" class="night-measure" hidden></pre>
       <button id="nightToSound" class="night-lnk night-dev" data-i18n="night.toSound" hidden>Sound panel and diagnostics (development)</button>
     </div>
+  </div>
+  <!-- AUDIO-3: THE AUDIO LAB (development edition only; apps/night/audiolab.js): the glitch counter, the recorder, the buffer and search choices, the bypass switches -->
+  <div id="nightLab" class="night-lab night-glass" hidden>
+    <div class="night-lab-head"><b class="night-dev">Audio lab</b> <button id="nightLabClose" class="night-lnk night-dev">close</button></div>
+    <p id="nightLabCount" class="night-lab-count night-dev"></p>
+    <div class="night-lab-btns"><button id="nightLabRec" class="night-btn night-dev">Record what you hear</button><button id="nightLabCopy" class="night-btn night-dev">Copy the log</button><button id="nightLabReset" class="night-btn night-dev">Reset counters</button></div>
+    <p id="nightLabMsg" class="night-lab-msg night-dev"></p>
+    <label class="night-lab-row night-dev">Audio buffer (reload to apply): <select id="nightLabLat"></select></label>
+    <label class="night-lab-row night-dev">Palm search with no hand: every <select id="nightLabIdle"></select></label>
+    <p class="night-lab-sub night-dev">On = playing. Untick to take a part out of the sound (one at a time):</p>
+    <div id="nightLabGrid" class="night-lab-grid"></div>
   </div>
   <!-- NIGHT-7: THE FIRST CARDS (apps/night/cards.js): four short cards with drawn pictures after the calibration offer on a first start, and from
        Settings → How to play; the picture, the title and the text are written by the module (NIGHT-7b: filled at load too, so no label is ever blank) -->

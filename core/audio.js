@@ -1301,8 +1301,14 @@ function chordOff(owner,when){ if(ffLive.length) ffCancel(owner, when!=null?when
    МЁРТВОМУ контексту. Живого пути это не касается (initAudio зовётся ровно один раз), поэтому
    сбрасывать здесь ничего не стали — но офлайн-рендеру нужен СВЕЖИЙ контекст на каждый рендер
    (startRendering одноразов), значит F3 обязан добавить сюда явную очистку этих таблиц. */
+/* CORE-27 (opt-in): the live context's latency hint, read when it is created ('interactive' = as before; 'balanced' / 'playback' = a larger output
+   buffer for a machine that cannot keep up). An app sets it before the start click; never set (Full): 'interactive' exactly as before. */
+let latHint='interactive';
+const setLatencyHint=h=>{ if(h==='interactive' || h==='balanced' || h==='playback') latHint=h; return latHint; };
+/* CORE-27: the node that feeds the speakers (a development recorder taps it; the same node the meter and the clip tap read) */
+const masterOut=()=>outLast;
 async function initAudio(mkCtx){
-  AC = mkCtx ? mkCtx() : new (window.AudioContext||window.webkitAudioContext)({latencyHint:'interactive'});
+  AC = mkCtx ? mkCtx() : new (window.AudioContext||window.webkitAudioContext)({latencyHint:latHint});
   /* ⛳ СБРОС МОДУЛЬНЫХ ТАБЛИЦ (слайс F3, долг с F0) — ЧТОБЫ ОДНУ КОПИЮ МОДУЛЯ МОЖНО БЫЛО
      ИНИЦИАЛИЗИРОВАТЬ НЕСКОЛЬКО РАЗ, КАЖДЫЙ РАЗ ПРОТИВ СВЕЖЕГО КОНТЕКСТА.
      ⚠️ ЗАЧЕМ. У OfflineAudioContext startRendering ОДНОРАЗОВ, значит каждому рендеру нужен свой
@@ -2267,7 +2273,7 @@ export {
   /* RENDER-LEAK: first solo KS timbre index — a track render loads the KS worklet only when the track uses one */
   LEAD_KS_FROM, leadIsKs,   // TIM3b: leadIsKs(i) — a KS timbre by its record's engine
   ksReady,   // F0: ЗАГРУЗИЛСЯ ЛИ KS-ВОРКЛЕТ В ЭТОТ КОНТЕКСТ. Живая связка, до initAudio читается как true (начальное значение) — спрашивать ТОЛЬКО после него. Нужна зонду рендера: у офлайн-копии свой контекст и своя загрузка, и провал там ТИХИЙ (buildKSFallback молча подменяет семь тембров), см. render.js
-  masterDynSet, masterDyn, offlineMasterDyn, forestData, dynReady, ffInfo, masterDelayMs, masterProbeNodes,
+  masterDynSet, masterDyn, offlineMasterDyn, forestData, dynReady, ffInfo, masterDelayMs, masterProbeNodes, setLatencyHint, masterOut,
   /* AUD1a: the engine context of this instance (probes; moved builders receive it) */
   engineCtx,
   /* ENG1: the engine contract (plan §4.4) — makeENG calls only these */

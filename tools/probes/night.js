@@ -41,6 +41,7 @@ export { checkNightGlowTint } from './night/core25.js';   // CORE-25: the hands'
 export { checkBedNull } from './night/audio1.js';   // AUDIO-1: the rain bed made cheaper by structure, proven by a null test
 export { checkRainHands } from './night/audio2.js';   // AUDIO-2: hand events create nothing; the bed survives a main-thread stall
 export { checkRainFx } from './night/rain6.js';   // RAIN-6: the effects hand in the rain
+export { checkNightLab } from './night/audio3.js';   // AUDIO-3: the development audio lab
 export { checkForestApart } from './night/forest2e.js';   // FOREST-2e: plants apart
 export { checkForestCull } from './night/forestcull.js';   // FOREST-2e: the cull (?forest=cull) keeps the frames
 export { checkRainQuads } from './night/rain5.js';   // RAIN-5b: no sprite's quad edge shows   // RAIN-4: the forest's bed bit-exact after the jazz bed   // FOREST-2: the switch ?forest=new

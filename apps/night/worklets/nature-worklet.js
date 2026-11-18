@@ -7,7 +7,7 @@
    hands over to it in BROOK_REC.swap s (equal power) and is no longer computed; → posts { rec:{ ok, len } }. Without it the synthesis plays on. */
 import { brookNew, brookOut, brookStats } from '../pure/brook.js';
 import { recNew, recOut, recStats, BROOK_REC } from '../pure/brookrec.js';
-import { layersNew, layersRec, layersFocus, layersOn, layersOut, layersStats, layersPasses, layersDensity, layersRain } from '../pure/layers.js';
+import { layersNew, layersRec, layersFocus, layersOn, layersOut, layersStats, layersPasses, layersDensity, layersRain, layersSkip } from '../pure/layers.js';
 
 class NightNature extends AudioWorkletProcessor{
   constructor(opt){
@@ -53,6 +53,7 @@ class NightLayers extends AudioWorkletProcessor{
       else if(m.k==='density') layersDensity(this.st, m.v, m.at, currentTime);   // RAIN-2: booked at its time
       else if(m.k==='focus') layersFocus(this.st, m.v);
       else if(m.k==='rain') layersRain(this.st, m.near, m.far);   // RAIN-6: Echo
+      else if(m.k==='skip') layersSkip(this.st, m.v);   // AUDIO-3: the lab's switches
       else if(m.k==='on') layersOn(this.st, m.v);
       else if(m.k==='recipe' && m.L) this.st.L=m.L;
       else if(m.k==='stats') this.port.postMessage({ stats:layersStats(this.st) }); } };

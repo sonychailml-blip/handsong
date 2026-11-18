@@ -85,17 +85,17 @@ export async function lofiEngine(ac, dest, base, o={}){ const epMode=o.ep==='sho
     sat=k=>{ const w=ac.createWaveShaper(); w.curve=curve(k); w.oversample='2x'; return w; }, lfo=(hz, depth, into, type='sine')=>{ const s=ac.createOscillator(), d=g(depth); s.type=type; s.frequency.value=hz; s.connect(d); d.connect(into); s.start(); return d; };
   /* the master: bus → high cut → saturation → tape (wow, flutter) → gentle compression → level */
   const out=g(0), busLp=flt('lowpass', M.bus.lp, 0.4), busSat=sat(M.bus.drive), tape=ac.createDelay(0.05), comp=ac.createDynamicsCompressor();
-  tape.delayTime.value=M.tape.base; lfo(M.tape.wowHz, M.tape.wow, tape.delayTime); lfo(M.tape.flutterHz, M.tape.flutter, tape.delayTime);
+  tape.delayTime.value=M.tape.base; const wowD=[lfo(M.tape.wowHz, M.tape.wow, tape.delayTime), lfo(M.tape.flutterHz, M.tape.flutter, tape.delayTime)];   // AUDIO-3: kept for the lab's bypass
   comp.threshold.value=M.comp.thr; comp.ratio.value=M.comp.ratio; comp.knee.value=M.comp.knee; comp.attack.value=M.comp.att; comp.release.value=M.comp.rel;
   busLp.connect(busSat); busSat.connect(tape); tape.connect(comp); comp.connect(out); out.connect(dest);
   if(KR) try{ busLp.frequency.automationRate='k-rate'; }catch(e){}   // AUDIO-1: a 0.017-Hz breath needs no per-sample filter coefficients (≤ 0.3 Hz per 128 frames)
-  lfo(M.breath.hz[2], 900, busLp.frequency);   // the master's high cut breathes (±900 Hz over a minute)
+  const cutD=lfo(M.breath.hz[2], 900, busLp.frequency);   // the master's high cut breathes (±900 Hz over a minute)
   const verb=ac.createConvolver(); verb.buffer=G.ir; verb.connect(busLp);
   const L={ ep:g(1), vib:g(1), gtr:g(1), bass:g(1), beat:g(1), crackle:g(0) }, pumpK=g(1), pumpB=g(1);
   /* the piano: a chorus (two slowly moving delays beside the dry), a tremolo and an auto-pan (their depth breathing), a soft high cut and saturation */
   const epIn=g(1), chorusOut=g(1), trem=g(1), pan=ac.createStereoPanner(), keysLp=flt('lowpass', M.keys.lp, 0.5), keysSat=sat(M.keys.drive);
-  epIn.connect(chorusOut); for(const hz of M.chorus.hz){ const dl=ac.createDelay(0.05), wg=g(M.chorus.wet); dl.delayTime.value=M.chorus.d; lfo(hz, M.chorus.depth, dl.delayTime); epIn.connect(dl); dl.connect(wg); wg.connect(chorusOut); }
-  const td=lfo(M.trem.hz, M.trem.depth, trem.gain); lfo(M.breath.hz[0], M.trem.depth*0.7, td.gain); lfo(M.trem.panHz, M.trem.pan, pan.pan);   // AUDIO-1: the auto-pan stays per sample (block rate measured −66 dB under the signal: not within the renders' noise, and on the piano's path)
+  epIn.connect(chorusOut); const chW=[]; for(const hz of M.chorus.hz){ const dl=ac.createDelay(0.05), wg=g(M.chorus.wet); chW.push(wg); dl.delayTime.value=M.chorus.d; lfo(hz, M.chorus.depth, dl.delayTime); epIn.connect(dl); dl.connect(wg); wg.connect(chorusOut); }
+  const td=lfo(M.trem.hz, M.trem.depth, trem.gain); lfo(M.breath.hz[0], M.trem.depth*0.7, td.gain); const panD=lfo(M.trem.panHz, M.trem.pan, pan.pan);   // AUDIO-1: the auto-pan stays per sample (block rate measured −66 dB under the signal: not within the renders' noise, and on the piano's path)
   L.ep.connect(epIn); chorusOut.connect(trem); trem.connect(pan); pan.connect(keysLp); keysLp.connect(keysSat); keysSat.connect(pumpK); pumpK.connect(busLp);
   /* the guitar (its body) and the vibraphone, each with the tape delay: a beat-timed echo, its feedback darkened, its time wavering, its feedback breathing */
   const body=[flt('highpass', 62, 0.7), flt('peaking', 98, 2.4, 9), flt('peaking', 188, 4, 5), flt('peaking', 245, 5, 4), flt('peaking', 392, 4, 3), flt('peaking', 520, 5, 2), flt('lowshelf', 160, 0.7, 3), flt('lowpass', 6200, 0.6)]; L.gtr.connect(body[0]); for(let i=1;i<body.length;i++) body[i-1].connect(body[i]);   // RAIN-4e: the air resonance near 100 Hz and more body modes
@@ -105,7 +105,7 @@ export async function lofiEngine(ac, dest, base, o={}){ const epMode=o.ep==='sho
   const bassLp=flt('lowpass', 1400, 0.6); L.bass.connect(bassLp); bassLp.connect(pumpB); pumpB.connect(busLp);
   const beatLp=flt('lowpass', M.beat.lp, 0.5), beatSat=sat(M.beat.drive); L.beat.connect(beatLp); beatLp.connect(beatSat); beatSat.connect(busLp);
   const cr=ac.createBufferSource(); cr.buffer=G.crackle; cr.loop=true; const crg=g(M.crackle); cr.connect(crg); crg.connect(L.crackle); L.crackle.connect(busLp); cr.start();
-  for(const [k, v] of Object.entries(M.wet)){ const s=g(v); (k==='gtr' ? body[body.length-1] : L[k]).connect(s); s.connect(verb); }
+  const wetS={}; for(const [k, v] of Object.entries(M.wet)){ const s=g(v); wetS[k]=s; (k==='gtr' ? body[body.length-1] : L[k]).connect(s); s.connect(verb); }   // AUDIO-3: wetS — the sends (a part put back reconnects its own)
   /* the piano's voices: tine banks from core (one strike each; a pool round-robin), each into its own release envelope and pan */
   const E={ ac, build:{ banks:[], vib:null, hum:null, shim:null }, lfo:{}, nightLean:false }, TB=velTables(rec.recipe), banks=[];
   if(!ST || epMode==='short' || leg.ep) for(let v=0;v<3;v++) for(let i=0;i<10;i++){ const pre=g(1); E.build.banks=[];   // AUDIO-1: RAIN-4d's banks only where they play (the default never strikes them)
@@ -147,10 +147,30 @@ export async function lofiEngine(ac, dest, base, o={}){ const epMode=o.ep==='sho
       else if(d==='hat') one(S.buf['hat-foot'], L.beat, when, 1.06, v*M.hat, ev.pan, 0.09, 0.04);
       else if(d==='ohat') one(G.ohat, L.beat, when, 1, v*M.ohat, ev.pan, null, 0);
       else if(d==='shaker') one(G.shaker, L.beat, when, 1, v*M.shaker, ev.pan, null, 0); }
-    else if(ev.kind==='pump'){ const a=Math.min(1, ev.vel||0); for(const [n, depth] of [[pumpK, M.pump.keys], [pumpB, M.pump.bass]]){ n.gain.setTargetAtTime(1-depth*a, when, 0.004); n.gain.setTargetAtTime(1, when+0.02, M.pump.tc); } }   // RAIN-4e: dips and returns smoothly (an instant drop clicked on the held piano)
+    else if(ev.kind==='pump'){ if(BY.pump) return; const a=Math.min(1, ev.vel||0); for(const [n, depth] of [[pumpK, M.pump.keys], [pumpB, M.pump.bass]]){ n.gain.setTargetAtTime(1-depth*a, when, 0.004); n.gain.setTargetAtTime(1, when+0.02, M.pump.tc); } }   // RAIN-4e: dips and returns smoothly (an instant drop clicked on the held piano)
     else if(ev.kind==='layer' && ev.layer==='crackle'){ const p=L.crackle.gain; p.setValueAtTime(p.value, when); p.linearRampToValueAtTime(ev.gain, when+ev.ramp); } }
   const layer=(name, v, when, ramp=0)=>{ if(!L[name]) return; const p=L[name].gain; p.cancelScheduledValues(when); p.setValueAtTime(ramp ? p.value : v, when); if(ramp) p.linearRampToValueAtTime(v, when+ramp); };
   const level=(v, when, tc=1.2)=>{ out.gain.setTargetAtTime(v, when, tc/3); };
   /* the piece's tempo: the tape delay's time (a dotted eighth) */
   const tempo=(bpm, when=ac.currentTime)=>{ beat=60/bpm; dl.delayTime.setTargetAtTime(Math.min(1.9, beat*M.delay.beats), when, 0.3); };
-  return { play, layer, level, tempo, out, state:()=>({ notes, plucks:P.size, banks:banks.length, long:lbanks.length, peak, held:held.length, ep:epMode }) }; }
+  /* AUDIO-3 (development lab): each part of the bed taken OUT of the graph (disconnected, so the audio thread stops computing it — not merely
+     muted) and put back. key → [take out, put back]; the founder turns them off one at a time while listening for the dropouts */
+  const BY={}, sats=[busSat, keysSat, beatSat], satC=sats.map(w=>w.curve);
+  const BYP={
+    bed:[()=>out.disconnect(dest), ()=>out.connect(dest)],
+    piano:[()=>L.ep.disconnect(), ()=>{ L.ep.connect(epIn); L.ep.connect(wetS.ep); }],
+    bass:[()=>L.bass.disconnect(), ()=>{ L.bass.connect(bassLp); L.bass.connect(wetS.bass); }],
+    drums:[()=>L.beat.disconnect(), ()=>{ L.beat.connect(beatLp); L.beat.connect(wetS.beat); }],
+    vib:[()=>L.vib.disconnect(), ()=>{ L.vib.connect(pumpK); L.vib.connect(dIn); L.vib.connect(wetS.vib); }],
+    guitar:[()=>L.gtr.disconnect(), ()=>L.gtr.connect(body[0])],
+    reverb:[()=>verb.disconnect(), ()=>verb.connect(busLp)],
+    chorus:[()=>chW.forEach(w=>w.disconnect()), ()=>chW.forEach(w=>w.connect(chorusOut))],
+    tremolo:[()=>{ td.disconnect(); panD.disconnect(); trem.gain.value=1; pan.pan.value=0; }, ()=>{ td.connect(trem.gain); panD.connect(pan.pan); }],
+    delay:[()=>dWet.disconnect(), ()=>dWet.connect(pumpK)],
+    compressor:[()=>{ tape.disconnect(); tape.connect(out); }, ()=>{ tape.disconnect(); tape.connect(comp); }],
+    wow:[()=>wowD.forEach(d=>d.disconnect()), ()=>wowD.forEach(d=>d.connect(tape.delayTime))],
+    pump:[()=>{ for(const n of [pumpK, pumpB]){ n.gain.cancelScheduledValues(0); n.gain.value=1; } }, ()=>{}],
+    highcut:[()=>{ cutD.disconnect(); busLp.type='allpass'; }, ()=>{ busLp.type='lowpass'; cutD.connect(busLp.frequency); }],
+    saturation:[()=>sats.forEach(w=>{ w.curve=null; w.oversample='none'; }), ()=>sats.forEach((w, i)=>{ w.curve=satC[i]; w.oversample='2x'; })] };
+  const bypass=(key, off)=>{ const f=BYP[key]; if(!f || !!BY[key]===!!off) return !!BY[key]; BY[key]=!!off; try{ f[off ? 0 : 1](); }catch(e){} return BY[key]; };
+  return { play, layer, level, tempo, out, bypass, bypassKeys:Object.keys(BYP), bypassed:()=>({ ...BY }), state:()=>({ notes, plucks:P.size, banks:banks.length, long:lbanks.length, peak, held:held.length, ep:epMode }) }; }

@@ -40,13 +40,12 @@ vec3 skyOver(vec3 c, vec2 p, float r){ if(uSkyA.w<0.5) return c; float hgt=clamp
     c+=uWhiteCol*uPlaneC.y*exp(-dot(a, a)/(rr*rr))*e*uPlane.z*1.8; }
   return c; }`;
 export const VIEW_F=`precision highp float; uniform sampler2D uBase, uL1, uL2, uL3, uDepth; uniform vec3 uRad; uniform vec4 uFoc; uniform vec2 uTan; uniform vec3 uLight, uLightCol; varying vec2 vUv;
-uniform vec2 uStreak; uniform vec3 uCityTint; uniform float uTime;   /* RAIN-6: Echo's falling streaks (amount, slant), Warm/Bright's light colour (1,1,1 at rest) */
+uniform vec2 uStreak; uniform float uTime;   /* RAIN-6: the falling streaks (Echo, Wave: amount, slant) */
 ${RAD}
 ${SKY_GLSL}
 void main(){ float dep=texture2D(uDepth, vUv).a, r=radAt(dep);   /* the depth rides in the picture's alpha */
   vec3 c0=texture2D(uBase, vUv).rgb, c1=texture2D(uL1, vUv).rgb, c2=texture2D(uL2, vUv).rgb, c3=texture2D(uL3, vUv).rgb, c;
   if(r<uRad.x) c=mix(c0, c1, r/uRad.x); else if(r<uRad.y) c=mix(c1, c2, (r-uRad.x)/(uRad.y-uRad.x)); else c=mix(c2, c3, clamp((r-uRad.y)/(uRad.z-uRad.y), 0., 1.));
-  c*=uCityTint;   /* RAIN-6: the city light's colour (exactly 1 at rest) */
   if(uStreak.x>0.){ vec2 q=(vUv*2.-1.)*uTan; q.x+=q.y*uStreak.y; float cx=q.x*110., h=fract(sin(floor(cx)*91.7)*43758.5), y=fract(q.y*1.3+uTime*(1.6+h)+h*7.);   /* RAIN-6: rain falling in the air, seen against the lights */
     float s=step(0.45, h)*smoothstep(0., 0.04, y)*smoothstep(0.26, 0.02, y)*smoothstep(0.42, 0.05, abs(fract(cx)-0.5)), lum=dot(c1, vec3(0.3, 0.5, 0.2));
     c+=s*uStreak.x*(0.015+0.9*lum)*vec3(0.86, 0.9, 0.98); }
@@ -103,12 +102,14 @@ void main(){ float R=radAt(aDK.x), kind=aDK.y, b=max(aRect.z, 0.7/uPx); vKind=ki
   vGain=pow(max(A0, 1e-9)/max(A1, 1e-9), 0.55); vCol=aCol.rgb*aCol.a;
   gl_Position= aCol.a>0.003 ? vec4((aRect.xy+vP)/uTan, 0., 1.) : vec4(2., 2., 2., 1.); }`;
 export const LIGHT_F=`precision highp float; varying vec2 vP, vH, vHS; varying vec3 vCol; varying float vRad, vKind, vGain, vK, vB, vPx; uniform float uWin;
+uniform float uLamp;   /* RAIN-6c: Warm/Bright on the light sources — −1 amber tungsten, softer, a little dimmer … 0 as they are … +1 white LED, brighter */
+vec3 lampTone(vec3 c){ if(uLamp==0.) return c; float L=dot(c, vec3(0.3, 0.5, 0.2)); return uLamp<0. ? mix(c, L*vec3(1.38, 0.8, 0.38)*0.82, -uLamp) : mix(c, L*vec3(0.92, 1.0, 1.12)*1.25, uLamp); }
 void main(){ vec2 q=abs(vP)-vH; float d=length(max(q, 0.))+min(max(q.x, q.y), 0.)-vRad;
   float fade= vKind>0.5 && vKind<1.5 ? pow(clamp(0.5+0.5*vP.y/max(vH.y+vRad, 1e-5), 0., 1.), 1.6) : 1.;
   float sharp= vKind<0.5 ? exp(-dot(vP, vP)/(vB*vB)*1.6)+0.18*exp(-length(vP)/(vB*1.6)) : smoothstep(0., -vRad*0.5-1e-5, d);
   float disc=smoothstep(0., -max(vRad*0.25, 1e-5), d)*(0.82+0.18*smoothstep(-vRad*0.7, 0., d))*vGain;
   float hp=min(vHS.x, vHS.y)*vPx, rp=length(vP)*vPx, win= vKind<0.5 ? mix(1., 1.-smoothstep(hp-3., hp-1.2, rp), uWin) : 1.;   /* RAIN-5e: a point light is a round disc at every size and blur (its glow faded to 0 inside its quad) */
-  gl_FragColor=vec4(vCol*mix(sharp, disc, vK)*fade*win, 1.); }`;
+  gl_FragColor=vec4(lampTone(vCol)*mix(sharp, disc, vK)*fade*win, 1.); }`;
 /* A DROP into the DROP MAP (one instance each: aDrop its place on the pane and its radius, aShape its stretch while running). The map holds,
    premultiplied by the drop's mask, the place inside the drop (−1…1, encoded 0…1): the glass reads it as a lens. uSoft widens the edge as the
    focus leaves the glass (the drop softens into a pale disc). */

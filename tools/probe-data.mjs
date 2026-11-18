@@ -2054,21 +2054,39 @@ async function nightTextsAll(){
 async function rainFxLaw(){
   const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); };
   const X=await import(new URL('../apps/night/rooms/rain/pure/fxlaw.js', import.meta.url).href), LY=await import(new URL('../apps/night/pure/layers.js', import.meta.url).href);
-  const neutral=(rain, sound, tint, streak)=>[0, 0.1, 0.4, 0.65, 1].every(b=>rain(b, 0)===b) && sound(0).near===1 && sound(0).far===1 && tint(0.5).every(v=>v===1) && streak(0, 0).amount===0 && streak(0, 1).amount===0;
+  const neutral=(rain, sound, tint, streak)=>[0, 0.1, 0.4, 0.65, 1].every(b=>rain(b, 0)===b) && sound(0).near===1 && sound(0).far===1 && tint(0.5).every(v=>v===1) && streak(0, 0).amount===0;
   ok('a law is not exactly neutral at the hand’s rest', neutral(X.rainOf, X.soundOf, X.tintOf, X.streakOf));
   ok('CONTROL: a rain law 0.01 above the mood at rest passes', !neutral((b, e)=>X.rainOf(b, e)+0.01, X.soundOf, X.tintOf, X.streakOf));
   { let mono=true; for(const b of [0.1, 0.4, 0.65]) for(let e=0;e<1;e+=0.05) if(!(X.rainOf(b, e+0.05)>X.rainOf(b, e) && X.rainOf(b, e+0.05)<=1)) mono=false;
     ok('the rain does not rise with Echo (or passes 1)', mono); }
   ok('the streaks and the sound do not rise with Echo', X.streakOf(1, 0).amount>X.streakOf(0.5, 0).amount && X.soundOf(1).near>X.soundOf(0.5).near && X.soundOf(1).far>X.soundOf(0.5).far);
   ok('Wave does not slant the streaks more', X.streakOf(1, 1).slant>X.streakOf(1, 0).slant);
-  { const w=X.tintOf(0), c=X.tintOf(1); ok(`warm is not warm (${w}) or bright not cold (${c})`, w[0]>1 && w[2]<1 && c[2]>1 && c[0]<1); }
+  /* RAIN-6c: Warm ↔ Bright works on the LIGHT SOURCES (lampOf, neonOf, windowsOf), never as a tint of the whole picture */
+  ok('the light sources are not exactly as they are at rest', X.lampOf(0.5)===0 && X.neonOf(0)===1 && X.windowsOf(0)===0);
+  ok(`warm / bright tones wrong: ${X.lampOf(0)} / ${X.lampOf(1)}, neon ${X.neonOf(-1)} / ${X.neonOf(1)}, windows ${X.windowsOf(-1)} / ${X.windowsOf(1)}`, X.lampOf(0)===-1 && X.lampOf(1)===1 && X.neonOf(-1)<1 && X.neonOf(1)>1 && X.windowsOf(-1)===0 && X.windowsOf(1)>0);
+  ok('the wind (Wave) does not show the rain', X.streakOf(0, 1).amount>0.3 && X.streakOf(0, 0).amount===0);
+  { const fs=await import('node:fs'), G=fs.readFileSync(new URL('../apps/night/rooms/rain/rain-glass.js', import.meta.url), 'utf8'), view=src=>(src.match(/export const VIEW_F=`([\s\S]*?)`;/)||[])[1]||'', whole=v=>/c\s*\*=\s*u[A-Z]\w*Tint/.test(v);
+    ok('the view still tints the whole picture', !!view(G) && !whole(view(G)) && /uniform float uLamp/.test(G));
+    ok('CONTROL: the old whole-picture tint planted back is not caught', whole(view(G).replace('if(dep>0.995)', 'c*=uCityTint; if(dep>0.995)'))); }
   { const mk=()=>{ const st=LY.layersNew(48000, { near:{ gain:0.5 }, far:{ gain:0.4 } }, 77); LY.layersOn(st, true); LY.layersFocus(st, 0.5); return st; }, out=st=>{ const a=[0, 1, 2, 3].map(()=>new Float32Array(4800)); LY.layersOut(st, 0, a[0], a[1], a[2], a[3]); return a; };
     const A=out(mk()), s1=mk(); LY.layersRain(s1, 1, 1); const B=out(s1), s2=mk(); LY.layersRain(s2, 2, 2); const C=out(s2), en=a=>a.reduce((x, ch)=>x+ch.reduce((y, v)=>y+v*v, 0), 0);
     ok('the layers with gains 1 differ from without the Echo message', A.every((ch, i)=>ch.every((v, j)=>v===B[i][j])));
     ok(`the layers are not louder with gains 2 (${en(C).toFixed(4)} vs ${en(A).toFixed(4)})`, en(C)>en(A)*3.5); }
-  notes.push(`at rest: rain = the mood's, gains 1, light [1, 1, 1]; full Echo: rain ${X.rainOf(0.4, 1).toFixed(2)} (mood 0.40), streaks ${X.streakOf(1, 0).amount}, sound ×${X.soundOf(1).near} near / ×${X.soundOf(1).far} far; warm ${X.tintOf(0).map(v=>v.toFixed(2))}, bright ${X.tintOf(1).map(v=>v.toFixed(2))}`);
+  notes.push(`at rest: rain = the mood's, gains 1, light [1, 1, 1]; full Echo: rain ${X.rainOf(0.4, 1).toFixed(2)} (mood 0.40), streaks ${X.streakOf(1, 0).amount}, sound ×${X.soundOf(1).near} near / ×${X.soundOf(1).far} far; the lights warm −1 (neon ×${X.neonOf(-1)}), bright +1 (neon ×${X.neonOf(1)}, +${X.windowsOf(1)} of the windows lit); the wind alone: streaks ${X.streakOf(0, 1).amount}`);
   return { cases:n, total:d.length, differences:d, notes };
 }
+/* CORE-27 — «CORE-27 idle search cadence (core)»: schedPlan's third argument sets the palm search's cadence only while NO hand is tracked (every
+   n-th frame); one hand keeps HAND_SEARCH_EVERY; absent = exactly the old schedule. CONTROL: the default must not search every 6th frame. */
+async function idleSearch(){ const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); };
+  const S=await import(new URL('../core/pure/handsched.js', import.meta.url).href);
+  const run=(mode, every, k)=>{ const s={ mode, since:0 }, out=[]; for(let i=0;i<k;i++){ const a= every==null ? S.schedPlan(s, '2s') : S.schedPlan(s, '2s', every); out.push(a); s.since= a==='search' ? 0 : s.since+1; } return out; };
+  const idx=a=>a.map((x, i)=>x==='search' ? i : -1).filter(i=>i>=0);
+  ok('no hand, every 6: not every 6th frame — '+idx(run('none', 6, 18)), JSON.stringify(idx(run('none', 6, 18)))==='[5,11,17]');
+  ok('one hand changed with every 6: '+idx(run('one', 6, 9)), JSON.stringify(run('one', 6, 9))===JSON.stringify(run('one', undefined, 9)));
+  ok('the default changed: '+idx(run('none', undefined, 9)), JSON.stringify(idx(run('none', undefined, 9)))==='[2,5,8]');
+  ok('CONTROL: the default searches every 6th frame', JSON.stringify(idx(run('none', undefined, 18)))!=='[5,11,17]');
+  notes.push('no hand: every 3rd frame by default, every 6th / 10th by choice; one hand unchanged');
+  return { cases:n, total:d.length, differences:d, notes }; }
 async function rainFocus(){
   const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); };
   const F=await import(new URL('../apps/night/rooms/rain/pure/focus.js', import.meta.url).href), C=F.FOCUS, CT=await import(new URL('../apps/night/rooms/rain/pure/city.js', import.meta.url).href);
@@ -3367,6 +3385,7 @@ const ROWS=[
   ['FOREST hidden (app)',       ()=>forestHiddenCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 9
   ['NIGHT texts both languages (app)', ()=>nightTextsCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-7
   ['NIGHT texts in every language (app)', ()=>nightTextsAll(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // LANG-1
+  ['CORE-27 idle search cadence (core)', ()=>idleSearch(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // CORE-27
   ['RAIN effects hand (app)', ()=>rainFxLaw(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-6
   ['NIGHT home screen (app)', ()=>nightHomeScreen(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-7c
   ['NIGHT forest files (app)',  ()=>nightForestFiles(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 (the files rule, the size budget)

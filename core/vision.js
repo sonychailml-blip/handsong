@@ -1,6 +1,6 @@
 import { camFacing, setCamFacing } from './state.js';   // CORE-16: a picked camera tells its own facing (the one mirroring source stays camFacing)
 import { t } from './i18n.js';
-import { schedNew, schedPlan, schedAfter, HAND_POLICIES } from './pure/handsched.js';
+import { schedNew, schedPlan, schedAfter, HAND_POLICIES, HAND_SEARCH_EVERY } from './pure/handsched.js';
 import { MP_LINE, rateOf } from './pure/latency.js';
 import { LOW_MODES, lowConstraints, lowVerdict, exposureSupported, LOW_SETTLE_MS, LOW_MEASURE_MS, devSnap, restoreAdvanced, restoreConstraints,
   healList, autoLeft, TEST_REC_KEY, testRecNext, testRecRepair, camErrKind } from './pure/camlight.js';
@@ -274,6 +274,9 @@ function takeFrame(id, cap, pres, now, pf=NaN){
     pend=job; pump();
   }, ()=>{});
 }
+/* CORE-27 (opt-in): the palm search's cadence while no hand is tracked — every n-th camera frame (default HAND_SEARCH_EVERY: as before) */
+let idleEvery=HAND_SEARCH_EVERY;
+const setIdleSearchEvery=n=>{ idleEvery=Math.max(1, Math.min(30, (+n|0)||HAND_SEARCH_EVERY)); return idleEvery; };
 async function pump(){
   if(busy || !pend || !det) return;
   const job=pend; pend=null; busy=true;
@@ -282,7 +285,7 @@ async function pump(){
     if(job.id<=lastId) PS.dup++;              // a frame detected before (must never happen)
     if(job.id<snapMax) PS.notNewest++;        // a newer snapshot existed (must never happen)
     if(job.id>lastId) lastId=job.id;
-    const policy=opts.hands, action=schedPlan(sched, policy), t0=performance.now();
+    const policy=opts.hands, action=schedPlan(sched, policy, idleEvery), t0=performance.now();   // CORE-27: idleEvery (default the schedule's own)
     const r= action==='skip' ? { res:EMPTY, action, n:0, ms:0, w0:t0, w1:t0, bmp:job.bmp }
                              : await d.run({ bmp:job.bmp, t:job.snapT, action, policy });
     if(delayDbg) await new Promise(res=>setTimeout(res, delayDbg));   // probe: a detector slower than the camera that does not block
@@ -538,5 +541,5 @@ function pumpDbg(o={}){
 /* Экспорт: детектор живёт здесь; кадры и результаты отдаются стоку (main.js). */
 export { video, canvas, ctx, initVision, initDetector, handFilesOf, camHoldOf, camHoldInfo, startCamera, switchCamera, setHandsSink, pollFrame,
   camInfo, camLabel, modelInfo, visionOpts, VISION_DEF, setHandsTracked, setModelDelegate, setCamFps, setDetectPath, setLowLight, lowInfo,
-  pathInfo, pumpStats, pumpDbg, pumpStepDbg, detRunDbg, lowDbg, camSimDbg, camOpenDbg, camStats, camStatsDbg, setCameraPick, cameraSwitch, cameraList, cameraPickInfo,
+  pathInfo, pumpStats, pumpDbg, pumpStepDbg, detRunDbg, setIdleSearchEvery, lowDbg, camSimDbg, camOpenDbg, camStats, camStatsDbg, setCameraPick, cameraSwitch, cameraList, cameraPickInfo,
   cameraWatch, cameraWatchRetry, cameraWatchDbg };

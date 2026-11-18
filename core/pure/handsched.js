@@ -19,11 +19,12 @@ export const HAND_POLICIES=['2s','2','1'];
 export const schedNew=()=>({ mode:'none', since:HAND_SEARCH_EVERY-1 });
 
 /* what runs on the next frame */
-export function schedPlan(s, policy='2s'){
+/* CORE-27 (opt-in): idleEvery — the search's cadence while NO hand is tracked (default HAND_SEARCH_EVERY: exactly as before); one hand keeps HAND_SEARCH_EVERY */
+export function schedPlan(s, policy='2s', idleEvery=HAND_SEARCH_EVERY){
   if(policy==='1') return 'track1';
   if(policy==='2') return s.mode==='two' ? 'track2' : 'search';
   if(s.mode==='two') return 'track2';
-  if(s.since+1>=HAND_SEARCH_EVERY) return 'search';
+  if(s.since+1>=(s.mode==='none' ? Math.max(1, idleEvery|0) : HAND_SEARCH_EVERY)) return 'search';
   return s.mode==='one' ? 'track1' : 'skip';
 }
 
