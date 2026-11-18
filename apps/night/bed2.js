@@ -14,6 +14,13 @@ import { BED2_SEED, bed2Init, bed2Step, bed2Soon, bed2Tables, bed2Density } from
 import { BED2_WORKLET, BED2_POOLS, BED2_DIV, buildBed2, bed2Post, bed2Park, bed2Stats } from './sound/bed2.js';
 
 export const BED2_AHEAD=0.6, BED2_PARK_S=14;
+/* AUDIO-2: the lo-fi bed's notes are built on the main thread (its nodes cannot be made elsewhere), a whole bar at a time once the bar comes within
+   the look-ahead. At 0.6 s a main-thread stall longer than that just before a bar line (a real hand's first detections on the GPU, a busy picture)
+   made the downbeat late, and every late note then fired at once — the stutter. 2 s ahead covers such stalls; a beat that is still late by more
+   than LOFI_LATE_S is skipped instead of bunched (sustained notes still play). lofiAheadDbg(s): the probe's CONTROL (0.6 = the old way). */
+export const LOFI_AHEAD=2, LOFI_LATE_S=0.08;
+let lofiAhead=LOFI_AHEAD;
+export const lofiAheadDbg=s=>{ lofiAhead= s==null ? LOFI_AHEAD : +s; return lofiAhead; };
 const mod=(s, n)=>((s%n)+n)%n;
 const hzOf=(s, n, v)=>chordRowFreq(mod(s, n), Math.floor(s/n), v);
 const groundOf=v=>[chordRowFreq(0, -1, v), droneSecondHz(v)/2];
@@ -84,7 +91,7 @@ function jazzMsgs(ev, when, pv, R){ const J=R.jazz, hz=s=>chordRowFreq(mod(s, JA
 let BEDJAZZ=false; try{ if(typeof location!=='undefined') BEDJAZZ=new URLSearchParams(location.search).get('bed')==='jazz'; }catch(e){}
 export const bedJazzDbg=v=>{ if(v!=null) BEDJAZZ=!!v; return BEDJAZZ; };
 let LOFI=null; export const bed2LofiSet=f=>{ LOFI=f||null; };
-const LF={ eng:null, loading:null, fail:false, on:false, R:null, level:'full', origin:0, view:null, players:[], tick:null };
+const LF={ eng:null, loading:null, fail:false, on:false, R:null, level:'full', origin:0, view:null, players:[], tick:null, late:0, skipped:0, worst:0 };   // AUDIO-2: late — notes that came late, skipped — late beats left out, worst — the latest (s, < 0)
 const lofiWanted=R=>!!(R && R.lofi && LOFI && !BEDJAZZ);
 const pieceOf=(R, v)=>{ const L=R.lofi, id=modeIdOf(v); return L.pieces[id] || L.pieces[L.first]; };
 const pcOf=P=>{ const m=scaleById(P.parent); return m && m.iv && m.iv.length===7 ? m.iv.slice() : undefined; };   // RAIN-4d: the parent's pitch classes (the phrases' safe notes)
@@ -103,11 +110,13 @@ function lofiTick(now){ const E=LF.eng, R=LF.R; if(!E || !LF.on) return; const l
     if(P!==cur.P){ const at=lofiStop(cur.st, law), st=lofiInit(P, LF.level, { at, pc:pcOf(P) }); lofiFadeIn(st); LF.players.push({ st, P, pv:parentOf(P, v) }); if(E.tempo) E.tempo(P.bpm, LF.origin+at); }
     else cur.pv=parentOf(P, v); }
   const late=law-1, T=LF.tick={ law:0, ep:0, bass:0, drum:0, vib:0, gtr:0, chord:0 };
-  for(const pl of LF.players){ const evs=lofiStep(pl.st, law-1, law+BED2_AHEAD), beat=60/pl.P.bpm; T.law+=evs.length;
-    for(const ev of evs){ if(ev.t<late && ev.kind!=='chord') continue; if(T[ev.kind]!=null) T[ev.kind]++; const at=Math.max(LF.origin+ev.t, now+0.02); if(pl.pv) E.play(ev, at, pl.pv);
+  for(const pl of LF.players){ const evs=lofiStep(pl.st, law-1, law+lofiAhead), beat=60/pl.P.bpm; T.law+=evs.length;
+    for(const ev of evs){ if(ev.t<late && ev.kind!=='chord') continue; const due=LF.origin+ev.t-(now+0.02);   // AUDIO-2: < 0 = this note is late
+      if(due<0){ LF.late++; LF.worst=Math.min(LF.worst, due); if(-due>LOFI_LATE_S && (ev.kind==='drum' || ev.kind==='bass' || ev.kind==='pump')){ LF.skipped++; continue; } }
+      if(T[ev.kind]!=null) T[ev.kind]++; const at=Math.max(LF.origin+ev.t, now+0.02); if(pl.pv) E.play(ev, at, pl.pv);
       if(ev.kind==='chord' || ev.kind==='ep' || ev.kind==='bass' || ev.kind==='vib' || ev.kind==='gtr') BUS.push('bed', { kind:ev.kind==='ep' ? 'comp' : ev.kind==='gtr' ? 'vib' : ev.kind, at, v:3, steps:ev.steps||null, step:ev.step??null, vel:ev.vel??null, dur:ev.dur??null, beat }); } }
   LF.players=LF.players.filter(pl=>pl.st.stopAt===Infinity || pl.st.stopAt>law-2); }
-export const bed2LofiDbg=()=>({ wanted:!!LOFI, jazz:BEDJAZZ, loaded:!!LF.eng, fail:LF.fail, on:LF.on, level:LF.level, players:LF.players.map(p=>({ id:p.P.id, at:p.st.at, stopAt:p.st.stopAt, bar:p.st.bar, g:Object.fromEntries(Object.entries(p.st.g).map(([k, G])=>[k, G.map(q=>q.slice())])) })), origin:LF.origin, tick:LF.tick, eng:LF.eng ? LF.eng.state() : null });
+export const bed2LofiDbg=o=>{ if(o && o.reset){ LF.late=0; LF.skipped=0; LF.worst=0; } return ({ late:LF.late, skipped:LF.skipped, worst:LF.worst, ahead:lofiAhead, wanted:!!LOFI, jazz:BEDJAZZ, loaded:!!LF.eng, fail:LF.fail, on:LF.on, level:LF.level, players:LF.players.map(p=>({ id:p.P.id, at:p.st.at, stopAt:p.st.stopAt, bar:p.st.bar, g:Object.fromEntries(Object.entries(p.st.g).map(([k, G])=>[k, G.map(q=>q.slice())])) })), origin:LF.origin, tick:LF.tick, eng:LF.eng ? LF.eng.state() : null }); };
 /* every pad tone out (Off, a preset change) */
 function padsOut(M, when, r){ const out=[]; for(const i of M.cur){ out.push({ k:'off', t:when, slot:i, r }); M.slots[i]={ hz:0, step:null, freeAt:when+2.1*r }; } M.cur=[]; return out; }
 

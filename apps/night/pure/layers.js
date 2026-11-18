@@ -61,6 +61,8 @@ export function layersDensity(st, d, at=null, now=0){ d=Math.max(0, +d||0); st.d
   if(!st.book || at===-1e9) st.book=passBook(d); else passBookSet(st.book, at==null ? now+0.5 : at, d); }
 /* the focus target (0…1) and on / off (the fade does the rest) */
 export function layersFocus(st, f){ st.f=Math.max(0, Math.min(1, +f||0)); }
+/* RAIN-6: the rain's sound with Echo — the near and far gains' factors (exactly 1 at rest) */
+export function layersRain(st, near, far){ st.rk={ near:Math.max(0, +near||0), far:Math.max(0, +far||0) }; }
 export function layersOn(st, on){ st.on=!!on; if(on) st.sleep=false; }
 /* one layer's grains added into L, R (from index o, n frames), times the per-frame gain array G */
 function layerAdd(st, Y, L, R, o, n, G){
@@ -80,7 +82,7 @@ export function layersOut(st, t0, nL, nR, fL, fR, o=0, n=nL.length-o){
   for(let i=0;i<n;i++){ nL[o+i]=0; nR[o+i]=0; fL[o+i]=0; fR[o+i]=0; }
   if(st.sleep) return;
   const GN=st.gn && st.gn.length>=n ? st.gn : (st.gn=new Float32Array(Math.max(n, 128))), GF=st.gf && st.gf.length>=n ? st.gf : (st.gf=new Float32Array(Math.max(n, 128)));
-  const P=st.L, gnB=P.near ? P.near.gain : 0, gfB=P.far ? P.far.gain : 0; let fs=st.fs, g=st.g; const kf=st.kf, tg=st.on ? 1 : 0, dg=st.dg;
+  const P=st.L, rk=st.rk, gnB=(P.near ? P.near.gain : 0)*(rk ? rk.near : 1), gfB=(P.far ? P.far.gain : 0)*(rk ? rk.far : 1); let fs=st.fs, g=st.g; const kf=st.kf, tg=st.on ? 1 : 0, dg=st.dg;   // RAIN-6: rk — Echo's factors
   for(let i=0;i<n;i++){ fs+=(st.f-fs)*kf; g= g<tg ? Math.min(tg, g+dg) : Math.max(tg, g-dg); const q=fs*Math.PI/2, w=g*g*(3-2*g); GN[i]=Math.cos(q)*w*gnB; GF[i]=Math.sin(q)*w*gfB; }
   st.fs=fs; st.g=g;
   if(st.near) layerAdd(st, st.near, nL, nR, o, n, GN); else if(P.near) synthAdd(st, st.syn.n, nL, nR, o, n, GN, P.near.synth==null ? LAYERS.synth : P.near.synth);
@@ -111,5 +113,5 @@ export function layersOut(st, t0, nL, nR, fL, fR, o=0, n=nL.length-o){
   if(!st.on && g<=0) st.sleep=true;
 }
 /* counters for the worklet and the probes */
-export const layersStats=st=>({ frames:st.frames, grains:st.grains, sleep:st.sleep, on:st.on, focus:st.fs, near:!!st.near, far:!!st.far, voices:st.voices.length,
+export const layersStats=st=>({ rk:st.rk||null, frames:st.frames, grains:st.grains, sleep:st.sleep, on:st.on, focus:st.fs, near:!!st.near, far:!!st.far, voices:st.voices.length,
   cars:!!st.cars, passes:st.passes, sounding:st.pv.length, density:st.dens, passLog:st.passLog.slice(-16) });

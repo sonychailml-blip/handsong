@@ -12,7 +12,7 @@ import { bedHold, bedResume, bedTakesDrone } from './bed.js';
 import { tintApply, tintNow } from './tint.js';   // DESIGN-1: the interface takes the room's tint
 import { setGlowTint, glowTint } from '../../core/state.js';   // CORE-25: the hands' lit firefly and the note field's glow take it too
 import { roomMusicApply } from './roomdoors.js';   // RAIN-4
-import { buildAmbience, ambienceSchedule, ambienceTune, ambienceSet, ambienceRoom, ambienceBrook, ambienceBrookLight, ambienceBrookRec, ambienceLayers, ambienceLayersRec, ambienceLayersFocus, ambienceLayersDensity, ambienceLayersStats, NATURE_WORKLET } from './sound/ambience.js';
+import { buildAmbience, ambienceSchedule, ambienceTune, ambienceSet, ambienceRoom, ambienceBrook, ambienceBrookLight, ambienceBrookRec, ambienceLayers, ambienceLayersRec, ambienceLayersFocus, ambienceLayersDensity, ambienceLayersStats, NATURE_WORKLET, ambienceLayersRain } from './sound/ambience.js';
 
 export const ROOM_KEY='handsong.nightRoom';
 export const ROOM_NAME_MS=1500, ROOM_QUIET_MS=2500;   // the name's time on screen; without the room's picture, the bed waits out the nature crossfade
@@ -73,8 +73,9 @@ function naturePasses(E, a, R){ const P=R.record.nature.layers.passes; if(!P || 
 export function natureDensity(d, at=null){ if(liveAmb && liveAmb.layers) ambienceLayersDensity(null, liveAmb, d, at); }   // RAIN-2: at — the audio time it counts from (null: the audio thread's now + the margin)
 /* RAIN-3: the focus (0 the glass … 1 the far city), the picture's own eased number, for the layers' near / far balance (no layers: nothing) */
 export function natureFocus(f){ if(liveAmb && liveAmb.layers) ambienceLayersFocus(null, liveAmb, f); }
-/* probe: the live layers' node — its counters, its recordings' state and whether it plays → a promise (null without the node) */
 export const natureLayersDbg=()=> liveAmb && liveAmb.layers ? ambienceLayersStats(null, liveAmb).then(st=>st && { ...st, rec:{ ...liveAmb.layers.rec }, playing:liveAmb.layers.on }) : Promise.resolve(null);
+export function natureRain(g){ if(liveAmb && liveAmb.layers) ambienceLayersRain(null, liveAmb, g); }   // RAIN-6: Echo — the rain's sound, { near, far } gains (1 at rest)
+/* probe: the live layers' node — its counters, its recordings' state and whether it plays → a promise (null without the node) */
 /* the Lighter mode (the shell): fewer bubbles, the nearest voices only */
 export function natureLight(v){ brookLight=!!v; if(liveAmb && liveAmb.brook) ambienceBrookLight(null, liveAmb, brookLight); }
 /* at the start, before the first picture: the visit's start room (guard.js: html[data-room] — random, or the address's), if it is a real one this app has.

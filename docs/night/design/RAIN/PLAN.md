@@ -252,6 +252,14 @@ Each slice is one run for Opus at high effort. Each ends with something to look 
 - **Rows.** The dev-only row is replaced by the real rooms' rows covering two rooms; `node tools/smoke-paths.mjs --build`; Level 4.
 - **You check:** the five phone checks of that step.
 
+## 5b. RAIN-7 «even more life» — recorded 2026-11-18 (the founder approved the whole list; build LATER, starred items first; nothing built yet)
+- **Rain and water:** ★ rain visible in the lamps' light cones; splashes on the asphalt and in puddles; water running off awnings, balconies and cornices; overflowing gutters and rivulets along the kerb; reflections in the wet asphalt trembling as cars pass.
+- **Light:** ★ headlights sweeping across the facades when a car turns; ★ an animated pharmacy cross; signs blinking, one with a failing lamp, a dot ticker without text; a street lamp that flickers now and then.
+- **Wind:** ★ tree crowns swaying and falling leaves (more with Wave); awnings and flags moving; chimney smoke drifting; a rare gust turning someone's umbrella inside out.
+- **People:** ★ a street musician under an awning playing along with our music; after the rain children jumping in puddles; a couple dancing under one umbrella (rare); a street sweeper machine, a courier, someone with a torch; late at night shops close — shutters come down, signs go out one by one (the half-down shutter can come down fully at Late night).
+- **Windows:** a cat on a sill, someone opening a balcony door, someone shaking out a rug (TVs already flicker).
+- **Our own window** (concept layer 0, not built yet): ★ the windowsill with a cup of tea with rising steam and a potted plant; the painted wooden frame with a brass latch.
+
 ## 6. Cost per item
 
 Laptop = Intel HD 4000, Standard. «Fill» = extra pixels shaded, as a share of one full screen. All est. unless under «RAIN-0 as built».

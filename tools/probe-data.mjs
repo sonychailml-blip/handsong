@@ -2046,6 +2046,29 @@ async function nightTextsAll(){
   notes.push(`${want.length} languages; ${player.length} player keys + ${tnames.length} timbre names in each of ${NEW.join(', ')}; ${recs.length} room records named in all`);
   return { cases:n, total:d.length, differences:d, notes };
 }
+/* RAIN-6 (item 7) — «RAIN effects hand (app)»: the effects hand in the rain (rooms/rain/pure/fxlaw.js). At the hand's rest (Echo 0, Warm ↔ Bright 0.5,
+   Wave 0) every law is EXACTLY neutral — the rain is the mood's own, no falling streaks, the rain's sound gains 1, the city light's colour [1, 1, 1] —
+   so the room is today's until the hand moves; Echo raises the rain, the streaks and the sound monotonically; warm (0) reddens, bright (1) blues the
+   light. The nature layers (pure/layers.js): without the Echo message the output equals the output with gains 1 (sample for sample), louder with 2.
+   CONTROL: a law with a 0.01 offset at rest is caught. */
+async function rainFxLaw(){
+  const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); };
+  const X=await import(new URL('../apps/night/rooms/rain/pure/fxlaw.js', import.meta.url).href), LY=await import(new URL('../apps/night/pure/layers.js', import.meta.url).href);
+  const neutral=(rain, sound, tint, streak)=>[0, 0.1, 0.4, 0.65, 1].every(b=>rain(b, 0)===b) && sound(0).near===1 && sound(0).far===1 && tint(0.5).every(v=>v===1) && streak(0, 0).amount===0 && streak(0, 1).amount===0;
+  ok('a law is not exactly neutral at the hand’s rest', neutral(X.rainOf, X.soundOf, X.tintOf, X.streakOf));
+  ok('CONTROL: a rain law 0.01 above the mood at rest passes', !neutral((b, e)=>X.rainOf(b, e)+0.01, X.soundOf, X.tintOf, X.streakOf));
+  { let mono=true; for(const b of [0.1, 0.4, 0.65]) for(let e=0;e<1;e+=0.05) if(!(X.rainOf(b, e+0.05)>X.rainOf(b, e) && X.rainOf(b, e+0.05)<=1)) mono=false;
+    ok('the rain does not rise with Echo (or passes 1)', mono); }
+  ok('the streaks and the sound do not rise with Echo', X.streakOf(1, 0).amount>X.streakOf(0.5, 0).amount && X.soundOf(1).near>X.soundOf(0.5).near && X.soundOf(1).far>X.soundOf(0.5).far);
+  ok('Wave does not slant the streaks more', X.streakOf(1, 1).slant>X.streakOf(1, 0).slant);
+  { const w=X.tintOf(0), c=X.tintOf(1); ok(`warm is not warm (${w}) or bright not cold (${c})`, w[0]>1 && w[2]<1 && c[2]>1 && c[0]<1); }
+  { const mk=()=>{ const st=LY.layersNew(48000, { near:{ gain:0.5 }, far:{ gain:0.4 } }, 77); LY.layersOn(st, true); LY.layersFocus(st, 0.5); return st; }, out=st=>{ const a=[0, 1, 2, 3].map(()=>new Float32Array(4800)); LY.layersOut(st, 0, a[0], a[1], a[2], a[3]); return a; };
+    const A=out(mk()), s1=mk(); LY.layersRain(s1, 1, 1); const B=out(s1), s2=mk(); LY.layersRain(s2, 2, 2); const C=out(s2), en=a=>a.reduce((x, ch)=>x+ch.reduce((y, v)=>y+v*v, 0), 0);
+    ok('the layers with gains 1 differ from without the Echo message', A.every((ch, i)=>ch.every((v, j)=>v===B[i][j])));
+    ok(`the layers are not louder with gains 2 (${en(C).toFixed(4)} vs ${en(A).toFixed(4)})`, en(C)>en(A)*3.5); }
+  notes.push(`at rest: rain = the mood's, gains 1, light [1, 1, 1]; full Echo: rain ${X.rainOf(0.4, 1).toFixed(2)} (mood 0.40), streaks ${X.streakOf(1, 0).amount}, sound ×${X.soundOf(1).near} near / ×${X.soundOf(1).far} far; warm ${X.tintOf(0).map(v=>v.toFixed(2))}, bright ${X.tintOf(1).map(v=>v.toFixed(2))}`);
+  return { cases:n, total:d.length, differences:d, notes };
+}
 async function rainFocus(){
   const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); };
   const F=await import(new URL('../apps/night/rooms/rain/pure/focus.js', import.meta.url).href), C=F.FOCUS, CT=await import(new URL('../apps/night/rooms/rain/pure/city.js', import.meta.url).href);
@@ -3344,6 +3367,7 @@ const ROWS=[
   ['FOREST hidden (app)',       ()=>forestHiddenCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 9
   ['NIGHT texts both languages (app)', ()=>nightTextsCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-7
   ['NIGHT texts in every language (app)', ()=>nightTextsAll(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // LANG-1
+  ['RAIN effects hand (app)', ()=>rainFxLaw(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-6
   ['NIGHT home screen (app)', ()=>nightHomeScreen(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-7c
   ['NIGHT forest files (app)',  ()=>nightForestFiles(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 (the files rule, the size budget)
   ['OLD NAME gone',             ()=>oldNameGone(),  r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // SPLIT-2

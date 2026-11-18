@@ -11,7 +11,8 @@
    note clears a spot (pure/glass.js). Every colour is a token (--cv-rain-*). Seeded: the same picture on every device. No sound, no network. */
 import { seeded } from '../../../../core/pure/dsp.js';
 import { roomFov, roomLook } from '../../pure/room.js';
-import { natureFocus, natureDensity } from '../../roomswitch.js';
+import { natureFocus, natureDensity, natureRain } from '../../roomswitch.js';
+import { rainOf, streakOf, soundOf, tintOf, easeTo } from './pure/fxlaw.js';   // RAIN-6: the effects hand in the rain
 import { RAIN_FOCUS } from './heard.js';   // NIGHT-15: the last focus, for the sound while the picture is not drawn
 import { layersEvents, LAYERS } from '../../pure/layers.js';
 import { heardMs } from '../../pure/heard.js';
@@ -86,7 +87,7 @@ export function buildRain(T, opt){
   const moodOfLook=L=>Object.keys(RAIN_ROOM.looks).find(k=>RAIN_ROOM.looks[k]===L)||'late';
   const blurM=mat({ uniforms:{ uTex:{ value:null }, uDir:{ value:new T.Vector2() } }, vertexShader:QUAD_V, fragmentShader:BLUR_F });
   const downM=mat({ uniforms:{ uTex:{ value:null }, uTexel:{ value:new T.Vector2() } }, vertexShader:QUAD_V, fragmentShader:DOWN_F });   // small fixes: the mist's box downsample
-  const viewM=mat({ uniforms:{ uBase:{ value:null }, uL1:{ value:null }, uL2:{ value:null }, uL3:{ value:null }, uDepth:{ value:null }, uRad:{ value:new T.Vector3(0.004, 0.012, 0.04) }, uFoc:{ value:FOC },
+  const viewM=mat({ uniforms:{ uStreak:{ value:new T.Vector2(0, 0.08) }, uCityTint:{ value:new T.Vector3(1, 1, 1) }, uTime:UTIME, uBase:{ value:null }, uL1:{ value:null }, uL2:{ value:null }, uL3:{ value:null }, uDepth:{ value:null }, uRad:{ value:new T.Vector3(0.004, 0.012, 0.04) }, uFoc:{ value:FOC },
     uTan:{ value:UT }, uLight:{ value:new T.Vector3() }, uLightCol:{ value:LIGHT },
     uSkyA:{ value:new T.Vector4() }, uMoon:{ value:new T.Vector4() }, uMoonPh:{ value:0.5 }, uBeam:{ value:new T.Vector4() }, uPlane:{ value:new T.Vector4() }, uPlaneC:{ value:new T.Vector3() },   // RAIN-5c: the sky (pure/sky.js)
     uCloudLit:{ value:new T.Color() }, uCloudDark:{ value:new T.Color() }, uMoonCol:{ value:col('moon') }, uBeamCol:{ value:col('beam') }, uRedCol:{ value:col('nav-red') }, uGreenCol:{ value:col('nav-green') }, uWhiteCol:{ value:col('nav-white') } }, vertexShader:QUAD_V, fragmentShader:VIEW_F });
@@ -252,7 +253,7 @@ export function buildRain(T, opt){
   }
 
   /* ---- the room's state: the focus, the playing light, the lean, the finger on the glass ---- */
-  let focus=FOCUS.rest, target=FOCUS.rest, restOn=false, heldNow=0, pressAt=-1e9, lastPick=-1, picks=0, wipes=0, strokes=0, viewOver=null, finger=null, rainOver=null, simFrozen=false; const pickLog=[];
+  let focus=FOCUS.rest, target=FOCUS.rest, restOn=false, heldNow=0, pressAt=-1e9, lastPick=-1, picks=0, wipes=0, strokes=0, viewOver=null, finger=null, rainOver=null, simFrozen=false, fxE=0, fxT=0.5, fxW=0, fxOff=false, rainEff=0, soundSent=null; const pickLog=[];   // RAIN-6: fxE…soundSent — the effects hand's eased values
   const light={ x:0, y:0, on:0, d:0, glow:0.6 }, off={ x:0, y:0 };
   const toTan=(px, py)=>[(px/W*2-1)*tw, (1-py/H*2)*th];
   function resize(w, h, bufH){ W=w; H=h; const fov= viewOver && viewOver.fov ? viewOver.fov : roomFov(RAIN_ROOM.view, w, h); th=Math.tan(fov*Math.PI/360); tw=th*w/h; UT.set(tw, th);
@@ -265,6 +266,11 @@ export function buildRain(T, opt){
     { const nd=trafficDensity(look.traffic, fx && fx.wave), at=(tAudio==null ? t : tAudio)+DENS_MARGIN; if(!book){ book=passBook(nd); natureDensity(nd, -1e9); } else if(nd!==dens && passBookSet(book, at, nd)) natureDensity(nd, at); dens=nd; }   // RAIN-2: booked a margin ahead, the same time to the sound   // RAIN-1: the mood's traffic × Wave — the picture and the sound the same number
     if(look!==painted && painted) dirty=true;
     { const a=1-Math.exp(-dt/MOOD_TC); mistK+=(look.mist-mistK)*a; rainK+=(look.rain-rainK)*a; litK+=(look.lit-litK)*a; mistCol.lerp(lookCols(look).mist, a); }
+    /* RAIN-6 (item 7): the effects hand — Echo the rain's strength (the drops, the falling streaks, its sound), Warm ↔ Bright the city light's colour; exactly
+       neutral at rest (pure/fxlaw.js). fxOff (probe CONTROL): the hand ignored */
+    { const e=fxOff ? 0 : +(fx && fx.echo)||0, tn=fxOff || !fx || fx.tone==null ? 0.5 : +fx.tone, w=fxOff ? 0 : +(fx && fx.wave)||0; fxE=easeTo(fxE, e, dt); fxT=easeTo(fxT, tn, dt); fxW=easeTo(fxW, w, dt);
+      rainEff=rainOf(rainK, fxE); const S=streakOf(fxE, fxW), Ti=tintOf(fxT), V=viewM.uniforms; V.uStreak.value.set(S.amount, S.slant); V.uCityTint.value.set(Ti[0], Ti[1], Ti[2]);
+      const so=soundOf(fxE); if(!soundSent || Math.abs(so.near-soundSent.near)>0.004){ soundSent=so; natureRain(so); } }
     const play=(hands||[]).find(h=>h.play);
     if(play){ const [x, y]=toTan(play.x, play.y); if(light.on<0.02){ light.x=x; light.y=y; } const k=1-Math.exp(-dt*13); light.x+=(x-light.x)*k; light.y+=(y-light.y)*k; light.d=play.d; light.glow=play.glow==null ? 0.6 : play.glow; }
     light.on+=((play ? 1 : 0)-light.on)*Math.min(1, dt*(play ? 6 : 2.5));
@@ -282,7 +288,7 @@ export function buildRain(T, opt){
     if(t-pressAt<FINGER_GAP && light.on>0.5 && focus<0.5){ if(finger) { wipeStroke(wipe, finger[0], finger[1], px, py, 1-0.6*focus); strokes++; } finger=[px, py]; } else finger=null;
     const wl=wipeStep(wipe, dt);
     /* the rain on the pane */
-    if(!simFrozen) dropsStep(SIM, dt, rainOver==null ? rainK : rainOver); dropsUpload();
+    if(!simFrozen) dropsStep(SIM, dt, rainOver==null ? rainEff : rainOver); dropsUpload();
     if(wl || wipe.live || SIM.laneLive || mapDirty){ mapDirty=wipe.live || SIM.laneLive; const A=wipe.a, Ln=SIM.lane; for(let i=0;i<A.length;i++){ mapBytes[i*2]=A[i]*255; mapBytes[i*2+1]=Ln[i]*255; } mapTex.needsUpdate=true; }
     for(let i=0;i<WIN.length;i++) lit[i]=windowLight(WIN[i], litK, t-litAt[i]);
     { const cand=[]; for(let i=0;i<WIN.length;i++) if(WIN[i].amb<litK && WIN[i].depth<0.9) cand.push(i); winEv=winEventAt(t, cand);   // RAIN-5c: life in a lit window (rare)
@@ -299,7 +305,7 @@ export function buildRain(T, opt){
       if(S.plane){ V.uPlane.value.set(S.plane.x, S.plane.y, S.plane.k, 0); V.uPlaneC.value.set(S.plane.red, S.plane.white, S.plane.green); } else V.uPlane.value.z=0; skyNow=S; }
     const B=focusBlur(focus);
     viewM.uniforms.uLight.value.set(light.x, light.y, light.on*focus*(0.5+0.5*light.glow));
-    const G=glassM.uniforms; UOFF.set(off.x, off.y); G.uRain.value=rainK; G.uMist.value= mistOver==null ? mistK : mistOver; G.uG.value=B.glass; USOFT.value=B.glass; G.uFloor.value.x=GLASS.floor*wipe.floorK;
+    const G=glassM.uniforms; UOFF.set(off.x, off.y); G.uRain.value=rainEff; G.uMist.value= mistOver==null ? mistK : mistOver; G.uG.value=B.glass; USOFT.value=B.glass; G.uFloor.value.x=GLASS.floor*wipe.floorK;
     G.uLight.value.set(light.x, light.y); G.uLightK.value=light.on*(1-focus)*(0.5+0.5*light.glow);
   }
   let mapDirty=true, skyT=null, skyNow=null;   // RAIN-5c: skyT — captures only (the sky at a chosen moment)
@@ -314,7 +320,7 @@ export function buildRain(T, opt){
   function flyPick(){ const k=flyWindow(WIN, RAIN_ROOM.view, i=>lit[i]<=0.05); if(k>=0) return k; let best=null, bd=Infinity; WIN.forEach((w, i)=>{ const q=windowAt(i); if(!q.inView || lit[i]>0.05) return; const d=Math.hypot(q.x/W-0.6, q.y/H-0.5); if(d<bd){ bd=d; best=i; } }); return best; }
   const state=()=>({ now, focus, target, focusDepth:focusDepth(focus), blur:focusBlur(focus), light:{ ...light }, off:{ ...off }, windows:WIN.length, lit:Array.from(lit), litNow:lit.reduce((n, v)=>n+(v>0.05 ? 1 : 0), 0), lastPick, picks, pickLog:pickLog.slice(), wipes, strokes,
     wipe:{ live:wipe.live, wiped:wipe.wiped, floor:wipe.floorK, max:wipe.a.reduce((a, b)=>Math.max(a, b), 0) }, drops:{ n:SIM.list.length, running:SIM.list.filter(d=>d.mv).length, cap:SIM.cap, ledger:dropsLedger(SIM), t:SIM.t },
-    mood:moodId, look:look.pre, mist:mistK, rain:rainK, share:litK, tan:[tw, th], buffer:[bw, bh], repaints, frames, fine:Lv.fine, far:FAR.length, lights:nLights,
+    mood:moodId, look:look.pre, mist:mistK, rain:rainK, rainEff, fx:{ echo:fxE, tone:fxT, wave:fxW, off:fxOff, streak:viewM.uniforms.uStreak.value.x, slant:viewM.uniforms.uStreak.value.y, tint:viewM.uniforms.uCityTint.value.toArray(), sound:soundSent }, share:litK, tan:[tw, th], buffer:[bw, bh], repaints, frames, fine:Lv.fine, far:FAR.length, lights:nLights,
     baked:!!BK, cityMood:moodKey, density:dens, tAudio, carsMax:CARS_MAX });
   function texBytes(){ let b=GLASS.cols*GLASS.rows*2; for(const k in RT) b+=RT[k].width*RT[k].height*4; if(BK) b+=BK.lit.width*BK.lit.height*4+BK.depth.width*BK.depth.height+(moodTex ? BK.lit.width*BK.lit.height*4 : 0); return b; }   // RAIN-1: + the baked city's three textures
   function dispose(){ for(const o of own) try{ o.dispose(); }catch(e){} own.length=0; }
@@ -328,7 +334,8 @@ export function buildRain(T, opt){
     flyPick, flyAt:i=>{ const q=windowAt(i); return q ? { i, x:q.x, y:q.y, r:Math.max(1.5, q.r), glow:lit[i], dist:30, front:q.inView } : null; }, flyLand:i=>{ if(!WIN[i]) return false; litAt[i]=now; return true; },
     windowAt, wipeAtDbg:(x, y)=>wipeAt(wipe, x, y), wipeCellDbg:(x, y)=>wipeCell(wipe, x, y), laneAtDbg:(x, y)=>laneAt(SIM, x, y), focusDbg:v=>{ if(v!=null) focus=clamp(+v, 0, 1); return focus; },
     /* probes and captures: the drops as they are (a copy), the rain's strength held, the simulation frozen; the depth the picture holds at a view place, read back */
-    dropsDbg:()=>SIM.list.map(d=>({ id:d.id, x:d.x, y:d.y, r:d.r, mv:d.mv })), rainDbg:v=>{ rainOver= v==null ? null : clamp(+v, 0, 1); return rainOver; }, freezeDbg:on=>{ simFrozen=!!on; return simFrozen; },
+    dropsDbg:()=>SIM.list.map(d=>({ id:d.id, x:d.x, y:d.y, r:d.r, mv:d.mv })), fxDbg:o=>{ if(o && 'off' in o) fxOff=!!o.off; return { off:fxOff }; },   // RAIN-6: the effects hand ignored (probe CONTROL)
+    rainDbg:v=>{ rainOver= v==null ? null : clamp(+v, 0, 1); return rainOver; }, freezeDbg:on=>{ simFrozen=!!on; return simFrozen; },
     lawDepthDbg:(x, y)=>sceneAt(x, y).depth, blurAtDbg:d=>blurAt(d, focus),
     /* a render target's pixels at view places ([x, y] view-angle units) → [r, g, b, a] 0…1 each; 'base' holds the city with its depth in a */
     windowsDbg:()=>WIN, lookDbg:k=>{ lookOver= k||null; return lookOver; }, mistDbg:v=>{ mistOver= v==null ? null : +v; return mistOver; },   // RAIN-1, captures only: a mood held, the pane's mist held

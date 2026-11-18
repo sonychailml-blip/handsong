@@ -2236,3 +2236,6 @@ Surge XT и ZynAddSubFX как СПРАВОЧНИК (не библиотека: 
   can sit on top of the play screen.
 - Relation to today: the six lessons of `tutor.js` (§3.20) and the planned lesson content (§3.6) are the seed of it; the LESSONS / TUTORIAL
   update remains the LAST stage (user, 2026-10-13).
+
+### ⬜ 7.21. The shared privacy text names the old model hosts (recorded at LANG-1, 2026-11-18; the founder: leave Full's text as it is for now)
+- `core/i18n.js` `privacy.body` (EN/RU, Full's start card) still says the app downloads the hand-tracking model «from jsDelivr and Google's storage» — stale since CORE-22 (MediaPipe from our own origin). Night now uses its own correct text (`night.privacyBody`). Fix Full's when Full's release is prepared (a FULL run, or a CORE run if the key stays shared).

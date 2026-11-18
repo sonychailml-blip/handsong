@@ -53,6 +53,19 @@ try{
   } else if(argv.includes('--row')){   // the browser row «RAIN room» alone (a quick look while working; the judged run is the Night suite's)
     const { ctx, p, errs }=await open({ width:1280, height:800 }, LEVEL);
     console.log(JSON.stringify(await p.evaluate(async ()=>(await import('/tools/probes/night/rainroom.js')).checkRainRoom()), null, 1), errs.slice(0, 5)); await ctx.close();
+  } else if(argv.includes('--rain6')){   // RAIN-6: the effects hand in the rain → tools/.ui-snap/rain6/ (at rest = today; Echo full; warm; bright), phone and laptop
+    const O6=path.join(ROOT, 'tools/.ui-snap/rain6'); await mkdir(O6, { recursive:true }); const made6=[];
+    for(const [tag, vp, dpr] of [['phone', { width:390, height:844 }, 2.75], ['laptop', { width:1280, height:800 }, 1]]){
+      const { ctx, p }=await open(vp, LEVEL, dpr);
+      await p.evaluate(()=>{ const R=window.__H.sceneRoomDbg(); R.mistDbg(0.12); R.lookDbg('evening'); });
+      await hand(p, 0.5, 0.45, 0.16, false, 10); await p.waitForTimeout(2500);
+      const fx=(e, t)=>p.evaluate(async ([e, t])=>{ const A=await import('/core/audio.js'), ST=await import('/core/state.js'), k=ST.chainKeyOf('ld'); A.fxInstance(k, 'cecho').params[0].setNorm(e); A.fxInstance(k, 'ctone').params[1].setNorm(t); }, [e, t]);
+      for(const [name, e, t, ru] of [['rest', 0, 0.5, 'Рука эффектов в покое — как было (сегодняшняя картинка)'], ['echo', 1, 0.5, 'Эхо до конца: дождь сильнее — капли на стекле и струи дождя в свете огней'],
+        ['warm', 0, 0, 'Тепло: свет города тёплый, медовый'], ['bright', 0, 1, 'Ярко: свет города холодный, голубовато-белый']]){
+        await fx(e, t); await hand(p, 0.5, 0.45, 0.16, false, 10); await p.waitForTimeout(4200); const f=`${tag}-${name}.png`; await p.screenshot({ path:path.join(O6, f) }); made6.push([f, ru]); }
+      await fx(0, 0.5); await ctx.close(); }
+    await writeFile(path.join(O6, 'index.html'), `<!doctype html><meta charset="utf-8"><title>RAIN-6 — рука эффектов в дожде</title><style>body{ font:15px/1.45 system-ui; background:#111; color:#ddd; margin:16px; } figure{ display:inline-block; vertical-align:top; margin:0 12px 18px 0; max-width:640px; } img{ max-width:100%; max-height:560px; border:1px solid #333; }</style><h1>RAIN-6: Эхо и Тепло ↔ Ярко в дожде (Вечерний бульвар)</h1><p>«В покое» = как до RAIN-6 (законы точно нейтральны в покое).</p>`+made6.map(([f, ru])=>`<figure><img src="${f}"><figcaption><b>${f.replace('.png', '')}</b> — ${ru}</figcaption></figure>`).join(String.fromCharCode(10)));
+    console.log('[rain-snap] --rain6: '+made6.length+' captures → tools/.ui-snap/rain6/index.html');
   } else if(argv.includes('--rain1') || argv.includes('--rain2') || argv.includes('--rain5') || argv.includes('--rain5b') || argv.includes('--rain5c') || argv.includes('--rain5d')){   // RAIN-2: --rain2 the same captures into tools/.ui-snap/rain2/ (its comparison page: --rain2page)   /* RAIN-1: the baked city — each mood, the focus near / middle / far, a phrase lighting windows; a before / after page */
     const O1=path.join(ROOT, argv.includes('--rain5d') ? 'tools/.ui-snap/rain5d' : argv.includes('--rain5c') ? 'tools/.ui-snap/rain5c' : argv.includes('--rain5b') ? 'tools/.ui-snap/rain5b' : argv.includes('--rain5') ? 'tools/.ui-snap/rain5' : argv.includes('--rain2') ? 'tools/.ui-snap/rain2' : 'tools/.ui-snap/rain1'); await mkdir(O1, { recursive:true }); const made1=[], log1={};
     const RU={ late:'Поздняя ночь', evening:'Вечерний бульвар', after:'После дождя' };

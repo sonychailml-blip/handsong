@@ -293,6 +293,11 @@ body.night-boot #start .startFoot{ border-top-color:var(--night-hairline); color
 body.night-boot #privacyNote summary{ color:var(--night-ink-dim); }
 body.night-boot #start .startLang [data-icon]{ display:none; }
 body.night-boot #langSel{ background:var(--night-raised); color:var(--night-ink); border:1px solid var(--night-hairline); }
+/* LANG-FIX: the open list is drawn by the system, which cannot draw a translucent background (it fell back to white behind light text): a dark
+   control (color-scheme) and opaque option colours from the night palette; the chosen one in the room's tint */
+body.night-boot #langSel{ color-scheme:dark; }
+body.night-boot #langSel option{ background:var(--night-base); color:var(--night-ink); }
+body.night-boot #langSel option:checked{ background:var(--night-tint); color:var(--night-on-tint); }
 
 /* NIGHT-7: the start screen's privacy line; the first cards (their pictures: our own line drawings, apps/night/cards.js) */
 /* NIGHT-11 part 2: Begin reads as loading until it really works (apps/night/guard.js removes the class); the start's messages; a hidden Night-only item stays hidden */

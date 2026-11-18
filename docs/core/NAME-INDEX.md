@@ -28,7 +28,7 @@ NIGHT-3 stage 4: THE MUSIC BED's DOOR AND ITS v1 DRIVER (live) — the state the
 
 ## apps/night/bed2.js
 NIGHT-4: THE MUSIC BED v2's DRIVER (live and offline).
-- const (13): `BED2_AHEAD`, `bedBrushDbg`, `jazzMoodOf`, `bedJazzDbg`, `bed2LofiSet`, `bed2LofiDbg`, `bed2ViewOver`, `bed2Failed`, `bed2SamplerSet`, `bed2Dbg`, `bed2StatsLive`, `bed2NodeDbg`, `bed2ViewDbg`
+- const (15): `BED2_AHEAD`, `LOFI_AHEAD`, `lofiAheadDbg`, `bedBrushDbg`, `jazzMoodOf`, `bedJazzDbg`, `bed2LofiSet`, `bed2LofiDbg`, `bed2ViewOver`, `bed2Failed`, `bed2SamplerSet`, `bed2Dbg`, `bed2StatsLive`, `bed2NodeDbg`, `bed2ViewDbg`
 - fn (6): `bed2Load`, `bed2On`, `bed2Off`, `bed2Volume`, `bed2Tick`, `bed2Plan`
 - → ./sound/bed2.js (1): `bed2Stats`
 
@@ -205,7 +205,7 @@ NIGHT-11 part 2 — LINKS OPENED INSIDE A MESSENGER (audit W4).
 ## apps/night/pure/layers.js
 RAIN-3: A ROOM's LAYERED RECORDINGS — near and far, crossfaded by the focus — and its EVENT SOUNDS on a seeded schedule (pure, rule #36; data row «RAIN nature (app)»), run unchanged by the nature w…
 - const (3): `LAYERS`, `layerMinLen`, `layersStats`
-- fn (8): `layersEvents`, `layersNew`, `layersRec`, `layersPasses`, `layersDensity`, `layersFocus`, `layersOn`, `layersOut`
+- fn (9): `layersEvents`, `layersNew`, `layersRec`, `layersPasses`, `layersDensity`, `layersFocus`, `layersRain`, `layersOn`, `layersOut`
 
 ## apps/night/pure/lofi.js
 RAIN-4c / RAIN-4d: THE ROOM'S MUSIC AS LO-FI (pure, rule #36; data row «RAIN lo-fi bed (app)»).
@@ -470,6 +470,10 @@ RAIN-0: DEPTH IS FOCUS — the law (pure, rule #36; data row «RAIN focus law (a
 - const (6): `FOCUS`, `LAYER_DEPTH`, `focusDepth`, `focusPlateau`, `blurAt`, `focusBlur`
 - fn (2): `focusTarget`, `focusStep`
 
+## apps/night/rooms/rain/pure/fxlaw.js
+RAIN-6 (item 7): THE EFFECTS HAND IN THE RAIN — pure (rule #36; data row «RAIN effects hand (app)»).
+- const (6): `RAIN_FX`, `rainOf`, `streakOf`, `soundOf`, `tintOf`, `easeTo`
+
 ## apps/night/rooms/rain/pure/glass.js
 RAIN-0: THE GLASS's law (pure, rule #36; data row «RAIN glass law (app)») — THE WIPE MAP: a grid over the pane (view-angle units, as the windows) holding how much of the MIST (inside, on the room's…
 - const (4): `GLASS`, `midAt`, `wipeStamp`, `wipeAt`
@@ -549,7 +553,7 @@ RAIN-0: the rain room's 2D STAND-IN — the «low» level and the fallback witho
 ## apps/night/roomswitch.js
 NIGHT-3 stage 5 part 2: THE ROOM SWITCH — one door for everything a room change touches, in this order: the music bed fades out and holds (it takes the new room's recipes while silent); the picture…
 - const (10): `ROOM_KEY`, `ROOM_NAME_MS`, `roomCurrent`, `roomNature`, `natureModule`, `natureLayersDbg`, `glowFollowDbg`, `roomNext`, `roomSwitchDbg`, `natureAmbDbg`
-- fn (9): `natureLoad`, `natureRecOf`, `natureRecPcm`, `natureRecStereo`, `natureDensity`, `natureFocus`, `natureLight`, `roomRestore`, `roomSwitch`
+- fn (10): `natureLoad`, `natureRecOf`, `natureRecPcm`, `natureRecStereo`, `natureDensity`, `natureFocus`, `natureRain`, `natureLight`, `roomRestore`, `roomSwitch`
 
 ## apps/night/scalepick.js
 CORE-20: Night fetches only the modes it plays — every room's moods and the page profile's moods (core/scalepick.js reads the profile) — and what they need.
@@ -573,7 +577,7 @@ RUN 7 (C6 + C11, Night plan §5; docs/night/QUALITY.md points 4, 5, 6, 9, 10) �
 ## apps/night/sound/ambience.js
 THE ROOMS' AMBIENCE (RUN 7, C4c; Night's own since CORE-7): drone + wind + distant crickets + one soft echo (NIGHT-8: + the stream), built from a room's NATURE recipe (the forest's: apps/night/room…
 - const (4): `NATURE_WORKLET`, `BROOK_SLEEP_S`, `AMB_SWAP`, `LAYERS_WORKLET`
-- fn (14): `buildAmbience`, `ambienceSchedule`, `ambienceTune`, `ambienceSet`, `ambienceRoom`, `ambienceBrook`, `ambienceBrookLight`, `ambienceBrookStats`, `ambienceBrookRec`, `ambienceLayers`, `ambienceLayersDensity`, `ambienceLayersRec`, `ambienceLayersFocus`, `ambienceLayersStats`
+- fn (15): `buildAmbience`, `ambienceSchedule`, `ambienceTune`, `ambienceSet`, `ambienceRoom`, `ambienceBrook`, `ambienceBrookLight`, `ambienceBrookStats`, `ambienceBrookRec`, `ambienceLayers`, `ambienceLayersDensity`, `ambienceLayersRec`, `ambienceLayersFocus`, `ambienceLayersStats`, `ambienceLayersRain`
 
 ## apps/night/sound/bed.js
 NIGHT-3 stage 4: THE MUSIC BED's SOUND — built once on the first On into the master's input (the sleep fade and the limiter cover it; live sound, never a track — rule #31), from a room's bed recipe B.
@@ -1434,6 +1438,7 @@ SPLIT-2: the probe entry of the Night page: its own rows and the core rows flagg
 - → ./core/timbres.js (2): `checkTimbresBefore`, `dumpTimbres`
 - → ./core/vis.js (1): `checkVisStack`
 - → ./night/audio1.js (1): `checkBedNull`
+- → ./night/audio2.js (1): `checkRainHands`
 - → ./night/bed.js (1): `checkNightBed`
 - → ./night/calib.js (1): `checkNightCalib`
 - → ./night/cards.js (1): `checkNightCards`
@@ -1452,6 +1457,7 @@ SPLIT-2: the probe entry of the Night page: its own rows and the core rows flagg
 - → ./night/rain4.js (1): `checkForestBed`
 - → ./night/rain4e.js (1): `checkRainClicks`
 - → ./night/rain5.js (1): `checkRainQuads`
+- → ./night/rain6.js (1): `checkRainFx`
 - → ./night/rainnature.js (1): `checkRainNature`
 - → ./night/rainroom.js (1): `checkRainRoom`
 - → ./night/roomswitch.js (1): `checkNightRoomSwitch`
@@ -1465,6 +1471,12 @@ AUDIO-1 — «RAIN bed null test» (slow): the rain's bed made cheaper BY STRUCT
 - const (2): `NULL`, `nullPass`
 - default (1): `default`
 - fn (2): `nullOf`, `checkBedNull`
+
+## tools/probes/night/audio2.js
+AUDIO-2 — «RAIN hand events and the bed» (slow): the founder hears the rain's sound drop out, often when a hand enters or leaves the frame.
+- const (1): `HAND`
+- default (1): `default`
+- fn (1): `checkRainHands`
 
 ## tools/probes/night/bed.js
 NIGHT-3 stage 4: row «NIGHT music bed» (P.night).
@@ -1567,6 +1579,11 @@ RAIN-4e — «RAIN bed no clicks»: the founder heard «strange short sounds on 
 RAIN-5b — «RAIN no quad edges»: the founder saw square fields round the flying scraps (a sprite's quad showing under a wide focus blur).
 - fn (1): `checkRainQuads`
 
+## tools/probes/night/rain6.js
+RAIN-6 — «RAIN effects hand» (drawn): in the rain, through the REAL effect parameters the other hand moves (the Night chain's Echo amount and Warm ↔ Bright tilt; the shell publishes them each frame…
+- default (1): `default`
+- fn (1): `checkRainFx`
+
 ## tools/probes/night/rainnature.js
 RAIN-3: row «RAIN nature» (P.night) — the rain room's layered recordings in the real graph (apps/night/sound/ambience.js, the nature worklet's «night-layers»), rendered OFFLINE (deterministic, no r…
 - fn (1): `checkRainNature`
@@ -1601,7 +1618,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 UI-1 — «NIGHT labels follow the room»: the founder entered the rain and the Sound button still read «Firefly» while another timbre played.
 - fn (1): `checkNightLabels`
 
-_319 modules, 3148 exported names._
+_322 modules, 3166 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

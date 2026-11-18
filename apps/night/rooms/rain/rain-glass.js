@@ -40,11 +40,16 @@ vec3 skyOver(vec3 c, vec2 p, float r){ if(uSkyA.w<0.5) return c; float hgt=clamp
     c+=uWhiteCol*uPlaneC.y*exp(-dot(a, a)/(rr*rr))*e*uPlane.z*1.8; }
   return c; }`;
 export const VIEW_F=`precision highp float; uniform sampler2D uBase, uL1, uL2, uL3, uDepth; uniform vec3 uRad; uniform vec4 uFoc; uniform vec2 uTan; uniform vec3 uLight, uLightCol; varying vec2 vUv;
+uniform vec2 uStreak; uniform vec3 uCityTint; uniform float uTime;   /* RAIN-6: Echo's falling streaks (amount, slant), Warm/Bright's light colour (1,1,1 at rest) */
 ${RAD}
 ${SKY_GLSL}
 void main(){ float dep=texture2D(uDepth, vUv).a, r=radAt(dep);   /* the depth rides in the picture's alpha */
   vec3 c0=texture2D(uBase, vUv).rgb, c1=texture2D(uL1, vUv).rgb, c2=texture2D(uL2, vUv).rgb, c3=texture2D(uL3, vUv).rgb, c;
   if(r<uRad.x) c=mix(c0, c1, r/uRad.x); else if(r<uRad.y) c=mix(c1, c2, (r-uRad.x)/(uRad.y-uRad.x)); else c=mix(c2, c3, clamp((r-uRad.y)/(uRad.z-uRad.y), 0., 1.));
+  c*=uCityTint;   /* RAIN-6: the city light's colour (exactly 1 at rest) */
+  if(uStreak.x>0.){ vec2 q=(vUv*2.-1.)*uTan; q.x+=q.y*uStreak.y; float cx=q.x*110., h=fract(sin(floor(cx)*91.7)*43758.5), y=fract(q.y*1.3+uTime*(1.6+h)+h*7.);   /* RAIN-6: rain falling in the air, seen against the lights */
+    float s=step(0.45, h)*smoothstep(0., 0.04, y)*smoothstep(0.26, 0.02, y)*smoothstep(0.42, 0.05, abs(fract(cx)-0.5)), lum=dot(c1, vec3(0.3, 0.5, 0.2));
+    c+=s*uStreak.x*(0.015+0.9*lum)*vec3(0.86, 0.9, 0.98); }
   if(dep>0.995) c=skyOver(c, (vUv*2.-1.)*uTan, r);   /* RAIN-5c */
   vec2 p=(vUv*2.-1.)*uTan-uLight.xy; c+=uLightCol*uLight.z*0.2*exp(-dot(p, p)/0.012); gl_FragColor=vec4(c, 1.); }`;
 /* RAIN-2: THE WINDOW'S OWN QUAD — aQ0, aQ1 its four projected corners (a trapezoid along the street, the facade's perspective); the signed distance to

@@ -56,8 +56,30 @@ const made=[], report={}; let nBad=0;
 const shot=async (p, lang, size, name, ru)=>{ const f=`${lang}-${size}-${name}.png`; await p.evaluate(()=>document.fonts && document.fonts.ready); await p.waitForTimeout(150); await p.screenshot({ path:path.join(OUT, f) });
   const bad=await p.evaluate(OVERFLOW, ROOTS); report[f]=bad; nBad+=bad.length; made.push([f, ru, bad]); if(bad.length) console.log(`[lang-snap] ${f}: ${bad.length} overflow(s) — ${bad.slice(0, 3).join(' | ')}`); };
 let control=null;
+/* LANG-FIX (--select): the language list open, in both rooms' start screens — every option's background opaque and its text at least 4.5 : 1 against
+   it (the system draws the open list and cannot show a translucent background: it fell back to white behind light text). The capture shows the list
+   expanded in place (size = its options), with the same option styles. CONTROL: the old translucent option style must fail. */
+const SELECT=argv.includes('--select');
+const SELJUDGE=()=>{ const lum=c=>{ const m=c.match(/[\d.]+/g).map(Number), f=v=>{ v/=255; return v<=0.03928 ? v/12.92 : ((v+0.055)/1.055)**2.4; }; return 0.2126*f(m[0])+0.7152*f(m[1])+0.0722*f(m[2]); };
+  const bad=[]; for(const o of document.querySelectorAll('#langSel option')){ const s=getComputedStyle(o), bg=s.backgroundColor, fg=s.color, a=(bg.match(/[\d.]+/g)||[]).map(Number);
+    if(a.length<3 || (a.length===4 && a[3]<1)) { bad.push(`${o.value}: background ${bg} is not opaque`); continue; }
+    const L1=lum(bg), L2=lum(fg), cr=(Math.max(L1, L2)+0.05)/(Math.min(L1, L2)+0.05); if(cr<4.5) bad.push(`${o.value}: contrast ${cr.toFixed(2)} (${fg} on ${bg})`); }
+  return bad; };
+async function selectRun(){ let nB=0, ctl=null; const shots=[];
+  for(const room of ['forest', 'rain']) for(const [size, vp, dpr] of SIZES){
+    const ctx=await browser.newContext({ viewport:vp, deviceScaleFactor:dpr, locale:'en-US' }); const p=await ctx.newPage();
+    await p.goto(`http://127.0.0.1:${port}/apps/night/index.html?probe&room=${room}`); await p.waitForFunction(()=>window.__nightBoot && window.__nightBoot.state().done, null, { timeout:LIMIT }); await p.waitForTimeout(1200);
+    const bad=await p.evaluate(SELJUDGE); nB+=bad.length;
+    await p.evaluate(()=>{ const s=document.getElementById('langSel'); s.size=s.options.length; s.scrollIntoView({ block:'center' }); });
+    const f=`select-${room}-${size}.png`; await p.waitForTimeout(300); await p.screenshot({ path:path.join(OUT, f) }); shots.push([f, bad]); if(bad.length) console.log(`[lang-snap] ${f}: ${bad.join(' | ')}`);
+    if(ctl==null){ await p.addStyleTag({ content:'body.night-boot #langSel option{ background:transparent !important; color:inherit !important; }' }); ctl=(await p.evaluate(SELJUDGE)).length; }
+    await ctx.close(); }
+  const rows=shots.map(([f, bad])=>`<figure><img src="${f}"><figcaption><b>${f.replace('.png', '')}</b> — список языков раскрыт${bad.length ? `<br><span class="bad">${bad.join('<br>')}</span>` : ' — все пункты читаются'}</figcaption></figure>`).join(String.fromCharCode(10));
+  await writeFile(path.join(OUT, 'select.html'), `<!doctype html><meta charset="utf-8"><title>LANG-FIX — список языков</title><style>body{ font:15px/1.45 system-ui; background:#111; color:#ddd; margin:16px; } figure{ display:inline-block; vertical-align:top; margin:0 12px 18px 0; } img{ max-width:400px; max-height:600px; border:1px solid #333; } .bad{ color:#ff8a7a; }</style><h1>LANG-FIX: список языков на стартовом экране, лес и дождь</h1><p>Проверка: фон каждого пункта непрозрачный, контраст ≥ 4,5 : 1 — ${nB ? nB+' нарушений' : 'всё в порядке'}. Контроль (старый прозрачный стиль) ${ctl>0 ? 'пойман' : 'НЕ пойман'}.</p>${rows}`);
+  const pass=nB===0 && ctl>0; console.log(`[lang-snap] --select ${pass ? 'PASS' : 'NOT A PASS'} — ${shots.length} captures, ${nB} problem(s), CONTROL ${ctl>0 ? 'caught ('+ctl+')' : 'missed'} → ${path.relative(ROOT, OUT)}/select.html`); return pass; }
 try{
   await mkdir(OUT, { recursive:true });
+  if(SELECT){ process.exitCode=(await selectRun()) ? 0 : 1; throw 'done'; }
   for(const lang of LANGS) for(const [size, vp, dpr] of SIZES){
     const { ctx, p, errs }=await open(lang, vp, dpr);
     const htmlLang=await p.evaluate(()=>document.documentElement.lang); if(htmlLang!==lang) { console.log(`[lang-snap] ${lang}-${size}: <html lang> is ${htmlLang}`); nBad++; }
@@ -112,5 +134,5 @@ ${rows}`);
   const pass=nBad===0 && control>0;
   console.log(`[lang-snap] ${pass ? 'PASS' : 'NOT A PASS'} — ${made.length} captures in ${LANGS.length} language(s), ${nBad} overflow(s), CONTROL ${control>0 ? 'caught' : 'missed'} → ${path.relative(ROOT, OUT)}/index.html`);
   process.exitCode=pass ? 0 : 1;
-} catch(e){ console.log('[lang-snap] NOT A PASS — error: '+(e && e.stack || e)); process.exitCode=1; }
+} catch(e){ if(e!=='done'){ console.log('[lang-snap] NOT A PASS — error: '+(e && e.stack || e)); process.exitCode=1; } }
 finally{ await browser.close().catch(()=>{}); srv.close(); }
