@@ -2,7 +2,13 @@
    own words live in its record; the data row checks it. Night-only strings live in this app, not in core (core rule 3): imported first by main.js, they
    join the shared dictionaries (core/i18n.js DICTS — t() and [data-i18n] read them like any other key). Every key here has an English and a
    Russian text (data row «NIGHT texts both languages (app)» checks it, with every key the Night page and its code use). */
-import { DICTS } from '../../core/i18n.js';
+import { DICTS, langsAdd } from '../../core/i18n.js';
+import ES from './lang/es.js';   // LANG-1: six more languages (player-facing keys; development items fall back to English)
+import PT from './lang/pt.js';
+import DE from './lang/de.js';
+import FR from './lang/fr.js';
+import IT from './lang/it.js';
+import KA from './lang/ka.js';
 
 export const NIGHT_TEXTS=Object.freeze({
   en:Object.freeze({
@@ -41,6 +47,10 @@ export const NIGHT_TEXTS=Object.freeze({
     /* NIGHT-11 part 5 */
     'night.q.crashNote':'The picture opened at Standard: last time Detailed seemed too heavy for this device.',
     'night.howTo':'How to play', 'night.licences':'Licences',
+    /* STATS-1: the visit counter in the privacy notice; Write to us */
+    'night.privacyCount':'We count visits anonymously: no cookies, no camera data, no personal data.',
+    'night.privacyBody':'Your camera picture, your sound and your hand movements stay on this device: hand tracking runs inside the browser, and the app sends none of it anywhere. The app downloads only its own files and the hand model, from this same site.',   // LANG-1: Night's own (the shared text still names the CDN, gone since CORE-22)
+    'night.write':'Write to us', 'night.write.copy':'Copy address', 'night.write.copied':'Address copied', 'night.write.mail':'Open mail app',
     /* DESIGN-1 part C: the settings' three tabs, the «More» line, short labels with their notes under them */
     'night.tab.sound':'Sound', 'night.tab.picture':'Picture', 'night.tab.hands':'Hands',
     'night.set.answer':'Music answers my notes', 'night.set.answerNote':'Its next chord leans toward what I played.',
@@ -109,6 +119,9 @@ export const NIGHT_TEXTS=Object.freeze({
     /* NIGHT-11 part 5 */
     'night.q.crashNote':'Картинка открылась как «Обычная»: в прошлый раз «Подробная» оказалась слишком тяжёлой для этого устройства.',
     'night.howTo':'Как играть', 'night.licences':'Лицензии',
+    'night.privacyCount':'Мы анонимно считаем посещения: без cookie, без данных камеры, без личных данных.',
+    'night.privacyBody':'Изображение с камеры, ваш звук и движения рук остаются на этом устройстве: распознавание рук идёт внутри браузера, и приложение ничего из этого никуда не отправляет. Приложение загружает только свои файлы и модель рук — с этого же сайта.',
+    'night.write':'Написать нам', 'night.write.copy':'Скопировать адрес', 'night.write.copied':'Адрес скопирован', 'night.write.mail':'Открыть почту',
     'night.tab.sound':'Звук', 'night.tab.picture':'Картинка', 'night.tab.hands':'Руки',
     'night.set.answer':'Музыка отвечает моим нотам', 'night.set.answerNote':'Её следующий аккорд склоняется к сыгранному.',
     'night.q.detailedShort':'Подробная',
@@ -142,3 +155,8 @@ export const NIGHT_TEXTS=Object.freeze({
   }),
 });
 for(const [lang, T] of Object.entries(NIGHT_TEXTS)) if(DICTS[lang]) Object.assign(DICTS[lang], T);
+/* LANG-1: the six languages join after English and Russian (the order of the menu); the first visit then follows the device's language (core
+   langsAdd reads the choice again with them); a stored choice stays */
+export const NIGHT_LANGS=Object.freeze({ es:ES, pt:PT, de:DE, fr:FR, it:IT, ka:KA });
+langsAdd(Object.keys(NIGHT_LANGS));
+for(const [lang, T] of Object.entries(NIGHT_LANGS)) Object.assign(DICTS[lang], T);

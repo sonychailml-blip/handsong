@@ -13,6 +13,7 @@ import { calTick } from './calib.js';
 import { ROOMS } from './rooms/index.js';
 import { soundModAdd } from '../../core/soundmods.js';
 import { natureModule, roomRestore, roomSwitch } from './roomswitch.js';
+import { contactWire } from './contact.js';   // STATS-1
 import { camRestore } from './camera.js';   // NIGHT-10: the camera kept on this device
 import { startWire, startFailText, startSay, START_OLD } from './start.js';
 import { stillWire, stillRoomSet } from './still.js';   // DESIGN-1 part D: the start still waits for the live room
@@ -48,6 +49,7 @@ boot({ profile:'profile.night', afterDraw:()=>calTick(),
   parallel:!START_OLD, earlyModel:!START_OLD, onCamera:()=>{ fsCamera(); persistSoon(); }, freshRetry:true, handFiles:'own', camHold:QUICK_DENY_MS });   // CORE-22: MediaPipe's files from our own origin (the CSP names only 'self')   // CORE-20: a retry never takes a failed preload of early.js   // CORE-19: the camera beside the model, the model before the tap   // CORE-18: Night's start words; ?probe&modelstall=MS the runner's short stall
 startWire();
 updateWire();   // NIGHT-14
+contactWire();   // STATS-1: Write to us
 /* RAIN-R1: THE START ROOM READY BEFORE BEGIN — a room whose files are not here yet (the rain on a first visit: its files come on demand, then stay
    cached) loads while the start screen shows, and Begin keeps its loading look until they are in, START_ROOM_MS at most. They fail (offline, an error)
    or the time runs out: the forest instead (its still, tint and music) — Begin is never held for ever. The forest's files are the start set's: Begin

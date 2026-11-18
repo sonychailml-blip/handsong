@@ -788,6 +788,11 @@ export let volFloor=null;
 export const setVolFloor=v=>{ volFloor= v==null ? null : Math.max(0, Math.min(1, +v||0)); };
 export let nightView=null;
 export const setNightView=v=>{ nightView= v ? { glow:!!v.glow, plain:!!v.plain, fieldAll:!!v.fieldAll, tips:!!v.tips } : null; };   // RUN 8: tips — the hands as five fingertip fireflies
+/* CORE-25 (opt-in): the colour of the glow note field and the lit fingertip — null = the token --cv-hn-glow (Full, and every caller that never sets it).
+   Takes '#rrggbb' or 'rgb(r, g, b)' (a computed CSS colour); anything else clears it. Stored as '#rrggbb' (the canvas's hexA reads hex). */
+export let glowTint=null;
+export const setGlowTint=c=>{ const s=typeof c==='string' ? c.trim() : '', h=/^#[0-9a-f]{6}$/i.test(s) ? s.toLowerCase() : null, m= h ? null : s.match(/^rgba?\(\s*(\d+(?:\.\d+)?)[ ,]+(\d+(?:\.\d+)?)[ ,]+(\d+(?:\.\d+)?)/i);
+  glowTint= h || (m ? '#'+m.slice(1,4).map(v=>Math.max(0,Math.min(255,Math.round(+v)))).map(v=>v.toString(16).padStart(2,'0')).join('') : null); };
 /* RUN 7 (C4b): REPLACE a role's chain with `entries` (deep-copied) — the data half of a profile switch (Night's own chain, and back to the
    saved Full chain EXACTLY). The array keeps its identity (readers hold it); unassigned old scalars are hushed (rule 2.5). The sound half
    (fxSetActive, fxChainResplice) is ui's, as for fxChainDrop / fxChainPut. */

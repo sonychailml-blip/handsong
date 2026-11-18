@@ -102,7 +102,8 @@ export async function all(opt={}){   // F0: async — строка снимка 
   let nGuard=0; const stall0=frameStalls;
   setChordModeSel({});   // T7b: прогоны строят виды с ЖИВЫМ выбором режима аккордов — гоняем на умолчаниях, выбор человека возвращаем ниже
   setQuick(opt.quick);
-  const RUN=rowList({ quick:!!opt.quick, night:!!opt.night }), nRun=RUN.length, regBad=registryProblems();   // PROBE1: rows from the registry, in «at» order
+  const RUN=rowList({ quick:!!opt.quick, night:!!opt.night }).filter(r=>!opt.only || [].concat(opt.only).some(w=>r.name.includes(w))), nRun=RUN.length,   // CORE-25: opt.only — rows whose names hold one of these words (iteration mode)
+    regBad=registryProblems();   // PROBE1: rows from the registry, in «at» order
   try{
   for(const { name, run, read, drawn } of RUN){
     histReset();   // ED7: every row starts with an empty history (probes write the song directly; the tripwire would refuse a stale step)
@@ -146,7 +147,7 @@ export async function all(opt={}){   // F0: async — строка снимка 
   const songRows=rows.some(r=>r.song!=='—');   // SPLIT-2: a run with no song row (P.night on its own page) needs no song
   const pass=nDiff===0&&(M.ok||!songRows)&&!nHidden, sec=((performance.now()-T00)/1000).toFixed(1);
   console.log(`[scaleprobe all] ${title}: ${pass ? 'PASS' : 'NOT A PASS'} — ${rows.length} checks, ${nDiff} differences${nHidden?`, ${nHidden} not checked (tab hidden — rerun with the tab visible)`:''}, song material ${M.ok?'complete':'incomplete'} (${events.length} events, ${M.counts.views} tuning views) · ${sec} s`);
-  return { pass, rows, material:M, hidden:nHidden, seconds:+sec, measures };
+  return { pass, rows, material:M, hidden:nHidden, seconds:+sec, measures, lists:lists.map(([n,l])=>[n,l.slice(0,8)]) };   // CORE-25: lists — each row's first differences (--eval)
 }
 
 /* ═══ P.quick — БЫСТРЫЙ БАРЬЕР (слайс «быстрые пробы») ═══ Те же строки, что P.all, без медленных строк (флаг slow в реестре; прогоны данных по всем видам — их

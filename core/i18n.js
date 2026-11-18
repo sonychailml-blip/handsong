@@ -29,7 +29,7 @@ export const store = {
 export const LANGS = ['en','ru'];
 /* Эндонимы — самоназвания языков (каждый на своём языке), для подписи опций переключателя. Держим все
    четыре: пригодятся, когда es/de войдут; на выбор влияет только LANGS. */
-export const LANG_LABEL = { en:'English', ru:'Русский', es:'Español', de:'Deutsch' };
+export const LANG_LABEL = { en:'English', ru:'Русский', es:'Español', de:'Deutsch', pt:'Português', fr:'Français', it:'Italiano', ka:'ქართული' };   // CORE-26: pt, fr, it, ka (an app opts in with langsAdd)
 
 /* СЛОВАРИ — key → строка, по языку. ЭТАП A: перенесён ИНТЕРФЕЙСНЫЙ ХРОМ (кнопки/подписи/подсказки/
    тосты/статус/ярлыки холста). English — ОСНОВНОЙ текст (по нему читает большинство), ru — перевод.
@@ -1525,6 +1525,13 @@ export function withLang(code, fn){
   if(!LANGS.includes(code)) return fn();
   const keep=lang; lang=code;
   try{ return fn(); } finally { lang=keep; }
+}
+/* CORE-26 (opt-in): an app adds languages it carries dictionaries for (its own texts merged into DICTS), BEFORE its first render. The first
+   choice is then read again with them: the stored choice if valid, else the device's language. Never called (Full): LANGS and lang as before. */
+export function langsAdd(codes){
+  for(const c of codes||[]) if(typeof c==='string' && /^[a-z]{2}$/.test(c) && !LANGS.includes(c)){ LANGS.push(c); if(!DICTS[c]) DICTS[c]={}; }
+  const st=store.get(LS_KEY); lang=(st && LANGS.includes(st)) ? st : detectLang();
+  return LANGS.slice();
 }
 export function setLang(code){
   if(!LANGS.includes(code)) return;

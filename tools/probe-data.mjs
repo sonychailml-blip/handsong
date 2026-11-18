@@ -30,6 +30,7 @@ globalThis.fetch=async (u,o)=>{
 };
 
 const verbose=process.argv.includes('--verbose');
+const ONLY=(i=>i>=0 ? process.argv[i+1] : null)(process.argv.indexOf('--only'));   // LANG-1: --only WORD — only the rows whose names hold it (iteration mode; never a full pass)
 const T00=performance.now();
 let P, loadReport, LIC, NIX, LAT, DSP, HS, CL, FMT, IDR, GF, CFG, SONGF;
 /* LAT1: the latency core's arithmetic, exactly — statistics, the ring window, the hand → sound sum, the Bluetooth heuristic */
@@ -1975,6 +1976,76 @@ async function nightQuality(){
   notes.push('Detailed · Standard · Light; saved settings: '+MIG.map(([a, w])=>`${a.join('/')}→${w}`).join(', '));
   return { cases:n, total:d.length, differences:d, notes };
 }
+/* STATS-1 — «NIGHT visits and Write to us (app)»: the visit counter (Vercel Web Analytics, cookieless) is the same-origin script after its queue stub,
+   deferred, no new host in the page's CSP (connect-src / script-src stay 'self'); the privacy notice names it in Night's words in every language;
+   the service worker answers only its precache list (the counter's path never in it: offline play never waits for it). Write to us: the button and
+   its box on the page, the address put together by contact.js (hello@handsong.app) and never written in the page's source. CONTROLS: a page without
+   the counter, and a page with the address in its source, are caught. */
+async function nightVisits(){
+  const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); };
+  const fs=await import('node:fs'), rd=f=>fs.readFileSync(new URL(f, import.meta.url),'utf8');
+  const html=rd('../apps/night/index.html'), tx=rd('../apps/night/texts.js'), ct=rd('../apps/night/contact.js'), sw=rd('../apps/night/sw.js');
+  const counter=h=>{ const st=h.indexOf('<script src="../../core/va-stub.js"></script>'), sc=h.search(/<script defer src="\/_vercel\/insights\/script\.js"><\/script>/); return st>=0 && sc>st; };
+  ok('the counter is not the deferred same-origin script after its stub', counter(html));
+  ok('CONTROL: a page without the counter passes', !counter(html.replace('<script defer src="/_vercel/insights/script.js"></script>', '')));
+  { const csp=(html.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/)||[])[1]||''; ok(`the CSP names another host: ${csp}`, !!csp && !/https?:/.test(csp) && /connect-src 'self'/.test(csp)); }
+  ok('the privacy notice does not read Night’s counter line', /<p data-i18n="night.privacyCount">/.test(html));
+  const langs=(tx.match(/^ {2}([a-z]{2}):Object\.freeze\(\{/gm)||[]).map(x=>x.trim().slice(0,2));
+  { const c=k=>tx.split(`'${k}':`).length-1; for(const k of ['night.privacyCount', 'night.write', 'night.write.copy', 'night.write.copied', 'night.write.mail']) ok(`the text ${k} appears ${c(k)} time(s) (one per language: ${langs.length})`, c(k)===langs.length); }
+  ok('the service worker answers more than its list (the counter could be caught offline)', /const f=LIST\.get\(p\); if\(!f \|\| !wanted\(f\)\) return;/.test(sw));
+  ok('Write to us: the button or its box is missing', /id="nightWrite"/.test(html) && /id="nightWriteBox"[^>]*hidden/.test(html) && /id="nightWriteAddr"/.test(html) && /id="nightWriteCopy"/.test(html) && /id="nightWriteMail"/.test(html));
+  const addr=(()=>{ const m=ct.match(/ADDR=\[([^\]]+)\]\.join\('@'\)/); return m ? m[1].split(',').map(x=>x.trim().replace(/^'|'$/g,'')).join('@') : null; })();
+  ok(`the address is ${addr}, not hello@handsong.app`, addr==='hello@handsong.app');
+  const inSrc=h=>h.includes('hello@handsong.app'); ok('the address is written in the page’s source', !inSrc(html)); ok('CONTROL: the address planted in the page passes', inSrc(html.replace('</body>', 'hello@handsong.app</body>')));
+  notes.push(`counter after its stub, CSP 'self' only; ${langs.length} languages; Write to us → ${addr}`);
+  return { cases:n, total:d.length, differences:d, notes };
+}
+/* LANG-1 — «NIGHT texts in every language (app)»: Night carries eight languages (en, ru + es, pt, de, fr, it, ka; core langsAdd). Each of the six files
+   holds the same keys: every player-facing key the Night page and its code use (the night.* keys but the development items, and the shared keys the
+   start card shows), Night's own timbre names (tname.<id>) for every timbre Night offers; every key also exists in English (no stray key); each text
+   keeps the English text's placeholders ({begin}, {n}, {i:…}); Georgian texts are written in Georgian letters; no long text left in English. The room
+   records name every room, mood and music level in all eight; the language menu lists the eight in the dictionaries' order; the start guard has all
+   eight. CONTROLS: a dropped key, a dropped placeholder and a Georgian text in Latin letters are caught. */
+async function nightTextsAll(){
+  const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); };
+  const fs=await import('node:fs'), path=await import('node:path'), ROOT=new URL('..', import.meta.url).pathname.replace(/^\/(\w:)/,'$1');
+  const I=await import(new URL('../core/i18n.js', import.meta.url).href), TX=await import(new URL('../apps/night/texts.js', import.meta.url).href);
+  const html=fs.readFileSync(path.join(ROOT, 'apps/night/index.html'), 'utf8'), keys=new Set();
+  for(const m of html.matchAll(/data-i18n(?:-title)?="([^"]+)"/g)) keys.add(m[1]);
+  const walk=dir=>{ for(const e of fs.readdirSync(dir, { withFileTypes:true })){ const p=path.join(dir, e.name); if(e.isDirectory()){ if(!/vendor|fonts|icons|tex|lang/.test(e.name)) walk(p); } else if(p.endsWith('.js'))
+      for(const m of fs.readFileSync(p, 'utf8').matchAll(/\bt\(\s*'([a-zA-Z0-9_.\-]+)'/g)) keys.add(m[1]); } };
+  walk(path.join(ROOT, 'apps/night'));
+  const en=I.DICTS.en, DEV=/^night\.(cal\.votes|measure|measured|measuring|scene|toSound)/, SHARED=['privacy.title', 'prof.bgDark', 'prof.bgCamera', 'start.retry', 'install.btn', 'install.title'];
+  for(const p of [...keys].filter(k=>k.endsWith('.'))){ keys.delete(p); for(const k of Object.keys(en)) if(k.startsWith(p)) keys.add(k); }
+  const player=[...keys].filter(k=>k in en && ((k.startsWith('night.') && !DEV.test(k)) || SHARED.includes(k))).sort();
+  const NEW=Object.keys(TX.NIGHT_LANGS), want=['en','ru',...NEW];
+  ok(`the languages are ${I.LANGS.join(',')}, not ${want.join(',')}`, I.LANGS.join(',')===want.join(','));
+  const prof=JSON.parse(fs.readFileSync(path.join(ROOT, 'apps/night/data/night.json'), 'utf8')), rainSrc=fs.readFileSync(path.join(ROOT, 'apps/night/rooms/rain/pure/room.js'), 'utf8');
+  const timbres=[...(prof.timbres||[]), ...[...rainSrc.matchAll(/id:'(rain\/[a-z-]+)'/g)].map(m=>m[1])], tnames=timbres.map(id=>'tname.'+id);
+  const ph=s=>[...String(s).matchAll(/\{[a-z:\-]+\}/gi)].map(m=>m[0]).sort().join(' ');
+  const GEO=/[\u10A0-\u10FF\u1C90-\u1CBF]/, LAT=/[A-Za-z]{3}/;
+  const judge=(code, T)=>{ const bad=[];
+    for(const k of [...player, ...tnames]) if(!(k in T)) bad.push(`${code}: no ${k}`);
+    for(const k of Object.keys(T)) if(!k.startsWith('tname.') && !(k in en)) bad.push(`${code}: ${k} has no English`);
+    for(const k of Object.keys(T)) if(k in en && ph(T[k])!==ph(en[k])) bad.push(`${code}: ${k} placeholders «${ph(T[k])}», English «${ph(en[k])}»`);
+    if(code==='ka') for(const [k, v] of Object.entries(T)){ const plain=String(v).replace(/\{[^}]*\}|Handsong( Night)?|Zoom|Chrome|Safari|iPhone|iPad|cookie|%/g, ''); if(LAT.test(plain) || (/[^\s\d{}\/.%:·—–-]/.test(plain) && !GEO.test(plain))) bad.push(`ka: ${k} is not in Georgian letters («${v}»)`); }
+    const same=Object.entries(T).filter(([k, v])=>k in en && String(v).length>12 && v===en[k] && !/^Handsong/.test(v)).map(([k])=>k); if(same.length) bad.push(`${code}: left in English — ${same.slice(0,5).join(', ')}`);
+    return bad; };
+  for(const code of NEW){ const b=judge(code, TX.NIGHT_LANGS[code]); n++; if(b.length) d.push(...b.slice(0,6)); }
+  { const T={ ...TX.NIGHT_LANGS.es }; delete T['night.begin']; ok('CONTROL: a dropped key is not caught', judge('es', T).some(x=>/no night\.begin/.test(x))); }
+  { const T={ ...TX.NIGHT_LANGS.de, 'night.cam.busy.pc':'Die Kamera ist belegt.' }; ok('CONTROL: a dropped placeholder is not caught', judge('de', T).some(x=>/placeholders/.test(x))); }
+  { const T={ ...TX.NIGHT_LANGS.ka, 'night.begin':'Dacqeba' }; ok('CONTROL: Georgian in Latin letters is not caught', judge('ka', T).some(x=>/Georgian letters/.test(x))); }
+  /* the room records: every name in all eight */
+  const recs=[(await import(new URL('../apps/night/rooms/forest/pure/room.js', import.meta.url).href)).FOREST_ROOM, (await import(new URL('../apps/night/rooms/rain/pure/room.js', import.meta.url).href)).RAIN_ROOM].filter(Boolean);
+  { const miss=[]; for(const r of recs){ const fields=[['name', r.name], ...Object.entries((r.music && r.music.names)||{}).map(([k, v])=>['music.names.'+k, v]), ...Object.entries((r.music && r.music.bedNames)||{}).map(([k, v])=>['music.bedNames.'+k, v])];
+      for(const [f, v] of fields) for(const c of want) if(!v || typeof v[c]!=='string' || !v[c]) miss.push(`${r.id} ${f}.${c}`); }
+    n++; if(recs.length<2) d.push(`the room records were not read (${recs.length})`); if(miss.length) d.push('room names missing: '+miss.slice(0,8).join(', ')); }
+  { const sel=(html.match(/<select id="langSel"[^>]*>([\s\S]*?)<\/select>/)||[])[1]||'', opts=[...sel.matchAll(/value="([a-z]{2})"/g)].map(m=>m[1]); ok(`the language menu lists ${opts.join(',')}`, opts.join(',')===want.join(','));
+    const labs=[...sel.matchAll(/value="([a-z]{2})">([^<]+)</g)]; ok('the menu\u2019s names are not the endonyms', labs.every(([, c, l])=>I.LANG_LABEL[c]===l)); }
+  { const g=fs.readFileSync(path.join(ROOT, 'apps/night/guard.js'), 'utf8'); ok('the start guard lacks a language: '+want.filter(c=>!g.includes(' '+c+':{ slow:')).join(','), want.every(c=>g.includes(' '+c+':{ slow:'))); }
+  notes.push(`${want.length} languages; ${player.length} player keys + ${tnames.length} timbre names in each of ${NEW.join(', ')}; ${recs.length} room records named in all`);
+  return { cases:n, total:d.length, differences:d, notes };
+}
 async function rainFocus(){
   const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); };
   const F=await import(new URL('../apps/night/rooms/rain/pure/focus.js', import.meta.url).href), C=F.FOCUS, CT=await import(new URL('../apps/night/rooms/rain/pure/city.js', import.meta.url).href);
@@ -3218,6 +3289,7 @@ const ROWS=[
   ['NIGHT start still (app)',   ()=>nightStartStill(),  r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // DESIGN-1 part D
   ['NIGHT hand light anchor (app)', ()=>nightHandLight(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-13
   ["NIGHT quality (app)", ()=>nightQuality(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-16
+  ["NIGHT visits and Write to us (app)", ()=>nightVisits(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // STATS-1
   ["RAIN focus law (app)", ()=>rainFocus(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-0
   ["RAIN view law (app)", ()=>rainView(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-0b
   ["RAIN window pick (app)", ()=>rainPick(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-0
@@ -3271,6 +3343,7 @@ const ROWS=[
   ['FOREST paint (app)',        ()=>forestPaintCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 8
   ['FOREST hidden (app)',       ()=>forestHiddenCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 9
   ['NIGHT texts both languages (app)', ()=>nightTextsCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-7
+  ['NIGHT texts in every language (app)', ()=>nightTextsAll(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // LANG-1
   ['NIGHT home screen (app)', ()=>nightHomeScreen(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-7c
   ['NIGHT forest files (app)',  ()=>nightForestFiles(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 (the files rule, the size budget)
   ['OLD NAME gone',             ()=>oldNameGone(),  r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // SPLIT-2
@@ -3284,6 +3357,7 @@ out(`[probe-data] running ${ROWS.length} checks (40 s to 2 min, depending on the
 const keep={ log:console.log, warn:console.warn, table:console.table, info:console.info }, mute=()=>{};
 const rows=[], lists=[];
 for(const [name,run,read] of ROWS){
+  if(ONLY && !name.includes(ONLY)) continue;
   const t0=performance.now(); let row;
   if(!verbose){ console.log=console.warn=console.table=console.info=mute; }
   try{ let res=run(); if(res && typeof res.then==='function') res=await res;
@@ -3304,5 +3378,5 @@ if(loadReport.emergency) console.warn('[probe-data] data files: the loader fell 
 const regBad=REG.rowProblems();   // PROBE1: duplicate names, shared places, bad shapes in the registry
 if(regBad.length){ console.warn(`[probe-data] probe rows registry: ${regBad.length} problem(s)`); regBad.slice(0,5).forEach(m=>console.warn('   '+m)); }
 const nDiff=regBad.length+rows.reduce((n,r)=>n+(typeof r.differences==='number'?r.differences:1),0);
-const pass=nDiff===0 && !problems.length && !loadReport.emergency;
-verdict(pass, `${rows.length} checks, ${nDiff} differences, data files ${loadReport.files} (${problems.length} problems) · load ${loadMs} ms · total ${((performance.now()-T00)/1000).toFixed(1)} s`);
+const pass=nDiff===0 && !problems.length && !loadReport.emergency && !ONLY;   // --only is never a pass of the whole runner
+verdict(pass, `${ONLY ? `--only «${ONLY}»: ` : ''}${rows.length} checks, ${nDiff} differences, data files ${loadReport.files} (${problems.length} problems) · load ${loadMs} ms · total ${((performance.now()-T00)/1000).toFixed(1)} s`);

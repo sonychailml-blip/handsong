@@ -16,7 +16,7 @@
   --night-surface:rgba(20,28,44,.52); --night-surface-plain:rgba(12,17,28,.94); --night-hairline:rgba(200,215,240,.20); --night-raised:rgba(255,255,255,.06);
   --night-emblem-dot:rgba(230,236,245,.85);
   --night-tint-ms:calc(var(--night-scene-out) + var(--night-scene-in));   /* a room switch's two fades: the tint eases over both */
-  --night-font-display:"Literata", "Iowan Old Style", Georgia, serif; --night-font-body:"Andika", system-ui, "Segoe UI", sans-serif;
+  --night-font-display:"Literata", "Night Georgian", "Iowan Old Style", Georgia, serif; --night-font-body:"Andika", "Night Georgian", system-ui, "Segoe UI", sans-serif;   /* LANG-1: Georgian letters from Noto Sans Georgian (the faces below cover only its range) */
   --night-fw-light:300; --night-fw-regular:400; --night-fw-bold:700; --night-lh:1.45; --night-lh-tight:1.1; --night-track-wide:.12em;
   --night-fs-title:28px; --night-fs-body:17px; --night-fs-value:15px; --night-fs-label:13px; --night-fs-small:12px; --night-fs-mark:30px;
   --night-btn:56px; --night-ibtn:46px; --night-gap:12px; --night-gap-sm:6px; --night-pad:18px; --night-pad-lg:24px; --night-edge:14px;
@@ -67,6 +67,9 @@
 :root{ transition:--night-tint var(--night-tint-ms) var(--night-ease); }
 /* RUN 7 (C11): the Night face's fonts, self-hosted from our own origin (CSP default-src 'self'), register entries font-andika / font-literata
    (LIC1). Andika ships UNMODIFIED (its licence reserves the name); Literata as its latin + cyrillic subsets (no reserved name). */
+/* LANG-1: Georgian (Mkhedruli, Mtavruli, Asomtavruli/Nuskhuri) — Noto Sans Georgian, OFL-1.1, unmodified fontsource subsets; fetched only when a Georgian letter shows */
+@font-face{ font-family:"Night Georgian"; font-style:normal; font-weight:400; font-display:swap; src:url(fonts/noto-georgian/noto-sans-georgian-georgian-400-normal.woff2) format("woff2"); unicode-range:U+0589, U+10A0-10FF, U+1C90-1CBA, U+1CBD-1CBF, U+2D00-2D2F; }
+@font-face{ font-family:"Night Georgian"; font-style:normal; font-weight:700; font-display:swap; src:url(fonts/noto-georgian/noto-sans-georgian-georgian-700-normal.woff2) format("woff2"); unicode-range:U+0589, U+10A0-10FF, U+1C90-1CBA, U+1CBD-1CBF, U+2D00-2D2F; }
 @font-face{ font-family:"Andika"; font-style:normal; font-weight:400; font-display:swap; src:url(fonts/andika/Andika-Regular.woff2) format("woff2"); }
 @font-face{ font-family:"Andika"; font-style:normal; font-weight:700; font-display:swap; src:url(fonts/andika/Andika-Bold.woff2) format("woff2"); }
 @font-face{ font-family:"Literata"; font-style:normal; font-weight:300; font-display:swap; src:url(fonts/literata/literata-300-cyrillic.woff2) format("woff2");
@@ -394,7 +397,12 @@ html[data-room="room.rain"][data-still="full"] .night-still{ background-image:li
 .night-dot-trail{ position:fixed; left:0; top:0; width:100vw; height:100vh; z-index:var(--z-night-dot); pointer-events:none; }
 .night-start-head .emblem-glow.night-dot-out{ opacity:0; }
 @media (prefers-reduced-motion: reduce){ .night-still.breathe{ animation:none; } }
-a.night-lnk{ text-decoration:none; }   /* NIGHT-15: the «Licences» link reads as the other links */
+a.night-lnk{ text-decoration:none; }
+/* STATS-1: Write to us — the address selectable as one piece, the two buttons under it */
+.night-write{ margin:var(--night-gap-sm) 0 0; }
+.night-write-addr{ display:block; user-select:all; -webkit-user-select:all; color:var(--night-ink); font-size:var(--night-fs-value); overflow-wrap:anywhere; }
+.night-write .night-btns{ margin-top:var(--night-gap-sm); }
+#nightShell a.night-write-mail{ display:inline-flex; align-items:center; justify-content:center; color:var(--night-ink); text-decoration:none; }   /* NIGHT-15: the «Licences» link reads as the other links */
 
 /* FOREST-2: the development label «level · forest» (apps/night/forestlabel.js), only with ?forest=… in the address */
 .forest-label{position:fixed;left:var(--night-gap);bottom:var(--night-gap);z-index:var(--z-diag);padding:var(--night-gap-sm) var(--night-gap);border-radius:var(--night-r-pill);background:var(--night-raised);color:var(--night-ink-dim);font-size:var(--night-fs-small);line-height:var(--night-lh);pointer-events:none;white-space:nowrap}

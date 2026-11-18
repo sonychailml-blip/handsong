@@ -442,6 +442,22 @@
       "replace": "kept — the font of the user's chosen Night design (RUN 7, BACKLOG §7.19); not to be replaced"
     },
     {
+      "id": "font-noto-georgian",
+      "name": "Noto Sans Georgian (the Georgian letters of the Night face, LANG-1) — The Noto Project Authors",
+      "class": "font",
+      "use": "shipped",
+      "version": "npm @fontsource/noto-sans-georgian 5.1.0, georgian subset, weights 400 and 700 (woff2), UNMODIFIED",
+      "licence": "OFL-1.1",
+      "source": "https://fontsource.org/fonts/noto-sans-georgian (https://github.com/notofonts/georgian) — no Reserved Font Name (the licence file names none)",
+      "files": [
+        "apps/night/fonts/noto-georgian/noto-sans-georgian-georgian-400-normal.woff2",
+        "apps/night/fonts/noto-georgian/noto-sans-georgian-georgian-700-normal.woff2",
+        "apps/night/fonts/noto-georgian/OFL.txt"
+      ],
+      "notes": "LANG-1 (the founder: Georgian with a free OFL font, a fallback only): Andika and Literata have no Georgian. Used through @font-face with the Georgian unicode-range only, after Andika and Literata in Night's font stacks, so it is fetched only when a Georgian letter shows. SHA-256: 400 c2ee028964d2538739995beea3980b5558502423ef383934ce65dc4ce3bf4e10, 700 cca38349f7db358904741b60115c9fe71dfa34f3ca5c6ed2725c89e93392673e. Self-hosted, served from our own origin.",
+      "replace": "kept — a fallback for the Georgian letters of the user's chosen Night design"
+    },
+    {
       "id": "svg-namespace",
       "name": "The SVG namespace NAME «http://www.w3.org/2000/svg» — an identifier the DOM needs to create SVG elements (document.createElementNS); never fetched, nothing is sent",
       "class": "link",

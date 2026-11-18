@@ -12,7 +12,7 @@ import { FX_EDGE, FX_STEP, fxBarItems, fxBarsBox, fxBarsY, fxParamOnFinger, hexA
 import { drawRoll } from './roll.js';
 import { drawLooper, loopViewClear } from './strip.js';
 import { stackAdd } from './stack.js';   // VIS1a: the play screen's two modules
-import { nightView } from '../../state.js';   // RUN 7 (C6): the Night view (glow note field, plain labels)
+import { nightView, glowTint } from '../../state.js';   // RUN 7 (C6): the Night view (glow note field, plain labels); CORE-25: glowTint
 import { NIGHT_UI } from '../../pure/nightui.js';
 
  
@@ -443,7 +443,8 @@ function drawRole(instr,rx0,rx1,playH){
    a wide bright band): only a soft OVAL glow on the row under each playing hand — NIGHT_UI.glowReach of the field's width each side of the hand,
    fading to nothing at the row's edges and sides, brighter while it sounds; no lines at all. «Show the full note field» adds only a
    barely-there tint on every other row. nightHands = the bus's handsView of this frame (set by the surface module). */
-let nightHands=[], nightFxV=null;
+let nightHands=[], nightFxV=null, fieldCol=null;
+const glowCol=()=>glowTint||cv('hn-glow');   // CORE-25: the room's colour when an app sets one, else the token (Full)
 function drawNightField(x0,x1,playH,actSlots,actDegs){
   const w=x1-x0, bands=[], on=new Set();
   if(rectGrid()){ const RL=rectLayout(); for(let b=0;b<RL.bands;b++) bands.push(rectBandY(b,playH,RL.bands)); for(const g of actSlots||[]) on.add(Math.floor(g/RL.k)+RL.regBands); }
@@ -453,7 +454,7 @@ function drawNightField(x0,x1,playH,actSlots,actDegs){
     const b=bands.findIndex(([yTop,yBot])=>h.y>=yTop && h.y<yBot); if(b<0) continue;
     const [yTop,yBot]=bands[b], r=(yBot-yTop)/2, rx=Math.max(r, NIGHT_UI.glowReach*w), a=Math.min(1, NIGHT_UI.glowMax*(on.has(b) ? NIGHT_UI.glowOn : 1));
     ctx.save(); ctx.beginPath(); ctx.rect(x0,yTop,w,yBot-yTop); ctx.clip(); ctx.translate(h.x, yTop+r); ctx.scale(rx/r, 1);
-    const g=ctx.createRadialGradient(0,0,0,0,0,r); g.addColorStop(0, hexA(cv('hn-glow'), a)); g.addColorStop(0.45, hexA(cv('hn-glow'), a*0.4)); g.addColorStop(1, hexA(cv('hn-glow'), 0));
+    const c=fieldCol=glowCol(), g=ctx.createRadialGradient(0,0,0,0,0,r); g.addColorStop(0, hexA(c, a)); g.addColorStop(0.45, hexA(c, a*0.4)); g.addColorStop(1, hexA(c, 0));
     ctx.fillStyle=g; ctx.fillRect(-r,-r,2*r,2*r); ctx.restore(); }
 }
 /* RUN 8 (slice 3 + the user's addendum 5): NIGHT'S HANDS ARE FIVE FIREFLIES — the five fingertips only (the Hush emblem's five dots), exactly
@@ -469,7 +470,7 @@ function halo(x,y,r,soft,col,a){   // soft 0 = a sharp edge … 1 = a wide soft 
 function drawNightTips(S,k,lm,W,H){
   const hv=nightHands.find(h=>h.key===k), play= hv ? hv.play : handFnOf(k,'ld')!=='fx', d= hv ? hv.d : 0.5, now=performance.now(), fx=nightFxV||{};
   const sounding=new Set(Object.keys(S.fing||{}).map(f=>+f+1)); if(play && !sounding.size && S.pinch && S.oct>=0) sounding.add(S.oct+1);   // tip 0 = thumb, 1… = index…
-  const lime=cv('hn-glow'), amber=cv('hn-amber'), u=Math.min(W,H)/600;
+  const lime=glowCol(), amber=cv('hn-amber'), u=Math.min(W,H)/600;
   for(let j=0;j<5;j++){ const x=sx(lm[TIP_LM[j]].x,W), y=sy(lm[TIP_LM[j]].y,H), id=k+':'+j;
     let tr=trails.get(id); if(!tr) trails.set(id, tr=[]); tr.unshift([x,y,now]); while(tr.length>TRAIL_N || (tr.length && now-tr[tr.length-1][2]>TRAIL_MS)) tr.pop();
     let col=amber, a=0.75, big=false;
@@ -480,7 +481,7 @@ function drawNightTips(S,k,lm,W,H){
     if(big) halo(x,y,(14+30*d)*u, d, col, 0.55*a);
     halo(x,y,(big?9:7)*u, 0.3, col, 0.5*a);
     ctx.fillStyle=hexA(col, Math.min(1,a+0.15)); ctx.beginPath(); ctx.arc(x,y,(big?3.2:2.4)*u,0,7); ctx.fill();
-    tipsDrawn.push({ key:k, tip:j, x, y, lit:col===lime, a, halo: big ? (14+30*d)*u : 0 }); }
+    tipsDrawn.push({ key:k, tip:j, x, y, lit:col===lime, col, a, halo: big ? (14+30*d)*u : 0 }); }
 }
 /* CORE-21 (Night's «all points»): the hand's other sixteen points in the fingertips' own look — small, soft, dim amber glows under the five fireflies */
 function drawGlowJoints(lm,W,H){
@@ -491,6 +492,8 @@ function drawGlowJoints(lm,W,H){
 }
 /* probe only: the fingertip fireflies drawn in the last frame (positions in canvas pixels, which are lit, the halo's radius) */
 export const nightTipsDbg=()=>tipsDrawn.map(t=>({ ...t }));
+/* probe only (CORE-25): the colour the glow note field last drew with (null before its first glow) */
+export const fieldColDbg=()=>fieldCol;
 /* probe only (CORE-21): the other points drawn in Night's look in the last frame («all points») */
 export const glowJointsDbg=()=>jointsDrawn.map(t=>({ ...t }));
 /* probe only: draw the hands overlay once NOW from HANDS (the next screen frame redraws the canvas) → the fingertips drawn */

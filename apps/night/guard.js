@@ -6,10 +6,17 @@
    shorter wait. */
 (function(){
   var T={ en:{ slow:'Still loading. Check the connection, or reload.', fail:'Something did not load. Check the connection, then reload the page.', reload:'Reload' },
-          ru:{ slow:'Всё ещё загружается. Проверьте связь или перезагрузите страницу.', fail:'Что-то не загрузилось. Проверьте связь и перезагрузите страницу.', reload:'Перезагрузить' } };
+          ru:{ slow:'Всё ещё загружается. Проверьте связь или перезагрузите страницу.', fail:'Что-то не загрузилось. Проверьте связь и перезагрузите страницу.', reload:'Перезагрузить' },
+          /* LANG-1: the six more languages (apps/night/lang/) */
+          es:{ slow:'Todavía cargando. Comprueba la conexión o recarga la página.', fail:'Algo no se ha cargado. Comprueba la conexión y recarga la página.', reload:'Recargar' },
+          pt:{ slow:'Ainda carregando. Verifique a conexão ou recarregue a página.', fail:'Algo não carregou. Verifique a conexão e recarregue a página.', reload:'Recarregar' },
+          de:{ slow:'Lädt noch. Prüfe die Verbindung oder lade die Seite neu.', fail:'Etwas wurde nicht geladen. Prüfe die Verbindung und lade die Seite neu.', reload:'Neu laden' },
+          fr:{ slow:'Chargement en cours. Vérifiez la connexion ou rechargez la page.', fail:'Quelque chose n’a pas été chargé. Vérifiez la connexion, puis rechargez la page.', reload:'Recharger' },
+          it:{ slow:'Ancora in caricamento. Controlla la connessione o ricarica la pagina.', fail:'Qualcosa non si è caricato. Controlla la connessione, poi ricarica la pagina.', reload:'Ricarica' },
+          ka:{ slow:'ჯერ კიდევ იტვირთება. შეამოწმეთ კავშირი ან გადატვირთეთ გვერდი.', fail:'რაღაც ვერ ჩაიტვირთა. შეამოწმეთ კავშირი და გადატვირთეთ გვერდი.', reload:'გადატვირთვა' } };
   var q=location.search, SLOW_MS=12000, m=/[?&]probe\b/.test(q) && /[?&]bootslow=(\d+)/.exec(q); if(m) SLOW_MS=+m[1];
-  function lang(){ try{ var s=localStorage.getItem('handsong.night.lang'); if(s==='en' || s==='ru') return s; }catch(e){}
-    var L=(navigator.languages && navigator.languages.length) ? navigator.languages : [navigator.language||'']; for(var i=0;i<L.length;i++){ var c=String(L[i]).slice(0,2).toLowerCase(); if(c==='en' || c==='ru') return c; } return 'en'; }
+  function lang(){ try{ var s=localStorage.getItem('handsong.night.lang'); if(s && T[s]) return s; }catch(e){}
+    var L=(navigator.languages && navigator.languages.length) ? navigator.languages : [navigator.language||'']; for(var i=0;i<L.length;i++){ var c=String(L[i]).slice(0,2).toLowerCase(); if(T[c]) return c; } return 'en'; }
   try{ document.documentElement.setAttribute('lang', lang()); }catch(e){}
   /* DESIGN-1 part D: which level's still the start screen shows from the first paint (night.css: html[data-still]) — the stored picture level */
   try{ document.documentElement.setAttribute('data-still', localStorage.getItem('handsong.sceneLevel')==='full' ? 'full' : 'reduced'); }catch(e){}

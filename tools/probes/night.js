@@ -37,6 +37,8 @@ export { checkForestToday, checkForestFull, checkForestClear, checkForestLost, c
 export { checkForestBed } from './night/rain4.js';
 export { checkRainClicks } from './night/rain4e.js';   // RAIN-4e: no clicks on the bed
 export { checkNightLabels } from './night/ui1.js';   // UI-1: Sound, Music and Mood read what plays after a room switch
+export { checkNightGlowTint } from './night/core25.js';   // CORE-25: the hands' glow follows the room's tint
+export { checkBedNull } from './night/audio1.js';   // AUDIO-1: the rain bed made cheaper by structure, proven by a null test
 export { checkForestApart } from './night/forest2e.js';   // FOREST-2e: plants apart
 export { checkForestCull } from './night/forestcull.js';   // FOREST-2e: the cull (?forest=cull) keeps the frames
 export { checkRainQuads } from './night/rain5.js';   // RAIN-5b: no sprite's quad edge shows   // RAIN-4: the forest's bed bit-exact after the jazz bed   // FOREST-2: the switch ?forest=new

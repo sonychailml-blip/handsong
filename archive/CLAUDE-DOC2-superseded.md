@@ -50,3 +50,6 @@ CORE-22 + NIGHT-14 (2026-11-13), `CLAUDE.md` «What this is», «Running / devel
 
 CORE-22 + NIGHT-14 (2026-11-13), `docs/core/MODULE-MAP.md` «Root / Pages» (Night's SW precaches in a build):
 - **Root:** `index.html` redirect only; `vercel.json`. **Pages:** `apps/<app>/index.html` markup only (CSP `<meta>` first, rule #33; `#privacyNote`), `manifest.json`/`sw.js` PWA (cache-free SW); `core/tokens.css` THE design tokens (DOM +
+
+## Superseded at CORE-26 (LANG-1, 2026-11-18) — docs/core/MODULE-MAP.md
+- `core/i18n.js` — `LANGS`, `DICTS`, `t()`, `L()`, `applyI18n`. `core/icons.js` — THE icon component (`ICONS` by meaning, `icon`,

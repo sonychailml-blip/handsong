@@ -20,7 +20,7 @@ import LOFI_LATE from './lofi/late-night.js';   // RAIN-4c: the three lo-fi piec
 import LOFI_EVENING from './lofi/evening-boulevard.js';
 import LOFI_AFTER from './lofi/after-the-rain.js';
 export const RAIN_ROOM=F({
-  format:'handsong/room', version:1, id:'room.rain', name:F({ en:'Rain', ru:'Дождь' }), icon:'depth', tint:'rain-tint', tokens:'rain-',
+  format:'handsong/room', version:1, id:'room.rain', name:F({ en:'Rain', ru:'Дождь', es:'Lluvia', pt:'Chuva', de:'Regen', fr:'Pluie', it:'Pioggia', ka:'წვიმა' }), icon:'depth', tint:'rain-tint', tokens:'rain-',
   still:F({ full:'still/still-full.webp', reduced:'still/still-reduced.webp', fov:68, aspect:1.85, life:'drops' }),   // RAIN-R1: the start still's life — drops sliding down the glass
   view:F({ fov:55, tallFov:68, tall:0.8 }),
   /* what each picture level draws (RAIN-0b): the most simulated drops on the pane, the procedural fine-droplet layers, the far lights, the most cars */
@@ -37,8 +37,8 @@ export const RAIN_ROOM=F({
   /* RAIN-4: what the room plays with — its own four timbres for the playing hand (Night's session records, apps/night/rooms/rain/timbres/; never in
      Full's lists), each with its level (dB) and its strike cap (a fast phrase stays gentle on a phone), and the moods' names */
   music:F({ timbres:F([F({ id:'rain/e-piano', level:0, voices:6 }), F({ id:'rain/vibraphone', level:-11, voices:4 }), F({ id:'rain/nylon', level:0, voices:5 }), F({ id:'rain/celesta', level:-6, voices:4 })]),   // RAIN-4e: the celesta back (four, like the forest)
-    names:F({ late:F({ en:'Late night', ru:'Поздняя ночь' }), evening:F({ en:'Evening boulevard', ru:'Вечерний бульвар' }), after:F({ en:'After the rain', ru:'После дождя' }) }),
-    bedNames:F({ still:F({ en:'Drizzle', ru:'Морось' }), drift:F({ en:'Rain', ru:'Дождь' }), glimmer:F({ en:'Downpour', ru:'Ливень' }) }) }),   // UI-1: the Music button's names here (quiet · groove · full)
+    names:F({ late:F({ en:'Late night', ru:'Поздняя ночь', es:'Noche cerrada', pt:'Madrugada', de:'Späte Nacht', fr:'Tard dans la nuit', it:'Notte fonda', ka:'გვიანი ღამე' }), evening:F({ en:'Evening boulevard', ru:'Вечерний бульвар', es:'Bulevar al anochecer', pt:'Avenida ao anoitecer', de:'Boulevard am Abend', fr:'Boulevard du soir', it:'Viale di sera', ka:'საღამოს ბულვარი' }), after:F({ en:'After the rain', ru:'После дождя', es:'Tras la lluvia', pt:'Depois da chuva', de:'Nach dem Regen', fr:'Après la pluie', it:'Dopo la pioggia', ka:'წვიმის შემდეგ' }) }),
+    bedNames:F({ still:F({ en:'Drizzle', ru:'Морось', es:'Llovizna', pt:'Garoa', de:'Niesel', fr:'Bruine', it:'Pioggerella', ka:'ჟინჟღილი' }), drift:F({ en:'Rain', ru:'Дождь', es:'Lluvia', pt:'Chuva', de:'Regen', fr:'Pluie', it:'Pioggia', ka:'წვიმა' }), glimmer:F({ en:'Downpour', ru:'Ливень', es:'Aguacero', pt:'Temporal', de:'Platzregen', fr:'Averse', it:'Acquazzone', ka:'თავსხმა' }) }) }),   // UI-1: the Music button's names here (quiet · groove · full)
   nature:F({ id:'ambience.rain',
     drone:F({ root:0.07, fifth:0.035, tc:1.4, send:0.2 }),
     wind:F({ hz:2600, q:0.35, sweep:500, rate:0.045, gain:0.012, send:0.1, sec:2, seed:0x5241494E }),   // RAIN-3: only a breath of air now (the layers carry the rain; it stays if they cannot play)

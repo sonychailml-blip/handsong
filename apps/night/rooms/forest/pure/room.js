@@ -10,7 +10,7 @@ const LOOK=(pre, fog, mist, flies)=>Object.freeze({ pre, fog, mist, flies,
     shroom:pre+'shroom', bloom:pre+'bloom' }) });
 const F=Object.freeze;
 export const FOREST_ROOM=F({
-  format:'handsong/room', version:1, id:'room.forest', name:F({ en:'Forest', ru:'Лес' }), icon:'forest', tint:'forest-tint', still:F({ full:'still/still-full.webp', reduced:'still/still-reduced.webp', fov:68, aspect:1.85239,
+  format:'handsong/room', version:1, id:'room.forest', name:F({ en:'Forest', ru:'Лес', es:'Bosque', pt:'Floresta', de:'Wald', fr:'Forêt', it:'Bosco', ka:'ტყე' }), icon:'forest', tint:'forest-tint', still:F({ full:'still/still-full.webp', reduced:'still/still-reduced.webp', fov:68, aspect:1.85239,
     over:F({ sprites:'still/still-sil.webp', rects:F({ fern:F([0,0,128,512]), branch:F([128,0,128,256]) }), sil:FOREST_SIL, vignette:PAINT.vignette }) }), tokens:'forest-',   // DESIGN-1 part D: still — the start screen's prepared still per level (tools/night-still.mjs)
     // NIGHT-13: the still is the world only, seen by the room's camera at rest through a WIDER lens (fov, aspect: every screen up to 2.4 : 1 is a crop of it,
     // placed by the room's own lens law `view`); `over` — what the room pins to the screen (the corner silhouettes, the vignette), drawn over it per screen

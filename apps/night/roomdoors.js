@@ -7,7 +7,7 @@ import { sceneRoom } from './scene/host.js';
 import { roomById } from './rooms/index.js';
 import { timbreInstall, setTimbreTrim, setNightStrikes } from '../../core/audio.js';
 import { profileOf, profileCurrent } from '../../core/profile.js';
-import { L, t } from '../../core/i18n.js';
+import { L, t, DICTS, lang } from '../../core/i18n.js';
 
 const FILES=Object.freeze({ 'rain/e-piano':'e-piano', 'rain/vibraphone':'vibraphone', 'rain/nylon':'nylon', 'rain/celesta':'celesta' });   // RAIN-4e: the celesta back (the founder: four, like the forest)
 const fileOf=(R, id)=>new URL('timbres/'+FILES[id]+'.json', R.base);   // the room's own folder: fetched with the room, never in the forest's start set
@@ -29,7 +29,8 @@ export function roomDoors(D){ D0=D; return { ...D,
   timbres:()=>{ const R=musicOf(); return R ? R.music.timbres.map(x=>x.id).filter(id=>installed.has(id)) : D.timbres(); },
   moods:()=>{ const R=musicOf(); return R ? Object.keys(R.moods) : D.moods(); },
   moodName:id=>{ const R=musicOf(), look=R && R.moods[id]; return look && R.music.names[look] ? L(R.music.names[look]) : t('night.mood.'+id); },
-  timbreName:id=>{ const R=musicOf(), T=R && R.music.timbres.find(x=>x.id===id); return T ? (D.timbreName(id)||id) : D.timbreName(id); } }; }
+  timbreName:id=>{ const own=DICTS[lang] && DICTS[lang]['tname.'+id]; if(own) return own;   // LANG-1: Night's own name of the timbre in this language (none in English and Russian: the record's)
+    const R=musicOf(), T=R && R.music.timbres.find(x=>x.id===id); return T ? (D.timbreName(id)||id) : D.timbreName(id); } }; }
 /* after a room switch or the face's own settings: the room's mood and timbre on when it has its own (the last played there), the forest's back
    when it has not. Every change goes through the same doors the buttons use */
 export async function roomMusicApply(fresh){ if(!D0 || applying) return; applying=true; if(fresh) last.clear();   // fresh: a profile applied = a new face, nothing remembered (the app applies one only at boot)

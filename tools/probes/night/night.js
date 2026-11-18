@@ -548,6 +548,17 @@ export async function checkNightBars(){
       else notes.push(`«All points»: 10 fireflies + 32 points in Night's look, on their joints (off by ${worst.toExponential(1)} px)`); }
     { const nv=ST.nightView; ST.setNightView(null); const T=PV.nightTipsDrawDbg(), J=PV.glowJointsDbg(); ST.setNightView(nv);
       if(T.length || J.length) miss(`CONTROL: Full's view drew ${T.length} of Night's fireflies and ${J.length} of its points — the check cannot fail`); }
+    /* CORE-25: the lit firefly and the glow field take the app's glow colour (the room's tint); CONTROL: none set → the token's lime (Full's colour) */
+    { const keep=ST.glowTint, TINT='#f4c98a', lime=getComputedStyle(document.documentElement).getPropertyValue('--cv-hn-glow').trim(); n+=3;
+      try{ ST.setGlowTint('rgb(244, 201, 138)'); frame(two(0.75,0.25,0.3),3); await raf(); await wait(60); await raf();
+        const L=PV.nightTipsDrawDbg().filter(t=>t.lit), F=PV.fieldColDbg();
+        if(!(L.length && L.every(t=>t.col===TINT))) miss(`CORE-25: the lit fireflies drew ${JSON.stringify(L.map(t=>t.col))}, not the set tint ${TINT}`);
+        if(F!==TINT) miss(`CORE-25: the glow note field drew ${F}, not the set tint ${TINT}`);
+        ST.setGlowTint(null); frame(two(0.75,0.25,0.3),3); await raf(); await wait(60); await raf();
+        const L0=PV.nightTipsDrawDbg().filter(t=>t.lit), F0=PV.fieldColDbg();
+        if(!(L0.length && L0.every(t=>t.col===lime) && F0===lime && lime!==TINT)) miss(`CORE-25 CONTROL: with no tint set the lit fireflies drew ${JSON.stringify(L0.map(t=>t.col))} and the field ${F0}, not the token ${lime} — the check cannot fail`);
+        else notes.push(`CORE-25: tint ${TINT} → fireflies and field ${TINT}; none set → the token ${lime}`); }
+      finally{ ST.setGlowTint(keep); } }
     ST.setNightView({ ...ST.nightView, tips:true });
     /* one message at a time */
     frame([],2); G.handsProbe(null);

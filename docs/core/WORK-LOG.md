@@ -4,6 +4,18 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`. Checkpoints A–E of SPLIT-2 are its last sections.
 
+# CORE-26 (2026-11-18): an app adds languages — for LANG-1 (opt-in, Night only)
+Tree hashes before (STATS-1's after): core 4024c67e47e20bce · apps/full 0148bb454440c3e3 · apps/night 64f248ae4700c4e1. After: see LANG-1 (Night's log).
+- `core/i18n.js` `langsAdd(codes)`: pushes two-letter codes into `LANGS` (an empty `DICTS` entry each) and reads the first choice again (the stored one if valid, else the device's language). `LANG_LABEL` gains pt, fr, it, ka (endonyms). Never called (Full): `LANGS` stays en, ru and `lang` as before.
+- Checks: FULL untouched / census rows (see LANG-1); the data row «NIGHT texts in every language (app)» reads `LANGS` after Night's texts.
+
+# CORE-25 (2026-11-18): the hands follow the room's colour (opt-in, Night only; the founder's UI-1 leftover)
+Tree hashes before (UI-1's after): core 36450d3d646be550 · apps/full 0148bb454440c3e3 · apps/night 1ff8babf09bfa022. After: core 4024c67e47e20bce · apps/full 0148bb454440c3e3 (unchanged) · apps/night 2f4f22b25a39988a.
+- `core/state.js` `glowTint` + `setGlowTint(c)` ('#rrggbb' or a computed 'rgb(…)'; anything else clears it). `core/legacy-ui/views/play.js` `glowCol()` = `glowTint || cv('hn-glow')` for the glow note field and the lit fingertip firefly; the resting amber unchanged. Never set → the very token string as before (Full).
+- Night: `apps/night/roomswitch.js` `glowFollow` — at the start (`roomRestore`) and on every switch, reading the registered `--night-tint` each frame through its ease (≤ 6 s); the forest's tint is the token lime itself, so the forest looks as before.
+- Rows: P.night «NIGHT hands follow the room» (new, 5/0: forest → rain → forest, core's colour = the room's tint token; CONTROL the follow ignored → the rain keeps lime) and «NIGHT bars and fireflies» +3 (the lit fireflies and the field draw a set tint; CONTROL none set → the token). Probe tools: `P.night({ only })` / `P.all({ only })` run the named rows; the result carries `lists`; `--eval … --no-ui` skips Night's UI block (iteration mode).
+- Checks (iteration mode): static PASSED; data PASS; rows on Night (bars 20/0, labels 6/0, hands follow 5/0, NIGHT untouched 9/0, census, VIS1a) and on Full (FULL untouched 9/0, census 19/0, VIS1a 6/0). Both apps' full suites: the next full check.
+
 # CORE-23 (2026-11-15): the hand model's build holds while a camera request is young — for NIGHT-15 (opt-in, Night only)
 Tree hashes before: core f35f07b9825d7997 · apps/full 0148bb454440c3e3 · apps/night 1e02ac1d7c2e070f. After: core 224d24e3b33bc061 (CORE-23) · apps/full 0148bb454440c3e3 (unchanged) · apps/night 0aa779a514ae0293.
 - The cause (NIGHT-14, docs/night/BACKLOG.md): Night tells «refused without asking» (an in-app browser) from «a person said no» by how fast getUserMedia's refusal returns (`QUICK_DENY_MS` 450 ms, `gumMs`), timed on the main thread, where the hand model's build (two models, two warm-ups, 0.5–1.6 s each) can overlap the Begin tap: the refusal's callback waited behind a build step.

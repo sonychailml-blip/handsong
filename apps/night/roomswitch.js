@@ -9,7 +9,8 @@ import { sceneSwitch, sceneRoom, sceneRoomSet, sceneRooms, backgroundOf } from '
 import { ROOMS, roomById } from './rooms/index.js';
 import { ROOM_IDS } from './pure/room.js';
 import { bedHold, bedResume, bedTakesDrone } from './bed.js';
-import { tintApply } from './tint.js';   // DESIGN-1: the interface takes the room's tint
+import { tintApply, tintNow } from './tint.js';   // DESIGN-1: the interface takes the room's tint
+import { setGlowTint, glowTint } from '../../core/state.js';   // CORE-25: the hands' lit firefly and the note field's glow take it too
 import { roomMusicApply } from './roomdoors.js';   // RAIN-4
 import { buildAmbience, ambienceSchedule, ambienceTune, ambienceSet, ambienceRoom, ambienceBrook, ambienceBrookLight, ambienceBrookRec, ambienceLayers, ambienceLayersRec, ambienceLayersFocus, ambienceLayersDensity, ambienceLayersStats, NATURE_WORKLET } from './sound/ambience.js';
 
@@ -79,7 +80,17 @@ export function natureLight(v){ brookLight=!!v; if(liveAmb && liveAmb.brook) amb
 /* at the start, before the first picture: the visit's start room (guard.js: html[data-room] — random, or the address's), if it is a real one this app has.
    RAIN-R1: no room is remembered any more (a random room every visit): the old key is dropped */
 try{ localStorage.removeItem(ROOM_KEY); }catch(e){}
-export function roomRestore(){ const id=typeof document!=='undefined' ? document.documentElement.getAttribute('data-room') : null; if(id && ROOM_IDS.includes(id) && roomById(id)) sceneRoomSet(id); tintApply(roomCurrent(), { now:true }); return sceneRoom(); }   // DESIGN-1: its tint at once
+/* CORE-25: the canvas glow follows the interface's tint — at once, or through its ease (the registered --night-tint is read each frame until it
+   reaches the target; at most 6 s) */
+let glowSeq=0, glowOff=false;
+export const glowFollowDbg=o=>{ if(o && 'off' in o) glowOff=!!o.off; return { off:glowOff }; };   // probe only (CORE-25 CONTROL): the follow ignored
+function glowFollow(target, now){
+  if(glowOff) return; const my=++glowSeq; setGlowTint(tintNow()); if(now || typeof requestAnimationFrame!=='function') return;
+  setGlowTint(target); const want=glowTint; setGlowTint(tintNow());
+  const t0=performance.now(), step=()=>{ if(my!==glowSeq) return; setGlowTint(tintNow()); if(glowTint===want || performance.now()-t0>6000){ setGlowTint(want); return; } requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+}
+export function roomRestore(){ const id=typeof document!=='undefined' ? document.documentElement.getAttribute('data-room') : null; if(id && ROOM_IDS.includes(id) && roomById(id)) sceneRoomSet(id); glowFollow(tintApply(roomCurrent(), { now:true }), true); return sceneRoom(); }   // DESIGN-1: its tint at once
 /* the next room in order (the Room button) */
 export const roomNext=()=>{ const ids=sceneRooms(); return ids.length ? ids[(ids.indexOf(sceneRoom())+1)%ids.length] : null; };
 function nameShow(rec){ const el=document.getElementById('nightRoomName'); if(!el) return;
@@ -92,7 +103,7 @@ export async function roomSwitch(id, o={}){
   bedHold(rec.bed, rec.bed2);
   const pic=sceneSwitch(id, { fast:o.fast });   // sets the host's current room at once (its synchronous part)
   roomMusicApply();   // RAIN-4: the room's own mood and timbre (or the forest's back)
-  tintApply(rec, { now:o.fast });   // DESIGN-1: the interface's accents ease to the new room's tint over the picture's fades
+  glowFollow(tintApply(rec, { now:o.fast }), o.fast);   // DESIGN-1: the interface's accents ease to the new room's tint over the picture's fades; CORE-25: the hands' glow with them
   const I=ambienceInfo(); if(I && I.on) ambienceOn(true, I.level);   // the nature crossfade: the module now finds the new room's recipe
   if(!o.fast) nameShow(rec);
   await pic;

@@ -8850,3 +8850,11 @@ not a control · run a "random" failure many times and print WHERE and HOW MUCH 
 ### FULL CHECK (2026-11-17): ready to publish the forest. Log: `docs/night/WORK-LOG.md`
 - Fixed: the forest's shadow map is freed on leaving (a leak per build at Detailed); a profile apply starts the room memory fresh (RAIN-4's memory leaked chosen sounds between rows; players unaffected). Old rows judge the old forest; «NIGHT room switch» counts textures in the test room (exact).
 - P.night 68/0, Night UI PASS, P.quick 93/0, smoke with builds PASS, data 91/0. Start set 28.6 MB (was 26.6). No rain room in the players' build.
+
+## Moved from docs/night/HANDOFF.md at LANG-1 (2026-11-18)
+### RAIN-5e (2026-11-16): a wider depth of field; round far lights. Log: `docs/night/WORK-LOG.md`
+- Focus law: a sharp plateau (0.03 + 0.43 f) round the focus depth (span 0.82), fall-off 1.7 — far, street to hills sharp at once, the glass soft; near, the glass sharp. Point lights round (2 px room, the glow faded 1.2 px before the quad's edge). Far lights ×1.2–1.3. Rows: focus law 20/0 (CONTROL the old band), quad edges 4/0 (+ lights), RAIN room 47/0 (its far-hand case rewritten to the new law). Waiting for step 180.
+### RAIN-4e (2026-11-16): the bed's sound. Log: `docs/night/WORK-LOG.md`
+- RAIN-4d's piano kept behind `?bedep=short`. The default sustains: decays ×2, no bark, soft attacks, a pedal (released on a chord change, 7 s at most), its own voice pool. Clicks removed (the pump's instant drop, stops above −90 dB, sample starts, the release noise; the bark's ticks). The guitar: two polarisations in stereo, T60 5.2 s, a deeper body, more room. The celesta back (four timbres). Row: P.night «RAIN bed no clicks» (slow) 10/0. Waiting for step 179.
+### Small fixes (2026-11-17): the piano comps, round far lights, Detailed spruces later. Log: `docs/night/WORK-LOG.md`
+- `pure/lofi.js` lofiComp (voicing per hit, rolls, velocities, skips, passing notes); the mist's soft copy round (DOWN_F + three dense rounds); foliage-1024 in NIGHT_LATER (start ≈ 27.6 MB forest-only, ≈ 28.0 with the rain's code). «RAIN piano comping (app)» 22/0, «RAIN no quad edges» 6/0. Waiting for step 183.

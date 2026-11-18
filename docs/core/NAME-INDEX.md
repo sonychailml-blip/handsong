@@ -52,6 +52,11 @@ NIGHT-11 part 4 — PLAY FIRST, TEACH INSIDE: the DOM side of the one coaching l
 - const (4): `coachTextOf`, `coachShown`, `coachDbg`, `coachSpeedDbg`
 - fn (5): `coachBegin`, `coachTick`, `coachWire`, `coachShowDbg`, `coachResetDbg`
 
+## apps/night/contact.js
+STATS-1 — «WRITE TO US» in Settings: the address as selectable text, a copy button and a mail link (a convenience: many players have no mail app set up, so the address itself comes first).
+- const (1): `contactDbg`
+- fn (1): `contactWire`
+
 ## apps/night/early.js
 CORE-20 (audit P1) — MEDIAPIPE'S BINARY EARLY, NEVER AGAINST THE PAGE'S OWN FILES.
 - exports: none
@@ -76,6 +81,30 @@ NIGHT-11 part 2 (audit P2, W5) — AN HONEST START, before any module runs.
 ## apps/night/icons.js
 NIGHT-7c — NIGHT'S OWN DRAWN ICONS (our own work, rule #32), added to the shared table through core's door (CORE-15) before the page's markup is filled (main.js imports this right after the texts).
 - const (1): `NIGHT_ICONS`
+
+## apps/night/lang/de.js
+LANG-1 — Night's texts in German (informal «du»).
+- default (1): `default`
+
+## apps/night/lang/es.js
+LANG-1 — Night's texts in Spanish (informal «tú»).
+- default (1): `default`
+
+## apps/night/lang/fr.js
+LANG-1 — Night's texts in French («vous»).
+- default (1): `default`
+
+## apps/night/lang/it.js
+LANG-1 — Night's texts in Italian (informal «tu»).
+- default (1): `default`
+
+## apps/night/lang/ka.js
+LANG-1 — Night's texts in Georgian (the polite plural, თქვენ).
+- default (1): `default`
+
+## apps/night/lang/pt.js
+LANG-1 — Night's texts in Portuguese («você», neutral wording close to Brazil's).
+- default (1): `default`
 
 ## apps/night/lifecycle.js
 NIGHT-11 part 1 — WHEN THE PHONE LOOKS AWAY (audit W1, W2, W3).
@@ -519,7 +548,7 @@ RAIN-0: the rain room's 2D STAND-IN — the «low» level and the fallback witho
 
 ## apps/night/roomswitch.js
 NIGHT-3 stage 5 part 2: THE ROOM SWITCH — one door for everything a room change touches, in this order: the music bed fades out and holds (it takes the new room's recipes while silent); the picture…
-- const (9): `ROOM_KEY`, `ROOM_NAME_MS`, `roomCurrent`, `roomNature`, `natureModule`, `natureLayersDbg`, `roomNext`, `roomSwitchDbg`, `natureAmbDbg`
+- const (10): `ROOM_KEY`, `ROOM_NAME_MS`, `roomCurrent`, `roomNature`, `natureModule`, `natureLayersDbg`, `glowFollowDbg`, `roomNext`, `roomSwitchDbg`, `natureAmbDbg`
 - fn (9): `natureLoad`, `natureRecOf`, `natureRecPcm`, `natureRecStereo`, `natureDensity`, `natureFocus`, `natureLight`, `roomRestore`, `roomSwitch`
 
 ## apps/night/scalepick.js
@@ -567,7 +596,7 @@ DESIGN-1 part D: THE START SCREEN'S STILL, ITS LIGHTS AND THE REVEAL (the law: p
 
 ## apps/night/texts.js
 NIGHT-7 — NIGHT'S OWN TEXTS, both languages.
-- const (1): `NIGHT_TEXTS`
+- const (2): `NIGHT_TEXTS`, `NIGHT_LANGS`
 
 ## apps/night/tint.js
 DESIGN-1 part B: THE ROOM'S TINT ON THE INTERFACE — the current room's record names its `tint` token (its light colour in night.css; the data row «NIGHT room tint» checks dark ink on it and it on t…
@@ -721,7 +750,7 @@ tutor — обучающий слой (UI) подписывается СЮДА: 
 ## core/i18n.js
 ================= ИНТЕРНАЦИОНАЛИЗАЦИЯ (i18n) — ЭТАП 0: только каркас ================= English по умолчанию + Русский; форма механизма РАССЧИТАНА на четыре языка (en/ru/es/de), но словари es/de пок…
 - const (5): `store`, `LANGS`, `LANG_LABEL`, `DICTS`, `onLangChange`
-- fn (5): `t`, `L`, `applyI18n`, `withLang`, `setLang`
+- fn (6): `t`, `L`, `applyI18n`, `withLang`, `langsAdd`, `setLang`
 - let (1): `lang`
 
 ## core/icons.js
@@ -765,7 +794,7 @@ DRAW1 (DAY run 2026-10-16): shared canvas helpers (FX bar layout, status and tra
 
 ## core/legacy-ui/views/play.js
 DRAW1 (DAY run 2026-10-16): the play screen: overlays per frame (drawOverlays), roles, grids, hands, palette, effect bars, status — moved from draw.js verbatim (draw.js is the facade).
-- const (2): `nightTipsDbg`, `glowJointsDbg`
+- const (3): `nightTipsDbg`, `fieldColDbg`, `glowJointsDbg`
 - fn (2): `nightTipsDrawDbg`, `drawOverlays`
 
 ## core/legacy-ui/views/roll.js
@@ -1143,8 +1172,8 @@ CORE-7: THE DOOR FOR AN APP'S SOUND MODULES.
 
 ## core/state.js
 (no head comment)
-- const (99): `fx`, `fxIsScalar`, `CHAIN_ROLE`, `chainKeyOf`, `CHAIN_SOLO`, `CHAIN_TRACK`, `trackChainKeyOf`, `chainOwners`, `fxChainOf`, `fxVolReset`, `setFxParamAddr`, `setFxParamMode`, `setFxParamFixed`, `fxChainAdd`, `fxChainRemove`, `fxChainMove`, `setHandFn`, `handSide`, `handFnOf`, `roleHasTherm`, `roleHasFx`, `roleHasExpr`, `playsNotes`, `roleHasNotes`, `handActsOf`, `handActOf`, `setHandAct`, `setRectPref`, `setPinchFingers`, `VOICE_MODE_DEF`, `voiceMode`, `setVoiceMode`, `isLeadMode`, `setSplitRole`, `phoneHalves`, `setScaleId`, `setTonic`, `KEY_CENTS_MAX`, `setTonicCents`, `setARef`, `setTunedFrom`, `setChordMode`, `setChordModeSel`, `setSeventh`, `setLeadIdx`, `setChIdx`, `setBassIdx`, `setDrumKitIdx`, `setExprDisp`, `setChFitDeg`, `setExprBrightDisp`, `setLooperMsg`, `setLooperClear`, `setLatchDeg`, `setLatchOct`, `setChordFam`, `setChordVar`, `setLatchTy`, `setPhoneInstr`, `setCamFacing`, `setVideoRec`, `mirrored`, `flipX`, `setViewRect`, `sx`, `sy`, `setSplitOn`, `setOctReg`, `setBassOctReg`, `setChordOctReg`, `setRollOpen`, `setArrOpen`, `setArrFace`, `setRollWin`, `setRollSel`, `setRollSelNote`, `setRollSelMany`, `setRollPick`, `setRollBox`, `setRollDrag`, `setRollIns`, `setLaneRow0`, `setLaneDrag`, `ROLL_EDITABLE`, `setRollRole`, `setRollRow0`, `setRollRowsAll`, `setRollAut`, `setRollAutSel`, `setRollAutDrag`, `setRollBendSel`, `setRollBendDrag`, `setSecSel`, `setRollVolBars`, `rectOctReg`, `setRectOctReg`, `setVolFloor`, `setNightView`, `setFxChain`
-- let (50): `scaleId`, `aRef`, `tunedFrom`, `chordModeSel`, `chordModeVer`, `seventh`, `fxChains`, `exprDisp`, `chFitDeg`, `exprBrightDisp`, `looperMsg`, `looperClear`, `latchDeg`, `latchOct`, `chordFam`, `latchTy`, `phoneInstr`, `handFn`, `handActs`, `rectPref`, `pinchFingers`, `camFacing`, `videoRec`, `splitOn`, `SPLIT_ROLES`, `octReg`, `bassOctReg`, `chordOctReg`, `tonicCents`, `viewRect`, `rollOpen`, `rollBeat0`, `rollSpan`, `rollSel`, `arrOpen`, `arrFace`, `rollSelNote`, `rollSelMany`, `rollPick`, `rollDrag`, `rollRole`, `laneRow0`, `laneDrag`, `rollRowsAll`, `rollAut`, `rollBendSel`, `secSel`, `rollVolBars`, `volFloor`, `nightView`
+- const (100): `fx`, `fxIsScalar`, `CHAIN_ROLE`, `chainKeyOf`, `CHAIN_SOLO`, `CHAIN_TRACK`, `trackChainKeyOf`, `chainOwners`, `fxChainOf`, `fxVolReset`, `setFxParamAddr`, `setFxParamMode`, `setFxParamFixed`, `fxChainAdd`, `fxChainRemove`, `fxChainMove`, `setHandFn`, `handSide`, `handFnOf`, `roleHasTherm`, `roleHasFx`, `roleHasExpr`, `playsNotes`, `roleHasNotes`, `handActsOf`, `handActOf`, `setHandAct`, `setRectPref`, `setPinchFingers`, `VOICE_MODE_DEF`, `voiceMode`, `setVoiceMode`, `isLeadMode`, `setSplitRole`, `phoneHalves`, `setScaleId`, `setTonic`, `KEY_CENTS_MAX`, `setTonicCents`, `setARef`, `setTunedFrom`, `setChordMode`, `setChordModeSel`, `setSeventh`, `setLeadIdx`, `setChIdx`, `setBassIdx`, `setDrumKitIdx`, `setExprDisp`, `setChFitDeg`, `setExprBrightDisp`, `setLooperMsg`, `setLooperClear`, `setLatchDeg`, `setLatchOct`, `setChordFam`, `setChordVar`, `setLatchTy`, `setPhoneInstr`, `setCamFacing`, `setVideoRec`, `mirrored`, `flipX`, `setViewRect`, `sx`, `sy`, `setSplitOn`, `setOctReg`, `setBassOctReg`, `setChordOctReg`, `setRollOpen`, `setArrOpen`, `setArrFace`, `setRollWin`, `setRollSel`, `setRollSelNote`, `setRollSelMany`, `setRollPick`, `setRollBox`, `setRollDrag`, `setRollIns`, `setLaneRow0`, `setLaneDrag`, `ROLL_EDITABLE`, `setRollRole`, `setRollRow0`, `setRollRowsAll`, `setRollAut`, `setRollAutSel`, `setRollAutDrag`, `setRollBendSel`, `setRollBendDrag`, `setSecSel`, `setRollVolBars`, `rectOctReg`, `setRectOctReg`, `setVolFloor`, `setNightView`, `setGlowTint`, `setFxChain`
+- let (51): `scaleId`, `aRef`, `tunedFrom`, `chordModeSel`, `chordModeVer`, `seventh`, `fxChains`, `exprDisp`, `chFitDeg`, `exprBrightDisp`, `looperMsg`, `looperClear`, `latchDeg`, `latchOct`, `chordFam`, `latchTy`, `phoneInstr`, `handFn`, `handActs`, `rectPref`, `pinchFingers`, `camFacing`, `videoRec`, `splitOn`, `SPLIT_ROLES`, `octReg`, `bassOctReg`, `chordOctReg`, `tonicCents`, `viewRect`, `rollOpen`, `rollBeat0`, `rollSpan`, `rollSel`, `arrOpen`, `arrFace`, `rollSelNote`, `rollSelMany`, `rollPick`, `rollDrag`, `rollRole`, `laneRow0`, `laneDrag`, `rollRowsAll`, `rollAut`, `rollBendSel`, `secSel`, `rollVolBars`, `volFloor`, `nightView`, `glowTint`
 - → ./config.js (1): `FX_VOL`
 
 ## core/storens.js
@@ -1404,9 +1433,11 @@ SPLIT-2: the probe entry of the Night page: its own rows and the core rows flagg
 - → ./core/run.js (1): `material`
 - → ./core/timbres.js (2): `checkTimbresBefore`, `dumpTimbres`
 - → ./core/vis.js (1): `checkVisStack`
+- → ./night/audio1.js (1): `checkBedNull`
 - → ./night/bed.js (1): `checkNightBed`
 - → ./night/calib.js (1): `checkNightCalib`
 - → ./night/cards.js (1): `checkNightCards`
+- → ./night/core25.js (1): `checkNightGlowTint`
 - → ./night/forest.js (2): `checkForestRoom`, `checkBackgrounds`
 - → ./night/forest2.js (5): `checkForestToday`, `checkForestFull`, `checkForestClear`, `checkForestLost`, `checkForestLevels`
 - → ./night/forest2e.js (1): `checkForestApart`
@@ -1429,6 +1460,12 @@ SPLIT-2: the probe entry of the Night page: its own rows and the core rows flagg
 - → ./night/testroom.js (3): `testRoomInstall`, `testRoomRemove`, `testRoomMode`
 - → ./night/ui1.js (1): `checkNightLabels`
 
+## tools/probes/night/audio1.js
+AUDIO-1 — «RAIN bed null test» (slow): the rain's bed made cheaper BY STRUCTURE only, each change proven audibly identical offline.
+- const (2): `NULL`, `nullPass`
+- default (1): `default`
+- fn (2): `nullOf`, `checkBedNull`
+
 ## tools/probes/night/bed.js
 NIGHT-3 stage 4: row «NIGHT music bed» (P.night).
 - fn (1): `checkNightBed`
@@ -1444,6 +1481,10 @@ NIGHT-2 stage 2: row «NIGHT calibration screens» (quick; the probe clock throu
 ## tools/probes/night/cards.js
 NIGHT-7: row «NIGHT first cards» — the four first cards: they open, each has its title, text and drawn picture in both languages (no left-over {name}); Next walks them and the last closes them, cal…
 - fn (1): `checkNightCards`
+
+## tools/probes/night/core25.js
+CORE-25 — «NIGHT hands follow the room»: in the rain the hands' lit firefly and the note field's glow were still the forest's lime (core drew a cached token).
+- fn (1): `checkNightGlowTint`
 
 ## tools/probes/night/forest.js
 VIS1c (RUN 6, Night plan §10, review 2026-10-17): two rows (quick and all).
@@ -1560,7 +1601,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 UI-1 — «NIGHT labels follow the room»: the founder entered the rain and the Sound button still read «Firefly» while another timbre played.
 - fn (1): `checkNightLabels`
 
-_310 modules, 3126 exported names._
+_319 modules, 3148 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

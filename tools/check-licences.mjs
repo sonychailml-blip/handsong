@@ -194,6 +194,13 @@ export function renderNightLicences(reg, has){
     '<h1>Licences · Лицензии</h1>',
     '<p>Handsong Night uses these works by others, each under its own licence. Nothing here is sent anywhere.</p>',
     '<p lang="ru">Handsong Night использует эти чужие работы, каждую по её лицензии. Отсюда ничего никуда не отправляется.</p>',
+    // LANG-1: the six more languages of Night (the list itself stays as the register writes it)
+    '<p lang="es">Licencias: Handsong Night usa estas obras de otras personas, cada una con su propia licencia. Desde aquí no se envía nada.</p>',
+    '<p lang="pt">Licenças: o Handsong Night usa estas obras de outras pessoas, cada uma sob a própria licença. Nada é enviado daqui.</p>',
+    '<p lang="de">Lizenzen: Handsong Night nutzt diese Werke anderer, jedes unter seiner eigenen Lizenz. Von hier wird nichts gesendet.</p>',
+    '<p lang="fr">Licences : Handsong Night utilise ces œuvres d’autres auteurs, chacune sous sa propre licence. Rien n’est envoyé d’ici.</p>',
+    '<p lang="it">Licenze: Handsong Night usa queste opere di altri, ciascuna con la propria licenza. Da qui non viene inviato nulla.</p>',
+    '<p lang="ka">ლიცენზიები: Handsong Night იყენებს სხვების ამ ნამუშევრებს, თითოეულს თავისი ლიცენზიით. აქედან არაფერი იგზავნება.</p>',
     '<ul>', ...nightLicenceItems(reg, has).map(row), '</ul>','</body>','</html>',''].join(String.fromCharCode(10));
 }
 
