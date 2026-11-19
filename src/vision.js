@@ -1,4 +1,4 @@
-import { HandLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35";
+import { HandLandmarker, FilesetResolver } from "../vendor/mediapipe/0.10.35/vision_bundle.mjs";
 import { camFacing } from './state.js';
 import { t } from './i18n.js';
 
@@ -22,13 +22,18 @@ async function openCamera(facing){
   video.srcObject=stream; await video.play();
 }
 
+/* MediaPipe — С НАШЕГО ДОМЕНА, а не с jsDelivr/Google storage: те же файлы той же закреплённой версии 0.10.35,
+   байт в байт (хэши и источники — vendor/mediapipe/0.10.35/README.md; как Night в CORE-22). Пути — от адреса
+   ЭТОГО модуля (import.meta.url), не от корня: так работает и из подпапки GitHub Pages. Папка = версия. */
+const MP=new URL('../vendor/mediapipe/0.10.35/', import.meta.url);
+const MP_WASM=new URL('wasm', MP).href, MP_MODEL=new URL('hand_landmarker.task', MP).href;
+
 async function initVision(msg){
   msg(t('load.model'));
-  const files=await FilesetResolver.forVisionTasks(
-    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm");
+  const files=await FilesetResolver.forVisionTasks(MP_WASM);   // сам выберет пару SIMD или _nosimd (обе лежат в wasm/)
   landmarker=await HandLandmarker.createFromOptions(files,{
     baseOptions:{
-      modelAssetPath:"https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
+      modelAssetPath:MP_MODEL,
       delegate:"GPU"
     },
     runningMode:"VIDEO", numHands:2,
