@@ -2148,6 +2148,17 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
     1. The laptop (HD 4000), Detailed, the forest: no hand — smooth; raise a hand — its light casts shadows at once, no flash.
     2. A fresh profile on the laptop (a new browser profile or cleared site data for the address): Settings → Quality reads Light at once.
     3. Choose Standard, reload: Standard stays (the choice is remembered; Light only the first time). The Poco's fresh profile starts at Standard.
+187. RAIN-9: the rain room. Page: tools/.ui-snap/rain9/index.html. Three checks:
+    1. The cars: only the cinematic ones, at the focus near, on the boulevard and far (the founder's pick; no baked or box cars anywhere).
+    2. The street musician is gone (the arrow pictures show why: the near crowns cover the only near place).
+    3. The crowns (videos sway-wave0.webm and sway-wave1.webm, then the app with Wave at rest and full): each tree its own rhythm, a gust running
+       from the near trees to the far ones, leaves moving — natural, or remove the sway (compare `?room=rain&rain=nosway`).
+188. SAFARI-1: Night on a real iPhone (Safari) — the engine test had no sound and no camera. Five checks:
+    1. The ringer switch on SILENT, Night in Safari, Begin: the music and the notes are heard.
+    2. The camera prompt, then the hands: the dots follow the hand, notes play (the forest and the rain).
+    3. Settings → Quality: Detailed, Standard, Light — each draws, no freeze.
+    4. A second visit in airplane mode (from the build: night.handsong.app or a preview, after one full visit): Night opens and plays.
+    5. A link opened in Telegram: the «open in Safari» hint; then the same link in Safari works.
 ## Superseded at DOC1 (old lines verbatim, replaced in place above by a later slice)
 - NIGHT-2 stage 3 (2026-11-03, the rule of at most five manual checks) updated this line of CLAUDE.md's report format:
   probe verdict lines and fix rounds; what was left undone; docs found stale; the user's remaining steps (ear, camera, phone).

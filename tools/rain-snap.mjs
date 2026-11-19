@@ -5,7 +5,7 @@
                                               drops merging (a short sequence of crops). (RAIN-0's captures stay in tools/.ui-snap/rain0/.)
      node tools/rain-snap.mjs --level full    the same at Detailed (files named …-full)
      node tools/rain-snap.mjs --rain1         RAIN-1: the baked city → tools/.ui-snap/rain1/ (each mood, the focus near / middle / far, a phrase, before / after)
-     node tools/rain-snap.mjs --rain8 [--only laptop|phone]  RAIN-8: the cars' two trial versions and the old boxes side by side → tools/.ui-snap/rain8/
+     node tools/rain-snap.mjs --rain9         RAIN-9: the musician with an arrow, the crowns' sway as frame sequences → tools/.ui-snap/rain9/
      node tools/rain-snap.mjs --cost          no captures: per level, the room against Dark (hand detections a second, the forest budget's
                                               method), its frame time, draws, programs, texture memory and opening time, printed as JSON */
 import http from 'node:http';
@@ -26,18 +26,18 @@ const port=srv.address().port;
 const browser=await chromium.launch({ channel:'chrome', headless:true, args:['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--autoplay-policy=no-user-gesture-required', '--disable-background-timer-throttling', '--disable-renderer-backgrounding'] });
 /* a page with the rain room open at `level`: Begin tapped, the cards closed, the music held off */
 let QS='';   // RAIN-6b: extra query words for a page (the «before» captures)
-async function open(vp, level, dpr=1){
-  const ctx=await browser.newContext({ viewport:vp, deviceScaleFactor:dpr, locale:'en-US' });
+async function open(vp, level, dpr=1, ctxOpt={}){
+  const ctx=await browser.newContext({ viewport:vp, deviceScaleFactor:dpr, locale:'en-US', ...ctxOpt });   // RAIN-9: ctxOpt — e.g. a video of the page
   await ctx.grantPermissions(['camera', 'microphone'], { origin:`http://127.0.0.1:${port}` });
   await ctx.addInitScript(l=>{ try{ localStorage.setItem('handsong.nightBg', 'forest'); localStorage.setItem('handsong.sceneLevel', l); localStorage.setItem('handsong.night.lang', 'en'); }catch(e){} }, level);
-  const p=await ctx.newPage(), errs=[]; p.on('pageerror', e=>errs.push(String(e))); p.on('response', r=>{ if(r.status()===404) errs.push('404 '+new URL(r.url()).pathname); });
+  const p=await ctx.newPage(), errs=[]; p.on('pageerror', e=>errs.push(String(e))); p.on('console', m=>{ if(m.type()==='error' || /THREE\.WebGLProgram|shader/i.test(m.text())) errs.push(m.text().slice(0, 600)); }); p.on('response', r=>{ if(r.status()===404) errs.push('404 '+new URL(r.url()).pathname); });
   await p.goto(`http://127.0.0.1:${port}/apps/night/index.html?probe${FOREST ? '' : '&room=rain'}${QS}`);
   try{ await p.waitForFunction(()=>window.P && window.__nightBoot && window.__nightBoot.state().done, null, { timeout:120e3 }); }catch(e){ console.log('[rain-snap] the page did not boot:', errs.slice(0, 6)); throw e; }
   await p.click('#nightBegin');
   await p.waitForFunction(()=>!document.getElementById('start').classList.contains('on'), null, { timeout:180e3 });
   await p.evaluate(async want=>{ window.__H=await import('/apps/night/scene/host.js'); window.__G=await import('/core/gestures.js'); window.__PO=await import('/core/gestures/pose.js'); window.__V=await import('/core/vision.js');
     window.__want=want; const Q=await import('/core/frzqueue.js'); Q.afPause('runner', true); const SH=await import('/apps/night/shell.js'); SH.nightMusicHoldDbg(true); }, FOREST ? 'forest' : 'rain');
-  await p.waitForFunction(()=>{ const I=window.__H.sceneInfo(); return !!I.id && I.id.endsWith(window.__want) && !I.opening && I.rendered>2; }, null, { timeout:60e3 });
+  try{ await p.waitForFunction(()=>{ const I=window.__H.sceneInfo(); return !!I.id && I.id.endsWith(window.__want) && !I.opening && I.rendered>2; }, null, { timeout:60e3 }); }catch(e){ console.log('[rain-snap] the room did not open:', errs.slice(0, 6), await p.evaluate(()=>{ const I=window.__H.sceneInfo(); return JSON.stringify({ id:I.id, opening:I.opening, rendered:I.rendered, errors:I.errors, level:I.level, room:window.__H.sceneRoom() }); }).catch(x=>String(x))); throw e; }
   await p.waitForTimeout(4200);   // the start still's reveal is over
   return { ctx, p, errs };
 }
@@ -55,42 +55,32 @@ try{
   } else if(argv.includes('--row')){   // the browser row «RAIN room» alone (a quick look while working; the judged run is the Night suite's)
     const { ctx, p, errs }=await open({ width:1280, height:800 }, LEVEL);
     console.log(JSON.stringify(await p.evaluate(async ()=>(await import('/tools/probes/night/rainroom.js')).checkRainRoom()), null, 1), errs.slice(0, 5)); await ctx.close();
-  } else if(argv.includes('--rain8')){   // RAIN-8: the cars' two trial versions (and RAIN-6b's boxes) side by side, each mood, the focus near / middle / far, close-ups of the road; the people next to RAIN-5c's
-    const O=path.join(ROOT, 'tools/.ui-snap/rain8'); await mkdir(O, { recursive:true }); const made=[], log={};
-    const RU={ late:'Поздняя ночь', evening:'Вечерний бульвар', after:'После дождя' }, MODE={ box:'Было (коробки RAIN-6b)', baked:'(а) Запечённые машины', cine:'(б) Кинематографичные' };
-    const only=val('--only'); const DEV=[['laptop', { width:1280, height:800 }, 1], ['phone', { width:390, height:844 }, 2.75]].filter(d=>!only || d[0]===only);
-    for(const [tag, vp, dpr] of DEV){
-      { QS='&rain=carsbaked'; const { ctx, p, errs }=await open(vp, LEVEL, dpr);
-        await p.evaluate(async ()=>{ const R=window.__H.sceneRoomDbg(); R.mistDbg(0.1); await R.carsDbg('baked'); });
-        await hand(p, 0.5, 0.45, 0.2, false, 10);
-        const mid=await p.evaluate(async ()=>{ const FO=await import('/apps/night/rooms/rain/pure/focus.js'), R=window.__H.sceneRoomDbg(); let lo=0.08, hi=0.34, best=0.17;
-          for(let it=0;it<8;it++){ const s=(lo+hi)/2; best=s; const G=window.__G, c=window.__clk; for(let i=0;i<40;i++){ c.t+=1000/30; G.processHandsProbe({ landmarks:[window.__PO.pose({ x:0.5, y:0.45, s, gaps:[1, 1, 1, 1] })], handednesses:[[{ categoryName:'Right' }]] }); }
-            await new Promise(r=>setTimeout(r, 250)); if(FO.focusDepth(R.state().target)>FO.LAYER_DEPTH.street) lo=s; else hi=s; } return best; });
-        /* every trial version shot at the SAME moment of traffic (held: the busiest moment of a stretch, the cars on the near half of the road) */
-        const trio=async (name, ru, clip)=>{ for(const mode of ['box', 'baked', 'cine']){ await p.evaluate(async m=>{ await window.__H.sceneRoomDbg().carsDbg(m); }, mode); await p.waitForTimeout(450);
-          const f=`${tag}-${mode}-${name}.png`; await p.screenshot({ path:path.join(O, f), clip }); log[f]=await p.evaluate(()=>{ const R=window.__H.sceneRoomDbg(); return { cars:R.carsDbg(), cap:R.lifeCapDbg(), focus:+R.state().focus.toFixed(3) }; }); made.push({ f, ru, tag, mode, name }); } };
-        let k0=0; for(const mood of ['late', 'evening', 'after']){ await p.evaluate(m=>window.__H.sceneRoomDbg().lookDbg(m), mood); await p.waitForTimeout(1500);
-          const B=await p.evaluate(k=>{ const R=window.__H.sceneRoomDbg(), b=R.busiestDbg(100+k*120, 200+k*120); R.trafficHoldDbg(b.t); return b; }, k0++); log[`${tag}-${mood}-moment`]=B;
-          for(const [fn, s, ru] of [['near', 0.4, 'фокус на стекле'], ['mid', mid, 'фокус на бульваре'], ['far', 0.08, 'фокус вдали']]){ await hand(p, 0.5, 0.45, s, false, 12); await p.waitForTimeout(2600); await hand(p, 0.5, 0.45, s, false, 4); await trio(`${mood}-${fn}`, `${RU[mood]}, ${ru}`); } }
-        /* close-ups of the road (the car lanes), the focus on the boulevard, Evening, three busy moments */
-        await p.evaluate(()=>window.__H.sceneRoomDbg().lookDbg('evening')); await hand(p, 0.5, 0.45, mid, false, 12); await p.waitForTimeout(2000);
-        const tan=await p.evaluate(()=>window.__H.sceneRoomDbg().state().tan), W=vp.width, H=vp.height, toPx=(x, y)=>[(x/tan[0]*0.5+0.5)*W, (0.5-y/tan[1]*0.5)*H];
-        const box= tag==='phone' ? [-0.31, 0.12, 0.06, -0.62] : [-0.66, 0.1, 0.04, -0.62], [x0, y0]=toPx(box[0], box[1]), [x1, y1]=toPx(box[2], box[3]);
-        for(let k=0;k<3;k++){ const B=await p.evaluate(k=>{ const R=window.__H.sceneRoomDbg(), b=R.busiestDbg(500+k*90, 590+k*90, 25, 90); R.trafficHoldDbg(b.t); return b; }, k); log[`${tag}-close-${k+1}-moment`]=B; await p.waitForTimeout(800);
-          await trio(`close-${k+1}`, 'Крупно: полосы машин, фокус на бульваре (Вечерний бульвар)', { x:Math.max(0, x0), y:Math.max(0, y0), width:Math.min(W, x1)-Math.max(0, x0), height:Math.min(H, y1)-Math.max(0, y0) }); }
-        await p.evaluate(()=>window.__H.sceneRoomDbg().trafficHoldDbg(null));
-        if(errs.filter(e=>!/insights/.test(e)).length) console.log('[rain-snap] page errors:', errs.slice(0, 4)); await ctx.close(); } }
-    QS='';
-    await writeFile(path.join(O, 'rain8.json'), JSON.stringify(log, null, 1));
-    const fig=m=>m ? `<figure><a href="${m.f}"><img src="${m.f}" alt="" loading="lazy"></a><figcaption>${MODE[m.mode]} — ${m.ru}</figcaption></figure>` : '';
-    const row=(tag, name)=>`<div class="row">${['box', 'baked', 'cine'].map(md=>fig(made.find(m=>m.tag===tag && m.mode===md && m.name===name))).join('')}</div>`;
-    let body='';
-    for(const [tag] of DEV){ body+=`<h2>${tag==='laptop' ? 'Ноутбук 1280 × 800' : 'Телефон вертикально 390 × 844'}</h2><h3>Крупно (полосы машин)</h3>`+[1, 2, 3].map(k=>row(tag, 'close-'+k)).join('');
-      for(const mood of ['evening', 'late', 'after']) for(const fn of ['mid', 'near', 'far']) body+=`<h3>${RU[mood]} — ${fn==='mid' ? 'фокус на бульваре' : fn==='near' ? 'фокус на стекле' : 'фокус вдали'}</h3>`+row(tag, `${mood}-${fn}`);
-      body+=`<h3>Люди: RAIN-5c (слева) и сейчас (справа), фокус на бульваре</h3>`+['late', 'evening', 'after'].map(m=>`<div class="row"><figure><img src="../rain5c/${tag}-mood-${m}.png" alt="" loading="lazy"><figcaption>RAIN-5c — ${RU[m]}</figcaption></figure>${fig(made.find(x=>x.tag===tag && x.mode==='cine' && x.name===m+'-mid'))}</div>`).join(''); }
-    await writeFile(path.join(O, 'index.html'), `<!doctype html><meta charset="utf-8"><title>RAIN-8 — машины: две пробы</title><style>body{ font:15px/1.45 system-ui; background:#111; color:#ddd; margin:16px; } .row{ display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap; } figure{ margin:0; flex:1 1 300px; max-width:640px; } img{ width:100%; border:1px solid #333; } h2{ margin-top:34px; } h3{ font-weight:500; margin:18px 0 6px; color:#bbb; }</style>
-<h1>RAIN-8: машины — две пробы рядом</h1><p>В каждом ряду: слева «было» (коробки RAIN-6b), в середине <b>(а) запечённые машины</b> (пять смоделированных типов — седан, хэтчбек, такси, фургон, троллейбус — отрисованы заранее под ночным светом, фары и огни живые поверх), справа <b>(б) кинематографичные</b> (мягкий тёмный силуэт, блик фонарей на мокрой крыше, искры, фары и их пятна на мокрой дороге). Трамваи одинаковые во всех трёх. Своё окно (рама, подоконник, чашка, цветок) убрано. Включить пробу в приложении: <code>?room=rain&rain=carsbaked</code> или <code>&rain=carscine</code>. Клик по картинке — полный размер.</p>${body}`);
-    console.log('[rain-snap] --rain8: '+made.length+' captures → tools/.ui-snap/rain8/index.html');
+  } else if(argv.includes('--rain9')){   // RAIN-9: the musician (an arrow at him) at the focus near / on the boulevard / far, close-ups; the crowns' sway as frame sequences
+    const O=path.join(ROOT, 'tools/.ui-snap/rain9'); await mkdir(O, { recursive:true }); const made=[];
+    for(const [tag, vp, dpr] of [['laptop', { width:1280, height:800 }, 1], ['phone', { width:390, height:844 }, 2.75]]){
+      const { ctx, p }=await open(vp, LEVEL, dpr); await p.evaluate(()=>{ const R=window.__H.sceneRoomDbg(); R.mistDbg(0.1); R.lookDbg('evening'); });
+      await hand(p, 0.5, 0.45, 0.2, false, 10);
+      const mid=await p.evaluate(async ()=>{ const FO=await import('/apps/night/rooms/rain/pure/focus.js'), R=window.__H.sceneRoomDbg(); let lo=0.08, hi=0.34, best=0.17;
+        for(let it=0;it<8;it++){ const s=(lo+hi)/2; best=s; const G=window.__G, c=window.__clk; for(let i=0;i<40;i++){ c.t+=1000/30; G.processHandsProbe({ landmarks:[window.__PO.pose({ x:0.5, y:0.45, s, gaps:[1, 1, 1, 1] })], handednesses:[[{ categoryName:'Right' }]] }); }
+          await new Promise(r=>setTimeout(r, 250)); if(FO.focusDepth(R.state().target)>FO.LAYER_DEPTH.street) lo=s; else hi=s; } return best; });
+      /* RAIN-9: the musician was captured here with an arrow, found hidden under the near crowns and removed; those captures stay in tools/.ui-snap/rain9/ */
+      const shot=async (name, ru, clip)=>{ const f=`${tag}-${name}.png`; await p.screenshot({ path:path.join(O, f), clip }); made.push({ f, ru, tag }); };
+      /* the sway: the right-hand crowns, 8 frames 0.4 s apart, Wave at rest and full */
+      await hand(p, 0.5, 0.45, mid, false, 12); await p.waitForTimeout(1500);
+      const W=vp.width, H=vp.height, cc={ x:Math.round(W*0.35), y:Math.round(H*0.45), width:Math.round(W*0.4), height:Math.round(H*0.3) };
+      for(const [wv, ru] of [[0, 'Волна в покое'], [1, 'Волна до конца']]){ await p.evaluate(async w=>{ const A=await import('/core/audio.js'), ST=await import('/core/state.js'); A.fxInstance(ST.chainKeyOf('ld'), 'cwave').params[1].setNorm(w); }, wv); await p.waitForTimeout(3000);
+        for(let k=0;k<8;k++){ await hand(p, 0.5, 0.45, mid, false, 2); await shot(`sway-w${wv}-${k}`, `${ru}, кадр ${k+1} (через 0,4 с)`, cc); await p.waitForTimeout(400); } }
+      await ctx.close();
+      /* the crowns in motion: a 7 s video each, Wave at rest and full (the stills cannot show a sway) */
+      if(tag==='laptop') for(const wv of [0, 1]){ const V=await open(vp, LEVEL, dpr, { recordVideo:{ dir:O, size:vp } }); await V.p.evaluate(()=>{ const R=window.__H.sceneRoomDbg(); R.mistDbg(0.1); R.lookDbg('evening'); });
+        await hand(V.p, 0.5, 0.45, mid, false, 12); await V.p.evaluate(async w=>{ const A=await import('/core/audio.js'), ST=await import('/core/state.js'); A.fxInstance(ST.chainKeyOf('ld'), 'cwave').params[1].setNorm(w); }, wv);
+        await V.p.waitForTimeout(3000); for(let k=0;k<14;k++){ await hand(V.p, 0.5, 0.45, mid, false, 2); await V.p.waitForTimeout(500); } const vid=V.p.video(); await V.ctx.close(); const src=await vid.path(), dst=path.join(O, `sway-wave${wv}.webm`);
+        const { rename }=await import('node:fs/promises'); await rename(src, dst).catch(()=>{}); made.push({ f:`sway-wave${wv}.webm`, ru:`Видео: кроны, ${wv ? 'Волна до конца' : 'Волна в покое'} (последние 7 с)`, tag, video:true }); } }
+    const fig=m=>m.video ? `<figure><video src="${m.f}" controls loop muted style="max-width:100%"></video><figcaption>${m.ru}</figcaption></figure>` : `<figure><a href="${m.f}"><img src="${m.f}" alt="" loading="lazy"></a><figcaption>${m.ru}</figcaption></figure>`;
+    let body=''; for(const tag of ['laptop', 'phone']){ body+=`<h2>${tag==='laptop' ? 'Ноутбук 1280 × 800' : 'Телефон вертикально 390 × 844'}</h2><p>Музыкант: снимки со стрелкой (сделаны до удаления) — он под низкими кронами ближних деревьев, его не видно; убран.</p><div class="row">${['mid', 'near', 'far'].flatMap(fn=>[`${tag}-busker-${fn}.png`, `${tag}-busker-${fn}-close.png`]).map(f=>fig({ f, ru:f.includes('close') ? 'Крупно' : 'Стрелка — где он стоял' })).join('')}</div><div class="row">${made.filter(m=>m.tag===tag && m.video).map(fig).join('')}</div>`;
+      for(const w of [0, 1]) body+=`<h3>Кроны, ${w ? 'Волна до конца' : 'Волна в покое'} — 8 кадров через 0,4 с (каждое дерево в своём ритме, порыв идёт от ближних к дальним)</h3><div class="row">${made.filter(m=>m.tag===tag && m.f.includes(`sway-w${w}-`)).map(fig).join('')}</div>`; }
+    await writeFile(path.join(O, 'index.html'), `<!doctype html><meta charset="utf-8"><title>RAIN-9 — музыкант и кроны</title><style>body{ font:15px/1.45 system-ui; background:#111; color:#ddd; margin:16px; } .row{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px; } figure{ margin:0; max-width:420px; } img{ max-width:100%; border:1px solid #333; } h3{ font-weight:500; color:#bbb; }</style><h1>RAIN-9: музыкант ближе, кроны качаются по-деревьям</h1><p>Машины — только кинематографичные. Клик — полный размер.</p>${body}`);
+    console.log('[rain-snap] --rain9: '+made.length+' captures → tools/.ui-snap/rain9/index.html');
   } else if(argv.includes('--rain7')){   // RAIN-7: the starred details → tools/.ui-snap/rain7/ — before (?rain=noframe,nocones,nosway) and after
     const O=path.join(ROOT, 'tools/.ui-snap/rain7'); await mkdir(O, { recursive:true }); const made=[];
     const fx=(p, e, t, w=0)=>p.evaluate(async ([e, t, w])=>{ const A=await import('/core/audio.js'), ST=await import('/core/state.js'), k=ST.chainKeyOf('ld'); A.fxInstance(k, 'cecho').params[0].setNorm(e); A.fxInstance(k, 'ctone').params[1].setNorm(t); A.fxInstance(k, 'cwave').params[1].setNorm(w); }, [e, t, w]);

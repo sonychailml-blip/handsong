@@ -25,6 +25,7 @@ export const NIGHT_TEXTS=Object.freeze({
     'night.load.warm':'Almost ready…',
     'night.load.camera':'Starting the camera…',
     'night.load.modelFail':'The hand model did not finish loading. Check the connection, then tap {again}.',
+    'night.load.noAudio':'This browser cannot play sound, so Night cannot start here. Open this page in Safari or Chrome.',   // SAFARI-1: a browser without Web Audio
     'night.cam.denied.phone':'The camera is blocked for this page. Open this browser’s settings for the site (the icon next to the address, or the menu), allow the camera, then tap {begin} again.',
     'night.cam.denied.pc':'Camera access is blocked for this page. Click the camera or lock icon in the address bar, allow the camera, then press {begin} again.',
     'night.cam.busy.phone':'The camera is busy. Close other apps that use it, then tap {begin} again.',
@@ -97,6 +98,7 @@ export const NIGHT_TEXTS=Object.freeze({
     'night.load.warm':'Почти готово…',
     'night.load.camera':'Включаю камеру…',
     'night.load.modelFail':'Модель рук не загрузилась до конца. Проверьте связь и нажмите «{again}».',
+    'night.load.noAudio':'Этот браузер не умеет играть звук, поэтому Handsong Night здесь не запустится. Откройте страницу в Safari или Chrome.',
     'night.cam.denied.phone':'Камера для этой страницы запрещена. Откройте настройки сайта в браузере (значок рядом с адресом или меню), разрешите камеру и снова нажмите «{begin}».',
     'night.cam.denied.pc':'Доступ к камере для этой страницы запрещён. Нажмите значок камеры или замка в адресной строке, разрешите камеру и снова нажмите «{begin}».',
     'night.cam.busy.phone':'Камера занята. Закройте другие приложения, которые её используют, и снова нажмите «{begin}».',

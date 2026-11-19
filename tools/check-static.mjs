@@ -188,6 +188,7 @@ const RESERVED=new Set(('break case catch class const continue debugger default 
   'instanceof let new return super switch this throw try typeof var void while with yield async await of get set static from as '+
   'true false null undefined NaN Infinity arguments').split(' '));
 const GLOBALS=new Set((
+  /* SAFARI-1: an older iOS switches its audio session by playing our silent clip (an <audio> element) */ 'Audio '+
   /* DESIGN-1: the start still watches the start card */ 'MutationObserver '+
   /* NIGHT-14c: the forest asks the precache (Cache Storage) whether Detailed's pictures are in */ 'caches '+
   /* JavaScript */ 'Math JSON Object Array Number String Boolean Symbol BigInt Map Set WeakMap WeakSet WeakRef Promise Proxy Reflect Intl Date RegExp '+

@@ -196,7 +196,7 @@ function tick(now){
    them), Begin, the privacy line. «Begin» runs the very same start handler as Play, inside this click (rule #1). Only a person's own tap leads
    to the first cards (never a profile switch — the probes switch). */
 document.body.classList.add('night-boot');   // NIGHT-8b: the page's markup carries it already (the first paint is Night's); kept for a page without it
-$('nightBegin').onclick=()=>{ const go=$('startBtn').onclick; begun=true; firstRun=cardsDue(STORE); audioSessionPlayback(); if(go) go(); fsBegin(); musicEarly(); if(!START_OLD) forestEarly(); };   // NIGHT-11 part 3: the forest begins opening in the tap
+$('nightBegin').onclick=()=>{ const go=$('startBtn').onclick; begun=true; firstRun=cardsDue(STORE); audioSessionPlayback(); if(go) go(); resumeInTap(); fsBegin(); musicEarly(); if(!START_OLD) forestEarly(); };   // NIGHT-11 part 3: the forest begins opening in the tap
 /* NIGHT-12: «How to play» on the start screen — the same cards over it; closing them returns to the start card (nothing else of the flow changes) */
 $('nightStartHowTo').onclick=()=>{ if(!$('start').classList.contains('on') || cardsOpen()) return; document.body.classList.add('night-cards-start');
   cardsShow(()=>{ document.body.classList.remove('night-cards-start'); $('nightStartHowTo').focus({ preventScroll:true }); }); };
@@ -237,8 +237,22 @@ function musicEarly(){
       bedTick(); }
     early.raf=requestAnimationFrame(step); };
   early.raf=requestAnimationFrame(step); }
-/* NIGHT-7c: iPhone and iPad — sound even with the silent switch on, where the browser has the door (Safari 16.4+); elsewhere nothing changes */
-function audioSessionPlayback(){ try{ const a=navigator.audioSession; if(a && a.type!=='playback') a.type='playback'; return a ? a.type : null; }catch(e){ return null; } }
+/* NIGHT-7c / SAFARI-1: iPhone and iPad — sound even with the ringer switch on silent. Web Audio alone is muted there unless the page plays as a player:
+   Safari 16.4+ has the door (navigator.audioSession.type = 'playback'); an older iOS switches its session to playback when the page plays a media element
+   in a tap — a short silent clip of our own, made in memory (a WAV blob: media-src allows blob:, nothing fetched, no file). Called first in the Begin
+   tap, before the AudioContext is made; then resumeInTap() resumes the context in the same tap. Elsewhere nothing changes. */
+const IOS=typeof navigator!=='undefined' && (/iP(hone|ad|od)/.test(navigator.userAgent||'') || (/Macintosh/.test(navigator.userAgent||'') && navigator.maxTouchPoints>1));
+let silentEl=null;
+function silentClip(){ const n=800, b=new ArrayBuffer(44+n), v=new DataView(b), w=(o, t)=>{ for(let i=0;i<t.length;i++) v.setUint8(o+i, t.charCodeAt(i)); };
+  w(0, 'RIFF'); v.setUint32(4, 36+n, true); w(8, 'WAVE'); w(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, 8000, true); v.setUint32(28, 8000, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true);
+  w(36, 'data'); v.setUint32(40, n, true); for(let i=0;i<n;i++) v.setUint8(44+i, 128); return URL.createObjectURL(new Blob([b], { type:'audio/wav' })); }   // 0.1 s of 8-bit silence (128 = zero)
+function audioSessionPlayback(){ let how=null;
+  try{ const a=navigator.audioSession; if(a){ if(a.type!=='playback') a.type='playback'; how=a.type; } }catch(e){}
+  if(!how && IOS) try{ if(!silentEl){ silentEl=new Audio(silentClip()); silentEl.setAttribute('playsinline', ''); silentEl.preload='auto'; } const p=silentEl.play(); if(p && p.catch) p.catch(()=>{}); how='silent-clip'; }catch(e){}
+  sessionHow=how; return how; }
+let sessionHow=null;
+function resumeInTap(){ try{ if(AC && AC.state!=='running' && AC.resume){ const p=AC.resume(); if(p && p.catch) p.catch(()=>{}); } }catch(e){} }
+export const nightAudioSessionDbg=()=>({ how:sessionHow, ios:IOS, type:(()=>{ try{ return navigator.audioSession ? navigator.audioSession.type : null; }catch(e){ return null; } })(), ctx:AC ? AC.state : null });   // SAFARI-1, probes
 /* probe only: hold the music off (true) or let it play as the person chose (false) → whether it was playing */
 export function nightMusicHoldDbg(v){ const was=bedModeOf()!=='off'; musicHold=!!v; if(musicHold) bedSetMode('off'); else if(on) bedSetMode(musicNow(), room().bed, room().bed2); return was; }
 export const nightEarlyDbg=()=>({ ...early });

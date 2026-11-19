@@ -32,6 +32,7 @@ export function startWire(){ const c=$('nightInAppCopy'); if(c) c.onclick=()=>{ 
 /* boot's failText: Night's words for a failed start (null: core's own) */
 export function startFailText(err){
   if(err && err.modelKind) return t('night.load.modelFail', { again:t('start.retry') });
+  if(typeof window!=='undefined' && !(window.AudioContext || window.webkitAudioContext)) return t('night.load.noAudio');   // SAFARI-1: no Web Audio at all (seen in a WebKit build): say so, not core's raw error
   const k=err && err.camKind, E=startEnv(), w={ begin:t('night.begin') };
   if(k==='denied'){ if(E.inApp || (quickDeny(err.name, err.gumMs) && camPerm!=='denied')){ inAppShow(true); return t('night.cam.inapp'); }
     return t(E.phone ? 'night.cam.denied.phone' : 'night.cam.denied.pc', w); }

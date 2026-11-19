@@ -465,11 +465,6 @@ RAIN-7: THE STREET MUSICIAN under the café's awning, playing along with our mus
 - const (2): `BUSK`, `buskOn`
 - fn (1): `buskNotes`
 
-## apps/night/rooms/rain/pure/carsprites.js
-RAIN-8 (3a): THE BAKED CARS' SPRITE LAW — pure (rule #36; data row «RAIN-8 cars (app)»).
-- const (5): `CARS`, `BAKED_OF`, `cellOf`, `cellRC`, `CELLS`
-- fn (6): `viewDir`, `viewAxes`, `boxOf`, `frameOf`, `binsOf`, `seenOf`
-
 ## apps/night/rooms/rain/pure/city.js
 RAIN-0b: THE VIEW LAW — the eye on the 8th floor, looking slightly down and diagonally along the boulevard (concept §3), as ONE pure projection used by the painting, the depth map, the lights, the …
 - const (20): `CAM`, `STREET`, `BEND`, `bendX`, `BAKE_EXT`, `BLOCKS`, `FLOOR`, `FAR`, `camBasis`, `vanishing`, `DEPTH`, `hillsAt`, `RAIN_CITY_SEED`, `NEAR_TREES`, `TRAFFIC`, `DENS_MARGIN`, `RAIN_TRAFFIC`, `EAR`, `trafficAt`, `trafficDensity`
@@ -601,7 +596,7 @@ DESIGN-1 part C: THE SETTINGS IN THREE SHORT TABS — Sound · Picture · Hands 
 
 ## apps/night/shell.js
 RUN 7 (C6 + C11, Night plan §5; docs/night/QUALITY.md points 4, 5, 6, 9, 10) — THE NIGHT SHELL (DOM side; the logic is core/nightui.js).
-- const (10): `LEAN_PATH`, `MUSIC_KEYS`, `musicModeOf`, `firstGpu`, `REACH`, `nightEarlyDbg`, `qualityOf`, `nightClockDbg`, `nightShellDbg`, `nightSleepDbg`
+- const (11): `LEAN_PATH`, `MUSIC_KEYS`, `musicModeOf`, `firstGpu`, `REACH`, `nightAudioSessionDbg`, `nightEarlyDbg`, `qualityOf`, `nightClockDbg`, `nightShellDbg`, `nightSleepDbg`
 - fn (5): `nightShellWire`, `nightShellFace`, `nightMusicHoldDbg`, `qualitySet`, `nightLabelsDbg`
 
 ## apps/night/sound/ambience.js
@@ -1683,7 +1678,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 UI-1 — «NIGHT labels follow the room»: the founder entered the rain and the Sound button still read «Firefly» while another timbre played.
 - fn (1): `checkNightLabels`
 
-_334 modules, 3235 exported names._
+_333 modules, 3225 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

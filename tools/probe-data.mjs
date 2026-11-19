@@ -2111,25 +2111,20 @@ async function rainStreetLaw(){
     ok(`${slide} walkers slide their feet`, slide===0); }
   return { cases:n, total:d.length, differences:d, notes };
 }
-/* RAIN-8 — «RAIN-8 cars (app)»: the baked cars' sprite law (rooms/rain/pure/carsprites.js) — every cell its own place in the atlas; each frame holds its car's
-   whole box; the flank the street's eye sees comes out on the frame's right from the front and from behind; the bins follow the angle; a car on the near
-   road is seen at the angles baked (elevation within the bins, azimuth within 30°); the atlas exists and its bake made every cell. CONTROL: the view
-   without the side's sign (the eye on the same flank from behind) puts the back view's flank on the left — caught. */
-async function rain8Cars(){ const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); };
-  const K=await import(new URL('../apps/night/rooms/rain/pure/carsprites.js', import.meta.url).href), CY=await import(new URL('../apps/night/rooms/rain/pure/city.js', import.meta.url).href), fs=await import('node:fs');
-  const C=K.CARS, idx=new Set(); for(let t=0;t<C.types.length;t++) for(let s=0;s<2;s++) for(let e=0;e<C.elev.length;e++) for(let a=0;a<C.az.length;a++) idx.add(K.cellOf(t, s, e, a));
-  ok(`cells not one place each (${idx.size} of ${K.CELLS}, grid ${C.grid*C.grid})`, idx.size===K.CELLS && Math.max(...idx)<C.grid*C.grid);
-  const flankRight=(vd)=>{ let bad=0; for(const s of [0, 1]) for(const a of C.az.slice(1)) for(const e of C.elev){ const dd=vd(e, a, s), { r }=K.viewAxes(dd), fx=Math.sign(dd[0]); if(!(r[0]*fx>0)) bad++; } return bad; };
-  ok('the seen flank is not on the frame right', flankRight(K.viewDir)===0);
-  { const old=(e, a, s)=>{ const E=e*Math.PI/180, A=a*Math.PI/180, c=Math.cos(E); return [Math.sin(A)*c, Math.sin(E), (s===1 ? -1 : 1)*Math.cos(A)*c]; }, b=flankRight(old); ok('CONTROL: the view without the side sign passed', b>0); notes.push(`CONTROL the old view: ${b} views with the flank on the left`); }
-  let out=0; for(const T of C.types) for(const s of [0, 1]) for(const e of C.elev) for(const a of C.az){ const [u0, u1, v0, v1]=K.frameOf(T, e, a, s), dd=K.viewDir(e, a, s), { r, u }=K.viewAxes(dd);
-    for(const p of K.boxOf(T)){ const x=p[0]*r[0]+p[1]*r[1]+p[2]*r[2], y=p[0]*u[0]+p[1]*u[1]+p[2]*u[2]; if(x<u0 || x>u1 || y<v0 || y>v1) out++; } }
-  ok(`frames that cut their car's box: ${out} corners`, out===0);
-  { const b1=K.binsOf(20, 3), b2=K.binsOf(30, 20), b3=K.binsOf(2, 40); ok(`the bins do not follow the angle (${JSON.stringify([b1, b2, b3])})`, b1.ei<b2.ei && b3.ei===0 && b3.ai===C.az.length-1 && b1.ai===0); }
-  { let worst=[90, 0, 0]; for(const x of CY.STREET.lanes.map(l=>l.x)) for(let z=20;z<=600;z+=10){ const S=K.seenOf(x, z, 4.6, -1, [CY.CAM.x, CY.CAM.y, CY.CAM.z]); worst=[Math.min(worst[0], S.elev), Math.max(worst[1], S.elev), Math.max(worst[2], S.az)]; }
-    ok(`a car on the near road is seen beyond the baked angles (elevation ${worst[0].toFixed(1)}–${worst[1].toFixed(1)}°, azimuth ≤ ${worst[2].toFixed(1)}°)`, worst[1]<=C.elev[C.elev.length-1]+8 && worst[2]<=30); notes.push(`the near road: elevation ${worst[0].toFixed(1)}–${worst[1].toFixed(1)}°, azimuth ≤ ${worst[2].toFixed(1)}° (baked ${C.elev[0]}–${C.elev[C.elev.length-1]}°, ${C.az.join('/')}°)`); }
-  { const f=new URL('../apps/night/rooms/rain/'+C.file, import.meta.url), j=new URL('../tools/design/rain/cars/cars.json', import.meta.url); const has=fs.existsSync(f), J=fs.existsSync(j) ? JSON.parse(fs.readFileSync(j, 'utf8')) : null;
-    ok('the atlas or its bake record is missing', has && !!J); if(J){ ok(`the bake made ${J.cells} cells (${K.CELLS} wanted), ${J.thin} not filling their frame`, J.cells===K.CELLS && J.thin===0); notes.push(`atlas ${(fs.statSync(f).size/1024).toFixed(0)} KB, ${J.cells} cells`); } }
+/* SAFARI-1 — «NIGHT silent switch (app)»: an iPhone plays Night's sound with the ringer switch on silent — in the Begin tap, FIRST the session becomes a
+   player (navigator.audioSession.type = 'playback', Safari 16.4+; an older iOS plays our own silent clip, a WAV made in memory, media-src allows blob:),
+   THEN the start makes the AudioContext, THEN the context is resumed in the same tap; the clip only on iOS. A browser without Web Audio gets Night's
+   own words (night.load.noAudio). CONTROL: a tap that makes the context before the session switch fails. */
+async function nightSilentSwitch(){ const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); };
+  const fs=await import('node:fs'), sh=fs.readFileSync(new URL('../apps/night/shell.js', import.meta.url), 'utf8'), st=fs.readFileSync(new URL('../apps/night/start.js', import.meta.url), 'utf8'), html=fs.readFileSync(new URL('../apps/night/index.html', import.meta.url), 'utf8');
+  const order=src=>{ const m=src.match(/\$\('nightBegin'\)\.onclick=\(\)=>\{(.*)/); if(!m) return null; const b=m[1], a=b.indexOf('audioSessionPlayback()'), g=b.indexOf('go()'), r=b.indexOf('resumeInTap()'); return a>=0 && g>a && r>g; };
+  ok('the Begin tap does not switch the session, start, then resume — in that order', order(sh)===true);
+  ok('CONTROL: a tap starting before the session switch passed', order(sh.replace("audioSessionPlayback(); if(go) go();", "if(go) go(); audioSessionPlayback();"))===false);
+  ok('the session is not set to playback', /a\.type!=='playback'\) a\.type='playback'/.test(sh));
+  ok('the older iOS fallback (our silent clip, only on iOS) is missing', /if\(!how && IOS\)/.test(sh) && /new Audio\(silentClip\(\)\)/.test(sh) && /playsinline/.test(sh));
+  ok('the page does not allow a media blob (the silent clip)', /media-src 'self' blob:/.test(html));
+  ok('a browser without Web Audio does not get the own words of Night', /night\.load\.noAudio/.test(st));
+  notes.push('the Begin tap: audioSession playback (or the silent clip on an older iOS) → the AudioContext → resume');
   return { cases:n, total:d.length, differences:d, notes }; }
 /* RAIN-7 — «RAIN-7 law (app)»: the street musician (rooms/rain/pure/busker.js) plays ONLY the bar's chord tones, on its beats inside the bar, rests
    between sets (some bars silent, some sets silent) — CONTROL a note a step off the chord is caught; a turning car's sweep (pure/vehicles.js) stays on
@@ -3489,7 +3484,7 @@ const ROWS=[
   ['CORE-27 idle search cadence (core)', ()=>idleSearch(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // CORE-27
   ['RAIN effects hand (app)', ()=>rainFxLaw(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-6
   ['RAIN-7 law (app)', ()=>rain7Law(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-7
-  ['RAIN-8 cars (app)', ()=>rain8Cars(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-8
+  ['NIGHT silent switch (app)', ()=>nightSilentSwitch(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // SAFARI-1
   ['RAIN street law (app)', ()=>rainStreetLaw(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-6b
   ['NIGHT home screen (app)', ()=>nightHomeScreen(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-7c
   ['NIGHT forest files (app)',  ()=>nightForestFiles(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 (the files rule, the size budget)

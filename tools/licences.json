@@ -263,19 +263,6 @@
       ]
     },
     {
-      "id": "rain-cars-bake",
-      "name": "The rain room's baked cars (RAIN-8 trial, development room): five car types modelled by our own code and rendered once offline at the street's angles into one atlas",
-      "class": "image",
-      "use": "shipped",
-      "version": "RAIN-8, 2026-11-19 (tools/rain-cars-bake.mjs)",
-      "licence": "own-work",
-      "source": "Our own renders (tools/design/rain/cars/cars.js; three.js r128, MIT, the vendored copy) of our own procedural models (extruded profiles, boxes, cylinders) under lights and an environment drawn by our code. No texture, no photograph, no real car model copied, no text, no brand.",
-      "files": [
-        "apps/night/rooms/rain/cars/cars.webp"
-      ],
-      "replace": "to be replaced by the user's own authored design (Q13; a trial — the founder picks the baked or the cinematic cars)"
-    },
-    {
       "id": "rain-city-bake",
       "name": "The rain room's baked city (RAIN-1, development room): the whole boulevard built by our own code and rendered once offline — each mood's colour, the lit windows' colour, the depth map",
       "class": "image",

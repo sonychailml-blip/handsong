@@ -111,6 +111,7 @@ export default Object.freeze({
   'night.load.camera':'Kamera startet …',
   'night.load.model':'Das Handmodell wird vorbereitet …',
   'night.load.modelFail':'Das Handmodell wurde nicht fertig geladen. Prüfe die Verbindung und tippe dann auf {again}.',
+  'night.load.noAudio':'Dieser Browser kann keinen Ton abspielen, darum startet Night hier nicht. Öffne die Seite in Safari oder Chrome.',
   'night.load.modelP':'Das Handmodell wird vorbereitet … {p} %',
   'night.load.reload':'Neu laden',
   'night.load.warm':'Fast fertig …',

@@ -1,7 +1,6 @@
 /* RAIN-7 — «RAIN-7 street details» (drawn): in the rain room, live. The rain seen in the lamps' light: a cone under every near lamp (the light layer's
    kind 3); the crowns' mask covers part of the promenade (1–40 % of the bake) and their sway grows with Wave (CONTROL: Wave 0 → the rest sway only);
-   (RAIN-8: our own window removed — no switch of it left); the street musician there in every mood, inside an upright phone's crop, in his own pool of
-   light, and strumming when his note is heard (a «busk» bed event moves his strum's moment). The turning car's sweep and the musician's notes: the data row «RAIN-7 law (app)». */
+   (RAIN-8: our own window removed — no switch of it left); RAIN-9: the street musician's figure removed (his heard notes still mark their moment) (a «busk» bed event moves his strum's moment). The turning car's sweep and the musician's notes: the data row «RAIN-7 law (app)». */
 import { row } from '../core/rows.js';
 
 export async function checkRain7(){ const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); return !!c; };
@@ -18,11 +17,8 @@ export async function checkRain7(){ const d=[], notes=[]; let n=0; const ok=(wha
     if(st().baked){ ok(`the crowns' mask is wrong (${(D.crownShare*100).toFixed(1)} % of the bake)`, D.crownShare>0.01 && D.crownShare<0.4); wave(1); await wait(4000); const W=R().rain7Dbg(); ok(`the crowns do not sway more with Wave (${D.sway} → ${W.sway})`, W.sway>D.sway*2.5); notes.push(`crowns: ${(D.crownShare*100).toFixed(1)} % of the bake; sway ${D.sway.toFixed(4)} → ${W.sway.toFixed(4)} with Wave`); wave(0); }
     /* RAIN-8: our own window removed (the founder) — nothing of it left: no switch, no field */
     ok('our own window still has its switches', !R().frameDbg && !R().frameSoftDbg && !('frameOn' in D)); notes.push(`${D.cones} lamp cones`);
-    /* RAIN-8 (5): the musician there in every mood, inside an upright phone's crop (the narrowest: tan 34° × 390/844) and above the street, in his lamp's light */
-    { const CY=await import('../../../apps/night/rooms/rain/pure/city.js'), b=D.buskerAt, q=CY.project([b.x, 0, b.z]), tw=Math.tan(34*Math.PI/180)*390/844;
-      ok(`the musician is outside an upright phone's crop (${q.x.toFixed(3)} vs ±${tw.toFixed(3)})`, Math.abs(q.x)<tw-0.03 && q.y>-0.6);
-      for(const m of ['late', 'after', 'evening']){ R().lookDbg(m); await wait(400); ok(`the musician is not there at ${m}`, R().rain7Dbg().busker); }
-      const L=R().liveLightsDbg().filter(l=>l.kind===4 && Math.hypot(l.x-q.x, l.y-q.y)<0.03); ok('the musician has no pool of light round him', L.length>=1); notes.push(`the musician at ${q.x.toFixed(3)}, ${q.y.toFixed(3)} (an upright phone shows ±${tw.toFixed(3)}), his pool of light ${L.length ? 'there' : 'missing'}`); }
+    /* RAIN-9: the musician's figure removed (no place near enough to be seen) — no figure drawn in any mood; his heard notes still keep their moment */
+    for(const m of ['late', 'after', 'evening']){ R().lookDbg(m); await wait(400); ok(`the musician's figure is still drawn at ${m}`, R().rain7Dbg().busker===false); }
     { const b0=R().rain7Dbg().buskAt; R().bed({ kind:'busk', step:0, vel:0.5 }, R().rain7Dbg().t+0.05); await wait(700); const b1=R().rain7Dbg().buskAt; ok(`his strum does not follow his heard note (${b0} → ${b1})`, b1>b0); }
   } catch(e){ ok('error: '+(e && e.stack || e), false); }
   finally{ try{ wave(0); const r=R(); if(r){ r.lookDbg && r.lookDbg(null); } }catch(e){}

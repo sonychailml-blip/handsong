@@ -111,6 +111,7 @@ export default Object.freeze({
   'night.load.camera':'Encendiendo la cámara…',
   'night.load.model':'Preparando el modelo de las manos…',
   'night.load.modelFail':'El modelo de las manos no terminó de cargarse. Comprueba la conexión y toca {again}.',
+  'night.load.noAudio':'Este navegador no puede reproducir sonido, así que Night no puede empezar aquí. Abre esta página en Safari o Chrome.',
   'night.load.modelP':'Preparando el modelo de las manos… {p} %',
   'night.load.reload':'Recargar',
   'night.load.warm':'Casi listo…',

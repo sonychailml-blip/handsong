@@ -89,6 +89,8 @@ THERE in full and here as one index entry):
   184 UI-1: no notes under Quality, forest-only settings hidden in the rain, labels follow the room, the rain's music names, amber everywhere, round hill lights
   185 RAIN-8: our window removed, the cars' two trial versions (baked / cinematic), the street musician findable, people against RAIN-5c
   186 PERF-4: the forest's hand-light shadow skipped with no hand; a weak GPU starts at Light on its first visit
+  187 RAIN-9: the cinematic cars only, the musician removed, the crowns sway tree by tree
+  188 SAFARI-1: Night on a real iPhone — the silent switch, the camera and hands, quality, offline, Telegram
   163 Fixes after the backlog audit: an in-app browser's refusal, the Lighter stream, the rain room's sound on Dark, Licences, keeping the files (NIGHT-15, CORE-23)
 
 ## Moved to `archive/CLAUDE-history.md` at DOC1 (grep by title; read only what the slice needs)

@@ -112,6 +112,7 @@ export default Object.freeze({
   'night.load.camera':'კამერა ირთვება…',
   'night.load.model':'ხელების მოდელი მზადდება…',
   'night.load.modelFail':'ხელების მოდელი ბოლომდე ვერ ჩაიტვირთა. შეამოწმეთ კავშირი, შემდეგ შეეხეთ «{again}».',
+  'night.load.noAudio':'ამ ბრაუზერს ხმის დაკვრა არ შეუძლია, ამიტომ Handsong Night აქ ვერ ჩაირთვება. გახსენით ეს გვერდი Safari-ში ან Chrome-ში.',
   'night.load.modelP':'ხელების მოდელი მზადდება… {p} %',
   'night.load.reload':'გადატვირთვა',
   'night.load.warm':'თითქმის მზადაა…',
