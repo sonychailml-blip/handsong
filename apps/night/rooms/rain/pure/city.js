@@ -96,12 +96,18 @@ export function cityWindows(){
 }
 /* THE LAMPS (RAIN-1): along the left pavement's kerb, between the two rows of plane trees, and along the promenade before the terraces — their heads
    (world), for the lights and their reflections; the bake places its lamp heads exactly here */
+const LAMP_ROWS=F([F([STREET.kerbA+0.6, 0, 7.2]), F([(STREET.treeRows[0]+STREET.treeRows[1])/2, 0.5, 5.2]), F([STREET.terrace[0]-1, 0.25, 4.6])]);   // [x, phase, head height]
 export function cityLamps(){
-  const out=[], T=STREET.treeRows;
-  for(const [x, ph, y] of [[STREET.kerbA+0.6, 0, 7.2], [(T[0]+T[1])/2, 0.5, 5.2], [STREET.terrace[0]-1, 0.25, 4.6]])
+  const out=[];
+  for(const [x, ph, y] of LAMP_ROWS)
     for(let z=8+ph*STREET.lampEvery;z<STREET.len*0.7;z+=STREET.lampEvery) out.push({ p:[x, y, z], foot:[x, 0, z] });
   return out;
 }
+/* RELEASE-1 (A): how much the near lamps light a person standing at (x, z): 0…1, each lamp's pool a soft disc (σ = 0.75 × its height) — the same lamps */
+export function lampLitAt(x, z){ let s=0;
+  for(const [lx, ph, y] of LAMP_ROWS){ const z0=8+ph*STREET.lampEvery, k=Math.round((z-z0)/STREET.lampEvery), w=2*(0.75*y)**2;
+    for(let j=k-1;j<=k+1;j++){ const lz=z0+j*STREET.lampEvery; if(j<0 || lz>=STREET.len*0.7) continue; s+=Math.exp(-((x-lx)**2+(z-lz)**2)/w); } }
+  return Math.min(1, s); }
 /* the plane trees (RAIN-1): two rows between the road and the promenade — their crowns' centres and radii (world), seeded */
 export const NEAR_TREES=40;   // RAIN-2: plane trees nearer than this (z, m) are pruned: their crowns lower and smaller (the bake's planeTree thins their leaves too)
 export function cityTrees(){

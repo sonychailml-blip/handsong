@@ -24,9 +24,9 @@ import { RAIN_SEED, windowsLayout, farLights, windowPick, windowLight, flyWindow
 import { GLASS, wipeNew, wipeStamp, wipeStroke, wipeStep, wipeAt, wipeCell } from './pure/glass.js';
 import { DROPS, dropsNew, dropsRegion, dropAdd, dropsStep, dropStretch, dropsLedger, laneAt } from './pure/drops.js';
 import { winQuad } from './pure/windows.js';   // RAIN-2: a window's projected quad
-import { CAM, project, cityTrees, cityLamps, trafficAt, trafficDensity, sceneAt, depthOf, BAKE_EXT, DENS_MARGIN, STREET, vanishing } from './pure/city.js';
+import { CAM, project, cityTrees, cityLamps, lampLitAt, trafficAt, trafficDensity, sceneAt, depthOf, BAKE_EXT, DENS_MARGIN, STREET, vanishing } from './pure/city.js';
 import { passBook, passBookSet } from '../../pure/passes.js';   // RAIN-2: the density book
-import { lifeAt, lifeCyclists, LIFE, LK, UMB } from './pure/life.js';
+import { lifeAt, lifeCyclists, LIFE, LK, UMB, PEOPLE, wearFor } from './pure/life.js';
 import { vehicleItems, taxiAt, VK, sweepAt, SWEEP, VEH } from './pure/vehicles.js';   // RAIN-6b (1, 3): the vehicles' bodies, the taxi
 import { skyAt } from './pure/sky.js';
 import { FAR_LIFE, hillTop, slope, farCars, blink, twinkle, cableAt, farEventAt, smokerGlow, lampFlickerAt } from './pure/far.js';   // RAIN-5d: life far away
@@ -71,7 +71,7 @@ export function buildRain(T, opt){
   const looks=new Map(), lookCols=L=>{ let c=looks.get(L.pre); if(!c){ c={}; for(const [k, n] of Object.entries(L.tokens)) c[k]=new T.Color(C(n)); looks.set(L.pre, c); } return c; };
   let moodId=opt.mood||null, look=roomLook(RAIN_ROOM, moodId), mistK=look.mist, rainK=look.rain, litK=look.lit, painted=null;
   const PANE=col('pane'), HONEY=col('honey'), AMBER=col('amber'), WBASE=[col('honey'), col('amber')], TUNG=new T.Color(1.0, 0.56, 0.22), LEDW=new T.Color(0.86, 0.93, 1.0),   // RAIN-6c: the windows' own colours kept
-    LAMP=col('lamp'), LIGHT=col('light'), TAIL=col('tail'), HEAD=col('head'), mistCol=lookCols(look).mist.clone();
+    LAMP=col('lamp'), LIGHT=col('light'), TAIL=col('tail'), HEAD=col('head'), mistCol=lookCols(look).mist.clone(), ambCol=lookCols(look).glow.clone();   // RELEASE-1 (A): ambCol — the look's glow on the people's clothes
   let W=opt.w, H=opt.h, tw=1, th=1, bw=0, bh=0, now=0, dirty=true, repaints=0, frames=0;
 
   /* ---- the passes: one scene, the pass's own meshes shown ---- */
@@ -232,10 +232,10 @@ export function buildRain(T, opt){
      over the city and under the windows and lights; and THE MUSIC SHOWN (pure/shown.js): the bed's events queued with their heard moment */
   /* RAIN-9: THE CARS ARE CINEMATIC (the founder's pick of RAIN-8's two trials; the baked one: archive/rain-cars-baked-RAIN8/, not loaded) — a soft dark
      silhouette, the lamps' light on the wet roof and the glass, glints, the headlights' pools on the wet road (rain-glass.js LIFE_F, the light layer's kind 4) */
-  const NLIFE=480, fg=unitQuad(), fRect=new Float32Array(NLIFE*4), fK=new Float32Array(NLIFE*4), fD=new Float32Array(NLIFE), fRA=dyn(fRect, 4), fKA=dyn(fK, 4), fDA=dyn(fD, 1);
-  fg.setAttribute('aRect', fRA); fg.setAttribute('aK', fKA); fg.setAttribute('aDep', fDA); fg.instanceCount=0; let lifeN=0;
+  const NLIFE=480, fg=unitQuad(), fRect=new Float32Array(NLIFE*4), fK=new Float32Array(NLIFE*4), fD=new Float32Array(NLIFE), fW=new Float32Array(NLIFE*2), fV=new Float32Array(NLIFE*4), fRA=dyn(fRect, 4), fKA=dyn(fK, 4), fDA=dyn(fD, 1), fWA=dyn(fW, 2), fVA=dyn(fV, 4);
+  fg.setAttribute('aRect', fRA); fg.setAttribute('aK', fKA); fg.setAttribute('aDep', fDA); fg.setAttribute('aWear', fWA); fg.setAttribute('aView', fVA); fg.instanceCount=0; let lifeN=0;   // RELEASE-1 (A): aWear = (the wear code, the near lamps' light)
   const lifeM=mat({ uniforms:{ uTan:{ value:UT }, uFoc:{ value:FOC }, uPx:UPX, uWin:{ value:1 }, uGarA:{ value:col('garland-a') }, uGarB:{ value:col('garland-b') }, uGarC:{ value:col('garland-c') }, uGarD:{ value:col('garland-d') },
-    uWind:{ value:0 }, uTime:UTIME, uSign:{ value:col('sign') }, uSignWarm:{ value:col('sign-warm') }, uCross:{ value:col('cross') }, uWalkR:{ value:col('walk-red') }, uWalkG:{ value:col('walk-green') }, uNavR:{ value:TAIL }, uHead:{ value:HEAD }, uDepthMap:{ value:depTex||blankTex }, uExt:{ value:EXT }, uOccl:{ value:depTex ? 1 : 0 } }, vertexShader:LIFE_V, fragmentShader:LIFE_F, transparent:true, blending:T.CustomBlending, blendSrc:T.OneFactor, blendDst:T.OneMinusSrcAlphaFactor, blendSrcAlpha:T.OneFactor, blendDstAlpha:T.OneMinusSrcAlphaFactor });   // RAIN-5c: + the furniture's lights
+    uWind:{ value:0 }, uTime:UTIME, uSign:{ value:col('sign') }, uSignWarm:{ value:col('sign-warm') }, uCross:{ value:col('cross') }, uWalkR:{ value:col('walk-red') }, uWalkG:{ value:col('walk-green') }, uNavR:{ value:TAIL }, uHead:{ value:HEAD }, uDepthMap:{ value:depTex||blankTex }, uExt:{ value:EXT }, uOccl:{ value:depTex ? 1 : 0 }, uAmb:{ value:ambCol }, uLampC:{ value:LAMP }, uLamp:ULAMP }, vertexShader:LIFE_V, fragmentShader:LIFE_F, transparent:true, blending:T.CustomBlending, blendSrc:T.OneFactor, blendDst:T.OneMinusSrcAlphaFactor, blendSrcAlpha:T.OneFactor, blendDstAlpha:T.OneMinusSrcAlphaFactor });   // RAIN-5c: + the furniture's lights
   const lifeMesh=add(new T.Mesh(fg, lifeM), 0.5);
   /* RAIN-10: THE TRAM as a lit box in true perspective (rain-glass.js TRAM_V / TRAM_F; it was three flat sprites and six window lights over its roof):
      each carriage's near end, its near side and its roof — the farthest carriage first, so a nearer one covers the bellows behind it */
@@ -257,25 +257,30 @@ export function buildRain(T, opt){
   let lifeDropped=0, lifeExtra=null, lifeHold=null;   // RAIN-8: items past the sprite cap this frame (the people must never be among them); RAIN-10: lifeExtra — the probes' planted items
   const NEON=['uSign', 'uSignWarm', 'uCross'].map(u=>[u, lifeM.uniforms[u].value.clone()]);   // RAIN-6c: the signs' own colours kept (Bright lights them up, Warm subdues them)
   const lifeHist=[];
+  /* RELEASE-1 (A): how a person is seen — the walking direction's screen step per metre in the figure's own units (x: half widths; y: its height unit),
+     the sine of the angle we look down at it (the camera 25 m up), the half stride (m); standing: no direction */
+  const NOVIEW=[0, 0, 0, 0], tall=k=>k<=2 || (k>=14 && k<=18);
+  function viewOf(q, b, hw, hh){ const sE=Math.max(0, Math.min(0.98, (CAM.y-(q.h||1.7)*0.6)/Math.max(1, b.dist))); if(!q.dir || q.kind===LK.stand || q.kind===LK.talk || q.kind===LK.sit) return [0, 0, sE, 0];
+    const p1=project([q.x, q.y, q.z+q.dir]), yu=2*hh/(tall(q.kind) ? 1.15 : 1); if(p1.z<=1 || !(hw>0) || !(yu>0)) return [0, 0, sE, 0]; return [(p1.x-b.x)/hw, (p1.y-b.y)/yu, sE, (q.step||0.7)/2]; }
   function lifeUpload(t, cars, fx){ const lk=moodOfLook(look); if(lookOver) lifeHist.length=0; if(!lifeHist.length || lifeHist[lifeHist.length-1][1]!==lk){ lifeHist.push([lifeHist.length ? t : -1e9, lk]); if(lifeHist.length>6) lifeHist.splice(1, 1); }
     if(lifeHold!=null) t=lifeHold;   // RAIN-10, probes only: the street's life held at one moment
     const A=lifeAt(t, lk, cars||[], fx && fx.wave, undefined, undefined, lifeHist, { signal, sleep:sleepE }); let n=0;
     tramUpload(cars||[]);
-    if(bodiesOn){ const V=vehicleItems(cars||[], t, taxiNow).filter(q=>q.kind!==VK.tram); if(taxiNow && taxiNow.person) V.push({ kind:taxiNow.person.walk ? LK.walk : LK.stand, x:taxiNow.person.x, y:0, z:taxiNow.person.z, h:1.72, w:0.75, ph:taxiNow.person.walk ? frac1(t*0.9) : 0.25, c:5+8*UMB.black, a:taxiNow.person.a, lane:'taxi' }); A.unshift(...V); }   // RAIN-6b (1, 3): the bodies first (the people over them)
+    if(bodiesOn){ const V=vehicleItems(cars||[], t, taxiNow).filter(q=>q.kind!==VK.tram); if(taxiNow && taxiNow.person) V.push({ kind:taxiNow.person.walk ? LK.walk : LK.stand, x:taxiNow.person.x, y:0, z:taxiNow.person.z, h:1.72, w:0.75, ph:taxiNow.person.walk ? frac1(t*0.9) : 0.25, c:5+8*UMB.black, wear:wearFor(9700, 5, UMB.black), a:taxiNow.person.a, lane:'taxi' }); A.unshift(...V); }   // RAIN-6b (1, 3): the bodies first (the people over them)
     if(bodiesOn){ shutK+=((look===RAIN_ROOM.looks.late ? 1 : 0.5)-shutK)*Math.min(1, 0.02); A.push({ kind:27.9, x:STREET.opp-0.05, y:0.3, z:SHOP.z, h:SHOP.h, span:SHOP.w/2, ph:Math.min(0.99, shutK), c:0, a:1, lane:'facade' });   // RAIN-6b (4): the shop's roller shutter (the band 27.9 → kind 28)
       for(const [za, zb] of LIFE.tables.cafes) for(let z=za+1.5;z<zb-1.5;z+=3.2) A.push({ kind:27, x:STREET.opp-3.75, y:2.62, z, h:0.34, span:1.5, ph:0, c:Math.round(z*7)%9, a:0.95, lane:'facade' }); }   // the awnings' fringes, at their outer edge (the bake's panels: 3.2 m apart, 3.8 m deep, tilted)
     if(lifeExtra) A.push(...lifeExtra);   // RAIN-10: the probes' planted items
     const S=[]; lifeDropped=0; for(const q of A){ if(q.span){ const p1=project([q.x, q.y, q.z-q.span]), p2=project([q.x, q.y, q.z+q.span]), p3=project([q.x, q.y+q.h, q.z]); if(p1.z<=1 || p2.z<=1) continue;   // a facade thing: its width along the facade, its slope
         const cx=(p1.x+p2.x)/2, cy=(p1.y+p2.y)/2, hw=Math.abs(p2.x-p1.x)/2, hh=(p3.y-cy)/2, kk=hw>0 && hh>0 ? (p2.y-p1.y)/(p2.x-p1.x)*hw/(2*hh)*Math.sign(p2.x-p1.x) : 0, dq=depthOf(p3.dist);
-        if(!(hh>0.0002) || hidden(cx, cy+hh, dq, CULL.life)) continue; S.push([p3.dist, cx, cy, hw, hh, Math.round(q.kind), Math.round(Math.max(0, Math.min(1, kk+0.5))*16)+q.ph, q.c, q.a, dq]); continue; }
+        if(!(hh>0.0002) || hidden(cx, cy+hh, dq, CULL.life)) continue; S.push([p3.dist, cx, cy, hw, hh, Math.round(q.kind), Math.round(Math.max(0, Math.min(1, kk+0.5))*16)+q.ph, q.c, q.a, dq, 0, 0, NOVIEW]); continue; }
       const b=project([q.x, q.y, q.z]); if(b.z<=1) continue; const veh=q.kind===VK.car || q.kind===VK.tram, tp=veh ? project([q.x, q.y+q.h, q.z+q.len]) : project([q.x, q.y+q.h*(q.kind<=2 || (q.kind>=14 && q.kind<=18) ? 1.15 : 1), q.z]), hh=(tp.y-b.y)/2, hw=q.w/2/b.z;
       if(veh){ const fy=project([q.x, q.y+q.h, q.z]).y; q.ph=Math.floor(q.ph)+Math.max(0.12, Math.min(0.95, (fy-b.y)/Math.max(1e-6, tp.y-b.y))); }   // the face's share of the sprite
       if(!(hh>0.00015) || Math.abs(b.x)>2 || Math.abs(b.y)>1.5) continue; const dq=depthOf(b.dist); if(hidden(b.x, b.y+hh*0.2, dq, CULL.life) && hidden(b.x, tp.y, dq, CULL.life)){ culled++; continue; }   // RAIN-6b (6): wholly behind a house or a crown
-      S.push([b.dist, b.x, b.y, hw, hh, q.kind, q.ph, q.c, q.a, dq]); }
+      const who=q.wear!=null || PEOPLE.includes(q.kind); S.push([b.dist, b.x, b.y, hw, hh, q.kind, q.ph, q.c, q.a, dq, q.wear||0, who ? lampLitAt(q.x, q.z) : 0, who ? viewOf(q, b, hw, hh) : NOVIEW]); }
     /* RAIN-10: far first — a nearer person, car or flag is drawn over a farther one (they were drawn in the law's order); past the cap the farthest go */
     S.sort((a, b)=>b[0]-a[0]); if(S.length>NLIFE){ lifeDropped=S.length-NLIFE; S.splice(0, lifeDropped); }
-    for(const s of S){ fRect.set([s[1], s[2], s[3], s[4]], n*4); fK.set([s[5], s[6], s[7], s[8]], n*4); fD[n]=s[9]; n++; }
-    lifeN=n; fg.instanceCount=n; fRA.needsUpdate=fKA.needsUpdate=fDA.needsUpdate=true; }
+    for(const s of S){ fRect.set([s[1], s[2], s[3], s[4]], n*4); fK.set([s[5], s[6], s[7], s[8]], n*4); fD[n]=s[9]; fW[n*2]=s[10]; fW[n*2+1]=s[11]; fV.set(s[12], n*4); n++; }
+    lifeN=n; fg.instanceCount=n; fRA.needsUpdate=fKA.needsUpdate=fDA.needsUpdate=fWA.needsUpdate=fVA.needsUpdate=true; }
   const bedQ=[], shownLog=[], GO=col('go'), SPARK=col('spark'), FLASH=col('flash'); let signal=0, sparkAt=-1e9, flashAt=-1e9, breathEnd=-1e9;
   const bedIn=(ev, when)=>{ if(Number.isFinite(when)){ bedQ.push({ ...ev, when }); if(bedQ.length>256) bedQ.shift(); } };
 
@@ -360,7 +365,7 @@ export function buildRain(T, opt){
     if(lookOver && RAIN_ROOM.looks[lookOver]) look=RAIN_ROOM.looks[lookOver];   // captures only: a mood held
     { const nd=sleepTraffic(trafficDensity(look.traffic, fx && fx.wave), sleepE), at=(tAudio==null ? t : tAudio)+DENS_MARGIN; if(!book){ book=passBook(nd); natureDensity(nd, -1e9); } else if(nd!==dens && passBookSet(book, at, nd)) natureDensity(nd, at); dens=nd; }   // RAIN-2: booked a margin ahead, the same time to the sound   // RAIN-1: the mood's traffic × Wave — the picture and the sound the same number
     if(look!==painted && painted) dirty=true;
-    { const a=1-Math.exp(-dt/MOOD_TC); mistK+=(look.mist-mistK)*a; rainK+=(look.rain-rainK)*a; litK+=(look.lit-litK)*a; mistCol.lerp(lookCols(look).mist, a); }
+    { const a=1-Math.exp(-dt/MOOD_TC); mistK+=(look.mist-mistK)*a; rainK+=(look.rain-rainK)*a; litK+=(look.lit-litK)*a; mistCol.lerp(lookCols(look).mist, a); ambCol.lerp(lookCols(look).glow, a); }
     /* RAIN-6 (item 7): the effects hand — Echo the rain's strength (the drops, the falling streaks, its sound), Warm ↔ Bright the city light's colour; exactly
        neutral at rest (pure/fxlaw.js). fxOff (probe CONTROL): the hand ignored */
     { const e=fxOff ? 0 : +(fx && fx.echo)||0, tn=fxOff || !fx || fx.tone==null ? 0.5 : +fx.tone, w=fxOff ? 0 : +(fx && fx.wave)||0; fxE=easeTo(fxE, e, dt); fxT=easeTo(fxT, tn, dt); fxW=easeTo(fxW, w, dt);

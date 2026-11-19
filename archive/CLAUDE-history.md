@@ -2165,6 +2165,12 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
     3. Cars: no box round a car or round its headlights' light on the road; the car reads as a car seen from above.
     4. Someone walking under the plane trees disappears behind the crowns and trunks and comes out again.
     5. The tram: its roof, the lit windows (people inside on the side we see), the cab's amber band, the warm light on the wet asphalt — natural? (If not: say what to change.)
+190. RELEASE-1 stage A: the rain room's people dressed part by part (laptop, Detailed; the sheet tools/.ui-snap/release1/after-people.png shows them large). Five checks:
+    1. Evening boulevard: the near walkers' coat, trousers (or skirt), shoes, hat / scarf / hood and bag in different colours; across people the outfits vary, nothing loud.
+    2. Under a street lamp the clothes brighten (warmer at the top); between lamps they stay dim, tinted by the mood (Late night, After the rain).
+    3. Umbrellas: ribs and the scalloped rim on the near ones, the striped golf umbrellas panel by panel, a bag swinging with the step.
+    4. Under the plane trees: a walker is hidden only behind leaves and trunks and seen through the gaps (never vanishing in an empty spot); a soft shadow and a faint reflection under every walker on the wet street; nobody floats.
+    5. Seen from above: the umbrellas as ovals hiding the heads, feet stepping along the street, the dog trotting ahead of its walker (not sideways); the people waiting at the crossing, on the phone and the talking pair walk up, stay a while and walk on.
 ## Superseded at DOC1 (old lines verbatim, replaced in place above by a later slice)
 - NIGHT-2 stage 3 (2026-11-03, the rule of at most five manual checks) updated this line of CLAUDE.md's report format:
   probe verdict lines and fix rounds; what was left undone; docs found stale; the user's remaining steps (ear, camera, phone).

@@ -8903,3 +8903,21 @@ not a control · run a "random" failure many times and print WHERE and HOW MUCH 
 - The row's live photograph showed the controls (a child's own `visibility:visible` beats the hidden `#nightShell`); hide rule + a guard; the still and the frame always matched. Every screen passes; the rain upright 0.040 → 0.232 edge match at scale 1.0000.
 ### PERF-4 (2026-11-19): founder-approved. Log: `docs/night/WORK-LOG.md`
 - The forest hand light's shadow not redrawn with no hand (`shadowAll` false). A weak GPU (renderer name: Intel HD ≤ Haswell, GMA, old Mali / Adreno / PowerVR) starts at Light on the first visit only (`pure/quality.js weakGpu`, `firstQualityOf`). Step 186.
+### RAIN-10 (2026-11-19): the street's regressions fixed, a real tram, the audit. Log: `docs/night/WORK-LOG.md`
+- Cause of «people float», «look alike», «a dark square flies»: RAIN-5b's border window over each sprite's outer 40 % (square contours); once RAIN-5e's sharp plateau made the sprite's padding 1.5 px it erased the feet (the gait), the arms and the umbrellas' domes, and squared every blurred leaf. Now the window works only in the padding (the shape's soft edge + 2.2 px), people's quads reach for the umbrella, a blur wider than a thing makes a round spot; thin ellipses (handlebars, tray, brim, newspaper, pantograph bar, wheels) became capsules. The law was never broken (data row proves it).
+- People behind trunks and crowns: the life layer had no depth test (only the whole-item CPU cull). Now every item reads the baked depth map (5 taps by its blur; facade things a wider margin); the tram too. Sprites drawn far first.
+- Cars: the body was a rounded box; now a tapered outline, wheels, boot / rear window / roof / windscreen / bonnet. The headlights' pool (light kind 4) was cut at 7 % of its peak — a faint box on the road; now 0 inside its quad.
+- The tram: six rectangle lights over its roof and flat sprites → a lit box in true perspective (`TRAM_V/TRAM_F`): roof with equipment and the windows' warm rim, the near side's lit windows with seeded passengers, the cab (windscreen, amber destination band, no text) or the lit rear window, bellows; lamps at its near end, warm spill on the wet road both sides. Life's tram heads retired.
+- Small item from RAIN-7's list: a near street lamp stutters now and then (`pure/far.js lampFlickerAt`).
+- Rows: data «RAIN-10 gait, clothes and the lamp (app)» 12/0; P.night «RAIN-10 people, cars and the tram» 78/0 at Detailed, Standard, Light (CONTROLS: RAIN-9's window, one colour, an opaque quad, RAIN-9's box, RAIN-8's pool, the depth test off); «RAIN no quad edges» follows the new quads. Captures `tools/.ui-snap/rain10/index.html`. Step 189.
+### SAFARI-1 (2026-11-19): Night in Safari's engine, the iPhone's silent switch. Log: `docs/night/WORK-LOG.md`
+- `tools/safari-check.mjs` (Playwright WebKit, iPhone and Mac sizes; `--root` a built tree): PASS. This WebKit (Windows) has no Web Audio and no camera, so sound and camera are for the real iPhone (step 188). Begin taps: audioSession playback, else (older iOS) our silent clip, then the context, then resume. No Web Audio → Night's own words (`night.load.noAudio`, 8 languages). Data row «NIGHT silent switch (app)».
+### RAIN-9 (2026-11-19): cinematic cars only, the musician removed, natural sway. Log: `docs/night/WORK-LOG.md`
+- Baked cars and boxes → `archive/rain-cars-baked-RAIN8/`; the musician → `archive/rain-busker-RAIN7-9.js` (no near place the crowns leave free); sway per tree with travelling gusts (one map `uTree`). Page `tools/.ui-snap/rain9/`. Step 187.
+### Moved from docs/night/HANDOFF.md at RELEASE-1 (still open)
+1. Medium is the default because high costs about a third of the hand tracking. Good enough, or make high cheaper?
+2. The night repeats every 24 minutes, a cloud about every 3 minutes. Right?
+3. Rare moments every 2.5–5 minutes. Right, or rarer?
+4. Opening the forest takes 1–3 s. Acceptable, or a gentle «waking» moment?
+5. The falling star passes in front of the trees. Natural?
+

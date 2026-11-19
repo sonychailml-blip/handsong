@@ -468,7 +468,7 @@ RAIN-7: THE STREET MUSICIAN under the café's awning, playing along with our mus
 ## apps/night/rooms/rain/pure/city.js
 RAIN-0b: THE VIEW LAW — the eye on the 8th floor, looking slightly down and diagonally along the boulevard (concept §3), as ONE pure projection used by the painting, the depth map, the lights, the …
 - const (20): `CAM`, `STREET`, `BEND`, `bendX`, `BAKE_EXT`, `BLOCKS`, `FLOOR`, `FAR`, `camBasis`, `vanishing`, `DEPTH`, `hillsAt`, `RAIN_CITY_SEED`, `NEAR_TREES`, `TRAFFIC`, `DENS_MARGIN`, `RAIN_TRAFFIC`, `EAR`, `trafficAt`, `trafficDensity`
-- fn (7): `project`, `rayOf`, `depthOf`, `sceneAt`, `cityWindows`, `cityLamps`, `cityTrees`
+- fn (8): `project`, `rayOf`, `depthOf`, `sceneAt`, `cityWindows`, `cityLamps`, `lampLitAt`, `cityTrees`
 
 ## apps/night/rooms/rain/pure/drops.js
 RAIN-0b: THE DROPS ON THE PANE — a stateful simulation, so drops see each other (pure, rule #36; data row «RAIN glass law (app)»).
@@ -496,8 +496,8 @@ RAIN-0: THE GLASS's law (pure, rule #36; data row «RAIN glass law (app)») — 
 
 ## apps/night/rooms/rain/pure/life.js
 RAIN-5 / RAIN-5b: LIFE ON THE STREET — who is out in the rain, as a pure seeded law of time (rule #36; data row «RAIN life law (app)»).
-- const (6): `LK`, `ACC`, `SIGNS`, `UMB`, `LIFE`, `PEOPLE`
-- fn (3): `lifePeople`, `lifeAt`, `lifeCyclists`
+- const (10): `LK`, `ACC`, `SIGNS`, `UMB`, `WEAR`, `WEAR_MIN`, `wearCode`, `wearParts`, `LIFE`, `PEOPLE`
+- fn (6): `wearFor`, `outfitOf`, `lifePeople`, `stayAt`, `lifeAt`, `lifeCyclists`
 
 ## apps/night/rooms/rain/pure/lofi/after-the-rain.js
 RAIN-4d: «After the rain» — warm lo-fi in C Mixolydian, 76 bpm, 16th swing 0.57.
@@ -559,7 +559,7 @@ RAIN-0b: THE STAND-IN CITY's prepared picture and its DEPTH MAP, painted ONCE on
 
 ## apps/night/rooms/rain/rain-glass.js
 RAIN-0: THE RAIN ROOM'S SHADERS (our own, written from the physics: a drop is a small strong lens that shows the view upside down and wide, darker at its rim; a running drop leaves a wet lane and b…
-- const (15): `QUAD_V`, `BLUR_F`, `DOWN_F`, `VIEW_F`, `WIN_V`, `WIN_F`, `LIGHT_V`, `LIGHT_F`, `DROP_V`, `DROP_F`, `glassShader`, `LIFE_V`, `LIFE_F`, `TRAM_V`, `TRAM_F`
+- const (16): `QUAD_V`, `BLUR_F`, `DOWN_F`, `VIEW_F`, `WIN_V`, `WIN_F`, `LIGHT_V`, `LIGHT_F`, `DROP_V`, `DROP_F`, `glassShader`, `LIFE_DN`, `LIFE_V`, `LIFE_F`, `TRAM_V`, `TRAM_F`
 
 ## apps/night/rooms/rain/rain.js
 RAIN-0 — THE RAIN ROOM's picture (docs/night/design/RAIN/CONCEPT.md; the plan and what is still a placeholder: PLAN.md).
@@ -1687,7 +1687,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 UI-1 — «NIGHT labels follow the room»: the founder entered the rain and the Sound button still read «Firefly» while another timbre played.
 - fn (1): `checkNightLabels`
 
-_335 modules, 3234 exported names._
+_335 modules, 3243 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

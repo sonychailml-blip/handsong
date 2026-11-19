@@ -91,6 +91,13 @@ const DEPTH_F=`precision highp float; varying vec3 vW; uniform vec2 uDA[${DEPTH.
 float depthOf(float d){ if(d<=uDA[0].x) return uDA[0].y*d/uDA[0].x; for(int i=1;i<${DEPTH.anchors.length};i++){ if(d<=uDA[i].x) return mix(uDA[i-1].y, uDA[i].y, log(d/uDA[i-1].x)/log(uDA[i].x/uDA[i-1].x)); }
   return min(0.99, uDA[${DEPTH.anchors.length-1}].y+0.03*log(d/uDA[${DEPTH.anchors.length-1}].x)); }
 void main(){ float v=depthOf(length(vW-cameraPosition)); gl_FragColor=vec4(v, v, v, 1.); }`;
+/* RELEASE-1 (A): the depth map honours alpha-tested cards — the leaf clusters, the lattice, the fringe (the override material wrote each card whole, so a person
+   under a crown vanished where the picture shows a gap between the leaves) */
+const DEPTH_VA=`varying vec3 vW; varying vec2 vUv; void main(){ vUv=uv; vec4 w=modelMatrix*vec4(position, 1.); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }`;
+const DEPTH_FA=DEPTH_F.replace('varying vec3 vW;', 'varying vec3 vW; varying vec2 vUv; uniform sampler2D uMap; uniform float uCut;').replace('void main(){ float v', 'void main(){ if(texture2D(uMap, vUv).a<uCut) discard; float v');
+function depthPass(T, r, scene, cam, target){ const uDA={ value:DEPTH.anchors.map(a=>new T.Vector2(a[0], a[1])) }, plain=new T.ShaderMaterial({ uniforms:{ uDA }, vertexShader:DEPTH_V, fragmentShader:DEPTH_F, side:T.DoubleSide }), cut=new Map(), keep=new Map();
+  scene.traverse(q=>{ if(!q.isMesh) return; keep.set(q, q.material); const m=q.material; if(m && m.alphaTest>0 && m.map){ if(!cut.has(m)) cut.set(m, new T.ShaderMaterial({ uniforms:{ uDA, uMap:{ value:m.map }, uCut:{ value:m.alphaTest } }, vertexShader:DEPTH_VA, fragmentShader:DEPTH_FA, side:T.DoubleSide })); q.material=cut.get(m); } else q.material= m && m.side===T.DoubleSide ? plain : new T.ShaderMaterial({ uniforms:{ uDA }, vertexShader:DEPTH_V, fragmentShader:DEPTH_F, side:m ? m.side : T.FrontSide }); });
+  r.setRenderTarget(target); r.render(scene, cam); for(const [q, m] of keep) q.material=m; }
 const COMP_F=`precision highp float; varying vec2 vUv; uniform sampler2D uMain, uMirror, uMask, uSky, uDep; uniform vec2 uPx; uniform float uWet, uExp, uHazeK; uniform vec3 uHaze;
 vec3 aces(vec3 x){ return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14), 0., 1.); }
 void main(){ vec4 c=texture2D(uMain, vUv); c.rgb+=texture2D(uSky, vUv).rgb; float m=texture2D(uMask, vUv).r*uWet;
@@ -130,6 +137,8 @@ window.cityBake=async function(o){
     const lampLights=scene.children.filter(q=>q.isLight);
     { const d=new T.DirectionalLight('#ffb070', 0.05); d.position.set(20, 2, 120); d.target.position.set(20, 15, 60); scene.add(d, d.target); }
     const back=backdropCanvas(EXT, px, LOOKS[mood]);
+    if(o.depthOnly){ if(mood!==o.litMood) continue; const tm=r.toneMapping, e2=r.outputEncoding; r.toneMapping=T.NoToneMapping; r.outputEncoding=T.LinearEncoding; r.setRenderTarget(null); r.clear(); depthPass(T, r, scene, cam, null); r.toneMapping=tm; r.outputEncoding=e2;   // RELEASE-1 (A): only the depth map (the pictures untouched)
+      depthCanvas=lay(back.depth); images['depth.png']=enc(depthCanvas, 'image/png'); images['depth-s.png']=enc(small(depthCanvas, o.small), 'image/png'); continue; }
     /* RAIN-2: THE SKY, OCCLUDED — the night sky's light from SKY_N directions over the upper hemisphere (cosine-weighted, the golden angle round), each a
        directional light with a soft shadow; their renders summed: every recess, eave, balcony underside and the street under the trees darker by how much
        sky it sees (ambient occlusion and soft contact shadows, from the scene's own geometry). The bake's time is free; the room only reads pictures. */
@@ -160,9 +169,8 @@ window.cityBake=async function(o){
       M.life.color.setRGB(9, 8.2, 7.4); renderComposite(1); M.life.color.setRGB(0.035, 0.032, 0.03);
       const lit=lay(back.colour); images['lit.webp']=enc(lit, 'image/webp', 0.9); images['lit-s.webp']=enc(small(lit, o.small), 'image/webp', 0.88);
       /* the depth map: the law's depth per fragment over the backdrop's (the sky 1) */
-      const dm=new T.ShaderMaterial({ uniforms:{ uDA:{ value:DEPTH.anchors.map(a=>new T.Vector2(a[0], a[1])) } }, vertexShader:DEPTH_V, fragmentShader:DEPTH_F });
-      scene.overrideMaterial=dm; const tm=r.toneMapping, e2=r.outputEncoding; r.toneMapping=T.NoToneMapping; r.outputEncoding=T.LinearEncoding; r.setRenderTarget(null); r.clear(); r.render(scene, cam);
-      r.toneMapping=tm; r.outputEncoding=e2; scene.overrideMaterial=null; depthCanvas=lay(back.depth); images['depth.png']=enc(depthCanvas, 'image/png'); images['depth-s.png']=enc(small(depthCanvas, o.small), 'image/png');
+      { const tm=r.toneMapping, e2=r.outputEncoding; r.toneMapping=T.NoToneMapping; r.outputEncoding=T.LinearEncoding; r.setRenderTarget(null); r.clear(); depthPass(T, r, scene, cam, null); r.toneMapping=tm; r.outputEncoding=e2; }   // RELEASE-1 (A): the cards' gaps kept
+      depthCanvas=lay(back.depth); images['depth.png']=enc(depthCanvas, 'image/png'); images['depth-s.png']=enc(small(depthCanvas, o.small), 'image/png');
       /* THE WINDOW MAP: each window projected by the law; kept when in the picture, wide enough, not hidden (the depth map at its centre is its own),
          nearest first, never overlapping a nearer one */
       const dx=depthCanvas.getContext('2d'), dAt=(u, v)=>{ const i=Math.round((u/EXT[0]*0.5+0.5)*W-0.5), j=Math.round((0.5-v/EXT[1]*0.5)*H-0.5); if(i<0 || j<0 || i>=W || j>=H) return -1; return dx.getImageData(i, j, 1, 1).data[0]/255; };

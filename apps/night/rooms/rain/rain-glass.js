@@ -5,6 +5,7 @@
    RAIN-0b: the focus has many depths — the view blends four pre-blurred copies of the prepared picture by its depth map, every light and window
    grows by its own depth; the drops are a simulation (pure/drops.js) drawn as sprites into a DROP MAP the glass reads (one pass still); the mist is
    inside the pane, over the drops (wiping never removes a drop). */
+import { WEAR } from './pure/life.js';   // RELEASE-1 (A): the clothes' palettes (LIFE_F's tables)
 export const QUAD_V=`varying vec2 vUv; void main(){ vUv=uv; gl_Position=vec4(position.xy, 0., 1.); }`;
 /* a 9-tap Gaussian along uDir (two taps read between texels, so five reads) */
 export const BLUR_F=`precision highp float; uniform sampler2D uTex; uniform vec2 uDir; varying vec2 vUv;
@@ -17,6 +18,9 @@ export const DOWN_F=`precision highp float; uniform sampler2D uTex; uniform vec2
 void main(){ vec3 c=texture2D(uTex, vUv+uTexel*vec2(-1., -1.)).rgb+texture2D(uTex, vUv+uTexel*vec2(1., -1.)).rgb+texture2D(uTex, vUv+uTexel*vec2(-1., 1.)).rgb+texture2D(uTex, vUv+uTexel*vec2(1., 1.)).rgb;
   gl_FragColor=vec4(c*0.25, 1.); }`;
 /* the blur radius (view-angle units) of a thing at depth d: uFoc = (focus depth, K, the widest radius) */
+/* RELEASE-1 (A): the clothes' palettes as GLSL tables, built from the people law's WEAR (one source) */
+const hexV=h=>`vec3(${[0, 2, 4].map(i=>(parseInt(h.slice(i, i+2), 16)/255).toFixed(4)).join(', ')})`, tabV=(n, L)=>`vec3 ${n}(float i){ ${L.slice(0, -1).map((h, j)=>`if(i<${j}.5) return ${hexV(h)}; `).join('')}return ${hexV(L[L.length-1])}; }`;
+const WEAR_GLSL=[['wCoat', WEAR.coat], ['wRain', WEAR.rain], ['wLegs', WEAR.legs], ['wShoes', WEAR.shoes], ['wAcc', WEAR.acc], ['wBag', WEAR.bag], ['wHair', WEAR.hair], ['wSkin', WEAR.skin], ['wUmb', WEAR.umb]].map(([n, L])=>tabV(n, L)).join(' ');
 const RAD=`float radAt(float d){ return uFoc.z*min(1., max(0., abs(d-uFoc.x)-uFoc.w)*uFoc.y); }`;   // RAIN-5e: uFoc.w — the sharp plateau's half-width
 /* THE VIEW's ground: the prepared picture (uBase) and its three blurred copies (uL1…uL3, their radii uRad), chosen per pixel by the depth map's
    blur; the playing light's soft pool on the city when the focus is far (uLight: its place, its strength) */
@@ -192,15 +196,20 @@ void main(){
 /* RAIN-10: the quad holds its shape whole — the padding is the shape's widest soft edge + 2.2 px (the border window works only inside the padding,
    never on the shape: RAIN-5b's window over the quad's outer 40 % erased the feet, the arms and the umbrella's dome once RAIN-5e's sharp plateau made
    the padding 1.5 px), people reach 45 % wider and 30 % higher (an umbrella leaning in the wind); vFade keeps RAIN-5b's padding (the far ones as faint as before) */
-export const LIFE_V=`attribute vec4 aRect, aK; attribute float aDep; uniform vec2 uTan; uniform vec4 uFoc; uniform float uPx, uWin;
-varying vec2 vQ, vE, vBand, vAsp, vP; varying vec4 vK; varying float vSoft, vFade, vDep, vR; ${RAD}
+/* RELEASE-1 (A): aView (the walking direction's screen step per metre in the figure's units, the sine of the angle we look down at it, the half stride in
+   metres) → vV; vRt the figure's width unit over its height unit (true proportions); people's quads reach DOWN (LIFE_DN of the quad's height: the feet
+   stepping towards us, the contact shadow, the wet street's reflection; the dog ahead of its walker) */
+export const LIFE_DN=k=>(k===2 ? 0.6 : (k<=1 || (k>=14 && k<=18) || k===4 || k===6) ? 0.3 : 0);
+export const LIFE_V=`attribute vec4 aRect, aK, aView; attribute float aDep; attribute vec2 aWear; uniform vec2 uTan; uniform vec4 uFoc; uniform float uPx, uWin;
+varying vec2 vQ, vE, vBand, vAsp, vP, vW; varying vec4 vK, vV; varying float vSoft, vFade, vDep, vR, vRt; ${RAD}
 void main(){ float R=radAt(aDep), k=floor(aK.x+0.5), soft=max(R+0.8/uPx, 0.04*aRect.w), pad=soft+2.2/uPx, padX=max(soft, soft*aRect.z/max(2.*aRect.w, 1e-6))+2.2/uPx, pad0=R+1.5/uPx;
   vec2 ext= (k<2.5 || (k>13.5 && k<18.5)) ? vec2(1.45, 1.3) : k>19.5 && k<20.5 ? vec2(1.3, 1.) : vec2(1.);   /* a sign: the cup's handle */ if(uWin>1.5){ ext=vec2(1.); pad=pad0; padX=pad0; }   /* uWin 2: RAIN-9's quad and window (the probes' CONTROL only) */
-  vec2 hs=aRect.zw*ext+vec2(padX, pad), P=vec2(aRect.x, aRect.y-pad+hs.y)+position.xy*hs;
+  float dn= uWin>1.5 ? 0. : (k>1.5 && k<2.5 ? 0.6 : (k<1.5 || (k>13.5 && k<18.5) || (k>3.5 && k<4.5) || (k>5.5 && k<6.5)) ? 0.3 : 0.)*2.*aRect.w;   /* LIFE_DN */
+  vec2 hs=aRect.zw*ext+vec2(padX, pad)+vec2(0., dn*0.5), P=vec2(aRect.x, aRect.y-pad-dn+hs.y)+position.xy*hs;
   vE=position.xy; vBand=vec2(padX, pad)/hs; vAsp=hs/max(hs.x, hs.y); vP=P; vDep=aDep; vR=R; vFade=min(1., (aRect.z*aRect.w)/max(1e-12, (aRect.z+pad0)*(aRect.w+pad0))*1.6);
-  vQ=vec2((P.x-aRect.x)/max(aRect.z, 1e-6), (P.y-aRect.y)/max(2.*aRect.w, 1e-6)); vK=aK; vSoft=(R+0.8/uPx)/max(2.*aRect.w, 1e-6);
+  vQ=vec2((P.x-aRect.x)/max(aRect.z, 1e-6), (P.y-aRect.y)/max(2.*aRect.w, 1e-6)); vK=aK; vW=aWear; vV=aView; vRt=aRect.z*((k<2.5 || (k>13.5 && k<18.5)) ? 1.15 : 1.)/max(2.*aRect.w, 1e-6); vSoft=(R+0.8/uPx)/max(2.*aRect.w, 1e-6);
   gl_Position= aK.w>0.003 ? vec4(P/uTan, 0., 1.) : vec4(2., 2., 2., 1.); }`;
-export const LIFE_F=`precision highp float; varying vec2 vQ, vE, vBand, vAsp, vP; varying vec4 vK; varying float vSoft, vFade, vDep, vR; uniform float uWin;
+export const LIFE_F=`precision highp float; varying vec2 vQ, vE, vBand, vAsp, vP, vW; varying vec4 vK, vV; varying float vSoft, vFade, vDep, vR, vRt; uniform float uWin;
 /* RAIN-10: the border window only inside the padding (uWin 0: none; 2: RAIN-5b's old window over the quad's outer 40 % — the probes' CONTROL only) */
 float winOf(){ vec2 a=abs(vE), w=vec2(1.)-smoothstep(vec2(1.)-vBand, vec2(1.), a); return uWin>1.5 ? 1.-smoothstep(0.6, 0.9, max(a.x, a.y)) : mix(1., w.x*w.y, uWin); }
 /* RAIN-10: behind the baked city — a trunk, a crown, a house nearer than the item hides it (the bake's depth map, softened by the item's blur);
@@ -214,25 +223,69 @@ float el(vec2 p, vec2 c, vec2 r){ return (length((p-c)/r)-1.)*min(r.x, r.y*2.); 
 float seg(vec2 p, vec2 a, vec2 b, float w){ vec2 e=b-a, q=p-a; float t=clamp(dot(q, e)/dot(e, e), 0., 1.); return length(q-e*t)-w; }
 /* RAIN-5c: a person seen from the front or the back (the street runs away from us) at ox: the swinging leg's foot lifts (heel, then toe), the hips
    sway over the standing leg, the body bobs twice a step, the arms swing against the legs (the one forward looks shorter); with an umbrella one arm
-   holds its handle steady at the middle. st 1 = standing; bend = a stoop; sw = the swing's size */
-float person(vec2 p, float ox, float ph, float sw, float st, float bend, float umb){ float a=ph*6.2832, s=sin(a)*(1.-st), k=sw/0.1, sway=0.03*s*k, bob=0.014*(1.-abs(cos(a)))*(1.-st)*k;
-  vec2 q=p-vec2(sway+bend*(p.y-0.3)*0.5, bob);
-  float d=min(el(q, vec2(ox, 0.53), vec2(0.38, 0.24)), el(q, vec2(ox+bend*0.12, 0.865), vec2(0.24, 0.065)));
-  d=min(d, el(q, vec2(ox, 0.765), vec2(0.17, 0.035)));
-  float lL=max(0., s)*0.075*k, lR=max(0., -s)*0.075*k;
-  d=min(d, min(el(q, vec2(ox-0.12, 0.16+lL*0.7), vec2(0.11, 0.155-lL*0.6)), el(q, vec2(ox+0.12, 0.16+lR*0.7), vec2(0.11, 0.155-lR*0.6))));
-  d=min(d, min(el(q, vec2(ox-0.12-0.02*lL, 0.014+lL), vec2(0.1+0.025*(1.-lL*12.), 0.018)), el(q, vec2(ox+0.12+0.02*lR, 0.014+lR), vec2(0.1+0.025*(1.-lR*12.), 0.018))));
-  float aL=max(0., -s)*k, aR=max(0., s)*k;
-  d=min(d, el(q, vec2(ox-0.37, 0.5+0.035*aL), vec2(0.075, 0.17-0.045*aL)));
-  if(umb>0.5) d=min(d, seg(q, vec2(ox+0.3, 0.68), vec2(ox+0.05, 0.84), 0.06)); else d=min(d, el(q, vec2(ox+0.37, 0.5+0.035*aR), vec2(0.075, 0.17-0.045*aR)));
+   holds its handle steady at the middle. st 1 = standing; bend = a stoop; sw = the swing's size.
+   RELEASE-1 (A): the figure in PARTS, each its own colour (RAIN-5b drew one body colour): the coat with its sleeves and collar and, by style, its hem
+   swinging with the step (0 a jacket, 1 a coat to the knee, 2 a skirt under a jacket, 3 a long coat); the trousers or skirt (dark tights below it);
+   the shoes; the hands; the head — hair by its style (short, medium, long to the shoulders, a bun) and, from the front, the face. The nearest figure's
+   parts are kept in the g* globals (a couple, a group: each figure its own clothes, who = its place); sc scales a shrunk figure's distances. */
+float gD=1e3, gC=1e3, gL=1e3, gT=1e3, gS=1e3, gK=1e3, gH=1e3, gA=1e3, gB=1e3, gN=1e3, gDog=1e3, gWho=0., gFig=0., gFace=0., gStyle=0., gHs=0., gRt=0.25; vec4 gV=vec4(0.);
+/* RELEASE-1 (A): a capsule in true proportions (x by the figure's width unit over its height unit), its radius in height units */
+float limb(vec2 q, vec2 a, vec2 b, float r){ return seg(vec2(q.x*gRt, q.y), vec2(a.x*gRt, a.y), vec2(b.x*gRt, b.y), r); }
+float figure(vec2 p, float ox, float ph, float sw, float st, float bend, float umb, float who, float sc){ float a=ph*6.2832, s=sin(a)*(1.-st), c=cos(a)*(1.-st), k=sw/0.1, sway=0.03*s*k, bob=0.014*(1.-abs(cos(a)))*(1.-st)*k;
+  vec2 q=p-vec2(sway+bend*(p.y-0.3)*0.5, bob); float hx=ox+bend*0.12, sty=mod(gStyle+2.*who, 4.), hst=mod(gHs+3.*who, 4.);
+  /* RELEASE-1 (A): THE STRIDE ON THE GROUND — each foot moves along the walking direction as it shows on screen (gV.xy per metre × the half stride gV.w):
+     walking away the leading foot sits higher, towards us lower, off to the side it shifts sideways too (a flat «front view» gait read as floating);
+     the swinging foot lifts; the arms swing against the legs along the same direction */
+  vec2 W=gV.xy*gV.w*min(k, 1.6); float lL=max(0., s)*0.075*k, lR=max(0., -s)*0.075*k;
+  vec2 fL=vec2(ox-0.12, 0.03+lL)-W*c, fR=vec2(ox+0.12, 0.03+lR)+W*c, Wn=length(W*vec2(gRt, 1.))>1e-4 ? normalize(W*vec2(gRt, 1.)) : vec2(0.);
+  float dC=min(el(q, vec2(ox, 0.53), vec2(0.38, 0.24)), el(q, vec2(ox, 0.765), vec2(0.17, 0.035)));   /* the coat and its collar */
+  if(sty>0.5 && sty<1.5 || sty>2.5){ float hy= sty<1.5 ? 0.24 : 0.15, t=clamp((0.46-q.y)/(0.46-hy), 0., 1.), hs=0.03*s*k*t;   /* the hem flares and swings with the legs */
+    dC=min(dC, max(abs(q.x-ox-hs)-mix(0.34, sty>2.5 ? 0.42 : 0.39, t), max(hy+0.008*sin(q.x*9.+a)-q.y, q.y-0.46))*0.45); }
+  vec2 aL=vec2(ox-0.37, 0.355)+W*c*0.55, aR=vec2(ox+0.37, 0.355)-W*c*0.55;   /* the hands, swinging */
+  dC=min(dC, limb(q, vec2(ox-0.3, 0.68), aL+vec2(0., 0.035), 0.075*gRt+0.006));   /* the sleeves */
+  float dK=el(q, aL, vec2(0.07, 0.032));
+  if(umb>0.5){ dC=min(dC, seg(q, vec2(ox+0.3, 0.68), vec2(ox+0.05, 0.84), 0.06)); dK=min(dK, el(q, vec2(ox+0.04, 0.85), vec2(0.075, 0.026))); }
+  else { dC=min(dC, limb(q, vec2(ox+0.3, 0.68), aR+vec2(0., 0.035), 0.075*gRt+0.006)); dK=min(dK, el(q, aR, vec2(0.07, 0.032))); }
+  float rl=0.1*gRt+0.004, legs=min(limb(q, vec2(ox-0.11, 0.32), fL+vec2(0., 0.012), rl), limb(q, vec2(ox+0.11, 0.32), fR+vec2(0., 0.012), rl)), dL=legs, dT=1e3;
+  if(sty>1.5 && sty<2.5){ float t=clamp((0.34-q.y)/0.14, 0., 1.); dL=max(abs(q.x-ox-0.018*s*k*t)-mix(0.3, 0.37, t), max(0.2+0.006*sin(q.x*11.+a)-q.y, q.y-0.34))*0.45; dT=legs; }   /* a skirt; tights below */
+  float dS=min(min(el(q, fL+vec2(0., -0.012), vec2(0.105, 0.02)), limb(q, fL+vec2(0., -0.012), fL+vec2(0., -0.012)+Wn*vec2(1./max(gRt, 0.05), 1.)*0.055, 0.02)),
+               min(el(q, fR+vec2(0., -0.012), vec2(0.105, 0.02)), limb(q, fR+vec2(0., -0.012), fR+vec2(0., -0.012)+Wn*vec2(1./max(gRt, 0.05), 1.)*0.055, 0.02)));   /* the shoes, toes forward */
+  float head=el(q, vec2(hx, 0.865), vec2(0.24, 0.065)), dH=head;
+  if(hst>1.5 && hst<2.5) dH=min(dH, gFace>0.5 ? max(el(q, vec2(hx, 0.81), vec2(0.25, 0.07)), 0.13-abs(q.x-hx)) : el(q, vec2(hx, 0.8), vec2(0.25, 0.07)));   /* long hair: from the front only at the sides */
+  else if(hst>2.5) dH=min(dH, el(q, vec2(hx+0.03, 0.935), vec2(0.12, 0.032)));   /* a bun */
+  float hl=(hst<0.5 ? 0.9 : hst<1.5 ? 0.885 : 0.88)-0.025*gV.z;   /* the hairline (seen from above: more hair, less face) */
+  if(gFace>0.5) dK=min(dK, max(head, max(q.y-hl, abs(q.x-hx)-(hst>1.5 && hst<2.5 ? 0.15 : 0.19))));   /* the face, from the front */
+  else if(hst<0.5) dK=min(dK, max(head, q.y-0.82));   /* the nape under short hair */
+  float d=min(min(min(dC, dL), min(dS, dK)), min(dH, dT))*sc;
+  if(d<gD){ gD=d; gC=dC*sc; gL=dL*sc; gT=dT*sc; gS=dS*sc; gK=dK*sc; gH=dH*sc; gWho=who; gFig=1.; }
   return d; }
+float person(vec2 p, float ox, float ph, float sw, float st, float bend, float umb){ return figure(p, ox, ph, sw, st, bend, umb, 0., 1.); }
 /* RAIN-6b (RAIN-6c's rest): an umbrella leans into Wave's wind about its handle's top, gusting (each its own phase) */
 uniform float uWind, uTime;
 vec2 tilt(vec2 p, float y, float k){ if(uWind<=0.) return p; float a=-uWind*(0.32+0.14*sin(uTime*2.3+k*1.7)), c=cos(a), s=sin(a); vec2 q=p-vec2(0., y*0.6); return vec2(c*q.x-s*q.y, s*q.x+c*q.y)+vec2(0., y*0.6); }
-float dome(vec2 p, float ox, float w, float y){ return p.y<y ? 1. : el(p, vec2(ox, y), vec2(w*0.9, 0.17)); }
-vec3 cloth(float i){ return i<0.5 ? vec3(0.05, 0.05, 0.06) : i<1.5 ? vec3(0.05, 0.07, 0.14) : i<2.5 ? vec3(0.1, 0.11, 0.06) : i<3.5 ? vec3(0.17, 0.05, 0.06) : i<4.5 ? vec3(0.2, 0.15, 0.09) : i<5.5 ? vec3(0.11, 0.11, 0.12) : i<6.5 ? vec3(0.04, 0.12, 0.12) : vec3(0.2, 0.16, 0.05); }
+/* RELEASE-1 (A): THE UMBRELLA'S CANOPY AS SEEN FROM ABOVE — the rim is a horizontal circle: on screen an ellipse of half width a and half height
+   a·(width unit / height unit)·sin(look-down angle) (gV.z); the dome rises over it by 0.17·cos (a side view: RAIN-5's half dome; from high above: an oval
+   that hides the head). Eight ribs from the top to the rim (each point placed on the cone between them: cRib, the panel's parity cPan for the golf
+   umbrellas, cT how far out), the rim's shade (cRim), the shaft from the hand (cHand) and the ferrule. gRtL: the width unit's ratio in this canopy's frame */
+float cRib=0., cRim=0., cPan=0., cHand=1e3, cTo=0., cSp=0.; vec2 cDQ=vec2(0.); float gRtL=0.25;
+float dome(vec2 p, float ox, float w, float y){ float sE=clamp(gV.z, 0., 0.98), cE=sqrt(1.-sE*sE), a=w*0.9, dn=a*gRtL*sE, up=0.17*cE+dn, hc=0.17*cE;
+  float d= p.y>=y ? el(p, vec2(ox, y), vec2(a, max(up, 1e-3))) : dn>0.004 ? el(p, vec2(ox, y), vec2(a, dn)) : max(el(p, vec2(ox, y), vec2(a, 0.17)), (y-p.y)*0.6);
+  float X=(p.x-ox)/a, Y=p.y-y-hc, A=hc*hc-dn*dn, B=2.*Y*hc, C=Y*Y+X*X*dn*dn, t;   /* the cone: (X/t)² + ((Y + hc·t)/(dn·t))² = 1 */
+  if(abs(A)<1e-6) t= abs(B)>1e-6 ? -C/B : 1.; else { float D=max(B*B-4.*A*C, 0.), t1=(-B+sqrt(D))/(2.*A), t2=(-B-sqrt(D))/(2.*A); t= t1>=0. && t1<=1.2 ? t1 : t2; }
+  t=clamp(t, 0.02, 1.); float cp=clamp(X/t, -1., 1.), sp= dn>0.004 ? clamp((Y+hc*t)/(dn*t), -1., 1.) : -sqrt(1.-cp*cp), f=(atan(sp, cp)+3.1416)/0.7854, u=fract(f);
+  cRib=(1.-smoothstep(0.04, 0.12, min(u, 1.-u)*t*2.5))*smoothstep(0.08, 0.3, t); cPan=mod(floor(f), 2.); cTo=t; cSp=sp; cRim=smoothstep(-0.035, -0.006, d); cDQ=vec2(X, sp);
+  d=min(d, seg(p, vec2(ox, y+hc), vec2(ox, y+hc+0.03*cE), 0.016)); if(cHand<100.) d=min(d, seg(p, vec2(cHand, 0.85), vec2(ox, y+0.01), 0.018));
+  return d; }
 vec3 vcol(float i){ return i<0.5 ? vec3(0.06, 0.065, 0.07) : i<1.5 ? vec3(0.22, 0.23, 0.24) : i<2.5 ? vec3(0.04, 0.06, 0.12) : i<3.5 ? vec3(0.16, 0.04, 0.045) : i<4.5 ? vec3(0.2, 0.17, 0.12) : i<5.5 ? vec3(0.02, 0.02, 0.025) : i<6.5 ? vec3(0.3, 0.31, 0.32) : vec3(0.04, 0.09, 0.07); }   /* RAIN-6b: the cars' muted colours */
-vec3 ucol(float i){ return i<0.5 ? vec3(0.2, 0.03, 0.04) : i<1.5 ? vec3(0.24, 0.18, 0.03) : i<2.5 ? vec3(0.03, 0.05, 0.13) : vec3(0.04, 0.13, 0.07); }
+${WEAR_GLSL}
+/* RELEASE-1 (A): a figure's clothes (pure/life.js outfitOf — the same arithmetic): code the look (coat + 8 umbrella kind), w the wear code, who its place */
+void outfit(float code, float w, float who, out vec3 c, out vec3 l, out vec3 s, out vec3 a, out vec3 b, out vec3 h, out vec3 k){ float ci=mod(mod(code, 8.)+3.*who, 8.), uk=mod(floor(code/8.), 8.);
+  c= uk>5.5 && uk<6.5 ? wRain(ci) : wCoat(ci); l=wLegs(mod(mod(w, 8.)+5.*who, 8.)); s=wShoes(mod(mod(floor(w/8.), 4.)+who, 4.)); a=wAcc(mod(mod(floor(w/32.), 8.)+3.*who, 8.));
+  b=wBag(mod(mod(floor(w/256.), 4.)+who, 4.)); h=wHair(mod(mod(floor(w/1024.), 8.)+3.*who, 8.)); k=wSkin(mod(mod(floor(w/8192.), 4.)+who, 4.)); }
+/* the light on a figure: the look's glow (uAmb, its hue kept a little) and the near lamps (aWear.y, toned by Warm/Bright), stronger higher up (the lamps are above) */
+uniform vec3 uAmb, uLampC; uniform float uLamp, uOneCol;
+vec3 lampTone(vec3 c){ if(uLamp==0.) return c; float L=dot(c, vec3(0.3, 0.5, 0.2)); return uLamp<0. ? mix(c, L*vec3(1.38, 0.8, 0.38)*0.82, -uLamp) : mix(c, L*vec3(0.92, 1.0, 1.12)*1.25, uLamp); }
+vec3 litBy(float y){ return mix(vec3(1.), uAmb/max(dot(uAmb, vec3(0.3, 0.5, 0.2)), 1e-3), 0.35)*0.4+lampTone(uLampC)*vW.y*(0.3+0.7*clamp(y, 0., 1.))*0.9; }
 /* a lit pictogram (no text): 0 a coffee cup with steam, 1 a pharmacy cross, 2 scissors, 3 a key, 4 a croissant — its glass at the sign's middle */
 float glyph(vec2 p, float g){ vec2 q=vec2(p.x*0.5, p.y-0.5);   /* a square sign: x in the sprite's half-widths → y units */
   if(g<0.5) return min(min(el(q, vec2(-0.06, -0.08), vec2(0.42, 0.28)), abs(el(q, vec2(0.42, -0.06), vec2(0.15, 0.12)))-0.05), min(seg(q, vec2(-0.2, 0.22), vec2(-0.12, 0.38), 0.035), seg(q, vec2(0.06, 0.22), vec2(0.14, 0.38), 0.035)));
@@ -241,28 +294,39 @@ float glyph(vec2 p, float g){ vec2 q=vec2(p.x*0.5, p.y-0.5);   /* a square sign:
   if(g<3.5) return min(abs(el(q, vec2(-0.3, 0.), vec2(0.2, 0.2)))-0.05, min(seg(q, vec2(-0.1, 0.), vec2(0.42, 0.), 0.045), min(seg(q, vec2(0.3, 0.), vec2(0.3, -0.13), 0.04), seg(q, vec2(0.18, 0.), vec2(0.18, -0.1), 0.04))));
   vec2 c0=vec2(0., 0.16); float cr=max(el(q, vec2(0., -0.02), vec2(0.42, 0.3)), -el(q, c0, vec2(0.3, 0.24))), gr=min(seg(q, c0, c0+vec2(-0.33, -0.36), 0.018), min(seg(q, c0, c0+vec2(0., -0.5), 0.018), seg(q, c0, c0+vec2(0.33, -0.36), 0.018)));
   return max(cr, -gr); }   /* a crescent with its grooves */
-/* a walker's carried and worn things (acc): 1 a shoulder bag, 2 a backpack, 3 a hat, 4 a scarf, 5 a bag and a scarf, 6 a knitted cap, 7 a tote; face 1 = from the front */
-void gear(vec2 p, float acc, float face, inout float d, inout float da){ if(acc<0.5) return;
-  if(acc>0.5 && acc<1.5 || acc>4.5 && acc<5.5) d=min(d, min(el(p, vec2(0.44, 0.36), vec2(0.12, 0.1)), seg(p, vec2(0.42, 0.42), vec2(-0.2, 0.76), 0.018)));
-  if(acc>1.5 && acc<2.5){ if(face<0.5) d=min(d, el(p, vec2(0., 0.58), vec2(0.3, 0.17))); else d=min(d, min(seg(p, vec2(-0.2, 0.74), vec2(-0.22, 0.42), 0.02), seg(p, vec2(0.2, 0.74), vec2(0.22, 0.42), 0.02))); }
-  if(acc>2.5 && acc<3.5) d=min(d, min(seg(p, vec2(-0.36, 0.915), vec2(0.36, 0.915), 0.022), el(p, vec2(0., 0.95), vec2(0.21, 0.045))));
-  if(acc>3.5 && acc<5.5){ da=min(da, el(p, vec2(0., 0.77), vec2(0.21, 0.035))); if(face>0.5) da=min(da, el(p, vec2(0.1, 0.66), vec2(0.05, 0.1))); }
-  if(acc>5.5 && acc<6.5) da=min(da, el(p, vec2(0., 0.925), vec2(0.25, 0.055)));
-  if(acc>6.5) d=min(d, el(p, vec2(-0.45, 0.32), vec2(0.15, 0.14))); }
+/* a walker's carried and worn things (acc): 1 a shoulder bag, 2 a backpack, 3 a hat, 4 a scarf, 5 a bag and a scarf, 6 a knitted cap, 7 a tote; face 1 = from the front.
+   RELEASE-1 (A): the bags (gB) swing with the step (ph), the hat, the scarf and the cap (gA) in their own colour */
+void gear(vec2 p, float acc, float face, float ph, inout float d){ if(acc<0.5) return; float a=ph*6.2832, sw=0.035*sin(a), lift=0.012*abs(cos(a));
+  if(acc>0.5 && acc<1.5 || acc>4.5 && acc<5.5) gB=min(gB, min(el(p, vec2(0.44+sw, 0.36+lift), vec2(0.12, 0.1)), seg(p, vec2(0.42+sw, 0.42+lift), vec2(-0.2, 0.76), 0.02)));
+  if(acc>1.5 && acc<2.5){ if(face<0.5) gB=min(gB, el(p, vec2(0., 0.58+lift*0.5), vec2(0.3, 0.17))); else gB=min(gB, min(seg(p, vec2(-0.2, 0.74), vec2(-0.22, 0.42), 0.022), seg(p, vec2(0.2, 0.74), vec2(0.22, 0.42), 0.022))); }
+  if(acc>2.5 && acc<3.5) gA=min(gA, min(seg(p, vec2(-0.36, 0.915), vec2(0.36, 0.915), 0.022), el(p, vec2(0., 0.95), vec2(0.21, 0.045))));
+  if(acc>3.5 && acc<5.5){ gA=min(gA, el(p, vec2(0., 0.77), vec2(0.21, 0.035))); if(face>0.5) gA=min(gA, el(p, vec2(0.1-sw*0.5, 0.66), vec2(0.05, 0.1))); else gA=min(gA, el(p, vec2(-0.12+sw*0.6, 0.69), vec2(0.05, 0.08))); }   /* the scarf's loose end */
+  if(acc>5.5 && acc<6.5) gA=min(gA, el(p, vec2(0., 0.925), vec2(0.25, 0.055)));
+  if(acc>6.5) gB=min(gB, min(el(p, vec2(-0.45-sw, 0.32+lift), vec2(0.15, 0.14)), seg(p, vec2(-0.45-sw, 0.42+lift), vec2(-0.4, 0.5), 0.02)));
+  d=min(d, min(gA, gB)); }
 void main0(){ float k=floor(vK.x+0.5), ph=fract(vK.y), sub=floor(vK.y), face=mod(sub, 2.), xtra=floor(sub/2.), code=floor(vK.z+0.5), ci=mod(code, 8.), uk=mod(floor(code/8.), 8.), uci=mod(floor(code/64.), 4.), acc=floor(code/256.);
   vec2 p=vQ; if(k<2.5 || (k>13.5 && k<18.5)) p.y*=1.15;   /* RAIN-5c: a person's quad reaches 15 % over the head (rain.js): the umbrella fits */
   float d=1., du=1., da=1., light=0., clear=0., uy=0.9, uw=1., ux=0.012*sin(ph*6.2832), lamp=0.; vec3 lampC=vec3(0.), glowC=vec3(0.);
-  float hasU= uk<3.5 ? 1. : 0.;
+  float hasU= uk<3.5 ? 1. : 0., wc=floor(vW.x+0.5); gV=vV; gRt=max(vRt, 0.02); gRtL=gRt; gFace=face; gStyle=mod(floor(wc/32768.), 4.); gHs=mod(floor(wc/131072.), 4.);   /* RELEASE-1 (A): the wear's style and hair style */
   if(k<0.5 || (k>14.5 && k<15.5) || (k>15.5 && k<16.5)){ float st= k>15.5 ? 1. : 0., bend= k>14.5 && k<15.5 ? 0.25 : 0.;
     d=person(p, 0., ph, k>14.5 && k<15.5 ? 0.06 : 0.1, st, bend, hasU*(1.-st));
-    if(k>15.5 && ph<0.3) d=min(d, el(p, vec2(0.22, 0.74), vec2(0.1, 0.05)));   /* the phone held up */
+    if(k>15.5 && ph<0.3){ gB=min(gB, el(p, vec2(0.22, 0.74), vec2(0.1, 0.05))); d=min(d, gB); lamp=exp(-dot((p-vec2(0.22, 0.74))/vec2(0.1, 0.05), (p-vec2(0.22, 0.74))/vec2(0.1, 0.05))*1.5)*0.35; lampC=vec3(0.55, 0.66, 0.9); }   /* the phone held up, its screen lit */
+    cHand= st>0.5 ? 1e3 : 0.04;
     if(uk<1.5 || uk>2.5 && uk<3.5){ uw= uk>2.5 ? 1.4 : 1.; du=dome(tilt(p, uy, ci+uk*3.), ux, uw, uy); } else if(uk>1.5 && uk<2.5){ du=dome(tilt(p, uy, ci+uk*3.), ux, 1., uy); clear=1.; }
-    else if(uk>3.5 && uk<4.5) d=min(d, el(p, vec2(0., 0.88), vec2(0.32, 0.09)));   /* a hood */
-    else if(uk>4.5 && uk<5.5) d=min(d, seg(p, vec2(-0.52, 0.97), vec2(0.52, 0.97), 0.03));   /* a newspaper over the head */
-    gear(p, acc, face, d, da); }
-  else if(k<1.5){ d=min(person(p, -0.3, ph, 0.07, 0., 0., 0.), person(p, 0.3, ph+0.5, 0.07, 0., 0., 1.)); du=dome(tilt(p, uy, ci+uk*3.), ux, 1.25, uy); }
-  else if(k<2.5){ float pull=0.06*sin(ph*12.566); d=min(person(p, -0.38, ph, 0.09, 0., 0., hasU), el(p, vec2(0.62+pull, 0.12), vec2(0.3, 0.07)));   /* the dog ahead, pulling */
-    float t=clamp((p.x+0.2)/0.75, 0., 1.); if(p.x>-0.2 && p.x<0.55) d=min(d, abs(p.y-mix(0.5, 0.18, t))-0.012); du=dome(tilt(p, uy, ci+uk*3.), -0.38+ux, 0.8, uy); }
+    else if(uk>3.5 && uk<4.5){ float hd=el(p, vec2(0., 0.88), vec2(0.32, 0.09)); if(face>0.5) hd=max(hd, -el(p, vec2(0., 0.862), vec2(0.17, 0.052))); gA=min(gA, hd); d=min(d, hd); }   /* a hood (its opening shows the face) */
+    else if(uk>4.5 && uk<5.5){ gN=min(gN, seg(p, vec2(-0.52, 0.97), vec2(0.52, 0.97), 0.03)); d=min(d, gN); }   /* a newspaper over the head */
+    gear(p, acc, face, ph, d); }
+  else if(k<1.5){ d=min(figure(p, -0.3, ph, 0.07, 0., 0., 0., 0., 1.), figure(p, 0.3, ph+0.5, 0.07, 0., 0., 1., 1., 1.)); du=dome(tilt(p, uy, ci+uk*3.), ux, 1.25, uy); }
+  else if(k<2.5){ d=person(p, -0.38, ph, 0.09, 0., 0., hasU);
+    /* RELEASE-1 (A): THE DOG walks AHEAD of its walker along the walking direction as it shows on screen (gV.xy per metre; RAIN-5 drew it side-on,
+       running sideways): its body from tail to head along that direction, four legs trotting, the tail up, the lead from the free hand to its collar */
+    vec2 Wm=length(gV.xy)>1e-4 ? gV.xy : vec2(0.9, 0.), G=vec2(0.3, 0.)+Wm*1.15, Rr=G-Wm*0.3, Ff=G+Wm*0.3, by=vec2(0., 0.17); float tr=sin(ph*12.566);
+    gDog=min(limb(p, Rr+by, Ff+by+vec2(0., 0.01), 0.048), limb(p, Ff+by+vec2(0., 0.035), Ff+by+vec2(0., 0.045)+Wm*0.13, 0.036));   /* body, head */
+    for(int j=0;j<4;j++){ float fj=float(j), sd= mod(fj, 2.)<0.5 ? -0.07 : 0.07, al= fj<1.5 ? 0.25 : -0.25, sg= mod(fj+floor(fj/2.), 2.)<0.5 ? 1. : -1.;
+      vec2 top=G+Wm*al+vec2(sd, 0.15), ft=G+Wm*(al+0.07*tr*sg)+vec2(sd, 0.004); gDog=min(gDog, limb(p, top, ft, 0.014)); }   /* legs, trotting in diagonal pairs */
+    gDog=min(gDog, limb(p, Rr+by+vec2(0., 0.01), Rr+by+vec2(0., 0.09)-Wm*0.1, 0.012));   /* the tail */
+    float lead=limb(p, vec2(-0.01, 0.37), Ff+by+vec2(0., 0.03), 0.004); d=min(min(d, gDog), lead); gN=min(gN, 1e3);
+    cHand= hasU>0.5 ? -0.34 : 1e3; du=dome(tilt(p, uy, ci+uk*3.), -0.38+ux, 0.8, uy); }
   else if(k<3.5){ float pa=ph*6.2832;   /* RAIN-5c: a cyclist from behind (riding away) or the front: one wheel end-on, the rider over it, legs pedalling */
     d=abs(seg(p, vec2(0., 0.13), vec2(0., 0.33), 0.08))-0.03;   /* RAIN-10: the wheel end-on, a capsule's rim clear of the quad's foot */ d=min(d, el(p, vec2(0., 0.66), vec2(0.36, 0.16))); d=min(d, el(p, vec2(0., 0.88), vec2(0.21, 0.06)));
     d=min(d, min(el(p, vec2(-0.14, 0.42+0.07*sin(pa)), vec2(0.1, 0.13)), el(p, vec2(0.14, 0.42-0.07*sin(pa)), vec2(0.1, 0.13))));
@@ -324,12 +388,13 @@ void main0(){ float k=floor(vK.x+0.5), ph=fract(vK.y), sub=floor(vK.y), face=mod
   else if(k<11.5){ light=1.; d=abs(el(p, vec2(0., 0.5), vec2(1., 0.5)))-0.05; }
   else if(k<12.5){ light=1.; d=p.y<0.5 ? 1. : abs(el(p, vec2(0., 0.5), vec2(1., 0.5)))-0.08; }
   else if(k<13.5) discard;   /* RAIN-10: 13 (heads over the tram) retired — the tram draws its passengers inside its windows */
-  else if(k<14.5){ vec2 q=p; d=person(vec2(q.x, q.y), -0.3, ph, 0.08, 0., 0., hasU); vec2 c=vec2((q.x-0.35)/0.62, q.y/0.62); d=min(d, person(c, 0., fract(ph*1.4), 0.12, 0., 0., 0.)*0.62);   /* a child holding a hand */
+  else if(k<14.5){ vec2 q=p; d=person(vec2(q.x, q.y), -0.3, ph, 0.08, 0., 0., hasU); vec2 c=vec2((q.x-0.35)/0.62, q.y/0.62); d=min(d, figure(c, 0., fract(ph*1.4), 0.12, 0., 0., 0., 1., 0.62)); cHand= hasU>0.5 ? -0.26 : 1e3;   /* a child holding a hand */
     if(p.x>-0.1 && p.x<0.25) d=min(d, abs(p.y-0.42)-0.014); du=dome(tilt(p, uy, ci+uk*3.), -0.3+ux, 0.9, uy); }
-  else if(k<17.5){ d=person(p, 0., ph, 0.05, 1., 0., 0.); d=min(d, el(p, vec2(xtra>0.5 ? -0.32 : 0.32, 0.58+0.05*sin(ph*6.2832)), vec2(0.09, 0.08))); }   /* talking: a gesturing hand */
+  else if(k<17.5){ d=person(p, 0., ph, 0.05, 1., 0., 0.); float hg=el(p, vec2(xtra>0.5 ? -0.32 : 0.32, 0.58+0.05*sin(ph*6.2832)), vec2(0.09, 0.08)); gK=min(gK, hg); d=min(d, hg); }   /* talking: a gesturing hand */
   else if(k<18.5){   /* RAIN-5c: a small group of three walking together (1.5 m), a golf umbrella over the middle one */
-    d=min(person(vec2((p.x+0.64)*2., p.y*1.04), 0., ph, 0.09, 0., 0., 0.)*0.5, min(person(vec2(p.x*2., p.y), 0., ph+0.31, 0.09, 0., 0., 1.)*0.5, person(vec2((p.x-0.64)*2., p.y*1.08), 0., ph+0.63, 0.09, 0., 0., 0.)*0.5));
-    du=dome(vec2(p.x*2., p.y), ux, 1.35, uy)*0.5; }
+    gRt=vRt*0.5; gRtL=gRt; gV.x*=2.;   /* RELEASE-1 (A): the group's frame is twice as wide */
+    d=min(figure(vec2((p.x+0.64)*2., p.y*1.04), 0., ph, 0.09, 0., 0., 0., 1., 0.5), min(figure(vec2(p.x*2., p.y), 0., ph+0.31, 0.09, 0., 0., 1., 0., 0.5), figure(vec2((p.x-0.64)*2., p.y*1.08), 0., ph+0.63, 0.09, 0., 0., 0., 2., 0.5)));
+    cHand=0.04; du=dome(vec2(p.x*2., p.y), ux, 1.35, uy)*0.5; }
   else if(k<19.5){ float sw=(ph-0.5)*0.6; vec2 q=p-vec2(sw*(1.-p.y), 0.); d=max(abs(q.x)-0.9*p.y, max(-p.y+0.02, p.y-0.98))*0.5; glowC= ci<0.5 ? uGarA : ci<1.5 ? uGarB : ci<2.5 ? uGarC : uGarD; }   /* a little flag of the bunting */
   else if(k<20.5){ float g=glyph(p, ci), board=el(vec2(p.x*0.5, p.y), vec2(0., 0.5), vec2(0.45, 0.45)); vec3 gc= ci>0.5 && ci<1.5 ? uCross : ci>3.5 || ci<0.5 ? uSignWarm : uSign;   /* a lit pictogram on its dark board */
     float sw=clamp(vSoft, 0.02, 0.6), win=winOf()*mix(1., vFade, uWin), core=smoothstep(sw, -sw, g), halo=smoothstep(0.35+sw, -sw, g)*0.35, bd=smoothstep(sw, -sw, board);
@@ -347,13 +412,31 @@ void main0(){ float k=floor(vK.x+0.5), ph=fract(vK.y), sub=floor(vK.y), face=mod
   float m=mix(smoothstep(sw, -sw, d), disc*0.85, kb)*win*fade, mu=smoothstep(sw, -sw, du)*(1.-kb)*win*fade, ma=smoothstep(sw, -sw, da)*(1.-kb)*win*fade;   // RAIN-10: a blur wider than the thing makes it a round soft spot, never a square
   if(light>0.5){ gl_FragColor=vec4(vec3(0.6, 0.6, 0.62)*m*vK.w, m*vK.w*0.35); return; }
   if(k>18.5 && k<19.5){ gl_FragColor=vec4(glowC*0.55*m*vK.w, m*vK.w); return; }
-  vec3 body= k>8.5 && k<9.5 ? (ci<0.5 ? vec3(0.1, 0.06, 0.03) : vec3(0.32, 0.31, 0.29)) : (k<0.5 || (k>13.5 && k<18.5) || (k>0.5 && k<2.5)) ? cloth(ci)*(uk>5.5 ? 1.8 : 1.) : vec3(0.025, 0.022, 0.03);
-  if(face>0.5 && k<0.5) body=mix(body, vec3(0.16, 0.12, 0.1), smoothstep(0.05, 0., length((p-vec2(0., 0.865))/vec2(0.2, 0.05))-1.)*0.5);   /* a face, dimly lit */
-  vec3 U= uk<0.5 ? vec3(0.02, 0.02, 0.025) : uk>2.5 && uk<3.5 ? mix(ucol(uci), vec3(0.3), step(0.5, fract(p.x*2.))) : ucol(uci);
-  float ua= clear>0.5 ? 0.35 : 1.; vec3 col=mix(body, ucol(mod(uci+1., 4.))*1.3, ma); col=mix(col, U, mu*ua*(1.-m*0.6)); float a=max(max(m, ma), mu*ua)*vK.w;
-  col=col*a+lampC*lamp*1.6*win*fade*vK.w; gl_FragColor=vec4(col, a); }
+  /* RELEASE-1 (A): a figure's parts each in their own colour, lit by the near lamps and the look's glow (a blur wider than the figure: its coat's colour) */
+  float pc=1.-kb; vec3 body, oc, ol, os, oa, ob, oh, ok; outfit(code, wc, gWho, oc, ol, os, oa, ob, oh, ok);
+  if(uOneCol>0.5){ ol=oc; os=oc; oa=oc; ob=oc; oh=oc; ok=oc; }   /* the probes' CONTROL: one colour per figure (RAIN-10) */
+  if(gFig>0.5){ float cC=smoothstep(sw, -sw, gC)*pc, cL=smoothstep(sw, -sw, gL)*pc, cT=smoothstep(sw, -sw, gT)*pc, cS=smoothstep(sw, -sw, gS)*pc, cH=smoothstep(sw, -sw, gH)*pc,
+      cK=smoothstep(sw, -sw, gK)*pc, cA=smoothstep(sw, -sw, gA)*pc, cB=smoothstep(sw, -sw, gB)*pc, cN=smoothstep(sw, -sw, gN)*pc, inP=max(max(max(cC, cL), max(cT, cS)), max(max(cH, cK), max(max(cA, cB), cN)));
+    vec3 al=mix(oc, vec3(0.1, 0.085, 0.075), pc*(1.-inP));   /* what is not a part: the dog, the lead, a tray */
+    float cG=smoothstep(sw, -sw, gDog)*pc; vec3 dogC= mod(code, 3.)<0.5 ? vec3(0.09, 0.07, 0.055) : mod(code, 3.)<1.5 ? vec3(0.32, 0.22, 0.13) : vec3(0.42, 0.4, 0.36);
+    if(gV.y>=0.) al=mix(al, dogC, cG*(1.-inP));   /* the dog behind its walker (going away) … */
+    al=mix(al, uOneCol>0.5 ? oc : vec3(0.06, 0.06, 0.068), cT*(1.-cC)); al=mix(al, ol, cL*(1.-cC)); al=mix(al, os, cS); al=mix(al, oh, cH); al=mix(al, ok, cK); al=mix(al, oa, cA); al=mix(al, ob, cB); al=mix(al, vec3(0.62, 0.6, 0.55), cN); if(gV.y<0.) al=mix(al, dogC, cG);   /* … or in front (coming towards us) */
+    body=al*litBy(p.y);
+    if(uk>5.5 && uk<6.5) body+=lampTone(uLampC)*(vW.y*0.5+0.05)*cC*exp(-pow((p.x+0.15)/0.18, 2.))*smoothstep(0.3, 0.75, p.y)*0.3; }   /* a raincoat's wet shine */
+  else if(k>8.5 && k<9.5) body= ci<0.5 ? vec3(0.1, 0.06, 0.03) : vec3(0.32, 0.31, 0.29);
+  else if(k>2.5 && k<3.5 || k>4.5 && k<5.5 || k>22.5) body=oc*0.75*litBy(p.y);   /* the cyclist, the seated, the rider: in their coat */
+  else body=vec3(0.025, 0.022, 0.03);
+  vec3 U= uk<0.5 ? vec3(0.05, 0.05, 0.06) : uk>2.5 && uk<3.5 ? mix(wUmb(uci), vec3(0.78, 0.78, 0.76), cPan) : uk>1.5 && uk<2.5 ? vec3(0.72, 0.74, 0.78) : wUmb(uci);   /* a golf umbrella's panels alternate */
+  U=U*litBy(1.)*(1.-0.45*cRib*pc)*(1.-0.3*cRim*pc)*(0.85+0.15*cSp)+lampTone(uLampC)*(vW.y*0.6+0.06)*exp(-pow((cTo-0.45)/0.25, 2.))*smoothstep(-0.2, 0.8, cSp)*smoothstep(0.2, -0.6, cDQ.x)*0.35*pc;   /* the ribs, the rim's shade, the wet top's sheen (the far upper side) */
+  float ua= clear>0.5 ? 0.35 : 1.; vec3 col=mix(body, wAcc(mod(uci+2., 8.))*litBy(p.y), ma); col=mix(col, U, mu*ua);   /* RELEASE-1 (A): seen from above, the canopy hides the head (it showed through at 40 %) */ float a=max(max(m, ma), mu*ua)*vK.w;
+  col=col*a+lampC*lamp*1.6*win*fade*vK.w;
+  /* RELEASE-1 (A): ON THE WET STREET — a soft contact shadow under a person (the ground's ellipse: the look-down angle squashes it) and the person's dim
+     reflection running down from the feet, rippled by the rain; under the figure, faded to nothing well inside the quad's lower reach */
+  if(gFig>0.5){ float wd= k>0.5 && k<2.5 || k>13.5 && k<14.5 || k>17.5 && k<18.5 ? 0.8 : 0.45, sh=exp(-pow(p.x/wd, 2.)-pow(p.y/max(wd*gRt*gV.z+0.012, 0.012), 2.)), rf= p.y<0. ? smoothstep(wd, wd*0.4, abs(p.x))*smoothstep(-0.27, -0.03, p.y)*(0.7+0.3*sin(p.y*70.+uTime*2.6+p.x*9.)) : 0.;
+    float ga=(sh*0.3+rf*0.14)*pc*win*fade*vK.w; vec3 gc=oc*litBy(0.4)*0.6*rf*0.14*pc*win*fade*vK.w; col+=gc*(1.-a); a+=ga*(1.-a); }
+  gl_FragColor=vec4(col, a); }
 /* RAIN-10: every item behind the baked city's nearer things (facade things: only what stands clearly before their facade) */
-void main(){ main0(); float k=floor(vK.x+0.5); gl_FragColor*=seen(k>18.5 && k<20.5 || k>26.5 ? 0.035 : 0.012); }`;
+void main(){ main0(); float k=floor(vK.x+0.5); gl_FragColor*=seen(k>18.5 && k<20.5 || k>26.5 ? 0.035 : vQ.y<0.02 ? 0.04 : 0.012); }   /* RELEASE-1 (A): the shadow and reflection lie on the nearer ground just below the feet */`;
 /* RAIN-10: THE TRAM, a lit box seen in true perspective (the camera is nearly over the tracks: mostly its roof, a thin lit side, its near end).
    Each face is a quad of four world corners (rain.js tramUpload): aClip the corner in camera space (x·z, y·z, z: the GPU divides, so the face's own
    metres aUV interpolate exactly), aFace (face: 0 roof, 1 the near side, 2 the near end · the carriage's length · end: 0 bellows, 1 the cab, 2 the

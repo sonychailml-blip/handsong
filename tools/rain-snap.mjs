@@ -55,6 +55,19 @@ try{
   } else if(argv.includes('--row')){   // the browser row «RAIN room» alone (a quick look while working; the judged run is the Night suite's)
     const { ctx, p, errs }=await open({ width:1280, height:800 }, LEVEL);
     console.log(JSON.stringify(await p.evaluate(async ()=>(await import('/tools/probes/night/rainroom.js')).checkRainRoom()), null, 1), errs.slice(0, 5)); await ctx.close();
+  } else if(argv.includes('--wear')){   // RELEASE-1 (A): the people's clothes, part by part — Evening's walkers (the law's own codes and wear) large, middle and street-sized, dark and under a lamp → tools/.ui-snap/release1/<tag>-people.png
+    const O=path.join(ROOT, 'tools/.ui-snap/release1'), TAG=val('--tag')||'after'; await mkdir(O, { recursive:true });
+    const ctx=await browser.newContext({ viewport:{ width:800, height:600 } }), p=await ctx.newPage(); await p.goto(`http://127.0.0.1:${port}/apps/night/index.html?probe&room=rain`);
+    await p.waitForFunction(()=>window.P && window.__nightBoot && window.__nightBoot.state().done, null, { timeout:120e3 });
+    const PH=+(val('--ph')||0), url=await p.evaluate(async PH=>{ const S=await import('/tools/probes/night/rainsheet.js'), L=await import('/apps/night/rooms/rain/pure/life.js'), C=await import('/apps/night/rooms/rain/pure/city.js'), it=[], W=1600, H=900, tan=[1.6, 0.9];
+      const P=L.lifeAt(10, 'evening').filter(q=>L.PEOPLE.includes(q.kind) && q.kind!==L.LK.cycle && q.kind!==L.LK.scooter && q.kind!==L.LK.sit);
+      /* RELEASE-1 (A): each person as the room sees them at their own place — their proportions and view (the room's viewOf) */
+      const tall=k=>k<=2 || (k>=14 && k<=18), seen=q=>{ const b=C.project([q.x, 0, q.z]), hw=q.w/2/b.z, tp=C.project([q.x, q.h*(tall(q.kind) ? 1.15 : 1), q.z]), hh=(tp.y-b.y)/2, sE=Math.min(0.98, (C.CAM.y-q.h*0.6)/b.dist), p1=q.dir ? C.project([q.x, 0, q.z+q.dir]) : null;
+        return { r:hw/hh, view: p1 && q.kind!==L.LK.stand && q.kind!==L.LK.talk ? [(p1.x-b.x)/hw, (p1.y-b.y)/(2*hh/(tall(q.kind) ? 1.15 : 1)), sE, (q.step||0.7)/2] : [0, 0, sE, 0] }; };
+      const row=(y, list, hh, lit, n)=>list.slice(0, n).forEach((q, i)=>{ const v=seen(q); it.push({ x:-1.48+i*(2.96/Math.max(1, n-1)), y, hh, hw:hh*v.r, k:q.kind, ph:((q.ph+PH)%1)+(q.face==='front' ? 1 : 0), c:q.c, wear:q.wear, lit, dep:0.5, view:v.view }); });
+      row(0.25, P, 0.3, 0.15, 10); row(-0.35, P.slice(10), 0.16, 0.9, 16); row(-0.85, P.slice(4), 0.07, 0.5, 30);
+      return (await S.lifeSheet(it, { W, H, tan, foc:[0.5, 4, 0, 0], url:true, bg:0x2a2622, done:true })).url; }, PH);
+    await writeFile(path.join(O, `${TAG}-people.png`), Buffer.from(url.split(',')[1], 'base64')); await ctx.close(); console.log(`[rain-snap] --wear → tools/.ui-snap/release1/${TAG}-people.png`);
   } else if(argv.includes('--sheet')){   // RAIN-10: the life sheet (tools/probes/night/rainsheet.js) — people, colours, cars, the tram drawn large, sharp and blurred → tools/.ui-snap/rain10/<tag>-sheet.png
     const O=path.join(ROOT, 'tools/.ui-snap/rain10'), TAG=val('--tag')||'after'; await mkdir(O, { recursive:true });
     const ctx=await browser.newContext({ viewport:{ width:800, height:600 } }), p=await ctx.newPage(); await p.goto(`http://127.0.0.1:${port}/apps/night/index.html?probe&room=rain`);

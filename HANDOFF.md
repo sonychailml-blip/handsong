@@ -6,14 +6,14 @@ Two apps, one engine. Rules: `CLAUDE.md`. Every run belongs to one track: `CORE-
 |---|---|---|---|
 | **CORE** | `core/` | `docs/core/HANDOFF.md`, `BACKLOG.md`, `WORK-LOG.md` | Stage 3 foundation and `CORE-1`…`CORE-27` done, all opt-in (latest: the audio lab's buffer, search and tap, Night). |
 | **FULL** | `apps/full/` | `docs/full/HANDOFF.md`, `BACKLOG.md`, `WORK-LOG.md`, `UI-MAP.md`, `UX-INVENTORY.md` | Waits for the first release. Next: stage 5 (saving, export, audio take, mixer) and the calibration screen. |
-| **NIGHT** | `apps/night/` | `docs/night/HANDOFF.md`, `BACKLOG.md`, `WORK-LOG.md`, `STAGE4-NIGHT-plan.md`, `QUALITY.md` | The first public release. Waiting for the user's steps 129, 145–166 (the track handoff lists them; latest 189 `RAIN-10` (the street fixed, the tram), 188 `SAFARI-1`, 187 `RAIN-9`; 183 small fixes; 182 `RAIN-R1`; 181 `NIGHT-16`). FULL CHECK green (2026-11-17) for the forest; RAIN-R1 needs a new full check (a night run) before `night-release`. A timing pass is owed (FOREST-2/2b, RAIN-4, RAIN-5, step 134). Then steps 120–124, C8 rest, C10, C12. |
+| **NIGHT** | `apps/night/` | `docs/night/HANDOFF.md`, `BACKLOG.md`, `WORK-LOG.md`, `STAGE4-NIGHT-plan.md`, `QUALITY.md` | The first public release. **`RELEASE-1`** (stages A–G to the public release) — stage A done (190, people dressed part by part); next B (cars and the tram in true 3D). Waiting for the user's steps 129, 145–190 (the track handoff lists them). The timing pass (stage D) and the full check (stage E) before `night-release`. Then steps 120–124, C8 rest, C10, C12. |
 | **SITE** | `apps/site/` | `docs/site/HANDOFF.md`, `WORK-LOG.md` | handsong.app, the brand site: `SITE-1` built, `SITE-2` Install → Space, `SITE-3` the demo at demo.handsong.app; waits for its Vercel project and DNS. |
 
 Product roadmap: docs/ROADMAP.md — read it before proposing work.
 
 **Handsong** is a gesture synthesizer and tuning tutorial in the browser: camera → MediaPipe → pinches → Web Audio, with a multitrack recorder, piano roll and lessons. **Handsong Night** (code id `night`) is the quiet one: a night forest played with the hands, free, nothing leaves the device.
 
-**Who does what:** the user commits; Claude Code never runs git, not even read-only. A strategist writes the prompts (in Russian); terminal replies in English.
+**Who does what:** the user commits; Claude Code never runs git, not even read-only. Since RELEASE-1 the founder talks to Claude Code directly (simple Russian reports).
 
 **Deploy** (`CLAUDE.md` «Build and deploy»): Vercel projects per app; `dev` gives previews (with `?probe`). Production: Full builds `main`, Night `night-release` (https://night.handsong.app), the site `dev` (handsong.app, only when `apps/site/` changes). Build: `tools/build.mjs`.
 

@@ -45,15 +45,17 @@ if(argv.includes('--city')){ const DRAFT=argv.includes('--draft'), CITY=path.joi
   try{
     const p=await (await browser.newContext({ viewport:{ width:800, height:600 } })).newPage(), errs=[]; p.on('pageerror', e=>errs.push(String(e).slice(0, 200))); p.on('console', m=>{ if(m.type()==='error' && !/favicon|status of 404/.test(m.text())) errs.push(m.text().split(String.fromCharCode(10))[0].slice(0, 200)); });
     await p.goto(`http://127.0.0.1:${srv.address().port}/tools/design/rain/bake/citybake.html`); await p.waitForFunction(()=>window.cityBakeReady, null, { timeout:60e3 });
-    const res=await p.evaluate(o=>window.cityBake(o), { px:+(argv[argv.indexOf('--px')+1])||820, ss:2, small:0.625, moods:DRAFT && argv.includes('--one') ? ['evening'] : ['late', 'evening', 'after'], litMood:'evening', lights:10, shadows:3, exposure:+(argv[argv.indexOf('--exp')+1])||undefined, skyI:+(argv[argv.indexOf('--sky')+1])||undefined });
+    const DONLY=argv.includes('--depth-only');   // RELEASE-1 (A): only depth.png (full and reduced), the cards' gaps kept; the pictures and windows.json untouched
+    const res=await p.evaluate(o=>window.cityBake(o), { depthOnly:DONLY, px:+(argv[argv.indexOf('--px')+1])||820, ss:2, small:0.625, moods:(DRAFT && argv.includes('--one')) || DONLY ? ['evening'] : ['late', 'evening', 'after'], litMood:'evening', lights:10, shadows:3, exposure:+(argv[argv.indexOf('--exp')+1])||undefined, skyI:+(argv[argv.indexOf('--sky')+1])||undefined });
     if(errs.length) console.log('[rain-bake] page errors:', errs.slice(0, 8));
     const sizes={ full:{}, reduced:{} }; await mkdir(path.join(CITY, 'full'), { recursive:true }); await mkdir(path.join(CITY, 'reduced'), { recursive:true });
     for(const [k, url] of Object.entries(res.images)){ const lv=/-s\./.test(k) ? 'reduced' : 'full', f=k.replace('-s.', '.'), buf=Buffer.from(url.split(',')[1], 'base64'); await writeFile(path.join(CITY, lv, f), buf); sizes[lv][f]=buf.length; }
+    if(DONLY){ console.log(`[rain-bake] --depth-only: ${JSON.stringify(sizes)} (${res.ms} ms)`); } else {
     await writeFile(path.join(CITY, 'windows.json'), JSON.stringify(res.windows));
     if(DRAFT) console.log('[rain-bake] draft →', path.relative(ROOT, CITY), JSON.stringify({ ms:res.ms, crowns:res.crowns, light:res.light, houses:(res.houses||[]).length })); else {
     const info={ renderer:'three.js r128 (MIT), vendored at apps/night/vendor/three-r128/', ms:res.ms, size:res.size, counts:res.counts, windows:res.windows.length, sizes, light:res.light, crowns:res.crowns, houses:res.houses, errors:errs.slice(0, 8) };   // RAIN-2: + the light's passes, the crown cover, every house
     await writeFile(path.join(ROOT, 'tools/design/rain/bake/city.json'), JSON.stringify(info, null, 1));
-    console.log(`[rain-bake] the city: ${res.ms} ms, ${res.size.join(' × ')} (Standard ×0.625), ${res.windows.length} windows; files ${JSON.stringify(sizes)}`); }
+    console.log(`[rain-bake] the city: ${res.ms} ms, ${res.size.join(' × ')} (Standard ×0.625), ${res.windows.length} windows; files ${JSON.stringify(sizes)}`); } }
   } finally { await browser.close().catch(()=>{}); srv.close(); }
   process.exit(0);
 }

@@ -2159,6 +2159,50 @@ async function rain10Gait(){
     notes.push(`the flickering lamp: ${n0} stutters in 2 h, each ≤ ${FL.LAMP_FLICKER.dur} s, at least ${gaps(starts).toFixed(0)} s apart`); }
   return { cases:n, total:d.length, differences:d, notes };
 }
+/* RELEASE-1 (A) — «RELEASE-1 people clothes (app)»: the founder saw every figure in one colour since RAIN-10. The law (rooms/rain/pure/life.js outfitOf):
+   (1) WITHIN each figure — every person out at Evening, After the rain and Late night — the coat, the trousers or skirt, the hat / scarf / hood and the bag
+   stand apart (RGB distance ≥ WEAR_MIN) and the shoes apart from the trousers; (2) ACROSS figures the palettes spread: Evening's people wear ≥ 6 coat,
+   6 trousers, 5 hat-and-scarf, 3 bag, 5 hair, 4 skin colours, ≥ 20 distinct outfits; (3) the palettes are believable for a rainy night: no part brighter
+   than 0.75 or more saturated than 0.75 (no rainbow; the pale trainers and the cream scarf are the lightest); (4) a couple's or a group's figures wear
+   different coats. CONTROL: one colour per figure (every part the coat's) is caught. (On screen: P.night «RAIN-10 people, cars and the tram» (4b).) */
+async function release1Clothes(){
+  const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); return !!c; }, U=f=>import(new URL(f, import.meta.url).href);
+  const L=await U('../apps/night/rooms/rain/pure/life.js'), dist=(a, b)=>Math.hypot(a[0]-b[0], a[1]-b[1], a[2]-b[2]), M=L.WEAR_MIN;
+  const apart=(o, one)=>{ const q= one ? { ...o, legs:o.coat, shoes:o.coat, acc:o.coat, bag:o.coat } : o; return dist(q.legs, q.coat)>=M.legs-1e-9 && dist(q.acc, q.coat)>=M.acc-1e-9 && dist(q.bag, q.coat)>=M.bag-1e-9 && dist(q.shoes, q.legs)>=M.shoes-1e-9; };
+  let all=0, bad=0, ctl=0; const who=[]; const ppl=look=>L.lifeAt(10, look).filter(q=>L.PEOPLE.includes(q.kind));
+  for(const look of ['evening', 'after', 'late']) for(const q of ppl(look)){ all++; if(q.wear==null){ bad++; continue; } const o=L.outfitOf(q.c, q.wear); if(!apart(o)){ bad++; who.push(`${look} kind ${q.kind} lane ${q.lane}`); } if(apart(o, true)) ctl++; }
+  ok(`a figure's parts share a colour (${bad} of ${all} people: ${who.slice(0, 4).join('; ')})`, all>40 && bad===0); ok(`CONTROL: one colour per figure passed (${ctl} of ${all})`, ctl===0);
+  const E=ppl('evening').map(q=>L.outfitOf(q.c, q.wear)), key=a=>a.map(v=>v.toFixed(3)).join(','), cnt=f=>new Set(E.map(o=>key(f(o)))).size;
+  const S={ coat:cnt(o=>o.coat), legs:cnt(o=>o.legs), acc:cnt(o=>o.acc), bag:cnt(o=>o.bag), hair:cnt(o=>o.hair), skin:cnt(o=>o.skin), outfits:new Set(E.map(o=>key([...o.coat, ...o.legs, ...o.acc, ...o.shoes]))).size };
+  ok(`the palettes do not spread across figures (${JSON.stringify(S)})`, S.coat>=6 && S.legs>=6 && S.acc>=5 && S.bag>=3 && S.hair>=5 && S.skin>=4 && S.outfits>=20);
+  const sat=c=>{ const mx=Math.max(...c), mn=Math.min(...c); return mx>0 ? (mx-mn)/mx : 0; }; let loud=[];
+  for(const [k, list] of Object.entries(L.WEAR)) list.forEach((h, i)=>{ const c=[0, 2, 4].map(j=>parseInt(h.slice(j, j+2), 16)/255); if(Math.max(...c)>0.75 || sat(c)>0.75) loud.push(`${k}[${i}] ${h}`); });
+  ok(`a palette colour is too loud for a rainy night: ${loud.join(', ')}`, loud.length===0);
+  { const c=ppl('evening').find(q=>q.kind===L.LK.couple), g=ppl('evening').find(q=>q.kind===L.LK.group); for(const q of [c, g].filter(Boolean)){ const a=L.outfitOf(q.c, q.wear, 0), b=L.outfitOf(q.c, q.wear, 1); ok(`a ${q.kind===L.LK.couple ? 'couple' : 'group'} wears one coat`, dist(a.coat, b.coat)>0.05); } }
+  notes.push(`${all} people over three moods, every figure's parts apart; Evening: ${S.coat} coats, ${S.legs} trousers, ${S.acc} hats / scarves, ${S.bag} bags, ${S.hair} hair, ${S.skin} skin colours, ${S.outfits} distinct outfits; CONTROL one colour per figure caught (${all-ctl} of ${all})`);
+  return { cases:n, total:d.length, differences:d, notes };
+}
+/* RELEASE-1 (A) — «RELEASE-1 people come and go (app)»: the founder saw too many people standing still for ever. Over ten minutes of Evening every waiting or
+   talking person (lanes 'stand', 'talk') stands at most 65 s at a time, walks every few minutes (arriving, then leaving along their pavement), and while they
+   walk their step's phase follows the distance (no sliding: Δph ≡ Δs / (2 × step)); they fade only at the two ends of their visit. CONTROL: the street
+   without the rhythm (L.stay absent: RAIN-5's standing for ever) is caught. */
+async function release1Stay(){
+  const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); return !!c; }, U=f=>import(new URL(f, import.meta.url).href);
+  const L=await U('../apps/night/rooms/rain/pure/life.js');
+  const judge=(LL)=>{ const st=new Map(); let slide=0, pairs=0, prev=null;
+    for(let t=0;t<=600;t+=0.5){ const A=L.lifeAt(t, 'evening', [], 0, L.LIFE.seed, LL).filter(q=>q.lane==='stand' || q.lane==='talk'), cur=new Map();
+      A.forEach(q=>{ const id=q.lane+':'+q.x+':'+q.h.toFixed(3); cur.set(id, q); const s=st.get(id)||{ run:0, longest:0, walks:0, was:'' }; const mode=q.kind===L.LK.walk ? 'walk' : 'stand';
+        if(mode==='stand'){ s.run+=0.5; s.longest=Math.max(s.longest, s.run); } else { s.run=0; if(s.was!=='walk') s.walks++; }
+        if(mode==='walk' && prev && prev.has(id) && prev.get(id).kind===L.LK.walk){ const p=prev.get(id), ds=Math.abs(q.z-p.z); if(ds<2){ pairs++; const want=((ds/(2*q.step))%1+1)%1, got=((q.ph-p.ph)%1+1)%1, e=Math.min(Math.abs(got-want), 1-Math.abs(got-want)); if(e>1e-6) slide++; } }
+        s.was=mode; st.set(id, s); });
+      for(const [id, s] of st) if(!cur.has(id)){ s.run=0; s.was=''; } prev=cur; }
+    return { st:[...st.values()], slide, pairs }; };
+  const J=judge(L.LIFE), longest=Math.max(...J.st.map(s=>s.longest)), fewest=Math.min(...J.st.map(s=>s.walks));
+  ok(`someone stands too long (${longest.toFixed(0)} s at a time)`, J.st.length>=5 && longest<=65); ok(`someone never walks in ten minutes (${fewest} walks)`, fewest>=2); ok(`a waiting person slides while walking (${J.slide} of ${J.pairs})`, J.pairs>50 && J.slide===0);
+  const C=judge({ ...L.LIFE, stay:null }), cl=Math.max(...C.st.map(s=>s.longest)); ok(`CONTROL: standing for ever passed (${cl.toFixed(0)} s)`, cl>65);
+  notes.push(`${J.st.length} waiting and talking people over ten minutes: at most ${longest.toFixed(0)} s standing at a time, each walked ≥ ${fewest} times, ${J.pairs} step pairs without sliding; CONTROL standing for ever caught (${cl.toFixed(0)} s)`);
+  return { cases:n, total:d.length, differences:d, notes };
+}
 async function rain7Law(){
   const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); return !!c; }, U=f=>import(new URL(f, import.meta.url).href);
   const B=await U('../apps/night/rooms/rain/pure/busker.js'), V=await U('../apps/night/rooms/rain/pure/vehicles.js');
@@ -3076,10 +3120,11 @@ async function rainLife(){ const d=[], notes=[]; let n=0; const miss=x=>d.push(x
   const ppl=look=>lifeAt(10, look).filter(q=>PEOPLE.includes(q.kind)), Cn={ late:ppl('late').length, after:ppl('after').length, evening:ppl('evening').length };
   n++; if(!(Cn.evening>Cn.after && Cn.after>Cn.late)) miss(`the moods' crowds: evening ${Cn.evening}, after ${Cn.after}, late ${Cn.late}`);
   { const E=lifeAt(10, 'evening'), W=E.filter(q=>[LK.walk, LK.couple, LK.dog, LK.child, LK.old].includes(q.kind)), clothes=new Set(W.map(q=>q.c%8)), umb=new Set(W.map(q=>Math.floor(q.c/8)%8)), hs=W.map(q=>q.h);
-    const kinds=new Set(E.map(q=>q.kind)), none=W.filter(q=>Math.floor(q.c/8)%8>=UMB.hood).length; n+=5;
+    const kinds=new Set(E.map(q=>q.kind)); for(let t=0;t<=300;t+=3) for(const q of lifeAt(t, 'evening')) kinds.add(q.kind);   /* RELEASE-1 (A): the waiting and the talking come and go — seen within five minutes */
+    const none=W.filter(q=>Math.floor(q.c/8)%8>=UMB.hood).length; n+=5;
     if(clothes.size<6) miss(`only ${clothes.size} clothes colours among the walkers (6 wanted)`); if(umb.size<5 || !none) miss(`umbrella kinds ${umb.size}, without one ${none} (5 kinds and some without wanted)`);
     if(Math.max(...hs)-Math.min(...hs)<0.25) miss(`heights span only ${(Math.max(...hs)-Math.min(...hs)).toFixed(2)} m`);
-    for(const [k, nm] of [[LK.child, 'a child holding a hand'], [LK.old, 'an older walker'], [LK.dog, 'a dog walker'], [LK.couple, 'a couple'], [LK.stand, 'someone standing (waiting, on a phone)'], [LK.talk, 'two talking']]) if(!kinds.has(k)) miss(`no ${nm} at Evening`);
+    for(const [k, nm] of [[LK.child, 'a child holding a hand'], [LK.old, 'an older walker'], [LK.dog, 'a dog walker'], [LK.couple, 'a couple'], [LK.stand, 'someone standing (waiting, on a phone)'], [LK.talk, 'two talking']]) if(!kinds.has(k)) miss(`no ${nm} at Evening (within five minutes)`);
     const speeds=new Set(LIFE.lanes.map(l=>l.v)); if(speeds.size<5) miss('fewer than five walking paces');
     notes.push(`Evening: ${W.length} walkers, ${clothes.size} clothes colours, ${umb.size} umbrella kinds (${none} without), heights ${Math.min(...hs).toFixed(2)}–${Math.max(...hs).toFixed(2)} m, ${speeds.size} paces`); }
   /* (3) no collisions, every mood, and across a mood change */
@@ -3515,6 +3560,8 @@ const ROWS=[
   ['RAIN effects hand (app)', ()=>rainFxLaw(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-6
   ['RAIN-7 law (app)', ()=>rain7Law(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-7
   ['RAIN-10 gait, clothes and the lamp (app)', ()=>rain10Gait(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-10
+  ['RELEASE-1 people clothes (app)', ()=>release1Clothes(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RELEASE-1 (A)
+  ['RELEASE-1 people come and go (app)', ()=>release1Stay(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RELEASE-1 (A)
   ['NIGHT silent switch (app)', ()=>nightSilentSwitch(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // SAFARI-1
   ['RAIN street law (app)', ()=>rainStreetLaw(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-6b
   ['NIGHT home screen (app)', ()=>nightHomeScreen(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-7c
