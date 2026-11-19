@@ -7,6 +7,8 @@ import { $, revealBar } from './ui.js';          // side-effect: строит м
 import './demo.js';                              // side-effect: демо «путешествие по строям» (без камеры). Его КНОПКИ на старте БОЛЬШЕ НЕТ — demo.js вешает обработчик защитно (if(db)), сам код жив и ждёт переезда внутрь обучения
 import { openLessons, wireStarter } from './tutor.js';   // обучение: «Обучение» открывает список уроков; выбор урока сам поднимает приложение через startApp
 import { t } from './i18n.js';
+import { audioSessionPlayback } from './audiosession.js';   // iOS: звук и при беззвучном режиме (сессия «playback», в тапе старта)
+import './inapp-hint.js';                        // side-effect: мягкая подсказка «откройте в Safari/Chrome», если страница во встроенном браузере приложения
 
 /* =====================================================================
    HANDSONG — жестовый синтезатор + интерактивный учебник ладов
@@ -61,8 +63,9 @@ async function startApp(){
   if(started) return true;
   const btn=$('startBtn'), learn=$('learnBtn'), msgEl=$('loadmsg'), msg=s=>msgEl.textContent=s;
   btn.disabled=true; if(learn) learn.disabled=true;
+  audioSessionPlayback();                    // iOS: сессия «playback» — иначе беззвучный режим глушит Web Audio (синхронно, в тапе, ДО AC)
   try{
-    await initAudio();                       // async: ждём загрузку KS-ворклета (иначе banks[] разъедется)
+    await initAudio();                       // async: ждём загрузку KS-ворклета (иначе banks[] разъедется); AC.resume() — внутри, ещё в тапе
     await AC.resume();
     await initVision(msg);
     try{await navigator.wakeLock.request('screen');}catch(e){}

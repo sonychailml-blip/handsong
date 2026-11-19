@@ -62,6 +62,9 @@
          (standalone) → прячем всё. Обе скрыты по умолчанию (display:none), показывает ui.js. -->
     <button id="installBtn" data-i18n="install.btn" data-i18n-title="install.title" title="Add Handsong to your home screen" style="display:none">⬇ Install</button>
     <p id="installHint" style="display:none"></p>
+    <!-- Встроенный браузер приложения (Telegram/Instagram/…): мягкий совет открыть в Safari/Chrome — как в Night.
+         Скрыт по умолчанию; показывает и подписывает src/inapp-hint.js. Ничего не блокирует. -->
+    <div id="inAppHint" class="inAppHint" hidden><p id="inAppText"></p><input id="inAppUrl" readonly aria-label="Link"><button id="inAppCopy" data-i18n="inapp.copy">Copy link</button></div>
     <p id="loadmsg"></p>
     <p id="learnMsg"></p>
     <!-- Подвал: тихо, но читаемо. Метки ссылок пишет ui.js (URL — константы там). Отзыв виден всегда

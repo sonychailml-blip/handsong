@@ -457,6 +457,10 @@ function chordOff(owner,when){ const vs=chordHold[owner]; if(!vs)return;
 
 async function initAudio(){
   AC=new (window.AudioContext||window.webkitAudioContext)({latencyHint:'interactive'});
+  /* resume — СРАЗУ, в синхронной части тапа. Прежде он звался только в main ПОСЛЕ await загрузки ворклета —
+     уже вне жеста; iOS Safari тогда может оставить контекст в «suspended», и страница молчит. Промис не ждём
+     (ждать — значит уйти из жеста); поздний resume в main остаётся как был, вреда нет. */
+  try{ const p=AC.resume(); if(p && p.catch) p.catch(()=>{}); }catch(e){}
   /* KS-ворклет грузим В НАЧАЛЕ (по-прежнему внутри клика — правило #1 цело), ДО buildLeadBanks,
      чтобы banks[] строился синхронно и не разъехался с LEAD_INSTR. Провал загрузки — не падаем:
      ставим запасные субтрактивные щипки в слоты Струна/Ситар. Путь — от корня страницы (не ES-import). */

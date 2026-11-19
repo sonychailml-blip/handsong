@@ -407,6 +407,16 @@
     font-size:var(--fs-label); padding:9px 18px; background:transparent; color:var(--accent-ink);
     border:1px solid rgba(180,83,9,.5); border-radius:var(--r-sm); font-weight:600;}
   #installHint{font-size:var(--fs-hint); color:#6a7089; margin:7px 0 0; line-height:1.45;}
+  /* Совет «откройте в Safari/Chrome» (встроенный браузер приложения) — МЯГКИЙ: тёплая бледная плашка,
+     мелкий текст, тихая кнопка; не спорит с «Играть». [hidden] прячет — свой display его бы перебил. */
+  .inAppHint{margin:14px 0 0; padding:11px 12px; text-align:left; background:#fff8ec;
+    border:1px solid rgba(180,83,9,.22); border-radius:var(--r-sm);}
+  .inAppHint[hidden]{display:none;}
+  .inAppHint p{margin:0 0 8px; font-size:var(--fs-label); line-height:1.45; color:#4a4f66;}
+  #inAppUrl{display:block; width:100%; margin:0 0 8px; padding:6px 9px; font-size:var(--fs-hint);
+    background:#fff; color:#2a2f45; border:1px solid rgba(20,24,50,.16); border-radius:var(--r-sm);}
+  #inAppCopy{display:block; width:100%; padding:9px 12px; font-size:var(--fs-label); font-weight:600;
+    background:transparent; color:var(--accent-ink); border:1px solid rgba(180,83,9,.5);}
   /* ⛶ полноэкранный — ЗАМЕТНАЯ вторичная кнопка (полезна почти всем каждый сеанс): по весу близка к двум
      главным (15px, крупный padding), но остаётся вторичной — контурная, не залита как «Играть»/«Обучение».
      Не в .startBtns (там stretch-колонка) — отдельный ребёнок карточки, центрируется text-align. .act =
