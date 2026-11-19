@@ -4,7 +4,7 @@ The site lives in `apps/site/`: plain static HTML/CSS (no framework, no build, n
 
 ## How it is made
 - Texts (both languages): `tools/site/texts.mjs`. Pages, 404, `sitemap.xml`, `robots.txt`: `node tools/site-pages.mjs --write` (never edit the HTML by hand — the check fails on a page that differs).
-- Pictures: `node tools/site-images.mjs` (`--only forest|demo|icons`; `--fresh` re-renders the forest). Night card and page: the forest through the still's rest camera (as `tools/night-still.mjs`), undimmed, portrait crop, WebP + JPG ≤ 150 KB. Tech demo card: the live https://handsong.vercel.app start screen at phone size, shown as a phone screen in the card. Space: a drawn wall with the forest projected on it. Sharing picture `img/og.jpg` 1200 × 630 with the emblem and wordmark. Favicons from `favicon.svg`.
+- Pictures: `node tools/site-images.mjs` (`--only forest|demo|icons`; `--fresh` re-renders the forest). Night card and page: the forest through the still's rest camera (as `tools/night-still.mjs`), undimmed, portrait crop, WebP + JPG ≤ 150 KB. Tech demo card: the live https://demo.handsong.app start screen (SITE-3: the demo moved there; handsong.vercel.app redirects) at phone size, shown as a phone screen in the card. Space: a drawn wall with the forest projected on it. Sharing picture `img/og.jpg` 1200 × 630 with the emblem and wordmark. Favicons from `favicon.svg`.
 - A video later: give a page's text `videoSrc: { src, poster }` (home `home.videoSrc`, Night `night.videoSrc`); the layout's slot renders it (the files go to `apps/site/`, own origin; a host for video needs the user's decision and the CSP).
 - Check: `node tools/site-check.mjs` (`--shots` for captures + `tools/.site-shots/index.html`).
 
@@ -17,5 +17,6 @@ Vercel → Add New Project → this repository:
 - Cloudflare DNS (DNS only, grey cloud): `A  @  76.76.21.21` and `CNAME  www  cname.vercel-dns.com`. If Vercel's Domains page shows other values (newer projects may show `A 216.198.79.1` or a project-specific `…vercel-dns-0xx.com`), use what it shows. Leave the `night` record and any MX/TXT (mail for hello@handsong.app) as they are. A CAA record, if present, must allow `letsencrypt.org`.
 
 ## State
+- `SITE-3` (2026-11-19): the Tech demo card and page link to https://demo.handsong.app (the demo moved; handsong.vercel.app redirects); site-check row «the demo address» (CONTROL a page with the old address).
 - `SITE-2` (2026-11-14): the venue product «Install» renamed «Handsong Space» (the founder: «Install» read as installing software and clashed with «Add to Home Screen»); both languages, page `/space/`, the old address a 308 redirect; site-check row «no product named Install» (CONTROLS: a page naming it, the redirect missing). Mock-ups in `site-design/` keep the old name on purpose. Waits for the founder's look at /space/ and /install on the live site.
 - `SITE-1` (2026-11-13) built; waits for the Vercel project, DNS, and the user's checks: a link in Telegram shows the picture; the pages on a real phone; the RU redirect in a Russian browser.

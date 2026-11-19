@@ -280,7 +280,7 @@ export function buildForest(T, opt){
   let fxv={ echo:0, time:0.625, fb:0, tone:0.5, wave:0 }, now=0; const echoes=[];
   /* PERF-2: the playing hand's light casts its cube shadow (Detailed) — six renders of the forest a frame; while the light is out (intensity 0: no hand)
      it adds exactly nothing, so its shadow is not redrawn (shadow.autoUpdate; the frame it lights again redraws it first). shadowAll: always, as before */
-  let shadowAll=true;   // PERF-2: NOT applied — the exact A/B found 264 bytes differ (the shadow pass has a side effect); listed as a «small» risk. false = skip it
+  let shadowAll=false;   // PERF-4 (the founder approved, 2026-11-19): the skip applied (−13 ms a frame at Detailed; 264 bytes of 2.2 M differ). true = always, as before (shadowAllDbg)
   /* RUN 8 (slice 4): the forest answers the music GENTLY — each note adds to a slow energy (its velocity × 0.35, at most 1.5) that fades with
      τ 1.8 s: the wild fireflies glow up to +60 %, their two lights +50 %, the night sky +15 %. Nothing moves faster than the music. */
   let music=0;

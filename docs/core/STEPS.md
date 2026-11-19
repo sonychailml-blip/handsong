@@ -87,6 +87,8 @@ THERE in full and here as one index entry):
   182 The rain for players: a random start room, the rain's start still with drops, the dot lights a window, its cards (RAIN-R1)
   183 Small fixes: the piano comps like a pianist, round far lights through the mist, Detailed's spruces after the start
   184 UI-1: no notes under Quality, forest-only settings hidden in the rain, labels follow the room, the rain's music names, amber everywhere, round hill lights
+  185 RAIN-8: our window removed, the cars' two trial versions (baked / cinematic), the street musician findable, people against RAIN-5c
+  186 PERF-4: the forest's hand-light shadow skipped with no hand; a weak GPU starts at Light on its first visit
   163 Fixes after the backlog audit: an in-app browser's refusal, the Lighter stream, the rain room's sound on Dark, Licences, keeping the files (NIGHT-15, CORE-23)
 
 ## Moved to `archive/CLAUDE-history.md` at DOC1 (grep by title; read only what the slice needs)

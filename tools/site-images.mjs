@@ -4,7 +4,7 @@
      night-card.webp/.jpg   portrait 9:14 crop for the Night card and page (each ≤ 150 KB)
      forest-wall.webp/.jpg  landscape crop for the Space picture (the forest on a projected wall)
      og.jpg                 1200 × 630 sharing picture: the forest + the emblem and the hand·song wordmark (the site's own Literata)
-     demo-card.webp/.jpg    the live https://handsong.vercel.app start screen at phone size (portrait 9:14)
+     demo-card.webp/.jpg    the live https://demo.handsong.app start screen at phone size (portrait 9:14)
      icon-32.png, apple-touch-icon.png (180), ../favicon.ico (PNG inside), from apps/site/favicon.svg (the five-dot emblem)
    Headless Chrome (channel chrome), own static server over the repo. Register entries «site-pictures» and «site-icons» (tools/licences.json).
      node tools/site-images.mjs                 everything (the forest from the cache when present)
@@ -98,7 +98,7 @@ async function compose(){
 /* the live tech demo's start screen (the old public Full), phone portrait */
 async function demo(){
   const ctx=await browser.newContext({ viewport:{ width:390, height:607 }, deviceScaleFactor:2, locale:'en-US', isMobile:true, hasTouch:true });
-  const p=await ctx.newPage(); await p.goto('https://handsong.vercel.app/', { waitUntil:'networkidle', timeout:90e3 }); await p.waitForTimeout(2500);
+  const p=await ctx.newPage(); await p.goto('https://demo.handsong.app/', { waitUntil:'networkidle', timeout:90e3 }); await p.waitForTimeout(2500);
   const png=await p.screenshot({ type:'png' }); await writeFile(path.join(SRC,'demo-raw.png'), png); await ctx.close();
   const c2=await browser.newContext({ viewport:{ width:800, height:800 } }), q=await c2.newPage(); await q.goto(`${base}/apps/site/404.html`);
   const r=await q.evaluate(async ([BUDGET])=>{ const img=await new Promise((r,j)=>{ const i=new Image(); i.onload=()=>r(i); i.onerror=j; i.src='/tools/.site-src/demo-raw.png'; });

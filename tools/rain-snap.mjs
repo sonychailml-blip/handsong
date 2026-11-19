@@ -5,6 +5,7 @@
                                               drops merging (a short sequence of crops). (RAIN-0's captures stay in tools/.ui-snap/rain0/.)
      node tools/rain-snap.mjs --level full    the same at Detailed (files named …-full)
      node tools/rain-snap.mjs --rain1         RAIN-1: the baked city → tools/.ui-snap/rain1/ (each mood, the focus near / middle / far, a phrase, before / after)
+     node tools/rain-snap.mjs --rain8 [--only laptop|phone]  RAIN-8: the cars' two trial versions and the old boxes side by side → tools/.ui-snap/rain8/
      node tools/rain-snap.mjs --cost          no captures: per level, the room against Dark (hand detections a second, the forest budget's
                                               method), its frame time, draws, programs, texture memory and opening time, printed as JSON */
 import http from 'node:http';
@@ -54,6 +55,42 @@ try{
   } else if(argv.includes('--row')){   // the browser row «RAIN room» alone (a quick look while working; the judged run is the Night suite's)
     const { ctx, p, errs }=await open({ width:1280, height:800 }, LEVEL);
     console.log(JSON.stringify(await p.evaluate(async ()=>(await import('/tools/probes/night/rainroom.js')).checkRainRoom()), null, 1), errs.slice(0, 5)); await ctx.close();
+  } else if(argv.includes('--rain8')){   // RAIN-8: the cars' two trial versions (and RAIN-6b's boxes) side by side, each mood, the focus near / middle / far, close-ups of the road; the people next to RAIN-5c's
+    const O=path.join(ROOT, 'tools/.ui-snap/rain8'); await mkdir(O, { recursive:true }); const made=[], log={};
+    const RU={ late:'Поздняя ночь', evening:'Вечерний бульвар', after:'После дождя' }, MODE={ box:'Было (коробки RAIN-6b)', baked:'(а) Запечённые машины', cine:'(б) Кинематографичные' };
+    const only=val('--only'); const DEV=[['laptop', { width:1280, height:800 }, 1], ['phone', { width:390, height:844 }, 2.75]].filter(d=>!only || d[0]===only);
+    for(const [tag, vp, dpr] of DEV){
+      { QS='&rain=carsbaked'; const { ctx, p, errs }=await open(vp, LEVEL, dpr);
+        await p.evaluate(async ()=>{ const R=window.__H.sceneRoomDbg(); R.mistDbg(0.1); await R.carsDbg('baked'); });
+        await hand(p, 0.5, 0.45, 0.2, false, 10);
+        const mid=await p.evaluate(async ()=>{ const FO=await import('/apps/night/rooms/rain/pure/focus.js'), R=window.__H.sceneRoomDbg(); let lo=0.08, hi=0.34, best=0.17;
+          for(let it=0;it<8;it++){ const s=(lo+hi)/2; best=s; const G=window.__G, c=window.__clk; for(let i=0;i<40;i++){ c.t+=1000/30; G.processHandsProbe({ landmarks:[window.__PO.pose({ x:0.5, y:0.45, s, gaps:[1, 1, 1, 1] })], handednesses:[[{ categoryName:'Right' }]] }); }
+            await new Promise(r=>setTimeout(r, 250)); if(FO.focusDepth(R.state().target)>FO.LAYER_DEPTH.street) lo=s; else hi=s; } return best; });
+        /* every trial version shot at the SAME moment of traffic (held: the busiest moment of a stretch, the cars on the near half of the road) */
+        const trio=async (name, ru, clip)=>{ for(const mode of ['box', 'baked', 'cine']){ await p.evaluate(async m=>{ await window.__H.sceneRoomDbg().carsDbg(m); }, mode); await p.waitForTimeout(450);
+          const f=`${tag}-${mode}-${name}.png`; await p.screenshot({ path:path.join(O, f), clip }); log[f]=await p.evaluate(()=>{ const R=window.__H.sceneRoomDbg(); return { cars:R.carsDbg(), cap:R.lifeCapDbg(), focus:+R.state().focus.toFixed(3) }; }); made.push({ f, ru, tag, mode, name }); } };
+        let k0=0; for(const mood of ['late', 'evening', 'after']){ await p.evaluate(m=>window.__H.sceneRoomDbg().lookDbg(m), mood); await p.waitForTimeout(1500);
+          const B=await p.evaluate(k=>{ const R=window.__H.sceneRoomDbg(), b=R.busiestDbg(100+k*120, 200+k*120); R.trafficHoldDbg(b.t); return b; }, k0++); log[`${tag}-${mood}-moment`]=B;
+          for(const [fn, s, ru] of [['near', 0.4, 'фокус на стекле'], ['mid', mid, 'фокус на бульваре'], ['far', 0.08, 'фокус вдали']]){ await hand(p, 0.5, 0.45, s, false, 12); await p.waitForTimeout(2600); await hand(p, 0.5, 0.45, s, false, 4); await trio(`${mood}-${fn}`, `${RU[mood]}, ${ru}`); } }
+        /* close-ups of the road (the car lanes), the focus on the boulevard, Evening, three busy moments */
+        await p.evaluate(()=>window.__H.sceneRoomDbg().lookDbg('evening')); await hand(p, 0.5, 0.45, mid, false, 12); await p.waitForTimeout(2000);
+        const tan=await p.evaluate(()=>window.__H.sceneRoomDbg().state().tan), W=vp.width, H=vp.height, toPx=(x, y)=>[(x/tan[0]*0.5+0.5)*W, (0.5-y/tan[1]*0.5)*H];
+        const box= tag==='phone' ? [-0.31, 0.12, 0.06, -0.62] : [-0.66, 0.1, 0.04, -0.62], [x0, y0]=toPx(box[0], box[1]), [x1, y1]=toPx(box[2], box[3]);
+        for(let k=0;k<3;k++){ const B=await p.evaluate(k=>{ const R=window.__H.sceneRoomDbg(), b=R.busiestDbg(500+k*90, 590+k*90, 25, 90); R.trafficHoldDbg(b.t); return b; }, k); log[`${tag}-close-${k+1}-moment`]=B; await p.waitForTimeout(800);
+          await trio(`close-${k+1}`, 'Крупно: полосы машин, фокус на бульваре (Вечерний бульвар)', { x:Math.max(0, x0), y:Math.max(0, y0), width:Math.min(W, x1)-Math.max(0, x0), height:Math.min(H, y1)-Math.max(0, y0) }); }
+        await p.evaluate(()=>window.__H.sceneRoomDbg().trafficHoldDbg(null));
+        if(errs.filter(e=>!/insights/.test(e)).length) console.log('[rain-snap] page errors:', errs.slice(0, 4)); await ctx.close(); } }
+    QS='';
+    await writeFile(path.join(O, 'rain8.json'), JSON.stringify(log, null, 1));
+    const fig=m=>m ? `<figure><a href="${m.f}"><img src="${m.f}" alt="" loading="lazy"></a><figcaption>${MODE[m.mode]} — ${m.ru}</figcaption></figure>` : '';
+    const row=(tag, name)=>`<div class="row">${['box', 'baked', 'cine'].map(md=>fig(made.find(m=>m.tag===tag && m.mode===md && m.name===name))).join('')}</div>`;
+    let body='';
+    for(const [tag] of DEV){ body+=`<h2>${tag==='laptop' ? 'Ноутбук 1280 × 800' : 'Телефон вертикально 390 × 844'}</h2><h3>Крупно (полосы машин)</h3>`+[1, 2, 3].map(k=>row(tag, 'close-'+k)).join('');
+      for(const mood of ['evening', 'late', 'after']) for(const fn of ['mid', 'near', 'far']) body+=`<h3>${RU[mood]} — ${fn==='mid' ? 'фокус на бульваре' : fn==='near' ? 'фокус на стекле' : 'фокус вдали'}</h3>`+row(tag, `${mood}-${fn}`);
+      body+=`<h3>Люди: RAIN-5c (слева) и сейчас (справа), фокус на бульваре</h3>`+['late', 'evening', 'after'].map(m=>`<div class="row"><figure><img src="../rain5c/${tag}-mood-${m}.png" alt="" loading="lazy"><figcaption>RAIN-5c — ${RU[m]}</figcaption></figure>${fig(made.find(x=>x.tag===tag && x.mode==='cine' && x.name===m+'-mid'))}</div>`).join(''); }
+    await writeFile(path.join(O, 'index.html'), `<!doctype html><meta charset="utf-8"><title>RAIN-8 — машины: две пробы</title><style>body{ font:15px/1.45 system-ui; background:#111; color:#ddd; margin:16px; } .row{ display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap; } figure{ margin:0; flex:1 1 300px; max-width:640px; } img{ width:100%; border:1px solid #333; } h2{ margin-top:34px; } h3{ font-weight:500; margin:18px 0 6px; color:#bbb; }</style>
+<h1>RAIN-8: машины — две пробы рядом</h1><p>В каждом ряду: слева «было» (коробки RAIN-6b), в середине <b>(а) запечённые машины</b> (пять смоделированных типов — седан, хэтчбек, такси, фургон, троллейбус — отрисованы заранее под ночным светом, фары и огни живые поверх), справа <b>(б) кинематографичные</b> (мягкий тёмный силуэт, блик фонарей на мокрой крыше, искры, фары и их пятна на мокрой дороге). Трамваи одинаковые во всех трёх. Своё окно (рама, подоконник, чашка, цветок) убрано. Включить пробу в приложении: <code>?room=rain&rain=carsbaked</code> или <code>&rain=carscine</code>. Клик по картинке — полный размер.</p>${body}`);
+    console.log('[rain-snap] --rain8: '+made.length+' captures → tools/.ui-snap/rain8/index.html');
   } else if(argv.includes('--rain7')){   // RAIN-7: the starred details → tools/.ui-snap/rain7/ — before (?rain=noframe,nocones,nosway) and after
     const O=path.join(ROOT, 'tools/.ui-snap/rain7'); await mkdir(O, { recursive:true }); const made=[];
     const fx=(p, e, t, w=0)=>p.evaluate(async ([e, t, w])=>{ const A=await import('/core/audio.js'), ST=await import('/core/state.js'), k=ST.chainKeyOf('ld'); A.fxInstance(k, 'cecho').params[0].setNorm(e); A.fxInstance(k, 'ctone').params[1].setNorm(t); A.fxInstance(k, 'cwave').params[1].setNorm(w); }, [e, t, w]);

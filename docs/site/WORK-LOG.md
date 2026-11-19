@@ -2,6 +2,13 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`).
 
+# SITE-3 (SITE track, 2026-11-19): the demo at demo.handsong.app
+Tree hashes after: apps/site ae5dbf3a7437b014 (no «before» hash: the pages were regenerated before it was taken). Core and Full untouched; Night only `apps/night/licences.html` regenerated (the register's link).
+- `tools/site/texts.mjs` LINKS.demo → https://demo.handsong.app; `node tools/site-pages.mjs --write` (home and demo, EN and RU). `tools/site-images.mjs` shoots the demo card from the new address (the picture itself not renewed: the same app).
+- `tools/licences.json` (the site's app links), `THIRD-PARTY-LICENSES.md` and `apps/night/licences.html` regenerated.
+- `tools/site-check.mjs` row «the demo address» (the home cards and the demo pages link there; no page names handsong.vercel.app; CONTROL caught).
+- Verdict: [site-check] PASS — every page in both languages at phone and laptop width …; 5 controls caught · 56.6 s (the new row: clean, its control caught). Fix rounds: 0.
+
 # SITE-2 (SITE track, 2026-11-14): «Install» renamed «Handsong Space»
 Tree hashes before and after: core f35f07b9825d7997 · apps/full 0148bb454440c3e3 · apps/night a92abb3fc8dffa21 (NIGHT-14d's, measured with this run's tree) (the site only: core, Full and Night untouched by this run).
 - Why (the founder): «Install» read as «install the software» and clashed with «Add to Home Screen»; «Space» is the venue product (museums, galleries, events, hotel lounges, children's centres).

@@ -2,7 +2,7 @@
    docs/site/site-design/copy-en.md (English). tools/site-pages.mjs turns them into apps/site/**.html; tools/site-check.mjs proves the pages current.
    Edit a text here, then: node tools/site-pages.mjs --write */
 export const ORIGIN='https://handsong.app';
-export const LINKS={ night:'https://night.handsong.app', demo:'https://handsong.vercel.app', youtube:'https://www.youtube.com/@handsongapp',
+export const LINKS={ night:'https://night.handsong.app', demo:'https://demo.handsong.app', youtube:'https://www.youtube.com/@handsongapp',
   instagram:'https://www.instagram.com/handsongapp', tiktok:'https://www.tiktok.com/@handsongapp', email:'hello@handsong.app' };
 
 export const T={

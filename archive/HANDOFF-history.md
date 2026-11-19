@@ -8876,3 +8876,12 @@ not a control · run a "random" failure many times and print WHERE and HOW MUCH 
 
 ### RAIN-6 part 1 (2026-11-18): the effects hand in the rain; LANG-FIX. Log: `docs/night/WORK-LOG.md`
 - Echo = the rain's strength (drops, falling streaks in the lights, its sound), Warm ↔ Bright = the city light's colour; exactly today's at rest. Rows «RAIN effects hand (app)» 8/0, P.night «RAIN effects hand» 9/0. LANG-FIX: the language list readable open (`lang-snap --select`). Next: RAIN-6 items 6, 8, 1–3, 5, 4.
+
+
+## Moved from docs/night/HANDOFF.md at RAIN-8 (2026-11-19)
+### RAIN-6c (2026-11-18): Warm ↔ Bright on the light sources, Wave as wind. Log: `docs/night/WORK-LOG.md`
+- Lamps, lights, windows tungsten ↔ LED, neon down ↔ up, more windows when bright; the whole-screen tint gone; Wave slants the rain. Rows 12/0 and 9/0. Next: umbrellas / flags with Wave, then RAIN-6 items 6, 8, 1–3, 5, 4.
+### AUDIO-3 (+ CORE-27, 2026-11-18): the development audio lab. Log: `docs/night/WORK-LOG.md`
+- Settings → «Audio lab (development)»: glitch counter, record what you hear (WAV), output buffer, no-hand search cadence, 18 bypass switches, log. P.night «NIGHT audio lab» 9/0. Waiting for the founder's findings.
+### RAIN-6b (2026-11-19): the street. Log: `docs/night/WORK-LOG.md`
+- (6) far lights and life behind houses or crowns not drawn (the baked depth map; `?rain=nocull`); (8) the sleep timer: windows out one by one, yours last, traffic and people thin; (1) vehicle bodies (7 types), the tram's carriages and pantograph; (2) the trams' CC0 recording + synthesised bell, squeal, clacks; (3) the taxi stop, picture and sound on one law; (5) walkers' own pace; (4) the shutter as an overlay; umbrellas, flags, awnings in the wind; baked shop windows follow Warm ↔ Bright. Rows «RAIN street law (app)» 21/0, P.night «RAIN street» 9/0. Captures `tools/.ui-snap/rain6b/`.

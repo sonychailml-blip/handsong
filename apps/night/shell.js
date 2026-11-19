@@ -37,7 +37,7 @@ import { homeHintFor } from './pure/homehint.js';
 import { scenePausing } from './scene/host.js';
 import { noticeOf, noticeShow, noticeHide } from './notice.js';
 import { roomMusicNote } from './roomdoors.js';   // RAIN-4
-import { QUALITIES, qualityFrom, qualityState } from './pure/quality.js';   // NIGHT-16: one quality choice
+import { QUALITIES, qualityFrom, qualityState, firstQualityOf } from './pure/quality.js';   // NIGHT-16: one quality choice
 
 const $=id=>document.getElementById(id), READ=BUS.reader();
 /* NIGHT-1 stage 2: what this app never plays leaves the graph (the sound stays the same to rounding; row «NIGHT lean path»). Its chain has no drive, brightness or tremolo; its one role is solo */
@@ -55,6 +55,11 @@ const save=(k,v)=>{ try{ localStorage.setItem(k,v); }catch(e){} };
    own key; the level remembered «before Lightweight» has no meaning in one choice and is dropped (migration) */
 const quality=()=>qualityFrom(load(KEY.light), sceneLevel());
 try{ localStorage.removeItem('handsong.nightLightScene'); }catch(e){}
+/* PERF-4: a FIRST visit on a weak GPU (pure/quality.js weakGpu: the WebGL renderer's name) starts at Light, stored like the player's choice so every
+   later visit reads it as now. Read once, from a throwaway context, only when nothing is stored yet. firstGpu: what was read (Measure, probes) */
+export const firstGpu=(()=>{ if(load(KEY.light)!=null || load('handsong.sceneLevel')!=null) return null; let name='';
+  try{ const c=document.createElement('canvas'), g=c.getContext('webgl'); if(g){ const x=g.getExtension('WEBGL_debug_renderer_info'); name=String(g.getParameter(x ? x.UNMASKED_RENDERER_WEBGL : g.RENDERER)||''); const l=g.getExtension('WEBGL_lose_context'); if(l) l.loseContext(); } }catch(e){}
+  const q=firstQualityOf(null, null, name); if(q==='light') save(KEY.light, '1'); return { name, light:q==='light' }; })();
 const STORE={ getItem:load, setItem:save };   // the cards' key through the same guarded doors
 let D=null, on=false, st=null, raf=0, info=false, sleep={ mins:0, t0:0 }, asleep=false, lastFade=1, amb=false;
 let begun=false, firstRun=false, startDue=false, defHand='right';   // NIGHT-2: a person's Begin, the cards due on it (NIGHT-7b), the offer due on the next frame, the profile's playing hand

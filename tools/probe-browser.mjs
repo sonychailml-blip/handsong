@@ -1027,8 +1027,10 @@ const MATCH_FN=async ([a, b])=>{
   /* the scale A shows the world at, against B (A × s lines up with B): s > 1 — the still is closer */
   return { scale:1/fine.s, s:fine.s, dx:fine.dx, dy:fine.dy, peak:fine.v, at1:ncc(1, 0, 0, 2), off3:Math.max(ncc(1.03, fine.dx, fine.dy, 2), ncc(0.97, fine.dx, fine.dy, 2)), w:W, h:H };
 };
-const MATCH_HIDE_A='#start, #canvas, #video, #nightShell, #nightStillLights, #nightStillDot, #nightStillMist{ visibility:hidden !important; } /*match-a*/';
-const MATCH_HIDE_B='#start, #canvas, #video, #nightShell, #nightStill, #nightStillMist, #nightStillDot{ visibility:hidden !important; } /*match-b*/';
+/* FIX-STILL: «#nightShell *» too — the controls set their own visibility:visible (#nightShell.show .night-fade), which beats the inherited hidden: the
+   live photograph held the control panel and the corner buttons, whose sharp edges outweighed the rain's soft picture on an upright phone (edge match 0.04) */
+const MATCH_HIDE_A='#start, #canvas, #video, #nightShell, #nightShell *, #nightStillLights, #nightStillDot, #nightStillMist{ visibility:hidden !important; } /*match-a*/';
+const MATCH_HIDE_B='#start, #canvas, #video, #nightShell, #nightShell *, #nightStill, #nightStillMist, #nightStillDot{ visibility:hidden !important; } /*match-b*/';
 async function stillMatchRun(page, vp, o={}){
   const c=await freshPage(page, { q:o.q||'', init:[()=>{ try{ localStorage.setItem('handsong.nightBg','forest'); localStorage.setItem('handsong.sceneLevel','reduced'); }catch(e){} }, null] });
   try{
@@ -1045,8 +1047,11 @@ async function stillMatchRun(page, vp, o={}){
     if(!done) return { err:'the reveal did not end within 90 s' };
     const rest=await c.p.evaluate(old=>{ if(!old) window.__host.sceneRest(true); return window.__host.sceneRestDbg().room; }, !!o.old), room=await c.p.evaluate(()=>window.__host.sceneRoom());   // the camera as at the hand-over (the first live frame's pose); the old way: as it is
     await c.p.addStyleTag({ content:MATCH_HIDE_B }); await c.p.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>requestAnimationFrame(r)))));
+    const over=await c.p.evaluate(()=>[...document.querySelectorAll('#nightShell *')].filter(e=>getComputedStyle(e).visibility==='visible' && e.getClientRects().length && +getComputedStyle(e).opacity>0).map(e=>e.id||e.className).slice(0, 4));   // FIX-STILL: nothing of the interface over the live photograph
+    if(over.length) return { err:'the live photograph still shows the interface: '+over.join(', ') };
     const B=(await c.p.screenshot({ animations:'disabled' })).toString('base64');
     const m=await c.p.evaluate(MATCH_FN, [A, B]);
+    if(!matchOk(m) && !o.old) try{ const d=path.join(ROOT, 'tools/.ui-snap/still-match'), n=`${room||'room'}-${vp.width}x${vp.height}`.replace(/[^\w.-]/g, '_'); await mkdir(d, { recursive:true }); await writeFile(path.join(d, n+'-A-still.png'), Buffer.from(A, 'base64')); await writeFile(path.join(d, n+'-B-live.png'), Buffer.from(B, 'base64')); }catch(e){}   // FIX-STILL: a failing case keeps its two pictures (git-ignored captures)
     return { ...m, fit, rest, vp, room };
   } finally { await c.ctx.close().catch(()=>{}); }
 }

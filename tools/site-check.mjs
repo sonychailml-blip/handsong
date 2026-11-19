@@ -180,6 +180,15 @@ try{
     const keep=RED; RED=[]; const cAddr=(await oldAddrs(BASE)).length>0; RED=keep;
     out(`no product named Install: ${files.length} pages and files (both languages) ${names.length ? names.length+' with the old name' : 'clean'}, /install and /ru/install ${addrs.length ? 'NOT redirected' : '→ 308 /space/ and /ru/space/'} · controls: a page naming it ${cName?'caught':'NOT CAUGHT'}, the redirect missing ${cAddr?'caught':'NOT CAUGHT'}`);
     if(!cName || !cAddr) fail('a CONTROL of «no product named Install» was not caught'); }
+  /* SITE-3: the tech demo lives at demo.handsong.app (handsong.vercel.app only redirects): the home's demo card and the demo page (both languages)
+     link there, and no page names the old address (+ its CONTROL) */
+  { const files=await siteFiles(), DEMO='https://demo.handsong.app', OLD=/handsong\.vercel\.app/;
+    const demoBad=fs=>{ const bad=[]; for(const [f, s] of fs){ if(OLD.test(s)) bad.push(`${f}: names handsong.vercel.app`); }
+      for(const f of ['index.html','ru/index.html','demo/index.html','ru/demo/index.html']){ const s=(fs.find(([g])=>g===f)||[])[1]||''; if(!s.includes(`href="${DEMO}"`)) bad.push(`${f}: no link to ${DEMO}`); } return bad; };
+    const bad=demoBad(files); for(const x of bad) fail('the demo address: '+x);
+    const cOld=demoBad(files.map(([f, s])=>[f, f==='demo/index.html' ? s.split(DEMO).join('https://handsong.vercel.app') : s])).length>0;
+    out(`the demo at ${DEMO}: ${bad.length ? bad.length+' problems' : 'the home cards and the demo pages (both languages) link there, no page names handsong.vercel.app'} · control: a page with the old address ${cOld?'caught':'NOT CAUGHT'}`);
+    if(!cOld) fail('the CONTROL of «the demo address» was not caught'); }
   /* CONTROLS */
   const homeHtml=await readFile(path.join(SITE,'index.html'),'utf8'), nightHtml=await readFile(path.join(SITE,'night/index.html'),'utf8');
   OVERLAY.set('/__control/broken/', { html:homeHtml.replace('</main>','<p><a href="/no-such-page/">x</a></p></main>') });

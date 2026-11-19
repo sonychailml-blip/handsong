@@ -1973,6 +1973,19 @@ async function nightQuality(){
     ok('the quality row still has explanatory lines: '+qNotes(html).join(', '), !qNotes(html).length);
     ok('CONTROL: a planted line under the levels passed', qNotes(html.replace('<div id="nightQualSeg"', '<p class="night-row-note" data-i18n="night.q.heavy">x</p><div id="nightQualSeg"')).length===1); }
   for(const k of ['night.set.quality', 'night.q.light', 'night.q.standard', 'night.q.detailedShort']){ const c=tx.split(`'${k}':`).length-1; ok(`the text ${k} appears ${c} time(s) (English and Russian: 2)`, c===2); }
+  /* PERF-4: a weak GPU starts at Light on the first visit only (renderer names as browsers report them); CONTROL: «every Intel is weak» fails */
+  { const G=[['ANGLE (Intel, Intel(R) HD Graphics 4000 Direct3D11 vs_5_0 ps_5_0, D3D11)', true], ['Intel HD Graphics 4000 OpenGL Engine', true], ['ANGLE (Intel, Intel(R) HD Graphics Direct3D11 vs_5_0 ps_5_0, D3D11)', true],
+      ['ANGLE (Intel, Intel(R) HD Graphics 4600 Direct3D11 vs_5_0 ps_5_0, D3D11)', true], ['ANGLE (Intel, Intel(R) HD Graphics Family Direct3D11 vs_5_0 ps_5_0)', true], ['Mesa DRI Intel(R) HD Graphics 3000 (SNB GT2)', true], ['Mali-450 MP', true], ['Mali-T720', true], ['Adreno (TM) 306', true], ['PowerVR SGX 544MP', true],
+      ['ANGLE (Intel, Intel(R) HD Graphics 520 Direct3D11 vs_5_0 ps_5_0, D3D11)', false], ['ANGLE (Intel, Intel(R) UHD Graphics 620 Direct3D11 vs_5_0 ps_5_0, D3D11)', false], ['ANGLE (Intel, Intel(R) Iris(R) Xe Graphics Direct3D11 vs_5_0 ps_5_0, D3D11)', false], ['Intel(R) HD Graphics 5500', false],
+      ['Mali-G57 MC2', false], ['Adreno (TM) 619', false], ['Apple GPU', false], ['ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11 vs_5_0 ps_5_0, D3D11)', false], ['WebKit WebGL', false], ['ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)), SwiftShader driver)', false], ['', false]];
+    const bad=f=>G.filter(([g, w])=>!!f(g)!==w).map(([g, w])=>`«${g}» → ${!w}`);
+    { const b=bad(Q.weakGpu); ok('weak GPUs misjudged: '+b.join('; '), !b.length); }
+    { const b=bad(g=>/intel/i.test(g)); ok('CONTROL: «every Intel is weak» passes — the check cannot fail', b.length>0); notes.push(`weak GPU: ${G.filter(x=>x[1]).length} weak, ${G.filter(x=>!x[1]).length} not; CONTROL «every Intel is weak» misjudges ${b.length}`); }
+    const HD='ANGLE (Intel, Intel(R) HD Graphics 4000 Direct3D11 vs_5_0 ps_5_0, D3D11)';
+    ok('a first visit on an HD 4000 does not start at Light', Q.firstQualityOf(null, null, HD)==='light');
+    ok('a later visit on an HD 4000 overrides the player\'s choice', Q.firstQualityOf('0', null, HD)===null && Q.firstQualityOf(null, 'reduced', HD)===null && Q.firstQualityOf(null, 'full', HD)===null);
+    ok('a first visit on a strong GPU leaves Standard', Q.firstQualityOf(null, null, 'Mali-G57 MC2')===null);
+    { const sh=fs.readFileSync(new URL('../apps/night/shell.js', import.meta.url),'utf8'); ok('the shell does not apply the first visit\'s choice', /firstQualityOf\(null, null, name\)/.test(sh) && /if\(load\(KEY\.light\)!=null \|\| load\('handsong\.sceneLevel'\)!=null\) return null/.test(sh)); } }
   notes.push('Detailed · Standard · Light; saved settings: '+MIG.map(([a, w])=>`${a.join('/')}→${w}`).join(', '));
   return { cases:n, total:d.length, differences:d, notes };
 }
@@ -2098,6 +2111,26 @@ async function rainStreetLaw(){
     ok(`${slide} walkers slide their feet`, slide===0); }
   return { cases:n, total:d.length, differences:d, notes };
 }
+/* RAIN-8 — «RAIN-8 cars (app)»: the baked cars' sprite law (rooms/rain/pure/carsprites.js) — every cell its own place in the atlas; each frame holds its car's
+   whole box; the flank the street's eye sees comes out on the frame's right from the front and from behind; the bins follow the angle; a car on the near
+   road is seen at the angles baked (elevation within the bins, azimuth within 30°); the atlas exists and its bake made every cell. CONTROL: the view
+   without the side's sign (the eye on the same flank from behind) puts the back view's flank on the left — caught. */
+async function rain8Cars(){ const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); };
+  const K=await import(new URL('../apps/night/rooms/rain/pure/carsprites.js', import.meta.url).href), CY=await import(new URL('../apps/night/rooms/rain/pure/city.js', import.meta.url).href), fs=await import('node:fs');
+  const C=K.CARS, idx=new Set(); for(let t=0;t<C.types.length;t++) for(let s=0;s<2;s++) for(let e=0;e<C.elev.length;e++) for(let a=0;a<C.az.length;a++) idx.add(K.cellOf(t, s, e, a));
+  ok(`cells not one place each (${idx.size} of ${K.CELLS}, grid ${C.grid*C.grid})`, idx.size===K.CELLS && Math.max(...idx)<C.grid*C.grid);
+  const flankRight=(vd)=>{ let bad=0; for(const s of [0, 1]) for(const a of C.az.slice(1)) for(const e of C.elev){ const dd=vd(e, a, s), { r }=K.viewAxes(dd), fx=Math.sign(dd[0]); if(!(r[0]*fx>0)) bad++; } return bad; };
+  ok('the seen flank is not on the frame right', flankRight(K.viewDir)===0);
+  { const old=(e, a, s)=>{ const E=e*Math.PI/180, A=a*Math.PI/180, c=Math.cos(E); return [Math.sin(A)*c, Math.sin(E), (s===1 ? -1 : 1)*Math.cos(A)*c]; }, b=flankRight(old); ok('CONTROL: the view without the side sign passed', b>0); notes.push(`CONTROL the old view: ${b} views with the flank on the left`); }
+  let out=0; for(const T of C.types) for(const s of [0, 1]) for(const e of C.elev) for(const a of C.az){ const [u0, u1, v0, v1]=K.frameOf(T, e, a, s), dd=K.viewDir(e, a, s), { r, u }=K.viewAxes(dd);
+    for(const p of K.boxOf(T)){ const x=p[0]*r[0]+p[1]*r[1]+p[2]*r[2], y=p[0]*u[0]+p[1]*u[1]+p[2]*u[2]; if(x<u0 || x>u1 || y<v0 || y>v1) out++; } }
+  ok(`frames that cut their car's box: ${out} corners`, out===0);
+  { const b1=K.binsOf(20, 3), b2=K.binsOf(30, 20), b3=K.binsOf(2, 40); ok(`the bins do not follow the angle (${JSON.stringify([b1, b2, b3])})`, b1.ei<b2.ei && b3.ei===0 && b3.ai===C.az.length-1 && b1.ai===0); }
+  { let worst=[90, 0, 0]; for(const x of CY.STREET.lanes.map(l=>l.x)) for(let z=20;z<=600;z+=10){ const S=K.seenOf(x, z, 4.6, -1, [CY.CAM.x, CY.CAM.y, CY.CAM.z]); worst=[Math.min(worst[0], S.elev), Math.max(worst[1], S.elev), Math.max(worst[2], S.az)]; }
+    ok(`a car on the near road is seen beyond the baked angles (elevation ${worst[0].toFixed(1)}–${worst[1].toFixed(1)}°, azimuth ≤ ${worst[2].toFixed(1)}°)`, worst[1]<=C.elev[C.elev.length-1]+8 && worst[2]<=30); notes.push(`the near road: elevation ${worst[0].toFixed(1)}–${worst[1].toFixed(1)}°, azimuth ≤ ${worst[2].toFixed(1)}° (baked ${C.elev[0]}–${C.elev[C.elev.length-1]}°, ${C.az.join('/')}°)`); }
+  { const f=new URL('../apps/night/rooms/rain/'+C.file, import.meta.url), j=new URL('../tools/design/rain/cars/cars.json', import.meta.url); const has=fs.existsSync(f), J=fs.existsSync(j) ? JSON.parse(fs.readFileSync(j, 'utf8')) : null;
+    ok('the atlas or its bake record is missing', has && !!J); if(J){ ok(`the bake made ${J.cells} cells (${K.CELLS} wanted), ${J.thin} not filling their frame`, J.cells===K.CELLS && J.thin===0); notes.push(`atlas ${(fs.statSync(f).size/1024).toFixed(0)} KB, ${J.cells} cells`); } }
+  return { cases:n, total:d.length, differences:d, notes }; }
 /* RAIN-7 — «RAIN-7 law (app)»: the street musician (rooms/rain/pure/busker.js) plays ONLY the bar's chord tones, on its beats inside the bar, rests
    between sets (some bars silent, some sets silent) — CONTROL a note a step off the chord is caught; a turning car's sweep (pure/vehicles.js) stays on
    the facade's span, brightest in its middle, its sweeps at least the shortest gap apart. */
@@ -3456,6 +3489,7 @@ const ROWS=[
   ['CORE-27 idle search cadence (core)', ()=>idleSearch(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // CORE-27
   ['RAIN effects hand (app)', ()=>rainFxLaw(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-6
   ['RAIN-7 law (app)', ()=>rain7Law(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-7
+  ['RAIN-8 cars (app)', ()=>rain8Cars(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-8
   ['RAIN street law (app)', ()=>rainStreetLaw(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-6b
   ['NIGHT home screen (app)', ()=>nightHomeScreen(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-7c
   ['NIGHT forest files (app)',  ()=>nightForestFiles(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 (the files rule, the size budget)

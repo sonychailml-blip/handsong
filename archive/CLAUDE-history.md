@@ -2137,6 +2137,17 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
     3. Switch forest → rain → forest a few times: Sound, Music and Mood always read what plays; the rain's Music reads Drizzle · Rain · Downpour (Морось · Дождь · Ливень).
     4. The rain's interface amber everywhere — Begin, the emblem's dot, the links, the switches, the sliders, the tabs; the forest's lime unchanged. (The hands' firefly dots and the note field's glow are still lime: a CORE change, not done.)
     5. The hills far, focus far: every small light a soft round dot (compare tools/.ui-snap/ui1/index.html); the Poco.
+185. RAIN-8: the rain room after the founder's verdict. Pictures: tools/.ui-snap/rain8/index.html (rows: before, (a) baked, (b) cinematic). Five checks:
+    1. The pictures: pick the cars — (a) baked or (b) cinematic (or neither); the trams are the same in all.
+    2. In the app, `…/apps/night/?room=rain&rain=carsbaked`, then `&rain=carscine`: watch the cars pass at the focus near, on the boulevard and far.
+    3. No window frame, sill, cup or plant anywhere in the room (start still, reveal, playing; phone upright and laptop).
+    4. The street musician: in front of the first café's awning on the right, in his pool of warm light, in every mood (Late night too), on the
+       Poco upright and on the laptop; his strum follows his notes.
+    5. People: compare with RAIN-5c (the last row of the page) — the founder's impression that they became simpler (the code says they did not).
+186. PERF-4: the forest's shadow skip and the first visit on a weak GPU. Three checks:
+    1. The laptop (HD 4000), Detailed, the forest: no hand — smooth; raise a hand — its light casts shadows at once, no flash.
+    2. A fresh profile on the laptop (a new browser profile or cleared site data for the address): Settings → Quality reads Light at once.
+    3. Choose Standard, reload: Standard stays (the choice is remembered; Light only the first time). The Poco's fresh profile starts at Standard.
 ## Superseded at DOC1 (old lines verbatim, replaced in place above by a later slice)
 - NIGHT-2 stage 3 (2026-11-03, the rule of at most five manual checks) updated this line of CLAUDE.md's report format:
   probe verdict lines and fix rounds; what was left undone; docs found stale; the user's remaining steps (ear, camera, phone).

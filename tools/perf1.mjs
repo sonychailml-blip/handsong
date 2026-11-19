@@ -64,8 +64,7 @@ try{
       /* the hand model's share: the camera pump held → the main thread's long tasks and the frame */
       if(!MESHES && !QUICK){ const run=sum(await sample(p, 4)); await p.evaluate(()=>window.__V.pumpDbg({ hold:true })); await p.waitForTimeout(800); const held=sum(await sample(p, 4)); await p.evaluate(()=>window.__V.pumpDbg({ hold:false }));
         out.cases.push({ room, q, mood:'hands', running:run, held }); console.log(`[perf1] ${room} ${q} hand model: long tasks ${run.longMsPerSec} → ${held.longMsPerSec} ms/s held; frame p95 ${run.frame && run.frame.p95} → ${held.frame && held.frame.p95} ms; fps ${run.fps} → ${held.fps}`); }
-      if(room==='rain' && !MESHES && !QUICK){ await p.evaluate(()=>window.__H.sceneRoomDbg().frameDbg(false)); await p.waitForTimeout(600); const r=sum(await sample(p, 3)); await p.evaluate(()=>window.__H.sceneRoomDbg().frameDbg(true));
-        out.cases.push({ room, q, mood:'noframe', ...r }); console.log(`[perf1] rain ${q} without our window: GPU ${r.gpu && r.gpu.mean} ms, glass ${r.pass.glass && r.pass.glass.mean}`); }
+      /* RAIN-8: our own window removed — its «without our window» case with it */
       /* --meshes: each forest mesh left out alone (one case per level) → its GPU time, triangles, what it is */
       if(MESHES && room==='forest'){ const list=await p.evaluate(()=>{ const R=window.__H.sceneRoomDbg(), L=[]; R.scene.traverse(o=>{ if(o.isMesh || o.isPoints){ const g=o.geometry, ix=g.index ? g.index.count : (g.attributes.position ? g.attributes.position.count : 0); L.push({ k:L.length, type:o.type, inst:o.count||1, tris:Math.round(ix/3*(o.isInstancedMesh ? o.count : 1)), mat:o.material && (o.material.type+(o.material.transparent ? ' transparent' : '')+(o.material.alphaTest ? ' alphaTest' : '')), name:o.name||'', vis:o.visible, layer:o.renderOrder }); window.__all=(window.__all||[]); window.__all[L.length-1]=o; } }); return L; });
         const base=sum(await sample(p, 3)), res=[];

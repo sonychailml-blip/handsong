@@ -234,7 +234,8 @@ NIGHT-11 part 5 — THE SCENE'S PIXEL BUDGET (audit P4).
 
 ## apps/night/pure/quality.js
 NIGHT-16 — THE QUALITY CHOICE: one control, heaviest to lightest.
-- const (3): `QUALITIES`, `qualityFrom`, `qualityState`
+- const (4): `QUALITIES`, `qualityFrom`, `qualityState`, `firstQualityOf`
+- fn (1): `weakGpu`
 
 ## apps/night/pure/room.js
 NIGHT-3: THE ROOM RECORD's shape and validator (pure, rule #36; data row «NIGHT room records» with controls).
@@ -464,6 +465,11 @@ RAIN-7: THE STREET MUSICIAN under the café's awning, playing along with our mus
 - const (2): `BUSK`, `buskOn`
 - fn (1): `buskNotes`
 
+## apps/night/rooms/rain/pure/carsprites.js
+RAIN-8 (3a): THE BAKED CARS' SPRITE LAW — pure (rule #36; data row «RAIN-8 cars (app)»).
+- const (5): `CARS`, `BAKED_OF`, `cellOf`, `cellRC`, `CELLS`
+- fn (6): `viewDir`, `viewAxes`, `boxOf`, `frameOf`, `binsOf`, `seenOf`
+
 ## apps/night/rooms/rain/pure/city.js
 RAIN-0b: THE VIEW LAW — the eye on the 8th floor, looking slightly down and diagonally along the boulevard (concept §3), as ONE pure projection used by the painting, the depth map, the lights, the …
 - const (20): `CAM`, `STREET`, `BEND`, `bendX`, `BAKE_EXT`, `BLOCKS`, `FLOOR`, `FAR`, `camBasis`, `vanishing`, `DEPTH`, `hillsAt`, `RAIN_CITY_SEED`, `NEAR_TREES`, `TRAFFIC`, `DENS_MARGIN`, `RAIN_TRAFFIC`, `EAR`, `trafficAt`, `trafficDensity`
@@ -558,7 +564,7 @@ RAIN-0b: THE STAND-IN CITY's prepared picture and its DEPTH MAP, painted ONCE on
 
 ## apps/night/rooms/rain/rain-glass.js
 RAIN-0: THE RAIN ROOM'S SHADERS (our own, written from the physics: a drop is a small strong lens that shows the view upside down and wide, darker at its rim; a running drop leaves a wet lane and b…
-- const (14): `QUAD_V`, `BLUR_F`, `DOWN_F`, `VIEW_F`, `WIN_V`, `WIN_F`, `LIGHT_V`, `LIGHT_F`, `DROP_V`, `DROP_F`, `glassShader`, `LIFE_V`, `LIFE_F`, `FRAME_F`
+- const (13): `QUAD_V`, `BLUR_F`, `DOWN_F`, `VIEW_F`, `WIN_V`, `WIN_F`, `LIGHT_V`, `LIGHT_F`, `DROP_V`, `DROP_F`, `glassShader`, `LIFE_V`, `LIFE_F`
 
 ## apps/night/rooms/rain/rain.js
 RAIN-0 — THE RAIN ROOM's picture (docs/night/design/RAIN/CONCEPT.md; the plan and what is still a placeholder: PLAN.md).
@@ -595,7 +601,7 @@ DESIGN-1 part C: THE SETTINGS IN THREE SHORT TABS — Sound · Picture · Hands 
 
 ## apps/night/shell.js
 RUN 7 (C6 + C11, Night plan §5; docs/night/QUALITY.md points 4, 5, 6, 9, 10) — THE NIGHT SHELL (DOM side; the logic is core/nightui.js).
-- const (9): `LEAN_PATH`, `MUSIC_KEYS`, `musicModeOf`, `REACH`, `nightEarlyDbg`, `qualityOf`, `nightClockDbg`, `nightShellDbg`, `nightSleepDbg`
+- const (10): `LEAN_PATH`, `MUSIC_KEYS`, `musicModeOf`, `firstGpu`, `REACH`, `nightEarlyDbg`, `qualityOf`, `nightClockDbg`, `nightShellDbg`, `nightSleepDbg`
 - fn (5): `nightShellWire`, `nightShellFace`, `nightMusicHoldDbg`, `qualitySet`, `nightLabelsDbg`
 
 ## apps/night/sound/ambience.js
@@ -1606,7 +1612,7 @@ SPLIT-2: row «NIGHT profile round trip» on Night's page: the checks of C0 that
 - fn (1): `checkNightProfile`
 
 ## tools/probes/night/perf2.js
-PERF-2 — «PERF invisible» (drawn, slow): every optimisation applied only because it changes NOTHING on the screen, proved by the host's exact A/B (sceneSnapDbg: one scene state rendered twice — the…
+PERF-2 / PERF-4 — «PERF invisible» (drawn, slow): every optimisation applied only because it changes nothing the eye can see, proved by the host's exact A/B (sceneSnapDbg: one scene state rendered …
 - default (1): `default`
 - fn (1): `checkPerfInvisible`
 
@@ -1677,7 +1683,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 UI-1 — «NIGHT labels follow the room»: the founder entered the rain and the Sound button still read «Firefly» while another timbre played.
 - fn (1): `checkNightLabels`
 
-_333 modules, 3222 exported names._
+_334 modules, 3235 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

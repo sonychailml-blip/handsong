@@ -6,8 +6,8 @@ Two apps, one engine. Rules: `CLAUDE.md`. Every run belongs to one track: `CORE-
 |---|---|---|---|
 | **CORE** | `core/` | `docs/core/HANDOFF.md`, `BACKLOG.md`, `WORK-LOG.md` | Stage 3 foundation and `CORE-1`…`CORE-27` done, all opt-in (latest: the audio lab's buffer, search and tap, Night). |
 | **FULL** | `apps/full/` | `docs/full/HANDOFF.md`, `BACKLOG.md`, `WORK-LOG.md`, `UI-MAP.md`, `UX-INVENTORY.md` | Waits for the first release. Next: stage 5 (saving, export, audio take, mixer) and the calibration screen. |
-| **NIGHT** | `apps/night/` | `docs/night/HANDOFF.md`, `BACKLOG.md`, `WORK-LOG.md`, `STAGE4-NIGHT-plan.md`, `QUALITY.md` | The first public release. Waiting for the user's steps 129, 145–166 (the track handoff lists them; latest 184: `UI-1`; 183 small fixes; 182 `RAIN-R1` the rain for players; 181 `NIGHT-16`; 179–180 RAIN-4e/5e). FULL CHECK green (2026-11-17) for the forest; RAIN-R1 needs a new full check (a night run) before `night-release`. A timing pass is owed (FOREST-2/2b, RAIN-4, RAIN-5, step 134). Then steps 120–124, C8 rest, C10, C12. |
-| **SITE** | `apps/site/` | `docs/site/HANDOFF.md`, `WORK-LOG.md` | handsong.app, the brand site: `SITE-1` built, `SITE-2` Install → Space; waits for its Vercel project and DNS. |
+| **NIGHT** | `apps/night/` | `docs/night/HANDOFF.md`, `BACKLOG.md`, `WORK-LOG.md`, `STAGE4-NIGHT-plan.md`, `QUALITY.md` | The first public release. Waiting for the user's steps 129, 145–166 (the track handoff lists them; latest 186 `PERF-4`, 185 `RAIN-8` (pick the cars), 184 `UI-1`; 183 small fixes; 182 `RAIN-R1`; 181 `NIGHT-16`). FULL CHECK green (2026-11-17) for the forest; RAIN-R1 needs a new full check (a night run) before `night-release`. A timing pass is owed (FOREST-2/2b, RAIN-4, RAIN-5, step 134). Then steps 120–124, C8 rest, C10, C12. |
+| **SITE** | `apps/site/` | `docs/site/HANDOFF.md`, `WORK-LOG.md` | handsong.app, the brand site: `SITE-1` built, `SITE-2` Install → Space, `SITE-3` the demo at demo.handsong.app; waits for its Vercel project and DNS. |
 
 Product roadmap: docs/ROADMAP.md — read it before proposing work.
 
