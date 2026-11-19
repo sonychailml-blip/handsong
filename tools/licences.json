@@ -251,6 +251,18 @@
       ]
     },
     {
+      "id": "rain-tram-recording",
+      "name": "The rain room's trams (RAIN-6b): two tram pass-bys as one-shots, each played when a tram of the picture passes under the window (its loudest moment on the tram's closest one)",
+      "class": "sound",
+      "use": "shipped",
+      "version": "Freesound #774109 and #861335 (the sites' HQ previews, 2026-11-19)",
+      "licence": "CC0-1.0",
+      "source": "hanzla101, «Sound of a tram passing by. tram_15», Freesound https://freesound.org/people/hanzla101/sounds/774109/ (Creative Commons 0; preview SHA-1 b3145c8abe045ecaa67a93d02b77f4d90773539b); Valerie-Vivegnis, «260705- Tram passing by - Liège, Belgium (Stereo, to the right)», Freesound https://freesound.org/people/Valerie-Vivegnis/sounds/861335/ (Creative Commons 0; preview SHA-1 ff12d6f8ba40409389e5d63b9cf98a5d746ca35c). A third candidate kept in the design sources (alexdarek, «Tram passing through the switch», https://freesound.org/people/alexdarek/sounds/698204/, CC0, preview SHA-1 1bee669fe5d92cebdf2488dc54a1d3961fe245d0; tools/design/rain/sound/tram/, never shipped). Our edit (ffmpeg, a dev tool outside the repo; CC0 allows it): tram.mp3 = 774109 mono 0-23.2 s (×0.6, a 0.6-s fade out), 0.2 s of silence, 861335 mono (×1.2, 0.4-s fade in, 0.6-s fade out); 48 kHz mono MP3 64 kbit/s; its [start, length, peak] table in the room's recipe. The bell, the curve's squeal and the rail clacks are synthesised (apps/night/pure/layers.js).",
+      "files": [
+        "apps/night/rooms/rain/sound/tram.mp3"
+      ]
+    },
+    {
       "id": "rain-city-bake",
       "name": "The rain room's baked city (RAIN-1, development room): the whole boulevard built by our own code and rendered once offline — each mood's colour, the lit windows' colour, the depth map",
       "class": "image",

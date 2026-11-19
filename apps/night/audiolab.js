@@ -26,7 +26,7 @@ const load=k=>{ try{ return localStorage.getItem(k); }catch(e){ return null; } }
 export const LAB_LATENCY=['interactive', 'balanced', 'playback'], LAB_IDLE=[3, 6, 10];
 /* the stored choices, before the start click (main.js imports this module early): the development edition only */
 if(devItems()){ const l=load(KEY.lat); if(LAB_LATENCY.includes(l)) setLatencyHint(l); const n=+load(KEY.idle); if(LAB_IDLE.includes(n)) setIdleSearchEvery(n); }
-const BED_PARTS=[['bed', 'the whole music bed'], ['piano', 'piano'], ['bass', 'bass'], ['drums', 'drums'], ['vib', 'vibraphone'], ['guitar', 'guitar'],
+const BED_PARTS=[['bed', 'the whole music bed'], ['piano', 'piano'], ['bass', 'bass'], ['drums', 'drums'], ['vib', 'vibraphone'], ['guitar', 'guitar'], ['busker', 'street musician'],
   ['reverb', 'reverb (convolver)'], ['chorus', 'chorus'], ['tremolo', 'tremolo + auto-pan'], ['delay', 'tape delay'], ['compressor', 'compressor'],
   ['wow', 'wow / flutter'], ['pump', 'sidechain pump'], ['highcut', 'master high-cut'], ['saturation', 'saturation (3 shapers)']];
 const NATURE_PARTS=[['near', 'rain on the glass (near)'], ['far', 'street (far)'], ['cars', 'car and tram passes']];

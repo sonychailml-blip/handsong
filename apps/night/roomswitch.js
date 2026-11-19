@@ -64,9 +64,12 @@ function natureLayers(E, a, seed){
   const R=roomById(sceneRoom()); if(!a || a.layers || !R || !R.base || !R.record.nature.layers) return;
   const N=R.record.nature; a.layersWant=a.layersWant||natureLoad(E.ac).then(ok=>{ if(!ok || !ambienceLayers(E, a, N, seed)) return;
     for(const which of ['near', 'far']){ const L=N.layers[which]; a.layers.rec[which]='loading';
-      natureRecStereo(E.ac, new URL(L.file, R.base).href).then(([l, r])=>ambienceLayersRec(E, a, which, l, r, L.norm), e=>{ a.layers.rec[which]='failed'; console.warn('[night] a layer of the room sound did not load — its synthesis plays:', e); }); } naturePasses(E, a, R); });   // eslint-disable-line no-console
+      natureRecStereo(E.ac, new URL(L.file, R.base).href).then(([l, r])=>ambienceLayersRec(E, a, which, l, r, L.norm), e=>{ a.layers.rec[which]='failed'; console.warn('[night] a layer of the room sound did not load — its synthesis plays:', e); }); } naturePasses(E, a, R); natureTrams(E, a, R); });   // eslint-disable-line no-console
 }
 /* RAIN-1: the passes' one-shots (mono) of a room whose layers have `passes`, after its layers (natureLayers calls it) */
+/* RAIN-6b (2): the trams' one-shots (mono) of a room whose layers have `trams` */
+function natureTrams(E, a, R){ const P=R.record.nature.layers.trams; if(!P || !P.file || !a.layers || a.layers.rec.trams) return; a.layers.rec.trams='loading';
+  natureRecStereo(E.ac, new URL(P.file, R.base).href).then(([l])=>ambienceLayersRec(E, a, 'trams', l, null, P.norm), e=>{ a.layers.rec.trams='failed'; console.warn('[night] the room trams did not load — they rumble in synthesis:', e); }); }   // eslint-disable-line no-console
 function naturePasses(E, a, R){ const P=R.record.nature.layers.passes; if(!P || !a.layers || a.layers.rec.cars) return; a.layers.rec.cars='loading';
   natureRecStereo(E.ac, new URL(P.file, R.base).href).then(([l])=>ambienceLayersRec(E, a, 'cars', l, null, P.norm), e=>{ a.layers.rec.cars='failed'; console.warn('[night] the room\'s car passes did not load — the street plays without them:', e); }); }   // eslint-disable-line no-console
 /* RAIN-1: the traffic's density (the mood's amount × Wave), the picture's own number, for the passes (no layers: nothing) */

@@ -2046,6 +2046,74 @@ async function nightTextsAll(){
   notes.push(`${want.length} languages; ${player.length} player keys + ${tnames.length} timbre names in each of ${NEW.join(', ')}; ${recs.length} room records named in all`);
   return { cases:n, total:d.length, differences:d, notes };
 }
+/* RAIN-6b — «RAIN street law (app)»: the street's new pure laws. (8) THE SLEEP (rooms/rain/pure/sleep.js): every factor exactly 1 at e = 0, every window out
+   and the traffic ×0.1 and every person home at e = 1, the windows out one by one (no two at one moment), the windows you lit last and the newest of
+   them the very last; CONTROL a law ignoring yours fails. (1) THE BODIES (pure/vehicles.js): every car has a type and the same car always the same,
+   all seven types seen, the taxi's colour its own, the sheen brightest under a lamp; a tram gives three carriages and a pantograph. (3) THE TAXI: it
+   comes, stops, its door opens after the stop, the person is gone into it before it pulls away, and its sounds (brake, door, shut, go) sit on the
+   picture's moments; CONTROL a door before the stop is caught. (2) THE TRAMS' MOMENTS (pure/passes.js passTramEvents): each pass when the picture's
+   tram's middle is under the window (±0.05 s); the layers with `trams` sound around a tram's pass (the far output louder there) and WITHOUT `trams`
+   they are sample for sample as before (opt-in). (5) WALKING: no step slides (the phase follows the distance), the pace drifts within ±along. */
+async function rainStreetLaw(){
+  const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); return !!c; }, U=f=>import(new URL(f, import.meta.url).href);
+  const SL=await U('../apps/night/rooms/rain/pure/sleep.js'), V=await U('../apps/night/rooms/rain/pure/vehicles.js'), PA=await U('../apps/night/pure/passes.js'), CT=await U('../apps/night/rooms/rain/pure/city.js'), LY=await U('../apps/night/pure/layers.js'), RR=(await U('../apps/night/rooms/rain/pure/room.js')).RAIN_ROOM, LF=await U('../apps/night/rooms/rain/pure/life.js');
+  /* (8) the sleep */
+  ok('the sleep is not exactly nothing at e = 0', SL.sleepWinKeep(0.3, 0)===1 && SL.sleepTraffic(0.8, 0)===0.8 && SL.sleepPerson(0, 0)===1 && SL.sleepPerson(1, 0)===1);
+  ok('at e = 1 something is still awake', SL.sleepWinKeep(0.985, 1)===0 && Math.abs(SL.sleepTraffic(1, 1)-0.1)<1e-9 && SL.sleepPerson(1, 1)===0);
+  { let jump=0; for(let e=0;e<0.999;e+=0.001){ const a=SL.sleepPerson(0, e), b=SL.sleepPerson(0, e+0.001); if(a-b>0.1) jump++; } ok(`a person vanishes at once (${jump} steps)`, jump===0); }
+  const lit=new Float64Array(400).fill(-1e9); lit[17]=10; lit[230]=50; lit[99]=30; const M=SL.sleepMine(lit), at=i=>SL.sleepWinAt(i, M.has(i) ? M.get(i) : -1, M.size), U0=[...Array(400).keys()].map(at);
+  { const order=[...U0.keys()].sort((a, b)=>U0[b]-U0[a]); ok(`the last window out is not the newest you lit (${order[0]})`, order[0]===230); ok('the windows you lit are not the last three', [230, 99, 17].every(i=>order.slice(0, 3).includes(i)));
+    const ss=U0.slice().sort((a, b)=>a-b); let same=0; for(let i=1;i<ss.length;i++) if(ss[i]-ss[i-1]<1e-6) same++; ok(`${same} windows go out at the same moment`, same===0);
+    const bad=[...Array(400).keys()].map(i=>SL.sleepWinAt(i, -1, 0)), worst=[...bad.keys()].sort((a, b)=>bad[b]-bad[a])[0]; ok('CONTROL: a law ignoring your windows still ends on yours', worst!==230); }
+  /* (1) the bodies */
+  { const seen=new Set(); let same=true; for(let lane=0;lane<2;lane++) for(let k=0;k<400;k++){ const t=V.vehType(lane, k); seen.add(t); if(V.vehType(lane, k)!==t || V.vehColour(lane, k)!==V.vehColour(lane, k)) same=false; }
+    ok(`not every type is seen (${[...seen].join(',')})`, seen.size===V.VEH.types.length); ok('a car changes its body', same);
+    const lampZ=V.VEH.lampZ0+V.VEH.lampEvery*3; ok('the roof is not brightest under a lamp', V.sheenAt(lampZ)>0.95 && V.sheenAt(lampZ+V.VEH.lampEvery/2)<0.4);
+    const I=V.vehicleItems([{ kind:'tram', dir:1, x:12.15, z:200, len:28, lane:-1, slot:3 }, { kind:'car', dir:-1, x:2.6, z:80, len:4.4, lane:0, slot:5 }], 10);
+    ok(`a tram is not three carriages and a pantograph (${I.map(q=>q.kind).join(',')})`, I.filter(q=>q.kind===V.VK.tram).length===3 && I.filter(q=>q.kind===V.VK.panto).length===1);
+    ok('a car body is not under its lights (x, z)', I.some(q=>q.kind===V.VK.car && q.x===2.6 && q.z===80)); }
+  /* (3) the taxi */
+  { const S=CT.RAIN_TRAFFIC.stop, Vk=PA.stopVisit(S, 3), at=t=>PA.stopAt(S, t); let okSeq=true, why='';
+    const a=at(Vk.t0+1), b=at(Vk.tStop+0.5), c=at(Vk.tDoor+0.6), e=at(Vk.tIn+0.7), f=at(Vk.tGo+3);
+    if(!(a && a.phase==='come' && a.v>0)){ okSeq=false; why='it does not come'; } else if(!(b && b.phase==='stop' && b.v===0 && b.door===0)){ okSeq=false; why='it does not stop shut'; }
+    else if(!(c && c.door===1 && c.person && c.person.a===1)){ okSeq=false; why='the door is not open with the person there'; } else if(!(e && !e.person)){ okSeq=false; why='the person is not inside'; } else if(!(f && f.phase==='go' && f.z<S.stop)){ okSeq=false; why='it does not pull away'; }
+    ok('the taxi\'s order is wrong: '+why, okSeq);
+    const snd=PA.stopSounds(S, Vk.t0, Vk.tGo+1).map(x=>x.kind+'@'+x.t.toFixed(2)).join(' '), want=['brake@'+(Vk.t0+Vk.cruise/S.v).toFixed(2), 'door@'+Vk.tDoor.toFixed(2), 'shut@'+Vk.tShut.toFixed(2), 'go@'+Vk.tGo.toFixed(2)].join(' ');
+    ok(`the taxi's sounds are not on the picture's moments: ${snd} vs ${want}`, snd===want);
+    const shutWhileMoving=f=>{ for(let t=Vk.t0;t<Vk.tStop;t+=0.25){ const r=f(t); if(r && r.door>0) return false; } for(let t=Vk.tGo+0.1;t<Vk.tGo+20;t+=0.25){ const r=f(t); if(r && r.door>0) return false; } return true; };
+    ok('the taxi door opens while it moves', shutWhileMoving(at));
+    ok('CONTROL: a door opening as it brakes passes', !shutWhileMoving(t=>{ const r=at(t); return r && t>Vk.tStop-1.5 && t<Vk.tStop ? { ...r, door:0.5 } : r; })); notes.push(`the taxi's 4th visit: enters ${Vk.t0.toFixed(1)} s, stops ${Vk.tStop.toFixed(1)}, door ${Vk.tDoor.toFixed(1)}, away ${Vk.tGo.toFixed(1)}; sounds ${snd}`); }
+  /* (2) the trams' moments and their sound */
+  { const P=RR.nature.layers.passes, ev=PA.passTramEvents(P.traffic, P.ear, 0, 1200, 1).filter(e=>e.kind==='pass'); let worst=0;
+    for(const e of ev){ const tr=PA.passTraffic(P.traffic, e.t, 1).find(c=>c.kind==='tram' && c.slot===e.slot), mid= tr ? tr.z-tr.dir*tr.len/2 : 1e9; worst=Math.max(worst, Math.abs(mid-P.ear.z)/tr.v); }
+    ok(`no tram passes in 20 minutes (${ev.length})`, ev.length>=4); ok(`a tram's sound is off its picture by ${worst.toFixed(3)} s`, worst<0.05);
+    const bells=PA.passTramEvents(P.traffic, P.ear, 0, 1200, 1).filter(e=>e.kind==='bell').length; notes.push(`20 minutes: ${ev.length} trams under the window, ${bells} bells; the sound on the picture's moment within ${worst.toFixed(4)} s`);
+    const L0={ ...RR.nature.layers }; delete L0.trams; const run=(L, t0, sec)=>{ const st=LY.layersNew(16000, L, 5); LY.layersOn(st, true); LY.layersFocus(st, 0.7); const N=sec*16000, o=[0, 1, 2, 3].map(()=>new Float32Array(N)); for(let k=0;k<N;k+=1600) LY.layersOut(st, t0+k/16000, o[0], o[1], o[2], o[3], k, 1600); return o; };
+    const e0=ev[0], A=run(L0, e0.t-6, 12), B=run(RR.nature.layers, e0.t-6, 12), C=run(L0, e0.t-6, 12);
+    ok('without trams the layers are not as before (sample for sample)', A.every((ch, i)=>ch.every((v, j)=>v===C[i][j])));
+    const en=(o, a, b)=>{ let s=0; for(let j=a;j<b;j++) s+=o[2][j]**2+o[3][j]**2; return s; }, dE=en(B, 4*16000, 8*16000)-en(A, 4*16000, 8*16000);
+    ok(`the tram is not heard at its pass (far energy +${dE.toExponential(2)})`, dE>1e-4); }
+  /* (5) walking */
+  { const A=LF.lifeAt(100, 'evening'), B=LF.lifeAt(100.5, 'evening'); let slide=0; for(const p of A){ if(p.kind!==LF.LK.walk) continue; const q=B.find(x=>x.kind===p.kind && x.lane===p.lane && Math.abs(x.z-p.z)<3); if(!q) continue; const dz=Math.abs(q.z-p.z), dph=((q.ph%1)-(p.ph%1)+1)%1; if(Math.abs(dz/(2*p.step)-dph)>0.02 && Math.abs(dz/(2*p.step)-dph-1)>0.02 && Math.abs(dz/(2*p.step)-dph+1)>0.02) slide++; }
+    ok(`${slide} walkers slide their feet`, slide===0); }
+  return { cases:n, total:d.length, differences:d, notes };
+}
+/* RAIN-7 — «RAIN-7 law (app)»: the street musician (rooms/rain/pure/busker.js) plays ONLY the bar's chord tones, on its beats inside the bar, rests
+   between sets (some bars silent, some sets silent) — CONTROL a note a step off the chord is caught; a turning car's sweep (pure/vehicles.js) stays on
+   the facade's span, brightest in its middle, its sweeps at least the shortest gap apart. */
+async function rain7Law(){
+  const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); return !!c; }, U=f=>import(new URL(f, import.meta.url).href);
+  const B=await U('../apps/night/rooms/rain/pure/busker.js'), V=await U('../apps/night/rooms/rain/pure/vehicles.js');
+  const beat=0.75, evs=[...Array(400).keys()].map(k=>({ t:k*4*beat, n:k, steps:[k%7, (k%7)+2, (k%7)+4, (k%7)+7] }));
+  const inChord=(ev, N)=>N.every(x=>ev.steps.includes(x.step) && x.t>=ev.t && x.t<ev.t+4*beat);
+  let played=0, all=true; for(const ev of evs){ const N=B.buskNotes(ev, beat); if(N.length) played++; if(!inChord(ev, N)) all=false; }
+  ok('the musician plays a note outside the bar or its chord', all); ok(`he never rests or never plays (${played} of 400 bars)`, played>80 && played<360);
+  { const ev=evs.find(e=>B.buskNotes(e, beat).length), N=B.buskNotes(ev, beat).map((x, i)=>i ? x : { ...x, step:x.step+1 }); ok('CONTROL: a note a step off the chord passes', !inChord(ev, N)); }
+  notes.push(`the musician plays ${played} of 400 bars, ${B.BUSK.pattern.length} notes a bar, only the chord's tones`);
+  { let prev=-1e9, gap=1e9, out=0, mid=0, last=null; for(let t=0;t<3600;t+=0.05){ const s=V.sweepAt(t); if(!s) { last=null; continue; } if(!last){ gap=Math.min(gap, t-prev); prev=t; } last=s; if(s.z<V.SWEEP.z[0]-1e-9 || s.z>V.SWEEP.z[1]+1e-9) out++; if(Math.abs(s.u-0.5)<0.03) mid=Math.max(mid, s.k); }
+    ok(`a sweep leaves the facade (${out})`, out===0); ok(`the sweeps come too close (${gap.toFixed(1)} s)`, gap>=V.SWEEP.every[0]-1e-6); ok('a sweep is not brightest in its middle', mid>0.95); }
+  return { cases:n, total:d.length, differences:d, notes };
+}
 /* RAIN-6 (item 7) — «RAIN effects hand (app)»: the effects hand in the rain (rooms/rain/pure/fxlaw.js). At the hand's rest (Echo 0, Warm ↔ Bright 0.5,
    Wave 0) every law is EXACTLY neutral — the rain is the mood's own, no falling streaks, the rain's sound gains 1, the city light's colour [1, 1, 1] —
    so the room is today's until the hand moves; Echo raises the rain, the streaks and the sound monotonically; warm (0) reddens, bright (1) blues the
@@ -3387,6 +3455,8 @@ const ROWS=[
   ['NIGHT texts in every language (app)', ()=>nightTextsAll(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // LANG-1
   ['CORE-27 idle search cadence (core)', ()=>idleSearch(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // CORE-27
   ['RAIN effects hand (app)', ()=>rainFxLaw(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-6
+  ['RAIN-7 law (app)', ()=>rain7Law(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-7
+  ['RAIN street law (app)', ()=>rainStreetLaw(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-6b
   ['NIGHT home screen (app)', ()=>nightHomeScreen(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-7c
   ['NIGHT forest files (app)',  ()=>nightForestFiles(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 (the files rule, the size budget)
   ['OLD NAME gone',             ()=>oldNameGone(),  r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // SPLIT-2

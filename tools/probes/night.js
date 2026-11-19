@@ -42,6 +42,10 @@ export { checkBedNull } from './night/audio1.js';   // AUDIO-1: the rain bed mad
 export { checkRainHands } from './night/audio2.js';   // AUDIO-2: hand events create nothing; the bed survives a main-thread stall
 export { checkRainFx } from './night/rain6.js';   // RAIN-6: the effects hand in the rain
 export { checkNightLab } from './night/audio3.js';   // AUDIO-3: the development audio lab
+export { checkPianoLight } from './night/audio4.js';   // AUDIO-4: the bed's piano in one node, the same sound
+export { checkRainStreet } from './night/rain6b.js';   // RAIN-6b: the street (the cull, the sleep, the bodies, the trams)
+export { checkRain7 } from './night/rain7.js';   // RAIN-7: the starred street details
+export { checkPerfInvisible } from './night/perf2.js';   // PERF-2: the invisible optimisations, each by an exact A/B
 export { checkForestApart } from './night/forest2e.js';   // FOREST-2e: plants apart
 export { checkForestCull } from './night/forestcull.js';   // FOREST-2e: the cull (?forest=cull) keeps the frames
 export { checkRainQuads } from './night/rain5.js';   // RAIN-5b: no sprite's quad edge shows   // RAIN-4: the forest's bed bit-exact after the jazz bed   // FOREST-2: the switch ?forest=new

@@ -125,7 +125,10 @@ function dropRenderer(force){
    keeps today's law. The guard samples the scene's frame rate and the hand detection rate once a second while the room shows (not while it opens). */
 let guard=guardNew(), gT=0, gLast=null, gPeriod=1000, viewOver=null, sampleOver=null;
 const view=()=>viewOver || { w:innerWidth, h:innerHeight, dpr:devicePixelRatio||1 };
-function ratioNow(){ if(optOver && optOver.scale) return Math.min(devicePixelRatio||1, 1)*optOver.scale; const v=view(); return sceneRatio(v.w, v.h, v.dpr, level, guard.step); }
+/* PERF-3: the Light quality draws a room that asks at fewer pixels (the canvas is scaled up by the browser; the interface stays sharp) — the forest at
+   0.75 of Standard's (measured on an HD 4000: 35 → 24 ms a frame, steady 30 fps); the rain needs none */
+const LIGHT_PIX=Object.freeze({ 'room.forest':0.75 });
+function ratioNow(){ if(optOver && optOver.scale) return Math.min(devicePixelRatio||1, 1)*optOver.scale; const v=view(); return sceneRatio(v.w, v.h, v.dpr, level, guard.step)*(lightOn && room && LIGHT_PIX[room.id] ? LIGHT_PIX[room.id] : 1); }
 const guardReset=()=>{ guard=guardNew(); gLast=null; gT=0; };
 function guardTick(t){
   if(t-gT<gPeriod) return; const P=pumpStats();
@@ -303,7 +306,7 @@ export function setSceneLevel(v){
 }
 /* RAIN-R1: the Light quality (the shell): a room may draw less under it (its record's `light`); read at each build — the shell rebuilds through setSceneLevel */
 let lightOn=false;
-export const setSceneLight=v=>{ lightOn=!!v; return lightOn; };
+export const setSceneLight=v=>{ const was=lightOn; lightOn=!!v; if(was!==lightOn && renderer && room) resize(); return lightOn; };   // PERF-3: its pixel ratio follows at once
 export const sceneLevel=()=>held||level;   // NIGHT-14c: the player's choice (a held Detailed included); sceneInfo().level is what is drawn
 const shadowOn=()=> shadowOver!=null ? shadowOver : LV[level].shadow;
 export const sceneShadowDbg=v=>{ shadowOver= v==null ? null : !!v; return shadowOver; };

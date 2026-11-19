@@ -62,7 +62,7 @@ try{
       const put=ev=>{ if(!o.only || o.only.includes(ev.kind)) E.play(ev, ev.t, pv); };
       let t=0; const ch=changes.slice(); while(t<sec){ const nx=ch.length ? 0.3+ch[0][0]*B-0.5 : sec, evs=LF.lofiStep(st, t, Math.min(sec, nx)); if(o.arp) for(const e of evs) if(e.kind==='chord') o.arp(e).forEach(put); for(const e of evs) put(e); t=Math.min(sec, nx);
         if(ch.length && t<sec){ const [, l2]=ch.shift(); for(const ev of LF.lofiLevel(st, l2, t)) E.play(ev, ev.t, pv); } }
-      return await c.startRendering(); };
+      if(E.settle) await E.settle(); return await c.startRendering(); };
     const mix=(b, m)=>{ const L=b.getChannelData(0), R2=b.getChannelData(1), oL=new Float32Array(L.length), oR=new Float32Array(L.length); for(let i=0;i<L.length;i++){ oL[i]=L[i]+(m ? m[0][i]||0 : 0); oR[i]=R2[i]+(m ? m[1][i]||0 : 0); } return [oL, oR]; };
     /* (1) the nine sounds, about three minutes each (the full level also with the hand's melody) */
     for(const [id, , tn] of PIECES){ const P=RR.bed2.lofi.pieces[id];

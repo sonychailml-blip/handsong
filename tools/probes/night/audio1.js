@@ -17,7 +17,7 @@ async function render(o, gain=1){ const S=await import('../../../core/scales.js'
   const P=RR.bed2.lofi.pieces[NULL.piece], v=S.scaleView(S.scaleById(NULL.piece)), pv=S.scaleView(S.scaleById(P.parent), undefined, undefined, S.viewKey(v), S.viewKeyC(v)), c=new OfflineAudioContext(2, NULL.sr*NULL.sec, NULL.sr);
   const E=await EN.lofiEngine(c, c.destination, new URL('../../../apps/night/rooms/rain/', import.meta.url).href, o); E.tempo(P.bpm, 0); E.layer('crackle', 0, 0); E.level(RR.bed2.master*RR.bed2.level*RR.bed2.level*gain, 0, 0.03);
   const st=LF.lofiInit(P, NULL.level, { at:0.3, pc:S.scaleById(P.parent).iv }); for(const e of LF.lofiStep(st, 0, NULL.sec)) if(!(e.kind==='layer' && e.layer==='crackle')) E.play(e, e.t, pv);
-  const b=await c.startRendering(); return { ch:[b.getChannelData(0), b.getChannelData(1)], state:E.state() }; }
+  await E.settle(); const b=await c.startRendering(); return { ch:[b.getChannelData(0), b.getChannelData(1)], state:E.state() }; }
 const db=x=>x>0 ? 20*Math.log10(x) : -Infinity;
 /* a → b: the difference's peak (dBFS), its RMS and the signal's RMS (dB), exact equality */
 export function nullOf(a, b){ let pk=0, se=0, ss=0, n=0, same=true; for(let c=0;c<2;c++){ const x=a[c], y=b[c]; for(let i=0;i<x.length;i++){ const d=x[i]-y[i]; if(d!==0) same=false; const ad=Math.abs(d); if(ad>pk) pk=ad; se+=d*d; ss+=x[i]*x[i]; n++; } }

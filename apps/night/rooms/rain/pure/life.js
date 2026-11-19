@@ -12,6 +12,7 @@
    Each item: { kind, x, y, z (m), h, w (m), ph, c (look code: clothes + 8 × umbrella kind + 64 × umbrella colour), a (0…1) }. */
 const F=Object.freeze, frac=x=>x-Math.floor(x), hash=(a, b=0)=>frac(Math.sin(a*127.1+b*311.7)*43758.5453);
 import { farEventAt, FAR_LIFE } from './far.js';   // RAIN-5d
+import { sleepPerson } from './sleep.js';   // RAIN-6b (8): people go home as the city falls asleep
 export const LK=F({ walk:0, couple:1, dog:2, cycle:3, run:4, sit:5, waiter:6, pigeon:7, cat:8, leaf:9, steam:10, ring:11, splash:12, head:13, child:14, old:15, stand:16, talk:17, group:18, flag:19, sign:20, signal:21, walksig:22, scooter:23 });
 /* RAIN-5c: what a walker carries or wears (the look code's 256s): none, a shoulder bag, a backpack, a hat, a scarf, a bag and a scarf, a knitted cap, a tote */
 export const ACC=F({ none:0, bag:1, backpack:2, hat:3, scarf:4, bagScarf:5, cap:6, tote:7 });
@@ -25,7 +26,7 @@ export const LIFE=F({ seed:0x4C494645, loop:180, z0:12, r:0.35, rCouple:0.6, gat
   stand:F([F({ x:-3.6, z:69, b:'wait' }), F({ x:-3.6, z:69.8, b:'wait' }), F({ x:18.7, z:70, b:'wait' }), F({ x:24.0, z:90, b:'phone' })]),
   talk:F([F({ x:23.6, z:36 }), F({ x:24.6, z:36 })]),
   wire:F({ x:11.9, y:6.25, z:F([30, 44]) }),
-  stride:F([0.15, 0.17]), group:13,   // RAIN-5c: a step = h × (0.15 + 0.17 × speed) (longer when faster: 1.65–2 steps a second); every 13th walker a small group of three
+  stride:F([0.15, 0.17]), group:13, natural:F({ along:1.6, across:0.06, cadence:0, p:F([38, 15, 23]) }),   // RAIN-5c: a step = h × (0.15 + 0.17 × speed) (longer when faster: 1.65–2 steps a second); every 13th walker a small group of three
   bunting:F({ x:38.9, y:3.5, sag:0.35, every:0.75, posts:6 }),   // RAIN-5c: little flags over the café terraces (the string lights: rain.js), sagging between posts
   signs:F([F({ x:39.3, y:3.4, z:30, g:'key' }), F({ x:39.3, y:3.5, z:53, g:'cup' }), F({ x:39.3, y:3.5, z:78, g:'cross' }), F({ x:39.3, y:3.4, z:104, g:'croissant' }), F({ x:39.3, y:3.5, z:124, g:'scissors' }),
     F({ x:-3.3, y:3.4, z:58, g:'cross' }), F({ x:-3.3, y:3.5, z:92, g:'cup' })]),   // lit pictograms, no text, never a brand: blade signs facing along the street
@@ -47,6 +48,11 @@ export function lifePeople(seed=LIFE.seed, L=LIFE){ const N=L.pop.walkers, per=L
   const ranks=out.map(p=>p.rank).sort((a, b)=>a-b); out.forEach(p=>{ p.order=ranks.indexOf(p.rank); }); return out; }
 const POP=new Map(), peopleOf=(seed, L)=>{ const k=seed+':'+JSON.stringify(L.lanes)+':'+L.pop.walkers; if(!POP.has(k)) POP.set(k, lifePeople(seed, L)); return POP.get(k); };
 const inLook=(L, look, grp, o)=>o<((L.moods[look]||L.moods.late)[grp]||0);
+/* RAIN-6b (5): WALKING LESS LIKE EXTRAS (the founder) — each walker's own way of going: a slow drift of pace (two slow waves of position along the
+   lane, ±W.along m: a little faster, then slower, never more than the lane's spacing allows), a slight wander across it (±W.across m: the lanes' margins hold) and their own
+   cadence (±W.cadence of the step; 0 — the law keeps faster walkers' steps longer). The feet still follow the distance walked (the phase is that distance over the step: no sliding) */
+function natural(i, t, ln, W){ const h=k=>hash(i+0.37, 40+k), w1=6.2832/(W.p[0]*(0.8+0.4*h(1))), w2=6.2832/(W.p[1]*(0.8+0.4*h(3)));
+  return { ds:W.along*(Math.sin(w1*t+6.28*h(2))+0.5*Math.sin(w2*t+6.28*h(4)))/1.5, dx:W.across*Math.sin(t*6.2832/W.p[2]*(0.7+0.6*h(5))+6.28*h(6)), k:1+W.cadence*(h(7)-0.5)*2 }; }
 /* membership over the mood history → { on (in now), since (the time it last changed; −1e9: never) } */
 function member(L, hist, grp, o, t){ let on=null, since=-1e9; for(const [tc, lk] of hist){ if(tc>t) break; const v=inLook(L, lk, grp, o); if(on!==null && v!==on) since=tc; on=v; } return { on:!!on, since }; }
 /* a walker's distance along their loop at time t (m) and their z */
@@ -58,20 +64,21 @@ function moverAlpha(L, hist, grp, o, stagger, ln, off, t){ const m=member(L, his
 function standAlpha(L, hist, grp, o, stagger, t){ const m=member(L, hist, grp, o, t); if(m.since<-1e8 || L.instant) return m.on ? 1 : 0; const f=Math.max(0, Math.min(1, (t-m.since-stagger)/L.fadeStand)); return m.on ? f : 1-f; }
 /* everything out at time t (s); look — now; cars: the traffic law's list at t; wave 0…1; hist: [[t, look]…] (absent: always `look`) → items */
 export function lifeAt(t, look, cars=[], wave=0, seed=LIFE.seed, L=LIFE, hist=null, o=null){ const H=hist && hist.length ? hist : [[-1e9, look]], cur=H[H.length-1][1], M=L.moods[cur]||L.moods.late, out=[];   // RAIN-5c: o { signal } — the crossing's light
-  for(const p of peopleOf(seed, L)){ const ln=L.lanes[p.lane], off=p.slot/p.n+hash(p.lane, 3)*0.5, a=moverAlpha(L, H, 'walkers', p.order, p.stagger, ln, off, t); if(a<=0.001) continue;
-    const s=walked(ln, t, off, L), wide=p.kind===LK.couple || p.kind===LK.child || p.kind===LK.dog || p.kind===LK.group || p.umb===UMB.golf, step=p.h*(L.stride[0]+L.stride[1]*ln.v)*(p.kind===LK.old ? 0.8 : 1);   // RAIN-5c: the step from the speed
-    out.push({ kind:p.kind, x:ln.x, y:0, z:zOf(ln, s, L), h:p.h, w:(p.kind===LK.group ? 1.5 : wide ? 1.3 : 0.75)*p.build, ph:frac(s/(2*step))+(ln.dir<0 ? 1 : 0), c:p.clothes+8*p.umb+64*p.uc+256*p.acc, a, lane:p.lane, dir:ln.dir, face:ln.dir<0 ? 'front' : 'back', step, v:ln.v, r:wide ? L.rCouple : L.r }); }
-  { const q=L.pause, per=q.walk+q.stop, k=Math.floor(t/per), u=t-k*per, s=(k*q.walk+Math.min(u, q.walk))*q.v, a=standAlpha(L, H, 'pause', 0, 12, t);   // the one who stops and looks round (a lane of their own)
+  const zz=o && o.sleep>0 ? o.sleep : 0, home=r=>zz ? sleepPerson(r, zz) : 1;   // RAIN-6b (8): o.sleep — each person leaves at their own moment
+  for(const p of peopleOf(seed, L)){ const ln=L.lanes[p.lane], off=p.slot/p.n+hash(p.lane, 3)*0.5, a=moverAlpha(L, H, 'walkers', p.order, p.stagger, ln, off, t)*home(p.rank); if(a<=0.001) continue;
+    const N=L.natural ? natural(p.i, t, ln, L.natural) : null, s=walked(ln, t, off, L)+(N ? N.ds : 0), wide=p.kind===LK.couple || p.kind===LK.child || p.kind===LK.dog || p.kind===LK.group || p.umb===UMB.golf, step=p.h*(L.stride[0]+L.stride[1]*ln.v)*(p.kind===LK.old ? 0.8 : 1)*(N ? N.k : 1);   // RAIN-5c: the step from the speed; RAIN-6b (5): each their own pace
+    out.push({ kind:p.kind, x:ln.x+(N ? N.dx : 0), y:0, z:zOf(ln, s, L), h:p.h, w:(p.kind===LK.group ? 1.5 : wide ? 1.3 : 0.75)*p.build, ph:frac(s/(2*step))+(ln.dir<0 ? 1 : 0), c:p.clothes+8*p.umb+64*p.uc+256*p.acc, a, lane:p.lane, dir:ln.dir, face:ln.dir<0 ? 'front' : 'back', step, v:ln.v, r:wide ? L.rCouple : L.r }); }
+  { const q=L.pause, per=q.walk+q.stop, k=Math.floor(t/per), u=t-k*per, s=(k*q.walk+Math.min(u, q.walk))*q.v, a=standAlpha(L, H, 'pause', 0, 12, t)*home(0.31);   // the one who stops and looks round (a lane of their own)
     if(a>0.001) out.push({ kind:u<q.walk ? LK.walk : LK.stand, x:q.x, y:0, z:zOf(q, s, L), h:1.74, w:0.75, ph:u<q.walk ? frac(s/1.46) : 0.5+0.5*Math.sin((u-q.walk)/q.stop*6.28), c:2+8*UMB.colour+64*2, a, lane:'pause', dir:q.dir, r:L.r }); }
-  for(const c of lifeCyclists(t, cur, L)) out.push(c);   // RAIN-5c: facing its way (its back as it rides away), the rear light blinking
-  for(let i=0;i<(M.run||0);i++){ const q=L.run, s=q.v*t+0.67*L.loop; out.push({ kind:LK.run, x:q.x, y:0, z:zOf(q, s, L), h:1.8, w:0.7, ph:frac(s/2.4), c:6+8*UMB.hood, a:1, lane:'run', dir:q.dir, r:L.r }); }
+  for(const c of lifeCyclists(t, cur, L)){ const h=home(0.55); if(h>0.001) out.push(h<1 ? { ...c, a:c.a*h } : c); }   // RAIN-5c: facing its way (its back as it rides away), the rear light blinking
+  for(let i=0;i<(M.run||0);i++){ const q=L.run, s=q.v*t+0.67*L.loop; const h=home(0.12+0.1*i); if(h>0.001) out.push({ kind:LK.run, x:q.x, y:0, z:zOf(q, s, L), h:1.8, w:0.7, ph:frac(s/2.4), c:6+8*UMB.hood, a:h, lane:'run', dir:q.dir, r:L.r }); }
   { const T=L.tables, seats=[]; for(const [a, b] of T.cafes) for(let z=a+1.5;z<b-1.5;z+=T.every) seats.push(z);
-    for(let i=0;i<Math.min(L.pop.sit, seats.length);i++){ const a=standAlpha(L, H, 'sit', i, hash(i, 15)*L.stagger, t); if(a<=0.001) continue; const z=seats[Math.floor(hash(i, 7)*seats.length)]+((i%2) ? 0.7 : -0.7), sx=T.x+((i%3)-1)*0.75;
+    for(let i=0;i<Math.min(L.pop.sit, seats.length);i++){ const a=standAlpha(L, H, 'sit', i, hash(i, 15)*L.stagger, t)*home(hash(i, 23)); if(a<=0.001) continue; const z=seats[Math.floor(hash(i, 7)*seats.length)]+((i%2) ? 0.7 : -0.7), sx=T.x+((i%3)-1)*0.75;
       out.push({ kind:LK.sit, x:sx, y:0, z, h:1.3, w:0.7, ph:frac(t*0.13+hash(i, 9)), c:Math.floor(hash(i, 10)*8), a, lane:'sit', r:L.r }); } }
-  for(let i=0;i<(M.waiter||0);i++){ const q=L.waiter, s=0.5-0.5*Math.cos(t*q.v/(q.span[1]-q.span[0])*Math.PI); out.push({ kind:LK.waiter, x:q.x, y:0, z:q.span[0]+s*(q.span[1]-q.span[0]), h:1.85, w:0.75, ph:frac(t*0.7), c:0, a:1, lane:'waiter', r:L.r }); }
-  L.stand.forEach((q, i)=>{ const a=standAlpha(L, H, 'stand', i, hash(i, 17)*L.stagger, t); if(a<=0.001) return;
+  for(let i=0;i<(M.waiter||0);i++){ const q=L.waiter, s=0.5-0.5*Math.cos(t*q.v/(q.span[1]-q.span[0])*Math.PI); out.push({ kind:LK.waiter, x:q.x, y:0, z:q.span[0]+s*(q.span[1]-q.span[0]), h:1.85, w:0.75, ph:frac(t*0.7), c:0, a:home(0.8), lane:'waiter', r:L.r }); }
+  L.stand.forEach((q, i)=>{ const a=standAlpha(L, H, 'stand', i, hash(i, 17)*L.stagger, t)*home(hash(i, 24)); if(a<=0.001) return;
     out.push({ kind:LK.stand, x:q.x, y:0, z:q.z, h:1.62+0.2*hash(i, 18), w:0.75, ph:q.b==='phone' ? 0.25 : 0.5+0.1*Math.sin(t*0.4+i), c:Math.floor(hash(i, 19)*8)+8*(q.b==='phone' ? UMB.hood : UMB.black), a, lane:'stand', r:L.r }); });
-  for(let k=0;k<L.pop.talk;k++){ const a=standAlpha(L, H, 'talk', k, 8, t); if(a<=0.001) continue; L.talk.forEach((q, i)=>out.push({ kind:LK.talk, x:q.x, y:0, z:q.z, h:1.7-0.08*i, w:0.75, ph:frac(t*0.35+i*0.5)+(i ? 2 : 0), c:(3+i*4)%8+8*UMB.black, a, lane:'talk', r:L.r })); }
+  for(let k=0;k<L.pop.talk;k++){ const a=standAlpha(L, H, 'talk', k, 8, t)*home(0.45); if(a<=0.001) continue; L.talk.forEach((q, i)=>out.push({ kind:LK.talk, x:q.x, y:0, z:q.z, h:1.7-0.08*i, w:0.75, ph:frac(t*0.35+i*0.5)+(i ? 2 : 0), c:(3+i*4)%8+8*UMB.black, a, lane:'talk', r:L.r })); }
   if(M.pigeons){ const q=L.wire, tram=cars.find(c=>c.kind==='tram' && Math.abs(c.z-(q.z[0]+q.z[1])/2)<14+(c.len||28)/2), up= tram ? 1 : 0;   // pigeons on the wire, rising when a tram passes under them
     for(let i=0;i<M.pigeons;i++){ const z=q.z[0]+(i+0.5)/M.pigeons*(q.z[1]-q.z[0])+(hash(i, 1)-0.5)*0.6, fl=up*(0.6+0.4*hash(i, 2));
       out.push({ kind:LK.pigeon, x:q.x+fl*(hash(i, 4)-0.5)*6, y:q.y+fl*(2+3*hash(i, 5)), z:z+fl*(hash(i, 6)-0.5)*5, h:0.28, w:fl ? 0.6 : 0.32, ph:fl ? frac(t*3+hash(i, 8)) : -1, c:0, a:1, lane:'wire' }); } }

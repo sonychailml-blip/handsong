@@ -92,7 +92,9 @@ function jazzMsgs(ev, when, pv, R){ const J=R.jazz, hz=s=>chordRowFreq(mod(s, JA
 let BEDJAZZ=false; try{ if(typeof location!=='undefined') BEDJAZZ=new URLSearchParams(location.search).get('bed')==='jazz'; }catch(e){}
 export const bedJazzDbg=v=>{ if(v!=null) BEDJAZZ=!!v; return BEDJAZZ; };
 let LOFI=null; export const bed2LofiSet=f=>{ LOFI=f||null; };
-const LF={ eng:null, loading:null, fail:false, on:false, R:null, level:'full', origin:0, view:null, players:[], tick:null, late:0, skipped:0, worst:0 };   // AUDIO-2: late — notes that came late, skipped — late beats left out, worst — the latest (s, < 0)
+/* RAIN-7: a room's player along with the lo-fi bed (the rain's street musician): (chord event, beat) → his notes; null — none */
+export const bed2BuskSet=f=>{ LF.busk=f||null; };
+const LF={ busk:null, eng:null, loading:null, fail:false, on:false, R:null, level:'full', origin:0, view:null, players:[], tick:null, late:0, skipped:0, worst:0 };   // AUDIO-2: late — notes that came late, skipped — late beats left out, worst — the latest (s, < 0)
 const lofiWanted=R=>!!(R && R.lofi && LOFI && !BEDJAZZ);
 const pieceOf=(R, v)=>{ const L=R.lofi, id=modeIdOf(v); return L.pieces[id] || L.pieces[L.first]; };
 const pcOf=P=>{ const m=scaleById(P.parent); return m && m.iv && m.iv.length===7 ? m.iv.slice() : undefined; };   // RAIN-4d: the parent's pitch classes (the phrases' safe notes)
@@ -115,7 +117,8 @@ function lofiTick(now){ const E=LF.eng, R=LF.R; if(!E || !LF.on) return; const l
     for(const ev of evs){ if(ev.t<late && ev.kind!=='chord') continue; const due=LF.origin+ev.t-(now+0.02);   // AUDIO-2: < 0 = this note is late
       if(due<0){ LF.late++; LF.worst=Math.min(LF.worst, due); if(-due>LOFI_LATE_S && (ev.kind==='drum' || ev.kind==='bass' || ev.kind==='pump')){ LF.skipped++; continue; } }
       if(T[ev.kind]!=null) T[ev.kind]++; const at=Math.max(LF.origin+ev.t, now+0.02); if(pl.pv) E.play(ev, at, pl.pv);
-      if(ev.kind==='chord' || ev.kind==='ep' || ev.kind==='bass' || ev.kind==='vib' || ev.kind==='gtr') BUS.push('bed', { kind:ev.kind==='ep' ? 'comp' : ev.kind==='gtr' ? 'vib' : ev.kind, at, v:3, steps:ev.steps||null, step:ev.step??null, vel:ev.vel??null, dur:ev.dur??null, beat }); } }
+      if(ev.kind==='chord' || ev.kind==='ep' || ev.kind==='bass' || ev.kind==='vib' || ev.kind==='gtr') BUS.push('bed', { kind:ev.kind==='ep' ? 'comp' : ev.kind==='gtr' ? 'vib' : ev.kind, at, v:3, steps:ev.steps||null, step:ev.step??null, vel:ev.vel??null, dur:ev.dur??null, beat });
+      if(ev.kind==='chord' && LF.busk && pl.pv) for(const b of LF.busk(ev, beat)){ const bt=Math.max(LF.origin+b.t, now+0.02); E.play({ kind:'busk', step:b.step, vel:b.vel, pan:0.55, dur:0.9 }, bt, pl.pv); BUS.push('bed', { kind:'busk', at:bt, v:3, step:b.step, vel:b.vel }); } } }   // RAIN-7: the street musician, from the bar's chord
   LF.players=LF.players.filter(pl=>pl.st.stopAt===Infinity || pl.st.stopAt>law-2); }
 export const bed2LofiDbg=o=>{ if(o && o.reset){ LF.late=0; LF.skipped=0; LF.worst=0; } return ({ late:LF.late, skipped:LF.skipped, worst:LF.worst, ahead:lofiAhead, wanted:!!LOFI, jazz:BEDJAZZ, loaded:!!LF.eng, fail:LF.fail, on:LF.on, level:LF.level, players:LF.players.map(p=>({ id:p.P.id, at:p.st.at, stopAt:p.st.stopAt, bar:p.st.bar, g:Object.fromEntries(Object.entries(p.st.g).map(([k, G])=>[k, G.map(q=>q.slice())])) })), origin:LF.origin, tick:LF.tick, eng:LF.eng ? LF.eng.state() : null }); };
 /* every pad tone out (Off, a preset change) */

@@ -16,7 +16,7 @@ async function render(id, lv, C=CLICK){ const S=await import('../../../core/scal
   const P=RR.bed2.lofi.pieces[id], v=S.scaleView(S.scaleById(id)), pv=S.scaleView(S.scaleById(P.parent), undefined, undefined, S.viewKey(v), S.viewKeyC(v)), c=new OfflineAudioContext(2, C.sr*C.sec, C.sr);
   const E=await EN.lofiEngine(c, c.destination, new URL('../../../apps/night/rooms/rain/', import.meta.url).href); E.tempo(P.bpm, 0); E.layer('crackle', 0, 0); E.level(RR.bed2.master*RR.bed2.level*RR.bed2.level, 0, 0.03);
   const st=LF.lofiInit(P, lv, { at:0.3, pc:S.scaleById(P.parent).iv }); for(const e of LF.lofiStep(st, 0, C.sec)) if(!(e.kind==='layer' && e.layer==='crackle')) E.play(e, e.t, pv);
-  const b=await c.startRendering(); return [b.getChannelData(0), b.getChannelData(1)]; }
+  await E.settle(); const b=await c.startRendering(); return [b.getChannelData(0), b.getChannelData(1)]; }
 export async function checkRainClicks(){ const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); return !!c; }; let keep=null;
   for(const id of ['lydian-penta', 'dorian-hexa', 'mixolydian-hexa']){ const lvs=['quiet', 'groove', 'full'];   // a piece's three levels at once (each offline render on its own thread)
     const R3=await Promise.race([Promise.all(lvs.map(lv=>render(id, lv))), new Promise((_, no)=>setTimeout(()=>no(new Error(`${id}: the renders took over 400 s`)), 400000))]);

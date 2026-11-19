@@ -30,7 +30,7 @@ export const roomFov=(view, w, h)=> w/h<view.tall ? view.tallFov : view.fov;
    { drips?, tick?: { every > 0 s, gain [0, 1], hz? }, }, seed? } → null, or what is wrong */
 function checkLayers(L){
   if(!plain(L)) return ': { near, far, events?, seed? }';
-  for(const k of Object.keys(L)) if(!['near','far','events','seed','passes'].includes(k)) return `: unknown field «${k}»`;
+  for(const k of Object.keys(L)) if(!['near','far','events','seed','passes','trams'].includes(k)) return `: unknown field «${k}»`;
   for(const w of ['near','far']){ const Y=L[w]; if(!plain(Y) || typeof Y.file!=='string' || !/^[a-z0-9_-]+(\/[a-z0-9_-]+)*\.mp3$/.test(Y.file) || !num(Y.norm) || Y.norm<=0 || Y.norm>64 || !num(Y.gain) || Y.gain<0 || Y.gain>1
       || (Y.synth!=null && (!num(Y.synth) || Y.synth<0 || Y.synth>1)) || (w==='far' ? !num(Y.send) || Y.send<0 || Y.send>1 : Y.send!=null)) return `.${w}: { file «….mp3» in the room folder, norm (0, 64], gain 0…1${w==='far' ? ', send 0…1' : ''} }`; }
   if(L.events!=null){ if(!plain(L.events)) return '.events: { drips?, tick? }';
@@ -45,6 +45,11 @@ function checkLayers(L){
       || !Array.isArray(T.speed) || T.speed.length!==T.lanes.length || !T.speed.every(v=>num(v) && v>0) || !num(T.len) || T.len<=0 || !num(T.p) || T.p<0 || T.p>1) return '.passes.traffic: { lanes [{ x, dir ±1 }], every, speed (one per lane, > 0), len > 0, p 0…1 }';
     if(T.commit!=null && !(num(T.commit) && T.commit>=P.lead)) return '.passes.traffic.commit: at least the lead (s) — a car decided before its sound is scheduled (RAIN-2)';
     if(!plain(E) || !num(E.x) || !num(E.y) || !num(E.z)) return '.passes.ear: { x, y, z }'; }
+  if(L.trams!==undefined){ const P=L.trams;   // RAIN-6b (2): the trams' one-shots and their synthesised bell, squeal, clacks (with passes' law)
+    if(!L.passes) return '.trams: only beside passes (their law and listener)';
+    if(!plain(P) || typeof P.file!=='string' || !/^[a-z0-9_-]+(\/[a-z0-9_-]+)*\.mp3$/.test(P.file) || !num(P.norm) || P.norm<=0 || P.norm>64 || !num(P.gain) || P.gain<0 || P.gain>1) return '.trams: { file «….mp3», norm (0, 64], gain 0…1, … }';
+    if(!Array.isArray(P.segs) || !P.segs.length || !P.segs.every(q=>Array.isArray(q) && q.length===3 && q.every(num) && q[0]>=0 && q[1]>0 && q[2]>=0 && q[2]<=q[1])) return '.trams.segs: [[start, length, peak <= length] s, …]';
+  }
   return null;
 }
 export function checkRoom(r, known={}){

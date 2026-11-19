@@ -29,10 +29,24 @@ export function passTraffic(P, t, density=1){
     for(let k=k0;k<=k1;k++){ const T=carSlot(P, li, k, density); if(T==null) continue; const a=t-T; if(a<0 || a>span) continue;
       out.push({ kind:'car', lane:li, slot:k, dir:ln.dir, x:ln.x, z: ln.dir>0 ? Z0+a*v : L-a*v, len:P.carLen, v }); } });
   const M=P.tram; if(M){ const span=(L-Z0+M.len)/M.speed, k1=Math.floor(t/M.every), k0=Math.floor((t-span)/M.every)-1;
-    for(let k=k0;k<=k1;k++){ const T=k*M.every+hash(97, k)*M.every*0.4; if(hash(99, k)>=M.p*Math.min(1, densAt(P, density, T))) continue; const dir= hash(98, k)<0.5 ? -1 : 1, a=t-T; if(a<0 || a>span) continue;
+    for(let k=k0;k<=k1;k++){ const S=tramSlot(P, k, density); if(!S) continue; const { T, dir }=S, a=t-T; if(a<0 || a>span) continue;
       out.push({ kind:'tram', lane:-1, slot:k, dir, x:M.track[dir>0 ? 1 : 0], z: dir>0 ? Z0+a*M.speed : L-a*M.speed, len:M.len, v:M.speed }); } }
   return out;
 }
+/* a tram of slot k: its start T and direction, or null (decided like a car, at its commit time) */
+function tramSlot(P, k, density){ const M=P.tram, T=k*M.every+hash(97, k)*M.every*0.4; if(hash(99, k)>=M.p*Math.min(1, densAt(P, density, T))) return null; return { T, dir: hash(98, k)<0.5 ? -1 : 1 }; }
+/* RAIN-6b (2): THE TRAMS' MOMENTS between t0 and t1 — when a tram's MIDDLE is closest to the listener (kind 'pass': its sound's peak), when its front
+   is P.tram.bellAhead m before the crossing P.tram.bellZ (kind 'bell': rung by a seeded share bellP of the trams, as it nears the crossing) and P.tram.curveZ (kind 'squeal': the curve at the
+   line's far end) → [{ t, kind, slot, dir, x, v, dist, pan }] sorted; the picture's trams (passTraffic) are the same trams at the same moments */
+export function passTramEvents(P, ear, t0, t1, density=1){ const M=P.tram, out=[]; if(!M) return out; const Z0=z0Of(P), L=P.len, r=ear.r||[1, 0, 0], span=(L-Z0+M.len)/M.speed;
+  const k0=Math.floor((t0-span)/M.every)-1, k1=Math.floor(t1/M.every)+1;
+  for(let k=k0;k<=k1;k++){ const S=tramSlot(P, k, density); if(!S) continue; const { T, dir }=S, x=M.track[dir>0 ? 1 : 0];
+    const at=zf=>T+(dir>0 ? (zf-Z0) : (L-zf))/M.speed;   // the moment its front is at zf
+    const add=(kind, zf, zs)=>{ const t=at(zf); if(t<t0 || t>=t1 || zf<Z0-M.len || zf>L) return; const dx=x-ear.x, dy=1.5-ear.y, dz=zs-ear.z, dist=Math.hypot(dx, dy, dz), pan=Math.max(-1, Math.min(1, (dx*r[0]+dy*r[1]+dz*r[2])/dist)); out.push({ t, kind, slot:k, dir, x, v:M.speed, dist, pan }); };
+    add('pass', ear.z+dir*M.len/2, ear.z);
+    if(M.bellZ!=null && hash(96, k)<(M.bellP==null ? 0.5 : M.bellP)) { const zb=M.bellZ-dir*(M.bellAhead||30); add('bell', zb, zb); }
+    if(M.curveZ!=null) add('squeal', M.curveZ, M.curveZ); }
+  return out.sort((a, b)=>a.t-b.t || a.slot-b.slot); }
 /* the moment a car of lane li, slot k passes z = ez: dir +1 drives from zFrom up, dir −1 from len down (both only when ez lies on the path) */
 function passTime(P, li, k, density, ez){ const T=carSlot(P, li, k, density); if(T==null) return null; const ln=P.lanes[li], v=P.speed[li], Z0=z0Of(P);
   if(ez<Z0 || ez>P.len) return null; return T+(ln.dir>0 ? (ez-Z0)/v : (P.len-ez)/v); }
@@ -44,3 +58,23 @@ export function passEvents(P, ear, t0, t1, density=1){
       out.push({ t, lane:li, slot:k, x:ln.x, v, dir:ln.dir, dist, pan }); } });
   return out.sort((a, b)=>a.t-b.t || a.lane-b.lane);
 }
+const fr1=x=>x-Math.floor(x);
+/* RAIN-6b (3): A VEHICLE THAT STOPS AT THE KERB (a taxi picking someone up), its own seeded schedule on absolute time — T = { every:[lo, hi] s, x, z:[from, last], stop (z), v, brake (m/s²), wait:[lo, hi], walk, door, go, person:{ x, z } } — so the picture (stopAt) and the sound (stopSounds) read the same moments.
+   Its schedule: its k-th visit → { t0 (it enters at z[0]), tStop, tDoor (opens), tIn (the person in), tShut, tGo, tEnd } */
+export function stopVisit(T, k){ const t0=k*T.every[1]+hash(k+701, 71)*(T.every[1]-T.every[0]), run=T.z[0]-T.stop, cruise=Math.max(0, run-T.v*T.v/(2*T.brake)), tStop=t0+cruise/T.v+T.v/T.brake;
+  const tDoor=tStop+T.wait[0]+hash(k+701, 72)*(T.wait[1]-T.wait[0])-T.walk, tIn=tDoor+T.door, tShut=tIn+0.8, tGo=tShut+T.go; return { k, t0, tStop, tDoor:Math.max(tStop+1.5, tDoor), tIn:Math.max(tStop+1.5, tDoor)+T.door, tShut:Math.max(tStop+1.5, tDoor)+T.door+0.8, tGo:Math.max(tStop+1.5, tDoor)+T.door+0.8+T.go, cruise }; }
+/* the vehicle at time t → null, or { z, v, phase 'come' | 'stop' | 'go', door 0…1, person { z, a, walk } , hazard } */
+export function stopAt(T, t){ const k=Math.floor(t/T.every[1]); for(const kk of [k, k-1]){ if(kk<0) continue; const V=stopVisit(T, kk); if(t<V.t0) continue;
+    const run=T.z[0]-T.stop, tB=V.t0+V.cruise/T.v;   // braking from tB to tStop
+    let z, v, phase; if(t<tB){ z=T.z[0]-T.v*(t-V.t0); v=T.v; phase='come'; } else if(t<V.tStop){ const u=t-tB; v=T.v-T.brake*u; z=T.z[0]-V.cruise-(T.v*u-0.5*T.brake*u*u); phase='come'; }
+    else if(t<V.tGo){ z=T.stop; v=0; phase='stop'; } else { const u=t-V.tGo; v=Math.min(T.v, 2.2*u); z=T.stop-(u<T.v/2.2 ? 1.1*u*u : T.v*T.v/(4.4)+T.v*(u-T.v/2.2)); phase='go'; }
+    if(z<T.z[1]-140) continue; void run;
+    const door= t<V.tDoor ? 0 : t<V.tDoor+0.5 ? (t-V.tDoor)/0.5 : t<V.tShut ? 1 : t<V.tShut+0.3 ? 1-(t-V.tShut)/0.3 : 0;
+    const P=T.person, walkU=Math.max(0, Math.min(1, (t-(V.tDoor-T.walk))/T.walk)), pa= t<V.tIn ? 1 : Math.max(0, 1-(t-V.tIn)/0.6);
+    const person= t<V.tIn+0.6 ? { x:P.x+(T.x-0.9-P.x)*walkU, z:P.z+(T.stop+1.6-P.z)*walkU, a:pa, walk:walkU>0 && walkU<1 } : null;
+    return { k:kk, z, v, phase, door, person, hazard:phase==='stop' || (phase==='come' && t>tB) }; }
+  return null; }
+/* its sounds between t0 and t1 → [{ t, kind 'brake' | 'door' | 'shut' | 'go' }] (the same visits as stopAt) */
+export function stopSounds(T, t0, t1){ const out=[]; for(let k=Math.max(0, Math.floor(t0/T.every[1])-1);k<=Math.floor(t1/T.every[1])+1;k++){ const V=stopVisit(T, k), tB=V.t0+V.cruise/T.v;
+    for(const [t, kind] of [[tB, 'brake'], [V.tDoor, 'door'], [V.tShut, 'shut'], [V.tGo, 'go']]) if(t>=t0 && t<t1) out.push({ t, kind }); }
+  return out.sort((a, b)=>a.t-b.t); }

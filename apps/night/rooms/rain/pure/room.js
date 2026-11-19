@@ -52,6 +52,12 @@ export const RAIN_ROOM=F({
        passes under the window (pure/passes.js on the audio clock), panned by its side, louder the nearer its lane, its rate by its speed */
     layers:F({ near:F({ file:'sound/pane.mp3', norm:0.76, gain:1 }), far:F({ file:'sound/street.mp3', norm:0.608, gain:1, send:0.35 }),
       passes:F({ file:'sound/cars.mp3', norm:0.608, gain:1, segs:F([[0.5, 7.5, 6.9], [8.5, 3.3, 2.4], [12.3, 3, 2.1], [15.8, 2.8, 2], [19.1, 3.2, 2.3]].map(F)), vRef:12, rate:F([0.85, 1.2]), dRef:25, lead:9, traffic:RAIN_TRAFFIC, ear:EAR }),
+      /* RAIN-6b (2): the trams — each pass a one-shot of tram.mp3 (CC0, two pass-bys: [start, length, peak] s), the bell before the crossing, the squeal
+         where the line curves off and the rail clacks under the window synthesised; their own schedule (the traffic law's trams, never the music's) */
+      trams:F({ file:'sound/tram.mp3', norm:0.5, gain:1, segs:F([[0, 23.2, 8.47], [23.4, 15.3, 8.68]].map(F)), dRef:25, lead:12, rumble:0.05,
+        bell:F({ hz:F([1150, 2810]), dur:1.6, again:0.32, gain:0.05 }), squeal:F({ hz:3300, dur:2.6, gain:0.012 }),
+        clacks:F({ joint:15, axle:2.1, bogies:F([-11, -5, 5, 11]), gain:0.05, withRec:0.35 }),
+        taxi:F({ brake:F({ dur:1.8, gain:0.05 }), door:F({ dur:0.08, gain:0.06 }), shut:F({ dur:0.3, gain:0.12 }), go:F({ dur:2.6, gain:0.06 }) }) }),   // RAIN-6b (3): the taxi's sounds, on its law's moments
       events:F({ drips:F({ every:3.5, gain:0.06, hz:2300 }), tick:F({ every:9, gain:0.02 }) }), seed:0x52414933 }),
     level:0.6, master:0.42, ahead:0.35 }),
   acoustic:'fdepth',

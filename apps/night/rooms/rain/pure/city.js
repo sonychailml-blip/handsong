@@ -118,7 +118,8 @@ export const TRAFFIC=F({ every:F([10, 12]), p:0.6, speed:F([11.5, 12.5]), carLen
    DENS_MARGIN s ahead of the picture's audio time, so the audio thread has it before it counts (pure/passes.js passBook) */
 export const DENS_MARGIN=0.5, DENS_COMMIT=10;
 export const RAIN_TRAFFIC=F({ commit:DENS_COMMIT, len:520, zFrom:STREET.zFrom, every:TRAFFIC.every, p:TRAFFIC.p, speed:TRAFFIC.speed, carLen:TRAFFIC.carLen, lanes:STREET.lanes,
-  tram:F({ every:TRAFFIC.tram, p:TRAFFIC.tramP, speed:TRAFFIC.tramSpeed, len:TRAFFIC.tramLen, track:TRAFFIC.tramTrack }) });
+  tram:F({ every:TRAFFIC.tram, p:TRAFFIC.tramP, speed:TRAFFIC.tramSpeed, len:TRAFFIC.tramLen, track:TRAFFIC.tramTrack, bellZ:70, bellAhead:30, bellP:0.5, curveZ:470 }),
+  stop:F({ every:F([150, 260]), x:1.25, z:F([420, 58]), stop:58, v:9, brake:6, wait:F([4, 7]), walk:2.5, door:1.2, go:2.6, person:F({ x:-0.4, z:58.8 }) }) });   // RAIN-6b (3): the taxi that stops by a doorway of the left row   // RAIN-6b (2): the bell before the crossing, the squeal where the line curves off
 /* the listener: the eye at the window (its right vector for the pan) */
 export const EAR=F({ x:CAM.x, y:CAM.y, z:CAM.z, r:F(camBasis().r) });
 export const trafficAt=(t, density=1)=>passTraffic(RAIN_TRAFFIC, t, density);   // density: a number or a book (RAIN-2)

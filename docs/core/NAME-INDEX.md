@@ -33,7 +33,7 @@ NIGHT-3 stage 4: THE MUSIC BED's DOOR AND ITS v1 DRIVER (live) — the state the
 
 ## apps/night/bed2.js
 NIGHT-4: THE MUSIC BED v2's DRIVER (live and offline).
-- const (16): `BED2_AHEAD`, `LOFI_AHEAD`, `bed2LofiEngine`, `lofiAheadDbg`, `bedBrushDbg`, `jazzMoodOf`, `bedJazzDbg`, `bed2LofiSet`, `bed2LofiDbg`, `bed2ViewOver`, `bed2Failed`, `bed2SamplerSet`, `bed2Dbg`, `bed2StatsLive`, `bed2NodeDbg`, `bed2ViewDbg`
+- const (17): `BED2_AHEAD`, `LOFI_AHEAD`, `bed2LofiEngine`, `lofiAheadDbg`, `bedBrushDbg`, `jazzMoodOf`, `bedJazzDbg`, `bed2LofiSet`, `bed2BuskSet`, `bed2LofiDbg`, `bed2ViewOver`, `bed2Failed`, `bed2SamplerSet`, `bed2Dbg`, `bed2StatsLive`, `bed2NodeDbg`, `bed2ViewDbg`
 - fn (6): `bed2Load`, `bed2On`, `bed2Off`, `bed2Volume`, `bed2Tick`, `bed2Plan`
 - → ./sound/bed2.js (1): `bed2Stats`
 
@@ -210,7 +210,7 @@ NIGHT-11 part 2 — LINKS OPENED INSIDE A MESSENGER (audit W4).
 ## apps/night/pure/layers.js
 RAIN-3: A ROOM's LAYERED RECORDINGS — near and far, crossfaded by the focus — and its EVENT SOUNDS on a seeded schedule (pure, rule #36; data row «RAIN nature (app)»), run unchanged by the nature w…
 - const (3): `LAYERS`, `layerMinLen`, `layersStats`
-- fn (10): `layersEvents`, `layersNew`, `layersRec`, `layersPasses`, `layersDensity`, `layersFocus`, `layersRain`, `layersSkip`, `layersOn`, `layersOut`
+- fn (11): `layersEvents`, `layersNew`, `layersRec`, `layersPasses`, `layersTrams`, `layersDensity`, `layersFocus`, `layersRain`, `layersSkip`, `layersOn`, `layersOut`
 
 ## apps/night/pure/lofi.js
 RAIN-4c / RAIN-4d: THE ROOM'S MUSIC AS LO-FI (pure, rule #36; data row «RAIN lo-fi bed (app)»).
@@ -220,7 +220,7 @@ RAIN-4c / RAIN-4d: THE ROOM'S MUSIC AS LO-FI (pure, rule #36; data row «RAIN lo
 ## apps/night/pure/passes.js
 RAIN-1: PASSING VEHICLES — one law for the picture and the sound (pure, rule #36; data row «RAIN car passes (app)»).
 - const (1): `passBook`
-- fn (4): `passBookSet`, `passBookAt`, `passTraffic`, `passEvents`
+- fn (8): `passBookSet`, `passBookAt`, `passTraffic`, `passTramEvents`, `passEvents`, `stopVisit`, `stopAt`, `stopSounds`
 
 ## apps/night/pure/persist.js
 NIGHT-15: KEEP NIGHT'S FILES — whether to ask the browser for persistent storage (navigator.storage.persist), so a browser short of space does not drop the precache.
@@ -440,6 +440,10 @@ NIGHT-3: the forest's 2D STAND-IN — the «low» level and the fallback without
 NIGHT-3: THE ROOMS — the order a player meets them (ids, rule #37) and each room's parts: its record (data), its 2D stand-in, and its scene code, loaded only when the room is first opened.
 - const (5): `ROOMS`, `roomsAll`, `roomById`, `roomAdd`, `roomRemove`
 
+## apps/night/rooms/rain/ep-worklet.js
+AUDIO-4 — THE BED'S ELECTRIC PIANO IN ONE NODE («rain-ep»; loaded by rooms/rain/lofi.js).
+- exports: none
+
 ## apps/night/rooms/rain/heard.js
 NIGHT-15: THE RAIN ROOM HEARD WITHOUT ITS PICTURE (Dark, Camera, the 2D stand-in, an opening).
 - const (1): `RAIN_FOCUS`
@@ -454,6 +458,11 @@ RAIN-R1: THE RAIN ROOM, A REAL ROOM (the founder: the free part is the forest AN
 RAIN-4c / RAIN-4d: THE LO-FI BED'S SOUND (the rain room's; the player is apps/night/pure/lofi.js, the driver apps/night/bed2.js).
 - const (3): `LOFI_MIX`, `NYLON`, `EP_LONG`
 - fn (2): `nylonBuffer`, `lofiEngine`
+
+## apps/night/rooms/rain/pure/busker.js
+RAIN-7: THE STREET MUSICIAN under the café's awning, playing along with our music — a pure seeded law (rule #36; data row «RAIN street law (app)»).
+- const (2): `BUSK`, `buskOn`
+- fn (1): `buskNotes`
 
 ## apps/night/rooms/rain/pure/city.js
 RAIN-0b: THE VIEW LAW — the eye on the 8th floor, looking slightly down and diagonally along the boulevard (concept §3), as ONE pure projection used by the painting, the depth map, the lights, the …
@@ -527,6 +536,16 @@ RAIN-5c: THE SKY OVER THE CITY — a pure seeded law of time (rule #36; data row
 - const (1): `SKY`
 - fn (2): `skyEvents`, `skyAt`
 
+## apps/night/rooms/rain/pure/sleep.js
+RAIN-6b (8): THE CITY FALLS ASLEEP WITH YOU — the sleep timer in the rain, a pure law (rule #36; data row «RAIN sleep (app)»).
+- const (4): `SLEEP_CITY`, `sleepWinKeep`, `sleepTraffic`, `sleepPerson`
+- fn (2): `sleepWinAt`, `sleepMine`
+
+## apps/night/rooms/rain/pure/vehicles.js
+RAIN-6b (1, 3): THE VEHICLES' BODIES and THE TAXI — a pure seeded law (rule #36; data row «RAIN vehicles (app)»).
+- const (6): `VK`, `VEH`, `vehColour`, `sheenAt`, `taxiAt`, `SWEEP`
+- fn (3): `vehType`, `vehicleItems`, `sweepAt`
+
 ## apps/night/rooms/rain/pure/windows.js
 RAIN-0: THE WINDOWS — their places, which one a note lights, and how a lit window fades (pure, rule #36; data rows «RAIN window pick (app)», «RAIN window fade (app)»).
 - const (12): `RAIN_SEED`, `windowsLayout`, `winQuad`, `winCover`, `PICK_REACH`, `TRACE`, `AMB_LEVEL`, `windowLight`, `WINLIFE`, `winGarland`, `winOnOff`, `FLY_SHAPES`
@@ -539,7 +558,7 @@ RAIN-0b: THE STAND-IN CITY's prepared picture and its DEPTH MAP, painted ONCE on
 
 ## apps/night/rooms/rain/rain-glass.js
 RAIN-0: THE RAIN ROOM'S SHADERS (our own, written from the physics: a drop is a small strong lens that shows the view upside down and wide, darker at its rim; a running drop leaves a wet lane and b…
-- const (13): `QUAD_V`, `BLUR_F`, `DOWN_F`, `VIEW_F`, `WIN_V`, `WIN_F`, `LIGHT_V`, `LIGHT_F`, `DROP_V`, `DROP_F`, `glassShader`, `LIFE_V`, `LIFE_F`
+- const (14): `QUAD_V`, `BLUR_F`, `DOWN_F`, `VIEW_F`, `WIN_V`, `WIN_F`, `LIGHT_V`, `LIGHT_F`, `DROP_V`, `DROP_F`, `glassShader`, `LIFE_V`, `LIFE_F`, `FRAME_F`
 
 ## apps/night/rooms/rain/rain.js
 RAIN-0 — THE RAIN ROOM's picture (docs/night/design/RAIN/CONCEPT.md; the plan and what is still a placeholder: PLAN.md).
@@ -1449,6 +1468,7 @@ SPLIT-2: the probe entry of the Night page: its own rows and the core rows flagg
 - → ./night/audio1.js (1): `checkBedNull`
 - → ./night/audio2.js (1): `checkRainHands`
 - → ./night/audio3.js (1): `checkNightLab`
+- → ./night/audio4.js (1): `checkPianoLight`
 - → ./night/bed.js (1): `checkNightBed`
 - → ./night/calib.js (1): `checkNightCalib`
 - → ./night/cards.js (1): `checkNightCards`
@@ -1463,11 +1483,14 @@ SPLIT-2: the probe entry of the Night page: its own rows and the core rows flagg
 - → ./night/nightguard.js (2): `checkNightUntouched`, `dumpNight`
 - → ./night/nightmigrate.js (1): `checkNightMigrate`
 - → ./night/nightprofile.js (1): `checkNightProfile`
+- → ./night/perf2.js (1): `checkPerfInvisible`
 - → ./night/pixels.js (2): `checkNightPixels`, `checkNightDetailedGuard`
 - → ./night/rain4.js (1): `checkForestBed`
 - → ./night/rain4e.js (1): `checkRainClicks`
 - → ./night/rain5.js (1): `checkRainQuads`
 - → ./night/rain6.js (1): `checkRainFx`
+- → ./night/rain6b.js (1): `checkRainStreet`
+- → ./night/rain7.js (1): `checkRain7`
 - → ./night/rainnature.js (1): `checkRainNature`
 - → ./night/rainroom.js (1): `checkRainRoom`
 - → ./night/roomswitch.js (1): `checkNightRoomSwitch`
@@ -1492,6 +1515,12 @@ AUDIO-2 — «RAIN hand events and the bed» (slow): the founder hears the rain'
 AUDIO-3 — «NIGHT audio lab» (slow, development edition): the founder's tools for the rain's dropouts work in the rain with its music playing: the lab opens; the render-timing probe reports; «Record…
 - default (1): `default`
 - fn (1): `checkNightLab`
+
+## tools/probes/night/audio4.js
+AUDIO-4 — «RAIN bed piano lighter» (slow): the founder found the dropouts with the audio lab — every part on except the bed's PIANO, and they went away.
+- const (1): `A4`
+- default (1): `default`
+- fn (1): `checkPianoLight`
 
 ## tools/probes/night/bed.js
 NIGHT-3 stage 4: row «NIGHT music bed» (P.night).
@@ -1576,6 +1605,11 @@ SPLIT-2: row «NIGHT migrate»: old setting names move to the new ones, are remo
 SPLIT-2: row «NIGHT profile round trip» on Night's page: the checks of C0 that need Night's record, its shell and its CSS (they ran on the one page before the split, word for word).
 - fn (1): `checkNightProfile`
 
+## tools/probes/night/perf2.js
+PERF-2 — «PERF invisible» (drawn, slow): every optimisation applied only because it changes NOTHING on the screen, proved by the host's exact A/B (sceneSnapDbg: one scene state rendered twice — the…
+- default (1): `default`
+- fn (1): `checkPerfInvisible`
+
 ## tools/probes/night/pixels.js
 NIGHT-11 part 5 — rows «NIGHT pixel budget» and «NIGHT Detailed guard», on the running app with the forest open.
 - fn (2): `checkNightPixels`, `checkNightDetailedGuard`
@@ -1598,6 +1632,16 @@ RAIN-5b — «RAIN no quad edges»: the founder saw square fields round the flyi
 RAIN-6 — «RAIN effects hand» (drawn): in the rain, through the REAL effect parameters the other hand moves (the Night chain's Echo amount and Warm ↔ Bright tilt; the shell publishes them each frame…
 - default (1): `default`
 - fn (1): `checkRainFx`
+
+## tools/probes/night/rain6b.js
+RAIN-6b — «RAIN street» (drawn): in the rain room, live.
+- default (1): `default`
+- fn (1): `checkRainStreet`
+
+## tools/probes/night/rain7.js
+RAIN-7 — «RAIN-7 street details» (drawn): in the rain room, live.
+- default (1): `default`
+- fn (1): `checkRain7`
 
 ## tools/probes/night/rainnature.js
 RAIN-3: row «RAIN nature» (P.night) — the rain room's layered recordings in the real graph (apps/night/sound/ambience.js, the nature worklet's «night-layers»), rendered OFFLINE (deterministic, no r…
@@ -1633,7 +1677,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 UI-1 — «NIGHT labels follow the room»: the founder entered the rain and the Sound button still read «Firefly» while another timbre played.
 - fn (1): `checkNightLabels`
 
-_325 modules, 3184 exported names._
+_333 modules, 3222 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

@@ -24,12 +24,13 @@ const srv=await new Promise(res=>{ const s=http.createServer(async (q, r)=>{ try
 const port=srv.address().port;
 const browser=await chromium.launch({ channel:'chrome', headless:true, args:['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--autoplay-policy=no-user-gesture-required', '--disable-background-timer-throttling', '--disable-renderer-backgrounding'] });
 /* a page with the rain room open at `level`: Begin tapped, the cards closed, the music held off */
+let QS='';   // RAIN-6b: extra query words for a page (the «before» captures)
 async function open(vp, level, dpr=1){
   const ctx=await browser.newContext({ viewport:vp, deviceScaleFactor:dpr, locale:'en-US' });
   await ctx.grantPermissions(['camera', 'microphone'], { origin:`http://127.0.0.1:${port}` });
   await ctx.addInitScript(l=>{ try{ localStorage.setItem('handsong.nightBg', 'forest'); localStorage.setItem('handsong.sceneLevel', l); localStorage.setItem('handsong.night.lang', 'en'); }catch(e){} }, level);
   const p=await ctx.newPage(), errs=[]; p.on('pageerror', e=>errs.push(String(e))); p.on('response', r=>{ if(r.status()===404) errs.push('404 '+new URL(r.url()).pathname); });
-  await p.goto(`http://127.0.0.1:${port}/apps/night/index.html?probe${FOREST ? '' : '&room=rain'}`);
+  await p.goto(`http://127.0.0.1:${port}/apps/night/index.html?probe${FOREST ? '' : '&room=rain'}${QS}`);
   try{ await p.waitForFunction(()=>window.P && window.__nightBoot && window.__nightBoot.state().done, null, { timeout:120e3 }); }catch(e){ console.log('[rain-snap] the page did not boot:', errs.slice(0, 6)); throw e; }
   await p.click('#nightBegin');
   await p.waitForFunction(()=>!document.getElementById('start').classList.contains('on'), null, { timeout:180e3 });
@@ -53,6 +54,40 @@ try{
   } else if(argv.includes('--row')){   // the browser row «RAIN room» alone (a quick look while working; the judged run is the Night suite's)
     const { ctx, p, errs }=await open({ width:1280, height:800 }, LEVEL);
     console.log(JSON.stringify(await p.evaluate(async ()=>(await import('/tools/probes/night/rainroom.js')).checkRainRoom()), null, 1), errs.slice(0, 5)); await ctx.close();
+  } else if(argv.includes('--rain7')){   // RAIN-7: the starred details → tools/.ui-snap/rain7/ — before (?rain=noframe,nocones,nosway) and after
+    const O=path.join(ROOT, 'tools/.ui-snap/rain7'); await mkdir(O, { recursive:true }); const made=[];
+    const fx=(p, e, t, w=0)=>p.evaluate(async ([e, t, w])=>{ const A=await import('/core/audio.js'), ST=await import('/core/state.js'), k=ST.chainKeyOf('ld'); A.fxInstance(k, 'cecho').params[0].setNorm(e); A.fxInstance(k, 'ctone').params[1].setNorm(t); A.fxInstance(k, 'cwave').params[1].setNorm(w); }, [e, t, w]);
+    for(const [tag, vp, dpr] of [['laptop', { width:1280, height:800 }, 1], ['phone', { width:390, height:844 }, 2.75]]){
+      for(const before of [true, false]){ QS= before ? '&rain=noframe,nocones,nosway' : ''; const { ctx, p }=await open(vp, LEVEL, dpr);
+        await p.evaluate(()=>{ const R=window.__H.sceneRoomDbg(); R.mistDbg(0.1); R.lookDbg('evening'); });
+        const shot=async (name, ru, s=0.12)=>{ await hand(p, 0.5, 0.45, s, false, 30); await p.waitForTimeout(2500); await hand(p, 0.5, 0.45, s, false, 6); const f=`${tag}-${before ? 'before' : 'after'}-${name}.png`; await p.screenshot({ path:path.join(O, f) }); made.push([f, ru]); };
+        await shot('far', 'Фокус на городе: окно комнаты мягкое', 0.08);
+        await shot('near', 'Фокус на стекле: окно комнаты резкое (рама, защёлка, чашка с паром, цветок)', 0.42);
+        await fx(p, 1, 0.5, 0); await p.waitForTimeout(3000); await shot('rain', 'Эхо до конца: дождь виден в конусах света фонарей', 0.08); await fx(p, 0, 0.5, 0);
+        await ctx.close(); } }
+    QS='';
+    const fig=([f, ru])=>`<figure><img src="${f}" alt=""><figcaption>${ru}</figcaption></figure>`;
+    await writeFile(path.join(O, 'index.html'), `<!doctype html><meta charset="utf-8"><title>RAIN-7 — детали улицы</title><style>body{ font:15px/1.45 system-ui; background:#111; color:#ddd; margin:16px; } figure{ display:inline-block; vertical-align:top; margin:0 12px 18px 0; max-width:640px; } img{ max-width:100%; max-height:560px; border:1px solid #333; } h2{ margin-top:28px; }</style><h1>RAIN-7: детали улицы — было / стало</h1><p>«Было» = <code>?rain=noframe,nocones,nosway</code>. Движение (кроны, крест аптеки, музыкант, фары на фасаде) на снимке не видно — его проверяют глазами.</p>`
+      +['laptop', 'phone'].map(tg=>`<h2>${tg==='laptop' ? 'Ноутбук' : 'Телефон'}</h2>`+made.filter(m=>m[0].startsWith(tg)).map(fig).join('')).join(''));
+    console.log('[rain-snap] --rain7: '+made.length+' captures → tools/.ui-snap/rain7/index.html');
+  } else if(argv.includes('--rain6b')){   // RAIN-6b: the street → tools/.ui-snap/rain6b/ — before (?rain=nocull,nobodies) and after, the wind, the sleep, Late night
+    const O=path.join(ROOT, 'tools/.ui-snap/rain6b'); await mkdir(O, { recursive:true }); const made=[];
+    const fx=(p, e, t, w=0)=>p.evaluate(async ([e, t, w])=>{ const A=await import('/core/audio.js'), ST=await import('/core/state.js'), k=ST.chainKeyOf('ld'); A.fxInstance(k, 'cecho').params[0].setNorm(e); A.fxInstance(k, 'ctone').params[1].setNorm(t); A.fxInstance(k, 'cwave').params[1].setNorm(w); }, [e, t, w]);
+    for(const [tag, vp, dpr] of [['laptop', { width:1280, height:800 }, 1], ['phone', { width:390, height:844 }, 2.75]]){
+      for(const before of [true, false]){ QS= before ? '&rain=nocull,nobodies,noframe,nocones,nosway' : '&rain=noframe,nocones,nosway'; const { ctx, p }=await open(vp, LEVEL, dpr);
+        await p.evaluate(()=>{ const R=window.__H.sceneRoomDbg(); R.mistDbg(0.1); R.lookDbg('evening'); }); await hand(p, 0.5, 0.45, 0.12, false, 10); await p.waitForTimeout(3000);
+        const shot=async (name, ru)=>{ await hand(p, 0.5, 0.45, 0.12, false, 6); await p.waitForTimeout(600); const f=`${tag}-${before ? 'before' : 'after'}-${name}.png`; await p.screenshot({ path:path.join(O, f) }); made.push([f, ru, before]); };
+        await shot('evening', 'Вечерний бульвар, рука эффектов в покое');
+        if(!before){ await fx(p, 0, 0.5, 1); await p.waitForTimeout(5000); await shot('wind', 'Волна до конца: ветер — зонты наклоняются, бахрома маркиз и флажки трепещут, косой дождь, больше машин');
+          await fx(p, 0, 0.5, 0); await p.evaluate(()=>window.__H.sceneRoomDbg().sleepDbg(0.55)); await p.waitForTimeout(2500); await shot('sleep-half', 'Таймер сна на середине: окна гаснут по одному, машин и людей меньше');
+          await p.evaluate(()=>window.__H.sceneRoomDbg().sleepDbg(0.97)); await p.waitForTimeout(2500); await shot('sleep-end', 'Таймер сна в конце: город уснул');
+          await p.evaluate(()=>{ const R=window.__H.sceneRoomDbg(); R.sleepDbg(null); R.lookDbg('late'); }); await p.waitForTimeout(9000); await shot('late', 'Поздняя ночь: роллета магазина опущена до конца'); }
+        await ctx.close(); } }
+    QS='';
+    const fig=([f, ru])=>`<figure><img src="${f}" alt=""><figcaption>${ru}</figcaption></figure>`;
+    await writeFile(path.join(O, 'index.html'), `<!doctype html><meta charset="utf-8"><title>RAIN-6b — улица</title><style>body{ font:15px/1.45 system-ui; background:#111; color:#ddd; margin:16px; } figure{ display:inline-block; vertical-align:top; margin:0 12px 18px 0; max-width:640px; } img{ max-width:100%; max-height:560px; border:1px solid #333; } h2{ margin-top:28px; }</style><h1>RAIN-6b: улица — было / стало</h1><p>«Было» = <code>?rain=nocull,nobodies</code> (огни холмов сквозь дома, машины — только огни). Машины и трамваи едут по своему расписанию: в кадре те, что проезжали в этот момент.</p>`
+      +['laptop', 'phone'].map(tg=>`<h2>${tg==='laptop' ? 'Ноутбук' : 'Телефон'}</h2>`+made.filter(m=>m[0].startsWith(tg)).map(fig).join('')).join(''));
+    console.log('[rain-snap] --rain6b: '+made.length+' captures → tools/.ui-snap/rain6b/index.html');
   } else if(argv.includes('--rain6')){   // RAIN-6: the effects hand in the rain → tools/.ui-snap/rain6/ (at rest = today; Echo full; warm; bright), phone and laptop
     const O6=path.join(ROOT, 'tools/.ui-snap/rain6'); await mkdir(O6, { recursive:true }); const made6=[];
     for(const [tag, vp, dpr] of [['phone', { width:390, height:844 }, 2.75], ['laptop', { width:1280, height:800 }, 1]]){

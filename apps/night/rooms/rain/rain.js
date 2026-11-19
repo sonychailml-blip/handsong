@@ -16,7 +16,8 @@ import { rainOf, streakOf, soundOf, lampOf, neonOf, windowsOf, easeTo } from './
 import { RAIN_FOCUS } from './heard.js';   // NIGHT-15: the last focus, for the sound while the picture is not drawn
 import { layersEvents, LAYERS } from '../../pure/layers.js';
 import { heardMs } from '../../pure/heard.js';
-import { MOOD_TC } from '../../pure/cycle.js';
+import { MOOD_TC, nightDeep } from '../../pure/cycle.js';
+import { sleepWinAt, sleepWinKeep, sleepTraffic, sleepMine } from './pure/sleep.js';   // RAIN-6b (8): the city falls asleep with you
 import { RAIN_ROOM } from './pure/room.js';
 import { FOCUS, focusTarget, focusStep, focusBlur, focusDepth, focusPlateau, blurAt } from './pure/focus.js';
 import { RAIN_SEED, windowsLayout, farLights, windowPick, windowLight, flyWindow } from './pure/windows.js';
@@ -25,13 +26,14 @@ import { DROPS, dropsNew, dropsRegion, dropAdd, dropsStep, dropStretch, dropsLed
 import { winQuad } from './pure/windows.js';   // RAIN-2: a window's projected quad
 import { project, cityLamps, trafficAt, trafficDensity, sceneAt, depthOf, BAKE_EXT, DENS_MARGIN, STREET, vanishing } from './pure/city.js';
 import { passBook, passBookSet } from '../../pure/passes.js';   // RAIN-2: the density book
-import { lifeAt, lifeCyclists, LIFE } from './pure/life.js';
+import { lifeAt, lifeCyclists, LIFE, LK, UMB } from './pure/life.js';
+import { vehicleItems, taxiAt, VK, sweepAt, SWEEP } from './pure/vehicles.js';   // RAIN-6b (1, 3): the vehicles' bodies, the taxi
 import { skyAt } from './pure/sky.js';
 import { FAR_LIFE, hillTop, slope, farCars, blink, twinkle, cableAt, farEventAt, smokerGlow } from './pure/far.js';   // RAIN-5d: life far away
 const frac1=x=>x-Math.floor(x);
 import { winGarland, winEventAt, winOnOff } from './pure/windows.js';   // RAIN-5c: life in the windows   // RAIN-5c: the sky's clouds, moon, searchlight and aircraft   // RAIN-5: the people and the street's small life
 import { showDue, flashOf, breathOf, SHOWN } from './pure/shown.js';   // RAIN-5: the music shown when heard
-import { QUAD_V, BLUR_F, DOWN_F, VIEW_F, WIN_V, WIN_F, LIGHT_V, LIGHT_F, DROP_V, DROP_F, LIFE_V, LIFE_F, glassShader } from './rain-glass.js';
+import { QUAD_V, BLUR_F, DOWN_F, VIEW_F, WIN_V, WIN_F, LIGHT_V, LIGHT_F, DROP_V, DROP_F, LIFE_V, LIFE_F, FRAME_F, glassShader } from './rain-glass.js';
 import { cityUniforms, CITY_F, BAKED_F } from './rain-city.js';
 
 export const RAIN_LEVELS=RAIN_ROOM.levels;
@@ -84,11 +86,19 @@ export function buildRain(T, opt){
      windows, the depth map; raw values (the bake wrote the screen's colours), no mipmaps */
   const BK=opt.city || null, imgTex=(img, lum)=>{ const t=new T.Texture(img); t.minFilter=t.magFilter=T.LinearFilter; t.generateMipmaps=false; t.wrapS=t.wrapT=T.ClampToEdgeWrapping; if(lum) t.format=T.LuminanceFormat; t.needsUpdate=true; own.push(t); return t; };
   const litTex= BK ? imgTex(BK.lit) : null, depTex= BK ? imgTex(BK.depth, true) : null, EXT=new T.Vector2(BAKE_EXT[0], BAKE_EXT[1]); let moodTex=null, moodKey=null;
-  const bakedM= BK ? mat({ uniforms:{ uCity:{ value:null }, uDepthMap:{ value:depTex }, uTan:{ value:UT }, uExt:{ value:EXT }, uTexel:{ value:new T.Vector2(1/BK.depth.width, 1/BK.depth.height) } }, vertexShader:QUAD_V, fragmentShader:BAKED_F }) : null;   // UI-1: uTexel — the far windows read round
+  const bakedM= BK ? mat({ uniforms:{ uCity:{ value:null }, uDepthMap:{ value:depTex }, uTan:{ value:UT }, uExt:{ value:EXT }, uTexel:{ value:new T.Vector2(1/BK.depth.width, 1/BK.depth.height) }, uLampB:{ value:0 } }, vertexShader:QUAD_V, fragmentShader:BAKED_F }) : null;   // UI-1: uTexel — the far windows read round
   const moodOfLook=L=>Object.keys(RAIN_ROOM.looks).find(k=>RAIN_ROOM.looks[k]===L)||'late';
   const blurM=mat({ uniforms:{ uTex:{ value:null }, uDir:{ value:new T.Vector2() } }, vertexShader:QUAD_V, fragmentShader:BLUR_F });
   const downM=mat({ uniforms:{ uTex:{ value:null }, uTexel:{ value:new T.Vector2() } }, vertexShader:QUAD_V, fragmentShader:DOWN_F });   // small fixes: the mist's box downsample
-  const viewM=mat({ uniforms:{ uStreak:{ value:new T.Vector2(0, 0.08) }, uTime:UTIME, uBase:{ value:null }, uL1:{ value:null }, uL2:{ value:null }, uL3:{ value:null }, uDepth:{ value:null }, uRad:{ value:new T.Vector3(0.004, 0.012, 0.04) }, uFoc:{ value:FOC },
+  /* RAIN-7: THE CROWNS' MASK — where the baked city is nearer than the law's street over the promenade (the plane trees' crowns), read once on the CPU
+     from the depth map, softened so a crown's edge stays put while its inside sways (VIEW_F); ?rain=nosway — still, as before */
+  const swayOn=!(typeof location!=='undefined' && (new URLSearchParams(location.search).get('rain')||'').split(',').includes('nosway'));
+  let crownTex=null; if(BK && swayOn) try{ const GW=200, GH=110, m=new Float32Array(GW*GH), cv=document.createElement('canvas'); cv.width=BK.depth.width; cv.height=BK.depth.height; const g=cv.getContext('2d'); g.drawImage(BK.depth, 0, 0); const D=g.getImageData(0, 0, cv.width, cv.height).data;
+    for(let j=0;j<GH;j++) for(let i=0;i<GW;i++){ const x=((i+0.5)/GW*2-1)*BAKE_EXT[0], y=(1-(j+0.5)/GH*2)*BAKE_EXT[1], L=sceneAt(x, y); if(L.kind!=='street' || !L.hit || L.hit[0]<STREET.alleyA-0.5 || L.hit[0]>STREET.alleyB) continue;
+      const bd=D[(Math.min(cv.height-1, Math.floor((j+0.5)/GH*cv.height))*cv.width+Math.min(cv.width-1, Math.floor((i+0.5)/GW*cv.width)))*4]/255; if(bd<L.depth-0.015) m[j*GW+i]=1; }
+    const b=new Uint8Array(GW*GH); for(let j=0;j<GH;j++) for(let i=0;i<GW;i++){ let a=0, w=0; for(let dj=-1;dj<=1;dj++) for(let di=-1;di<=1;di++){ const ii=i+di, jj=j+dj; if(ii<0 || jj<0 || ii>=GW || jj>=GH) continue; a+=m[jj*GW+ii]; w++; } b[(GH-1-j)*GW+i]=Math.round(255*Math.max(0, a/w-0.34)/0.66); }
+    crownTex=new T.DataTexture(b, GW, GH, T.LuminanceFormat); crownTex.minFilter=crownTex.magFilter=T.LinearFilter; crownTex.generateMipmaps=false; crownTex.needsUpdate=true; own.push(crownTex); }catch(e){ crownTex=null; }
+  const viewM=mat({ uniforms:{ uCrown:{ value:crownTex }, uCExt:{ value:new T.Vector2(BAKE_EXT[0], BAKE_EXT[1]) }, uSway:{ value:0 }, uStreak:{ value:new T.Vector2(0, 0.08) }, uTime:UTIME, uBase:{ value:null }, uL1:{ value:null }, uL2:{ value:null }, uL3:{ value:null }, uDepth:{ value:null }, uRad:{ value:new T.Vector3(0.004, 0.012, 0.04) }, uFoc:{ value:FOC },
     uTan:{ value:UT }, uLight:{ value:new T.Vector3() }, uLightCol:{ value:LIGHT },
     uSkyA:{ value:new T.Vector4() }, uMoon:{ value:new T.Vector4() }, uMoonPh:{ value:0.5 }, uBeam:{ value:new T.Vector4() }, uPlane:{ value:new T.Vector4() }, uPlaneC:{ value:new T.Vector3() },   // RAIN-5c: the sky (pure/sky.js)
     uCloudLit:{ value:new T.Color() }, uCloudDark:{ value:new T.Color() }, uMoonCol:{ value:col('moon') }, uBeamCol:{ value:col('beam') }, uRedCol:{ value:col('nav-red') }, uGreenCol:{ value:col('nav-green') }, uWhiteCol:{ value:col('nav-white') } }, vertexShader:QUAD_V, fragmentShader:VIEW_F });
@@ -117,11 +127,22 @@ export function buildRain(T, opt){
   /* RAIN-5d: the far life (pure/far.js) — the hills' top cached on a grid once (the law's own scene), each far light shown only where the law sees the hills */
   const HOR=vanishing().horizon, TOPS=new Map(), topAt=u=>{ const k=Math.round(u*200); if(!TOPS.has(k)) TOPS.set(k, hillTop(k/200, sceneAt, HOR)); return TOPS.get(k); }, onHill=p=>p && sceneAt(p[0], p[1]).kind==='hills';
   const farDepth=sceneAt(0.6, HOR+0.03).depth||0.99, EMBER=col('ember'), TURN=col('turn'), BRIDGE=[]; { const B=FAR_LIFE.bridge; for(let k=0;k<B.lamps;k++){ const p=slope(B.u[0]+(B.u[1]-B.u[0])*k/(B.lamps-1), B.f, topAt, HOR); if(onHill(p)) BRIDGE.push(p); } }
-  const NL=FAR.length+LAMPS.length*2+CARS_MAX*6+32+STRINGS.length+12+40;
+  const NL=FAR.length+LAMPS.length*3+CARS_MAX*6+32+STRINGS.length+12+40;
   const lg=unitQuad(), lRect=new Float32Array(NL*4), lCol=new Float32Array(NL*4), lDK=new Float32Array(NL*2), aRect=dyn(lRect, 4), aCol=dyn(lCol, 4), aDK=dyn(lDK, 2);
   lg.setAttribute('aRect', aRect); lg.setAttribute('aCol', aCol); lg.setAttribute('aDK', aDK);
+  /* RAIN-6b (6): WHAT THE EYE CAN SEE — the baked depth map, read once on the CPU, at a light's or a living thing's place: where the city there is nearer
+     than the thing by more than CULL.m (far lights) or CULL.life (the street's lamps, cars and people), a house or a crown stands in front of it, so it
+     is not drawn (the founder saw the hills' lights through the left row). ?rain=nocull or cullDbg(false): everything drawn as before (the forest's
+     cull rule: the code stays, a switch turns it off). The stand-in (no bake) paints the law itself: nothing to cull */
+  const conesOn=!(typeof location!=='undefined' && (new URLSearchParams(location.search).get('rain')||'').split(',').includes('nocones'));   // RAIN-7
+  const CULL=Object.freeze({ far:0.8, m:0.03, life:0.06 }), SHOP=Object.freeze({ z:84, w:3.0, h:2.9 }), BUSKER=Object.freeze({ x:38.3, z:52 });   // RAIN-6b (4): the shop with the roller shutter; RAIN-7: the musician by the first cafe
+  let DPX=null, cullOn= !(typeof location!=='undefined' && (new URLSearchParams(location.search).get('rain')||'').split(',').includes('nocull')), culled=0;
+  const bakedAt=(x, y)=>{ if(!BK) return 1; if(!DPX){ try{ const c=document.createElement('canvas'); c.width=BK.depth.width; c.height=BK.depth.height; const g=c.getContext('2d'); g.drawImage(BK.depth, 0, 0); DPX={ d:g.getImageData(0, 0, c.width, c.height).data, w:c.width, h:c.height }; }catch(e){ DPX={ d:null }; } }
+    if(!DPX.d) return 1; const u=x/BAKE_EXT[0]*0.5+0.5, v=0.5-y/BAKE_EXT[1]*0.5; if(u<0 || u>1 || v<0 || v>1) return 1;
+    return DPX.d[(clamp(Math.round(v*DPX.h-0.5), 0, DPX.h-1)*DPX.w+clamp(Math.round(u*DPX.w-0.5), 0, DPX.w-1))*4]/255; };
+  const hidden=(x, y, dep, m)=>cullOn && !!BK && dep>0 && bakedAt(x, y)<dep-m;
   let nStatic=0, nLights=0;
-  const put=(i, x, y, hw, hh, c, k, depth, kind)=>{ lRect.set([x, y, hw, hh], i*4); lCol.set([c.r, c.g, c.b, k], i*4); lDK[i*2]=depth; lDK[i*2+1]=kind; };
+  const put=(i, x, y, hw, hh, c, k, depth, kind)=>{ if(k>0 && kind===0 && hidden(x, y, depth, depth>CULL.far ? CULL.m : CULL.life)){ k=0; culled++; } lRect.set([x, y, hw, hh], i*4); lCol.set([c.r, c.g, c.b, k], i*4); lDK[i*2]=depth; lDK[i*2+1]=kind; };
   /* a light at world point P (radius rad m) and, on the wet street, its reflection: a streak below its foot */
   const lightAt=(i, P, rad, c, k, refl, footY=0)=>{ const q=project(P); if(q.z<=1){ put(i, 9, 9, 0, 0, c, 0, 1, 0); return refl ? i+2 : i+1; }
     put(i, q.x, q.y, Math.max(rad/q.z, 0.0007), 0, c, k, depthOf(q.dist), 0); if(!refl) return i+1;
@@ -129,7 +150,11 @@ export function buildRain(T, opt){
     put(i+1, f.x, (top+bot)/2, Math.max(rad*1.6/q.z, 0.0008), hh, c, k*0.22, depthOf(q.dist), 1); return i+2; };
   const FARC=FAR.map(q=>HONEY.clone().lerp(AMBER, q.warm));   // RAIN-5d: the hill windows twinkle (put each frame in traffic())
   { let i=FAR.length;
-    for(const L of LAMPS) i=lightAt(i, L.p, 0.32, LAMP, 1, true); nStatic=i; }
+    for(const L of LAMPS) i=lightAt(i, L.p, 0.32, LAMP, 1, true);
+    /* RAIN-7: the rain seen in each lamp's light — a cone from its head to the street (the light layer's kind 3: a faint haze and the falling streaks lit) */
+    if(conesOn) for(const L of LAMPS){ const hd=project([L.p[0], L.p[1]-0.3, L.p[2]]), ft=project([L.p[0], 0, L.p[2]]), ed=project([L.p[0]+3.2, 0, L.p[2]]); if(hd.z<=1 || ft.z<=1 || hd.dist>220) continue;
+      put(i++, (hd.x+ft.x)/2, (hd.y+ft.y)/2, Math.max(0.002, Math.abs(ed.x-ft.x)), Math.max(0.002, (hd.y-ft.y)/2), LAMP, 0.9, depthOf(hd.dist), 3); }
+    nStatic=i; }
   const EVT=RAIN_ROOM.nature.layers ? RAIN_ROOM.nature.layers.events : null, EVT_SEED=RAIN_ROOM.nature.layers ? ((RAIN_ROOM.nature.layers.seed>>>0) || LAYERS.seed)>>>0 : 0;
   let clock=null, dripsShown=0, dens=1, book=null, tAudio=null, lookOver=null, mistOver=null, depthPx=null;
   /* RAIN-1: the cars are drawn at the moment that is HEARD now (the audio clock, its output latency in it) — the sound plays each car's pass from the
@@ -152,6 +177,11 @@ export function buildRain(T, opt){
   function traffic(t){
     tAudio= clock ? clock.ctx+(performance.now()-clock.perf)/1000 : null;
     let i=nStatic; const cars=trafficAt(tAudio==null ? t : tAudio, book||dens); let nc=0;   // RAIN-2: the book (every car decided before it enters)
+    taxiNow= bodiesOn ? taxiAt(tAudio==null ? t : tAudio) : null;   // RAIN-6b (3): the taxi (its sounds read the same law on the audio clock)
+    { const sw=bodiesOn ? sweepAt(tAudio==null ? t : tAudio) : null; if(sw && i<NL-2){ const a=project([STREET.opp-0.1, SWEEP.y, sw.z-3]), b=project([STREET.opp-0.1, SWEEP.y, sw.z+3]), c=project([STREET.opp-0.1, SWEEP.y+1.4, sw.z]);   // RAIN-7: a turning car's headlights sweep the house opposite
+        if(a.z>1 && b.z>1) put(i++, (a.x+b.x)/2, (a.y+b.y)/2, Math.max(0.002, Math.abs(b.x-a.x)/2), Math.max(0.002, c.y-(a.y+b.y)/2), HEAD, 0.16*sw.k, depthOf(c.dist), 2); sweepNow=sw; } else sweepNow=null; }
+    if(taxiNow){ const z=taxiNow.z, x=STREET.lanes[0].x-1.35, hz=blink(t, 1.5, 0.5);
+      for(const s of [-0.78, 0.78]){ i=lightAt(i, [x+s, 0.68, z], 0.11, HEAD, 1, true); if(taxiNow.hazard && hz) i=lightAt(i, [x+(s<0 ? -0.95 : 0.95), 0.7, z], 0.08, TURN, 0.9, false); } }
     for(const c of cars){ if(c.kind==='car'){ if(nc++>=CARS_MAX) continue;
         for(const s of [-0.78, 0.78]) i=lightAt(i, [c.x+s, 0.68, c.dir<0 ? c.z : c.z], 0.11, c.dir<0 ? HEAD : TAIL, c.dir<0 ? 1 : 0.8, true);
         { const hc=frac1(Math.sin((c.id||c.t0||c.z)*91.7)*43758.5); if(hc<FAR_LIFE.turn.share && blink(t, FAR_LIFE.turn.hz, 0.5, hc*7)) i=lightAt(i, [c.x+(hc<FAR_LIFE.turn.share/2 ? -0.95 : 0.95), 0.7, c.z], 0.08, TURN, 0.9, false); } }   // RAIN-5d: now and then a car's turn signal
@@ -171,21 +201,30 @@ export function buildRain(T, opt){
     { const ag=now-flashAt; if(ag<SHOWN.flash){ const fl=(ag<0.08 || (ag>0.18 && ag<0.26)) ? 1 : 0.25; put(i++, -0.2, 0.32, 1.4, 0.22, FLASH, 0.18*fl*(1-ag/SHOWN.flash), 1, 2); } }
     for(let j=i;j<nLights;j++) lCol[j*4+3]=0;   // last frame's extra lights out
     nLights=Math.max(i, nStatic); lg.instanceCount=Math.max(nLights, 1); aRect.needsUpdate=aCol.needsUpdate=aDK.needsUpdate=true; return cars; }
-  const lightM=mat({ uniforms:{ uTan:{ value:UT }, uFoc:{ value:FOC }, uPx:UPX, uWin:{ value:1 }, uLamp:ULAMP }, vertexShader:LIGHT_V, fragmentShader:LIGHT_F, transparent:true, blending:T.AdditiveBlending });
+  const lightM=mat({ uniforms:{ uTan:{ value:UT }, uFoc:{ value:FOC }, uPx:UPX, uWin:{ value:1 }, uLamp:ULAMP, uTime:UTIME, uRainK:{ value:0 } }, vertexShader:LIGHT_V, fragmentShader:LIGHT_F, transparent:true, blending:T.AdditiveBlending });
   const lights=add(new T.Mesh(lg, lightM), 2);
   /* RAIN-5: THE PEOPLE AND THE STREET'S SMALL LIFE (pure/life.js): one draw, each item projected by the view law and sized by its distance, drawn
      over the city and under the windows and lights; and THE MUSIC SHOWN (pure/shown.js): the bed's events queued with their heard moment */
   const NLIFE=320, fg=unitQuad(), fRect=new Float32Array(NLIFE*4), fK=new Float32Array(NLIFE*4), fD=new Float32Array(NLIFE), fRA=dyn(fRect, 4), fKA=dyn(fK, 4), fDA=dyn(fD, 1);
   fg.setAttribute('aRect', fRA); fg.setAttribute('aK', fKA); fg.setAttribute('aDep', fDA); fg.instanceCount=0; let lifeN=0;
   const lifeM=mat({ uniforms:{ uTan:{ value:UT }, uFoc:{ value:FOC }, uPx:UPX, uWin:{ value:1 }, uGarA:{ value:col('garland-a') }, uGarB:{ value:col('garland-b') }, uGarC:{ value:col('garland-c') }, uGarD:{ value:col('garland-d') },
-    uSign:{ value:col('sign') }, uSignWarm:{ value:col('sign-warm') }, uCross:{ value:col('cross') }, uWalkR:{ value:col('walk-red') }, uWalkG:{ value:col('walk-green') }, uNavR:{ value:TAIL }, uHead:{ value:HEAD } }, vertexShader:LIFE_V, fragmentShader:LIFE_F, transparent:true, blending:T.CustomBlending, blendSrc:T.OneFactor, blendDst:T.OneMinusSrcAlphaFactor, blendSrcAlpha:T.OneFactor, blendDstAlpha:T.OneMinusSrcAlphaFactor });   // RAIN-5c: + the furniture's lights
+    uWind:{ value:0 }, uTime:UTIME, uSign:{ value:col('sign') }, uSignWarm:{ value:col('sign-warm') }, uCross:{ value:col('cross') }, uWalkR:{ value:col('walk-red') }, uWalkG:{ value:col('walk-green') }, uNavR:{ value:TAIL }, uHead:{ value:HEAD } }, vertexShader:LIFE_V, fragmentShader:LIFE_F, transparent:true, blending:T.CustomBlending, blendSrc:T.OneFactor, blendDst:T.OneMinusSrcAlphaFactor, blendSrcAlpha:T.OneFactor, blendDstAlpha:T.OneMinusSrcAlphaFactor });   // RAIN-5c: + the furniture's lights
   const lifeMesh=add(new T.Mesh(fg, lifeM), 0.5);
   const NEON=['uSign', 'uSignWarm', 'uCross'].map(u=>[u, lifeM.uniforms[u].value.clone()]);   // RAIN-6c: the signs' own colours kept (Bright lights them up, Warm subdues them)
   const lifeHist=[];
   function lifeUpload(t, cars, fx){ const lk=moodOfLook(look); if(lookOver) lifeHist.length=0; if(!lifeHist.length || lifeHist[lifeHist.length-1][1]!==lk){ lifeHist.push([lifeHist.length ? t : -1e9, lk]); if(lifeHist.length>6) lifeHist.splice(1, 1); }
-    const A=lifeAt(t, lk, cars||[], fx && fx.wave, undefined, undefined, lifeHist, { signal }); let n=0;
-    for(const q of A){ if(n>=NLIFE) break; const b=project([q.x, q.y, q.z]); if(b.z<=1) continue; const tp=project([q.x, q.y+q.h*(q.kind<=2 || (q.kind>=14 && q.kind<=18) ? 1.15 : 1), q.z]), hh=(tp.y-b.y)/2, hw=q.w/2/b.z;
-      if(!(hh>0.00015) || Math.abs(b.x)>2 || Math.abs(b.y)>1.5) continue; fRect.set([b.x, b.y, hw, hh], n*4); fK.set([q.kind, q.ph, q.c, q.a], n*4); fD[n]=depthOf(b.dist); n++; }
+    const A=lifeAt(t, lk, cars||[], fx && fx.wave, undefined, undefined, lifeHist, { signal, sleep:sleepE }); let n=0;
+    if(bodiesOn){ const V=vehicleItems(cars||[], t, taxiNow); if(taxiNow && taxiNow.person) V.push({ kind:taxiNow.person.walk ? LK.walk : LK.stand, x:taxiNow.person.x, y:0, z:taxiNow.person.z, h:1.72, w:0.75, ph:taxiNow.person.walk ? frac1(t*0.9) : 0.25, c:5+8*UMB.black, a:taxiNow.person.a, lane:'taxi' }); A.unshift(...V); }   // RAIN-6b (1, 3): the bodies first (the people over them)
+    if(bodiesOn){ shutK+=((look===RAIN_ROOM.looks.late ? 1 : 0.5)-shutK)*Math.min(1, 0.02); A.push({ kind:27.9, x:STREET.opp-0.05, y:0.3, z:SHOP.z, h:SHOP.h, span:SHOP.w/2, ph:Math.min(0.99, shutK), c:0, a:1, lane:'facade' });   // RAIN-6b (4): the shop's roller shutter (the band 27.9 → kind 28)
+      if(look!==RAIN_ROOM.looks.late) A.push({ kind:29, x:BUSKER.x, y:0, z:BUSKER.z, h:1.72, w:1.0, ph:Math.min(0.99, Math.max(0, (t-buskAt)/0.7)), c:3, a:1, lane:'busker' });   // RAIN-7: the street musician under the awning, strumming when his note is heard
+      for(const [za, zb] of LIFE.tables.cafes) for(let z=za+1.5;z<zb-1.5;z+=3.2) A.push({ kind:27, x:STREET.opp-3.75, y:2.62, z, h:0.34, span:1.5, ph:0, c:Math.round(z*7)%9, a:0.95, lane:'facade' }); }   // the awnings' fringes, at their outer edge (the bake's panels: 3.2 m apart, 3.8 m deep, tilted)
+    for(const q of A){ if(n>=NLIFE) break; if(q.span){ const p1=project([q.x, q.y, q.z-q.span]), p2=project([q.x, q.y, q.z+q.span]), p3=project([q.x, q.y+q.h, q.z]); if(p1.z<=1 || p2.z<=1) continue;   // a facade thing: its width along the facade, its slope
+        const cx=(p1.x+p2.x)/2, cy=(p1.y+p2.y)/2, hw=Math.abs(p2.x-p1.x)/2, hh=(p3.y-cy)/2, kk=hw>0 && hh>0 ? (p2.y-p1.y)/(p2.x-p1.x)*hw/(2*hh)*Math.sign(p2.x-p1.x) : 0, dq=depthOf(p3.dist);
+        if(!(hh>0.0002) || hidden(cx, cy+hh, dq, CULL.life)) continue; fRect.set([cx, cy, hw, hh], n*4); fK.set([Math.round(q.kind), Math.round(Math.max(0, Math.min(1, kk+0.5))*16)+q.ph, q.c, q.a], n*4); fD[n]=dq; n++; continue; }
+      const b=project([q.x, q.y, q.z]); if(b.z<=1) continue; const veh=q.kind===VK.car || q.kind===VK.tram, tp=veh ? project([q.x, q.y+q.h, q.z+q.len]) : project([q.x, q.y+q.h*(q.kind<=2 || (q.kind>=14 && q.kind<=18) ? 1.15 : 1), q.z]), hh=(tp.y-b.y)/2, hw=q.w/2/b.z;
+      if(veh){ const fy=project([q.x, q.y+q.h, q.z]).y; q.ph=Math.floor(q.ph)+Math.max(0.12, Math.min(0.95, (fy-b.y)/Math.max(1e-6, tp.y-b.y))); }   // the face's share of the sprite
+      if(!(hh>0.00015) || Math.abs(b.x)>2 || Math.abs(b.y)>1.5) continue; const dq=depthOf(b.dist); if(hidden(b.x, b.y+hh*0.2, dq, CULL.life) && hidden(b.x, tp.y, dq, CULL.life)){ culled++; continue; }   // RAIN-6b (6): wholly behind a house or a crown
+      fRect.set([b.x, b.y, hw, hh], n*4); fK.set([q.kind, q.ph, q.c, q.a], n*4); fD[n]=dq; n++; }
     lifeN=n; fg.instanceCount=n; fRA.needsUpdate=fKA.needsUpdate=fDA.needsUpdate=true; }
   const bedQ=[], shownLog=[], GO=col('go'), SPARK=col('spark'), FLASH=col('flash'); let signal=0, sparkAt=-1e9, flashAt=-1e9, breathEnd=-1e9;
   const bedIn=(ev, when)=>{ if(Number.isFinite(when)){ bedQ.push({ ...ev, when }); if(bedQ.length>256) bedQ.shift(); } };
@@ -206,7 +245,12 @@ export function buildRain(T, opt){
   const glassM=mat({ uniforms:{ uView:{ value:null }, uSoft:{ value:null }, uDrop:{ value:null }, uWipe:{ value:mapTex }, uTan:{ value:UT }, uOff:{ value:UOFF }, uExt:{ value:new T.Vector2(GLASS.ext[0], GLASS.ext[1]) },
     uFloor:{ value:new T.Vector3(0, GLASS.mid[0], GLASS.mid[1]) }, uLight:{ value:new T.Vector2() }, uTime:UTIME, uRain:{ value:rainK }, uMist:{ value:mistK }, uG:{ value:0 }, uLightK:{ value:0 },
     uLightCol:{ value:LIGHT }, uMistCol:{ value:mistCol } }, vertexShader:QUAD_V, fragmentShader:glassShader(Lv.fine) });
-  const qGlass=add(new T.Mesh(quad, glassM), 0), ALL=[qCity, qBlur, qDown, qView, lifeMesh, wins, lights, dropsMesh, qGlass];
+  /* RAIN-7: our own window (concept layer 0): the frame, the latch, the sill with the tea and the plant — over the glass, focused as the nearest thing; ?rain=noframe without */
+  let frameOn=!(typeof location!=='undefined' && (new URLSearchParams(location.search).get('rain')||'').split(',').includes('noframe'));
+  const frameM=mat({ uniforms:{ uTan:{ value:UT }, uSoft:{ value:0 }, uTime:UTIME, uAll:{ value:0 }, uFade:{ value:0 }, uWood:{ value:new T.Color(0.13, 0.12, 0.105) }, uBrass:{ value:new T.Color(0.42, 0.3, 0.12) }, uWarm:{ value:new T.Color(1.0, 0.7, 0.4) }, uLeaf:{ value:new T.Color(0.05, 0.1, 0.05) } }, vertexShader:QUAD_V, fragmentShader:FRAME_F,
+    transparent:true, blending:T.CustomBlending, blendSrc:T.OneFactor, blendDst:T.OneMinusSrcAlphaFactor, blendSrcAlpha:T.OneFactor, blendDstAlpha:T.OneMinusSrcAlphaFactor });
+  const qFrame=add(new T.Mesh(quad, frameM), 1);
+  const qGlass=add(new T.Mesh(quad, glassM), 0), ALL=[qCity, qBlur, qDown, qView, lifeMesh, wins, lights, dropsMesh, qGlass, qFrame];
   const show=(...on)=>{ for(const m of ALL) m.visible=on.includes(m); };
   const pass=(r, target, ...on)=>{ show(...on); r.setRenderTarget(target); r.render(scene, camera); };
   const blur=(r, from, to, dx, dy)=>{ blurM.uniforms.uTex.value=from; blurM.uniforms.uDir.value.set(dx, dy); pass(r, to, qBlur); };
@@ -234,6 +278,7 @@ export function buildRain(T, opt){
     if(bakedM){ const k=moodOfLook(look); if(k!==moodKey){ if(moodTex) moodTex.dispose(); moodTex=imgTex(BK.moods[k]||BK.moods.late); moodKey=k; } bakedM.uniforms.uCity.value=moodTex; }   // RAIN-1: the mood's baked colour (the last one leaves the GPU)
     const P=lookCols(look), U=cityU; U.uTan.value.copy(UT);
     for(const [u, k] of [['uSky', 'sky'], ['uCloud', 'cloud'], ['uGlow', 'glow'], ['uHaze', 'haze'], ['uStone', 'stone'], ['uPlaster', 'plaster'], ['uAsph', 'asphalt']]) U[u].value.copy(P[k]);
+    if(bakedM) bakedM.uniforms.uLampB.value=bakedLamp;
     U.uPane.value.copy(PANE); U.uLamp.value.copy(LAMP); pass(r, RT.base, qCity);   // the baked city or, without its files, the stand-in
     const unit=2*th/bh, s1=1.5*2*Math.hypot(1, 2), s2=1.5*4*Math.hypot(1, 2), s3=1.5*8*Math.hypot(1, 2, 3);   // σ in full-size pixels
     blur(r, RT.base.texture, RT.t1, 1/RT.t1.width, 0); blur(r, RT.t1.texture, RT.l1, 0, 1/RT.l1.height); blur(r, RT.l1.texture, RT.t1, 2/RT.t1.width, 0); blur(r, RT.t1.texture, RT.l1, 0, 2/RT.l1.height);
@@ -247,15 +292,17 @@ export function buildRain(T, opt){
   let rr=null;   // the renderer of the last frame (the probes' read-back)
   function render(r){
     rr=r; targets(r); const keep=r.getRenderTarget();
-    if(dirty){ dirty=false; paint(r); }
-    pass(r, RT.view, qView, lifeMesh, wins, lights);
-    soft(r, RT.view.texture, RT.view.width, RT.view.height, softOld);
-    r.getClearColor(keepClear); const ka=r.getClearAlpha(); r.setClearColor(0x000000, 0); show(dropsMesh); r.setRenderTarget(RT.drop); r.clear(true, false, false); r.render(scene, camera); r.setClearColor(keepClear, ka);
-    pass(r, keep, qGlass); show(...ALL); frames++;
+    const PT=typeof window!=='undefined' && window.__rainPassT, T=(n, f)=>PT ? PT(n, f) : f();   // PERF-1 (dev tool only): each pass timed on the GPU
+    if(dirty){ dirty=false; T('paint', ()=>paint(r)); }
+    T('view', ()=>pass(r, RT.view, qView, lifeMesh, wins, lights));
+    T('mist', ()=>soft(r, RT.view.texture, RT.view.width, RT.view.height, softOld));
+    T('drops', ()=>{ r.getClearColor(keepClear); const ka=r.getClearAlpha(); r.setClearColor(0x000000, 0); show(dropsMesh); r.setRenderTarget(RT.drop); r.clear(true, false, false); r.render(scene, camera); r.setClearColor(keepClear, ka); });
+    /* RAIN-7: our window comes in after the reveal (8–12 s after its first frame, on the room's own clock — the same for one state rendered twice — the start's still and the first live frames show the city alone) */
+    frameM.uniforms.uSoft.value=blurAt(0.012, focus)*0.03; if(frameT0==null) frameT0=now; frameM.uniforms.uFade.value=Math.max(0, Math.min(1, (now-frameT0-8)/4)); T('glass', ()=>{ if(frameOn) pass(r, keep, qGlass, qFrame); else pass(r, keep, qGlass); }); show(...ALL); frames++;
   }
 
   /* ---- the room's state: the focus, the playing light, the lean, the finger on the glass ---- */
-  let focus=FOCUS.rest, target=FOCUS.rest, restOn=false, heldNow=0, pressAt=-1e9, lastPick=-1, picks=0, wipes=0, strokes=0, viewOver=null, finger=null, rainOver=null, simFrozen=false, fxE=0, fxT=0.5, fxW=0, fxOff=false, rainEff=0, soundSent=null, neonNow=1, winExtra=0; const pickLog=[];   // RAIN-6: fxE…soundSent — the effects hand's eased values
+  let focus=FOCUS.rest, target=FOCUS.rest, restOn=false, heldNow=0, pressAt=-1e9, lastPick=-1, picks=0, wipes=0, strokes=0, viewOver=null, finger=null, rainOver=null, simFrozen=false, fxE=0, fxT=0.5, fxW=0, fxOff=false, sleepE=0, sleepOver=null, sleepM=null, taxiNow=null, sweepNow=null, buskAt=-1e9, frameT0=null, bakedLamp=0, shutK=0.5, bodiesOn=!(typeof location!=='undefined' && (new URLSearchParams(location.search).get('rain')||'').split(',').includes('nobodies')), rainEff=0, soundSent=null, neonNow=1, winExtra=0; const pickLog=[];   // RAIN-6: fxE…soundSent — the effects hand's eased values
   const light={ x:0, y:0, on:0, d:0, glow:0.6 }, off={ x:0, y:0 };
   const toTan=(px, py)=>[(px/W*2-1)*tw, (1-py/H*2)*th];
   function resize(w, h, bufH){ W=w; H=h; const fov= viewOver && viewOver.fov ? viewOver.fov : roomFov(RAIN_ROOM.view, w, h); th=Math.tan(fov*Math.PI/360); tw=th*w/h; UT.set(tw, th);
@@ -264,14 +311,15 @@ export function buildRain(T, opt){
   function update(dt, t, hands, fx, nin){
     now=t; UTIME.value=t;
     if(nin && nin.mood!==undefined && nin.mood!==moodId){ moodId=nin.mood; look=roomLook(RAIN_ROOM, moodId); }
+    sleepE= sleepOver!=null ? sleepOver : nin && nin.sleep>0 ? nightDeep(nin.sleep).e : 0;   // RAIN-6b (8): the sleep timer's depth (the forest's curve)
     if(lookOver && RAIN_ROOM.looks[lookOver]) look=RAIN_ROOM.looks[lookOver];   // captures only: a mood held
-    { const nd=trafficDensity(look.traffic, fx && fx.wave), at=(tAudio==null ? t : tAudio)+DENS_MARGIN; if(!book){ book=passBook(nd); natureDensity(nd, -1e9); } else if(nd!==dens && passBookSet(book, at, nd)) natureDensity(nd, at); dens=nd; }   // RAIN-2: booked a margin ahead, the same time to the sound   // RAIN-1: the mood's traffic × Wave — the picture and the sound the same number
+    { const nd=sleepTraffic(trafficDensity(look.traffic, fx && fx.wave), sleepE), at=(tAudio==null ? t : tAudio)+DENS_MARGIN; if(!book){ book=passBook(nd); natureDensity(nd, -1e9); } else if(nd!==dens && passBookSet(book, at, nd)) natureDensity(nd, at); dens=nd; }   // RAIN-2: booked a margin ahead, the same time to the sound   // RAIN-1: the mood's traffic × Wave — the picture and the sound the same number
     if(look!==painted && painted) dirty=true;
     { const a=1-Math.exp(-dt/MOOD_TC); mistK+=(look.mist-mistK)*a; rainK+=(look.rain-rainK)*a; litK+=(look.lit-litK)*a; mistCol.lerp(lookCols(look).mist, a); }
     /* RAIN-6 (item 7): the effects hand — Echo the rain's strength (the drops, the falling streaks, its sound), Warm ↔ Bright the city light's colour; exactly
        neutral at rest (pure/fxlaw.js). fxOff (probe CONTROL): the hand ignored */
     { const e=fxOff ? 0 : +(fx && fx.echo)||0, tn=fxOff || !fx || fx.tone==null ? 0.5 : +fx.tone, w=fxOff ? 0 : +(fx && fx.wave)||0; fxE=easeTo(fxE, e, dt); fxT=easeTo(fxT, tn, dt); fxW=easeTo(fxW, w, dt);
-      rainEff=rainOf(rainK, fxE); const S=streakOf(fxE, fxW), lp=lampOf(fxT), V=viewM.uniforms; V.uStreak.value.set(S.amount, S.slant); ULAMP.value=lp;
+      rainEff=rainOf(rainK, fxE); const S=streakOf(fxE, fxW), lp=lampOf(fxT), V=viewM.uniforms; V.uStreak.value.set(S.amount, S.slant); ULAMP.value=lp; V.uSway.value= crownTex ? 0.0011+0.0042*fxW : 0; lightM.uniforms.uRainK.value=rainEff; lifeM.uniforms.uWind.value=fxW; if(bakedM && Math.abs(lp-bakedLamp)>0.04 || (lp===0 && bakedLamp!==0)){ bakedLamp= Math.abs(lp)<0.02 ? 0 : lp; if(bakedM) dirty=true; }   // RAIN-6b: the baked shop windows follow (a repaint per step, only while the tone moves)
       /* RAIN-6c: the windows' light (warm: amber tungsten, a little dimmer; bright: a cool TV glow) and the signs' neon (subdued / up); exactly as they are at rest */
       { const to= lp<0 ? TUNG : LEDW, k=Math.abs(lp), dim= lp<0 ? 1-0.18*k : 1+0.12*k; HONEY.copy(WBASE[0]).lerp(to, k*0.75).multiplyScalar(dim); AMBER.copy(WBASE[1]).lerp(to, k*0.75).multiplyScalar(dim);
         const nf=neonOf(lp), L=lifeM.uniforms; for(const [u, b] of NEON) L[u].value.copy(b).multiplyScalar(nf); }
@@ -297,11 +345,13 @@ export function buildRain(T, opt){
     if(!simFrozen) dropsStep(SIM, dt, rainOver==null ? rainEff : rainOver); dropsUpload();
     if(wl || wipe.live || SIM.laneLive || mapDirty){ mapDirty=wipe.live || SIM.laneLive; const A=wipe.a, Ln=SIM.lane; for(let i=0;i<A.length;i++){ mapBytes[i*2]=A[i]*255; mapBytes[i*2+1]=Ln[i]*255; } mapTex.needsUpdate=true; }
     for(let i=0;i<WIN.length;i++) lit[i]=windowLight(WIN[i], litK+winExtra, t-litAt[i]);   // RAIN-6c: Bright lights more windows
+    if(sleepE>0){ if(!sleepM || sleepM.at!==picks){ sleepM=sleepMine(litAt); sleepM.at=picks; }   // RAIN-6b (8): the city falls asleep — window by window, yours last
+      for(let i=0;i<WIN.length;i++){ const m=sleepM.has(i) ? sleepM.get(i) : -1; lit[i]=(m>=0 ? Math.max(lit[i], 0.85) : lit[i])*sleepWinKeep(sleepWinAt(i, m, sleepM.size), sleepE); } }
     { const cand=[]; for(let i=0;i<WIN.length;i++) if(WIN[i].amb<litK && WIN[i].depth<0.9) cand.push(i); winEv=winEventAt(t, cand);   // RAIN-5c: life in a lit window (rare)
       if(winEvPrev>=0 && (!winEv || winEv.i!==winEvPrev)){ evArr[winEvPrev*4+1]=0; evArr[winEvPrev*4+2]=0; }
       { const fe=farEventAt(t); if(fe && fe.kind==='attic' && !winEv){ const top=[]; for(let j=0;j<WIN.length;j++) if((WIN[j].floor||0)>=5) top.push(j); if(top.length){ const j=top[Math.floor(fe.k*top.length)]; winEv={ i:j, kind:'walkup', u:frac1(fe.u*2), attic:true }; lit[j]=Math.max(lit[j], 0.85*Math.min(1, fe.u*8, (1-fe.u)*8)); } } }   // RAIN-5d: someone moving in a lit attic
       if(winEv){ const K={ walkup:1, curtain:2, onoff:3 }[winEv.kind]; evArr[winEv.i*4+1]=K; evArr[winEv.i*4+2]=winEv.u; if(K===3) lit[winEv.i]*=winOnOff(winEv.u); winEvPrev=winEv.i; } else winEvPrev=-1; evAttr.needsUpdate=true; }
-    for(const e of showDue(bedQ, t)){ shownLog.push([e.kind, e.when, t]); if(shownLog.length>64) shownLog.shift(); if(e.kind==='chord'){ signal^=1; sparkAt=t; } const b=breathOf(e); if(b) breathEnd=Math.max(breathEnd, t+b); if(flashOf(e, e.when)) flashAt=t; }
+    for(const e of showDue(bedQ, t)){ shownLog.push([e.kind, e.when, t]); if(shownLog.length>64) shownLog.shift(); if(e.kind==='chord'){ signal^=1; sparkAt=t; } if(e.kind==='busk') buskAt=t; const b=breathOf(e); if(b) breathEnd=Math.max(breathEnd, t+b); if(flashOf(e, e.when)) flashAt=t; }
     if(t<breathEnd){ const kb=0.22*Math.min(1, (breathEnd-t)*2); for(let i=0;i<lit.length;i++) if(lit[i]>0.15) lit[i]=Math.min(1, lit[i]*(1+kb)); }
     litAttr.needsUpdate=true; lifeUpload(t, traffic(t), fx);
     { const S=skyAt(skyT==null ? t : skyT, moodOfLook(look)), V=viewM.uniforms, P=lookCols(look); V.uSkyA.value.set(S.drift[0], S.drift[1], S.cover, 1);   // RAIN-5c: the sky's clouds, moon and rare events
@@ -340,7 +390,17 @@ export function buildRain(T, opt){
     flyPick, flyAt:i=>{ const q=windowAt(i); return q ? { i, x:q.x, y:q.y, r:Math.max(1.5, q.r), glow:lit[i], dist:30, front:q.inView } : null; }, flyLand:i=>{ if(!WIN[i]) return false; litAt[i]=now; return true; },
     windowAt, wipeAtDbg:(x, y)=>wipeAt(wipe, x, y), wipeCellDbg:(x, y)=>wipeCell(wipe, x, y), laneAtDbg:(x, y)=>laneAt(SIM, x, y), focusDbg:v=>{ if(v!=null) focus=clamp(+v, 0, 1); return focus; },
     /* probes and captures: the drops as they are (a copy), the rain's strength held, the simulation frozen; the depth the picture holds at a view place, read back */
-    dropsDbg:()=>SIM.list.map(d=>({ id:d.id, x:d.x, y:d.y, r:d.r, mv:d.mv })), fxDbg:o=>{ if(o && 'off' in o) fxOff=!!o.off; return { off:fxOff }; },   // RAIN-6: the effects hand ignored (probe CONTROL)
+    dropsDbg:()=>SIM.list.map(d=>({ id:d.id, x:d.x, y:d.y, r:d.r, mv:d.mv })), fxDbg:o=>{ if(o && 'off' in o) fxOff=!!o.off; return { off:fxOff }; },
+    frameAllDbg:on=>{ frameM.uniforms.uAll.value=on ? 1 : 0; },   // PERF-2: the window computed over the whole pane, as before (the A/B's other side)
+    frameDbg:on=>{ if(on!=null) frameOn=!!on; return frameOn; },   // RAIN-7 / PERF-1: our own window on or off
+    frameSoftDbg:f=>blurAt(0.012, f)*0.03,   // RAIN-7: the window's softness at a focus (the render's own formula)
+    rain7Dbg:()=>{ let cones=0; for(let j=0;j<nLights;j++) if(lDK[j*2+1]===3 && lCol[j*4+3]>0) cones++; let cs=0; if(crownTex){ const D=crownTex.image.data; for(let i=0;i<D.length;i++) if(D[i]>0) cs++; cs/=crownTex.image.data.length; }
+      return { cones, crownShare:cs, sway:viewM.uniforms.uSway.value, frameOn, frameSoft:frameM.uniforms.uSoft.value, focus, buskAt, t:now, busker:look!==RAIN_ROOM.looks.late }; },   // RAIN-7
+    litSumDbg:()=>{ let x=0; for(let i=0;i<lit.length;i++) x+=lit[i]; return x; },   // RAIN-6b (8): how lit the windows are, all together
+    bodiesDbg:on=>{ if(on!=null) bodiesOn=!!on; return { on:bodiesOn, taxi:taxiNow, sweep:sweepNow }; },   // RAIN-6b (1): the vehicles' bodies (?rain=nobodies: only their lights, as before)
+    sleepDbg:v=>{ if(v!==undefined) sleepOver= v==null ? null : clamp(+v, 0, 1); return { e:sleepE, over:sleepOver, mine:sleepM ? sleepM.size : 0 }; },   // RAIN-6b (8): the sleep's depth held (probes)
+    cullDbg:on=>{ if(on!=null) cullOn=!!on; const c=culled; culled=0; return { on:cullOn, culled:c }; }, hiddenDbg:(x, y, d, m)=>BK ? bakedAt(x, y)<d-(m==null ? CULL.m : m) : false,   // RAIN-6b (6): the cull's switch and its count since the last call
+    liveLightsDbg:()=>{ const out=[]; for(let j=0;j<nLights;j++) if(lCol[j*4+3]>0.003) out.push({ x:lRect[j*4], y:lRect[j*4+1], depth:lDK[j*2], kind:lDK[j*2+1], k:lCol[j*4+3] }); return out; },   // RAIN-6: the effects hand ignored (probe CONTROL)
     rainDbg:v=>{ rainOver= v==null ? null : clamp(+v, 0, 1); return rainOver; }, freezeDbg:on=>{ simFrozen=!!on; return simFrozen; },
     lawDepthDbg:(x, y)=>sceneAt(x, y).depth, blurAtDbg:d=>blurAt(d, focus),
     /* a render target's pixels at view places ([x, y] view-angle units) → [r, g, b, a] 0…1 each; 'base' holds the city with its depth in a */

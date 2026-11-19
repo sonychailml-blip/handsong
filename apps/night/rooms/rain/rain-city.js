@@ -15,11 +15,14 @@ const N=8;   // blocks per row the shader holds (BLOCKS has at most 8 per row)
    mood or screen size, so the taps cost nothing per frame. The street and the house opposite stay exactly as baked. */
 export const FAR_SOFT=Object.freeze([0.8, 0.84, 3.0]);
 export const BAKED_F=`precision highp float; varying vec2 vUv; uniform sampler2D uCity, uDepthMap; uniform vec2 uTan, uExt, uTexel;
+uniform float uLampB;   /* RAIN-6b (RAIN-6c's rest): the street's baked lights — shop windows, their pools — follow Warm-Bright like the lamps (exactly as baked at 0) */
 void main(){ vec2 q=clamp((vUv*2.-1.)*uTan/uExt*0.5+0.5, 0., 1.); float d=texture2D(uDepthMap, q).r; vec3 c=texture2D(uCity, q).rgb;
   if(d>${FAR_SOFT[0].toFixed(3)}){ vec3 s=vec3(0.); float w=0.;
     for(int j=-6;j<=6;j++) for(int i=-6;i<=6;i++){ vec2 o=vec2(float(i), float(j))*0.5; float r=length(o); if(r>${FAR_SOFT[2].toFixed(2)}) continue;
       float dk=texture2D(uDepthMap, q+o*uTexel).r; if(dk>${FAR_SOFT[0].toFixed(3)}){ float g=exp(-r*r/3.2); s+=texture2D(uCity, q+o*uTexel).rgb*g; w+=g; } }
     if(w>0.) c=mix(c, s/w, smoothstep(${FAR_SOFT[0].toFixed(3)}, ${FAR_SOFT[1].toFixed(3)}, d)); }
+  if(uLampB!=0. && d<${FAR_SOFT[0].toFixed(3)}){ float L=dot(c, vec3(0.3, 0.5, 0.2)), m=smoothstep(0.22, 0.5, L)*smoothstep(0.03, 0.16, c.r-c.b);
+    c=mix(c, uLampB<0. ? L*vec3(1.38, 0.8, 0.38)*0.85 : L*vec3(0.92, 1.0, 1.12)*1.2, m*abs(uLampB)); }
   gl_FragColor=vec4(c, d); }`;
 /* the uniforms of the painting (T the THREE namespace); the palette is set per look by the caller */
 export function cityUniforms(T){

@@ -16,7 +16,7 @@
      vehicle at the listener — the picture draws the same vehicles from the same law on the same clock. Panned by the vehicle's side, louder the
      nearer its lane, its playback rate by its speed (rate = v / vRef, bounded), into the far output (the street), softer when the focus is near. The
      density (Wave and the mood) comes by message, the same number the picture uses. A room without `passes` computes nothing new. */
-import { passEvents, passBook, passBookSet } from './passes.js';   // RAIN-1: the vehicles' law
+import { passEvents, passTramEvents, passBook, passBookSet, stopSounds } from './passes.js';   // RAIN-1: the vehicles' law (RAIN-6b: the trams' moments)
 export const LAYERS=Object.freeze({ seed:0x4C415952, grain:Object.freeze([5, 9]), fade:1.5, edge:0.25, focusTc:0.08, wake:0.6, slot:0.5, synth:0.12 });   // synth: the fallback's level
 const hash=(a, b)=>{ let h=(Math.imul(a|0, 0x27d4eb2d)^Math.imul(b|0, 0x165667b1))>>>0; h=Math.imul(h^(h>>>15), 0x85ebca77)>>>0; h=Math.imul(h^(h>>>13), 0xc2b2ae3d)>>>0; return ((h^(h>>>16))>>>0)/4294967296; };
 const rng=seed=>{ let s=(seed>>>0)||1; return ()=>{ s^=s<<13; s>>>=0; s^=s>>>17; s^=s<<5; s>>>=0; return s/4294967296; }; };
@@ -39,7 +39,7 @@ export function layersNew(rate, L, seed=LAYERS.seed){
     : { b0:(1-c)/2/a0, b1:(1-c)/a0, b2:(1-c)/2/a0, a1:-2*c/a0, a2:(1-al)/a0, x1:0, x2:0, y1:0, y2:0 }; };
   const syn={ R:rng((seed^0x53594E54)>>>0), n:[bq('bp', 2600, 0.5), bq('bp', 2900, 0.5)], f:[bq('lp', 700, 0.6), bq('lp', 640, 0.6)] };
   return { rate, L, seed:seed>>>0, syn, near:null, far:null, f:0, fs:0, kf:1-Math.exp(-1/(LAYERS.focusTc*rate)), on:false, g:0, dg:1/(LAYERS.wake*rate), sleep:true,
-    frames:0, grains:0, voices:[], evT:null, X:Math.round(LAYERS.fade*rate), cars:null, pv:[], pT:null, dens:1, passes:0, passLog:[] };
+    frames:0, grains:0, voices:[], evT:null, X:Math.round(LAYERS.fade*rate), cars:null, pv:[], pT:null, dens:1, passes:0, passLog:[], trams:null, tv:[], tT:null, tramLog:[], tR:rng((seed^0x5452414D)>>>0) };
 }
 /* a layer's recording: `which` 'near' | 'far', its two channels (Float32Array at the state's rate; one channel is used for both) and level → true, or
    false when it is too short */
@@ -56,6 +56,9 @@ export function layersPasses(st, Y, norm=1){
   const need=Math.max(...P.segs.map(([a, n])=>a+n))*st.rate; if(Y.length<need-1) return false;
   st.cars={ Y, norm:+norm||1 }; return true;
 }
+/* RAIN-6b (2): the trams' recording (mono, at the state's rate) → true, or false when shorter than its table needs */
+export function layersTrams(st, Y, norm=1){ const T=st.L && st.L.trams; if(!T || !(Y instanceof Float32Array)) return false;
+  if(Y.length<Math.max(...T.segs.map(([a, n])=>a+n))*st.rate-1) return false; st.trams={ Y, norm:+norm||1 }; return true; }
 /* RAIN-1: the traffic's density (the picture's same number) */
 export function layersDensity(st, d, at=null, now=0){ d=Math.max(0, +d||0); st.dens=d;   // RAIN-2: the density book — at the picture's time (at), or now + the margin (no picture); the first one opens the book
   if(!st.book || at===-1e9) st.book=passBook(d); else passBookSet(st.book, at==null ? now+0.5 : at, d); }
@@ -64,7 +67,7 @@ export function layersFocus(st, f){ st.f=Math.max(0, Math.min(1, +f||0)); }
 /* RAIN-6: the rain's sound with Echo — the near and far gains' factors (exactly 1 at rest) */
 export function layersRain(st, near, far){ st.rk={ near:Math.max(0, +near||0), far:Math.max(0, +far||0) }; }
 /* AUDIO-3 (development lab): parts of the layers left out (not computed): { near, far, cars } */
-export function layersSkip(st, k){ st.skip={ near:!!(k && k.near), far:!!(k && k.far), cars:!!(k && k.cars) }; }
+export function layersSkip(st, k){ st.skip={ near:!!(k && k.near), far:!!(k && k.far), cars:!!(k && k.cars), trams:!!(k && k.trams) }; }
 export function layersOn(st, on){ st.on=!!on; if(on) st.sleep=false; }
 /* one layer's grains added into L, R (from index o, n frames), times the per-frame gain array G */
 function layerAdd(st, Y, L, R, o, n, G){
@@ -112,9 +115,38 @@ export function layersOut(st, t0, nL, nR, fL, fR, o=0, n=nL.length-o){
     for(let v=st.pv.length-1;v>=0;v--){ const V=st.pv[v]; const i0=Math.max(0, Math.ceil(V.at));
       for(let i=i0;i<n;i++){ const q=(i-V.at)*V.r; if(q>=V.n-1){ V.done=true; break; } const j=V.s+q, a=Math.floor(j), f=j-a, x=(Y[a]+(Y[a+1]-Y[a])*f)*V.k*g*sw; fL[o+i]+=x*V.pl; fR[o+i]+=x*V.pr; }
       if(V.done || (n-V.at)*V.r>=V.n-1) st.pv.splice(v, 1); else V.at-=n; } }
+  /* RAIN-6b (2): THE TRAMS (opt-in `trams`, with `passes`' law and listener): each tram's pass a one-shot of the tram recording, its peak on the law's
+     moment (its middle under the window); the BELL (two struck tones, ding-ding) as it nears the crossing; the SQUEAL where the line curves off (far);
+     RAIL CLACKS as its bogies cross the joints near the window (ta-tak, by distance); without the recording a low RUMBLE in its place (the fallback) */
+  const TR=P.trams;
+  if(TR && PS && st.on && !SK.trams){ const from= st.tT==null ? t0 : st.tT, to=t1+(TR.lead||12), sw=0.35+0.65*Math.sin(fs*Math.PI/2);
+    for(const e of passTramEvents(PS.traffic, PS.ear, from, to, st.book||st.dens)){ const pl=Math.cos((e.pan+1)*Math.PI/4), pr=Math.sin((e.pan+1)*Math.PI/4), near=Math.max(0.2, Math.min(1.4, (TR.dRef||25)/e.dist)), at=(e.t-t0)*rate;
+      if(e.kind==='pass'){ st.tramLog.push({ t:e.t, slot:e.slot }); if(st.tramLog.length>32) st.tramLog.shift();
+        if(st.trams){ const seg=TR.segs[Math.floor(hash(e.slot*31+7, 3)*TR.segs.length)]; st.tv.push({ k:'rec', at:at-seg[2]*rate, s:seg[0]*rate, n:seg[1]*rate, g:TR.gain*st.trams.norm*near, pl, pr }); }
+        else st.tv.push({ k:'rumble', at:at-7*rate, n:14*rate, mid:7*rate, g:(TR.rumble||0.05)*near, pl, pr, y:0 });
+        const C=TR.clacks; if(C) for(const ob of C.bogies) for(let j=-3;j<=3;j++){ const tj=e.t+(j*C.joint+ob*e.dir)/e.v; if(tj<from || tj>=to+6) continue;
+          const d=Math.hypot(e.x-PS.ear.x, 1-PS.ear.y, j*C.joint), k=C.gain*(st.trams ? C.withRec : 1)*Math.min(1.4, (TR.dRef||25)/d); for(const dt of [0, C.axle/e.v]) st.tv.push({ k:'clack', at:(tj+dt-t0)*rate, n:Math.round(0.012*rate), g:k, pl, pr, y:0 }); } }
+      else if(e.kind==='bell'){ const B=TR.bell; for(const dt of [0, B.again]) st.tv.push({ k:'bell', at:at+dt*rate, n:Math.round(B.dur*rate), g:B.gain*near, pl, pr, f:B.hz, p:[0, 0] }); }
+      else if(e.kind==='squeal'){ const Q=TR.squeal; st.tv.push({ k:'squeal', at, n:Math.round(Q.dur*rate), g:Q.gain*near, pl, pr, f:Q.hz, p:0 }); } }
+    /* RAIN-6b (3): the vehicle that stops at the kerb (the taxi) — its brake on the wet street, the door, its shutting, its pull-away (the law's moments) */
+    const SP=PS.traffic.stop, TX=TR.taxi; if(SP && TX) for(const e of stopSounds(SP, from, to)){ const zz= e.kind==='brake' ? SP.stop+SP.v*SP.v/(2*SP.brake)*0.5 : SP.stop, dx=SP.x-PS.ear.x, dy=0.6-PS.ear.y, dz=zz-PS.ear.z, d=Math.hypot(dx, dy, dz), r=PS.ear.r||[1, 0, 0], pan=Math.max(-1, Math.min(1, (dx*r[0]+dy*r[1]+dz*r[2])/d)), K=TX[e.kind]||TX.door;
+      st.tv.push({ k:'tx'+e.kind, at:(e.t-t0)*rate, n:Math.round(K.dur*rate), g:K.gain*Math.min(1.4, (TR.dRef||25)/d), pl:Math.cos((pan+1)*Math.PI/4), pr:Math.sin((pan+1)*Math.PI/4), y:0, y2:0 }); }
+    st.tT=to;
+    const Rn=st.tR;
+    for(let v=st.tv.length-1;v>=0;v--){ const V=st.tv[v], i0=Math.max(0, Math.ceil(V.at)), end=Math.min(n, Math.floor(V.at+V.n));
+      for(let i=i0;i<end;i++){ const a=i-V.at; let x=0;
+        if(V.k==='rec'){ const q=V.s+a, b=Math.floor(q), f=q-b, Y=st.trams.Y; x=Y[b]+(Y[b+1]-Y[b])*f; }
+        else if(V.k==='rumble'){ const u=(a-V.mid)/(2*rate); V.y+=((Rn()*2-1)-V.y)*0.015; x=V.y*4/(1+u*u); }
+        else if(V.k==='clack'){ const tt=a/rate; V.y+=((Rn()*2-1)-V.y)*0.5; x=(V.y+0.8*Math.sin(2*Math.PI*900*tt))*Math.exp(-tt/0.003); }
+        else if(V.k==='bell'){ const tt=a/rate, e1=Math.exp(-tt/0.55), atk=Math.min(1, a/(0.002*rate)); x=atk*(Math.sin(2*Math.PI*V.f[0]*tt)*e1+0.55*Math.sin(2*Math.PI*V.f[1]*tt)*e1*e1); }
+        else if(V.k==='txbrake' || V.k==='txgo'){ const u=a/V.n, env= V.k==='txbrake' ? Math.sin(Math.PI*Math.min(1, u*3))*(1-u) : u*u*(1-u)*4; V.y+=((Rn()*2-1)-V.y)*(V.k==='txgo' ? 0.08+0.2*u : 0.25); V.y2+=(V.y-V.y2)*0.3; x=(V.y-V.y2)*env*3; }   // wet tyres: a band of noise, rising as it pulls away
+        else if(V.k==='txdoor' || V.k==='txshut'){ const tt=a/rate, thud= V.k==='txshut' ? Math.sin(2*Math.PI*85*tt)*Math.exp(-tt/0.05) : 0; V.y+=((Rn()*2-1)-V.y)*0.6; x=thud+V.y*Math.exp(-tt/(V.k==='txshut' ? 0.012 : 0.006))*0.6; }   // a handle's click; a door shut: a low thud
+        else if(V.k==='squeal'){ const tt=a/rate, u=a/V.n, env=Math.sin(Math.PI*u)**2; V.p+=2*Math.PI*V.f*(1+0.012*Math.sin(2*Math.PI*5.3*tt))/rate; x=env*(Math.sin(V.p)+0.3*(Rn()*2-1)); }
+        const k=V.g*g*sw; fL[o+i]+=x*k*V.pl; fR[o+i]+=x*k*V.pr; }
+      if(V.at+V.n<=n) st.tv.splice(v, 1); else V.at-=n; } }
   st.frames+=n;
   if(!st.on && g<=0) st.sleep=true;
 }
 /* counters for the worklet and the probes */
 export const layersStats=st=>({ rk:st.rk||null, frames:st.frames, grains:st.grains, sleep:st.sleep, on:st.on, focus:st.fs, near:!!st.near, far:!!st.far, voices:st.voices.length,
-  cars:!!st.cars, passes:st.passes, sounding:st.pv.length, density:st.dens, passLog:st.passLog.slice(-16) });
+  cars:!!st.cars, passes:st.passes, sounding:st.pv.length, density:st.dens, passLog:st.passLog.slice(-16), trams:!!st.trams, tramVoices:st.tv.length, tramLog:st.tramLog.slice(-8) });

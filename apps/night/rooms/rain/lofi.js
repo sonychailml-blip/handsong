@@ -92,6 +92,8 @@ export async function lofiEngine(ac, dest, base, o={}){ const epMode=o.ep==='sho
   const cutD=lfo(M.breath.hz[2], 900, busLp.frequency);   // the master's high cut breathes (±900 Hz over a minute)
   const verb=ac.createConvolver(); verb.buffer=G.ir; verb.connect(busLp);
   const L={ ep:g(1), vib:g(1), gtr:g(1), bass:g(1), beat:g(1), crackle:g(0) }, pumpK=g(1), pumpB=g(1);
+  /* RAIN-7: the street musician — soft nylon plucks far on the street: darker, more of the room's echo, not pumped */
+  L.busk=g(1); const buskLp=flt('lowpass', 2300, 0.6); L.busk.connect(buskLp); buskLp.connect(busLp);
   /* the piano: a chorus (two slowly moving delays beside the dry), a tremolo and an auto-pan (their depth breathing), a soft high cut and saturation */
   const epIn=g(1), chorusOut=g(1), trem=g(1), pan=ac.createStereoPanner(), keysLp=flt('lowpass', M.keys.lp, 0.5), keysSat=sat(M.keys.drive);
   epIn.connect(chorusOut); const chW=[]; for(const hz of M.chorus.hz){ const dl=ac.createDelay(0.05), wg=g(M.chorus.wet); chW.push(wg); dl.delayTime.value=M.chorus.d; lfo(hz, M.chorus.depth, dl.delayTime); epIn.connect(dl); dl.connect(wg); wg.connect(chorusOut); }
@@ -105,14 +107,29 @@ export async function lofiEngine(ac, dest, base, o={}){ const epMode=o.ep==='sho
   const bassLp=flt('lowpass', 1400, 0.6); L.bass.connect(bassLp); bassLp.connect(pumpB); pumpB.connect(busLp);
   const beatLp=flt('lowpass', M.beat.lp, 0.5), beatSat=sat(M.beat.drive); L.beat.connect(beatLp); beatLp.connect(beatSat); beatSat.connect(busLp);
   const cr=ac.createBufferSource(); cr.buffer=G.crackle; cr.loop=true; const crg=g(M.crackle); cr.connect(crg); crg.connect(L.crackle); L.crackle.connect(busLp); cr.start();
+  { const s=g(0.55); buskLp.connect(s); s.connect(verb); }
   const wetS={}; for(const [k, v] of Object.entries(M.wet)){ const s=g(v); wetS[k]=s; (k==='gtr' ? body[body.length-1] : L[k]).connect(s); s.connect(verb); }   // AUDIO-3: wetS — the sends (a part put back reconnects its own)
   /* the piano's voices: tine banks from core (one strike each; a pool round-robin), each into its own release envelope and pan */
   const E={ ac, build:{ banks:[], vib:null, hum:null, shim:null }, lfo:{}, nightLean:false }, TB=velTables(rec.recipe), banks=[];
-  if(!ST || epMode==='short' || leg.ep) for(let v=0;v<3;v++) for(let i=0;i<10;i++){ const pre=g(1); E.build.banks=[];   // AUDIO-1: RAIN-4d's banks only where they play (the default never strikes them)
+  const T0lvl=T=>T[0].lvl, LT=longTables(rec.recipe), lbanks=[], NV=o.voices!=null ? o.voices : EP_LONG.voices;
+  /* AUDIO-4: the same voices computed in ONE node (rooms/rain/ep-worklet.js) — each voice a proxy that forwards the very calls below as messages;
+     o.epw false, struct false (AUDIO-1's before-graph) or no worklet = the tine banks of before (the null test's reference); o.epwDbg the row's CONTROL */
+  let epw=null, epQ=[], epSyncN=0; if(!leg.ep && (epMode!=='short' || o.epShortW) && o.epw!==false && ST && ac.audioWorklet) try{ await ac.audioWorklet.addModule(new URL('ep-worklet.js', base).href);
+    epw=new AudioWorkletNode(ac, 'rain-ep', { numberOfInputs:0, numberOfOutputs:1, outputChannelCount:[2], processorOptions:{ tabs:(epMode==='short' ? TB : LT).map(T=>T.partials.map(([r, a, d])=>[r, a, d])), lvl:T0lvl(LT), n:epMode==='short' ? 10 : NV, dbg:o.epwDbg||null } }); epw.connect(L.ep); }catch(e){ epw=null; }
+  /* PERF-2 (not applied): the short piano in the one node did not null (−25…−43 dB, cause not found in the night) — only with o.epShortW */
+  const proxy=(id, v)=>{ const P=[]; return { v, bk:{ f:220, setFreq(f){ this.f=f; }, strike(t, vel){ epQ.push([id, 's', t, this.f, vel]); epSound(t); } }, env:{ gain:prm(id) }, p:{ pan:{ setValueAtTime:(x, t)=>{ P.push([t, x]); epQ.push([id, 'p', x, t]); }, get value(){ let x=0; for(const [t, y] of P) if(t<=ac.currentTime) x=y; return x; } } }, free:0 }; };
+  const prm=i=>({ cancelScheduledValues:t=>epQ.push([i, 'c', t]), setValueAtTime:(v, t)=>epQ.push([i, 'v', v, t]), linearRampToValueAtTime:(v, t)=>epQ.push([i, 'l', v, t]), setTargetAtTime:(v, t, tc)=>epQ.push([i, 'T', v, t, tc]) });
+  if(!ST || epMode==='short' || leg.ep) for(let v=0;v<3;v++) for(let i=0;i<10;i++){ if(epw && epMode==='short'){ banks.push(proxy(v*10+i, v)); continue; } const pre=g(1); E.build.banks=[];   // AUDIO-1: RAIN-4d's banks only where they play (the default never strikes them)
    buildTineBank(E, pre, TB[v], rec.id); const bk=E.build.banks[0]; bk.gain.gain.value=1; const env=g(0), p=ac.createStereoPanner(); pre.connect(env); env.connect(p); p.connect(L.ep); banks.push({ v, bk, env, p }); }
   const next=[0, 0, 0];
   /* RAIN-4e: the sustaining voices (the default): their own pool, each bank free again once its release has died away */
-  const LT=longTables(rec.recipe), lbanks=[]; if(epMode!=='short') for(let v=0;v<3;v++) for(let i=0;i<EP_LONG.voices;i++){ const pre=g(1); E.build.banks=[]; buildTineBank(E, pre, LT[v], rec.id); const bk=E.build.banks[0]; bk.gain.gain.value=1; const env=g(0), p=ac.createStereoPanner(); pre.connect(env); env.connect(p); p.connect(L.ep); lbanks.push({ v, bk, env, p, free:0 }); }
+  if(epMode!=='short') for(let v=0;v<3;v++) for(let i=0;i<NV;i++){
+    if(epw){ lbanks.push(proxy(v*NV+i, v)); continue; }
+    const pre=g(1); E.build.banks=[]; buildTineBank(E, pre, LT[v], rec.id); const bk=E.build.banks[0]; bk.gain.gain.value=1; const env=g(0), p=ac.createStereoPanner(); pre.connect(env); env.connect(p); p.connect(L.ep); lbanks.push({ v, bk, env, p, free:0 }); }
+  /* the most strikes sounding at once (each rings to its longest partial's stop: the worklet's own end) — counted here, by schedule */
+  const epEnd=Math.max(...LT[0].partials.map(p=>p[2]))+0.05, epOn=[]; let epPeak=0;
+  const epSound=t=>{ for(let i=epOn.length-1;i>=0;i--) if(epOn[i]<=t) epOn.splice(i, 1); epOn.push(t+epEnd); if(epOn.length>epPeak) epPeak=epOn.length; };
+  const epFlush=()=>{ if(epw && epQ.length){ epw.port.postMessage(epQ); epQ=[]; } };
   let held=[], heldKey=null, peak=0;
   /* the pedal: a new chord lets the held one go (a soft release); the same chord struck again rings over its own tails */
   const pedal=(key, t)=>{ if(key===heldKey) return; for(const b of held){ b.env.gain.setTargetAtTime(0, t, EP_LONG.rel); b.free=t+EP_LONG.rel*7; } held=[]; heldKey=key; };
@@ -140,6 +157,7 @@ export async function lofiEngine(ac, dest, base, o={}){ const epMode=o.ep==='sho
     else if(ev.kind==='vib'){ const f=hz(ev.step), [r0, nm]=nearest(S.notes.vib, f); one(S.buf[nm], L.vib, when, f/r0, k*M.vib*ev.vel, ev.pan, ev.dur*1.5, 0.7); }
     else if(ev.kind==='gtr'){ const f=hz(ev.step); if(leg.gtr){ const key='o'+Math.round(f*10); if(!P.has(key)) P.set(key, pluckOld(ac, f)); one(P.get(key), L.gtr, when, 1, k*0.07*ev.vel, ev.pan, Math.max(0.35, ev.dur*1.4), 0.25); return; }
       const vb=Math.min(2, Math.floor(ev.vel*3)), key=Math.round(f*10)+':'+vb; if(!P.has(key)) P.set(key, nylonBuffer(ac, f, [0.35, 0.6, 0.85][vb])); one(P.get(key), L.gtr, when, 1, k*M.gtr, ev.pan, Math.max(0.4, ev.dur*1.5), 0.3, true); }
+    else if(ev.kind==='busk'){ const f=hz(ev.step), vb=Math.min(2, Math.floor(ev.vel*3)), key=Math.round(f*10)+':'+vb; if(!P.has(key)) P.set(key, nylonBuffer(ac, f, [0.35, 0.6, 0.85][vb])); one(P.get(key), L.busk, when, 1, k*M.gtr*0.42*ev.vel, ev.pan||0.55, ev.dur||0.9, 0.3); }   // RAIN-7
     else if(ev.kind==='drum'){ const d=ev.drum, v=k*ev.vel;
       if(d==='kick') one(S.buf.kick, L.beat, when, 0.94, v*M.kick, 0, null, 0);
       else if(d==='snare' || d==='ghost') one(G.snare, L.beat, when, d==='ghost' ? 1.04 : 1, v*(d==='ghost' ? M.ghost : M.snare), ev.pan, null, 0);
@@ -148,7 +166,8 @@ export async function lofiEngine(ac, dest, base, o={}){ const epMode=o.ep==='sho
       else if(d==='ohat') one(G.ohat, L.beat, when, 1, v*M.ohat, ev.pan, null, 0);
       else if(d==='shaker') one(G.shaker, L.beat, when, 1, v*M.shaker, ev.pan, null, 0); }
     else if(ev.kind==='pump'){ if(BY.pump) return; const a=Math.min(1, ev.vel||0); for(const [n, depth] of [[pumpK, M.pump.keys], [pumpB, M.pump.bass]]){ n.gain.setTargetAtTime(1-depth*a, when, 0.004); n.gain.setTargetAtTime(1, when+0.02, M.pump.tc); } }   // RAIN-4e: dips and returns smoothly (an instant drop clicked on the held piano)
-    else if(ev.kind==='layer' && ev.layer==='crackle'){ const p=L.crackle.gain; p.setValueAtTime(p.value, when); p.linearRampToValueAtTime(ev.gain, when+ev.ramp); } }
+    else if(ev.kind==='layer' && ev.layer==='crackle'){ const p=L.crackle.gain; p.setValueAtTime(p.value, when); p.linearRampToValueAtTime(ev.gain, when+ev.ramp); }
+    epFlush(); }
   const layer=(name, v, when, ramp=0)=>{ if(!L[name]) return; const p=L[name].gain; p.cancelScheduledValues(when); p.setValueAtTime(ramp ? p.value : v, when); if(ramp) p.linearRampToValueAtTime(v, when+ramp); };
   const level=(v, when, tc=1.2)=>{ out.gain.setTargetAtTime(v, when, tc/3); };
   /* the piece's tempo: the tape delay's time (a dotted eighth) */
@@ -163,6 +182,7 @@ export async function lofiEngine(ac, dest, base, o={}){ const epMode=o.ep==='sho
     drums:[()=>L.beat.disconnect(), ()=>{ L.beat.connect(beatLp); L.beat.connect(wetS.beat); }],
     vib:[()=>L.vib.disconnect(), ()=>{ L.vib.connect(pumpK); L.vib.connect(dIn); L.vib.connect(wetS.vib); }],
     guitar:[()=>L.gtr.disconnect(), ()=>L.gtr.connect(body[0])],
+    busker:[()=>L.busk.disconnect(), ()=>L.busk.connect(buskLp)],
     reverb:[()=>verb.disconnect(), ()=>verb.connect(busLp)],
     chorus:[()=>chW.forEach(w=>w.disconnect()), ()=>chW.forEach(w=>w.connect(chorusOut))],
     tremolo:[()=>{ td.disconnect(); panD.disconnect(); trem.gain.value=1; pan.pan.value=0; }, ()=>{ td.connect(trem.gain); panD.connect(pan.pan); }],
@@ -173,4 +193,7 @@ export async function lofiEngine(ac, dest, base, o={}){ const epMode=o.ep==='sho
     highcut:[()=>{ cutD.disconnect(); busLp.type='allpass'; }, ()=>{ busLp.type='lowpass'; cutD.connect(busLp.frequency); }],
     saturation:[()=>sats.forEach(w=>{ w.curve=null; w.oversample='none'; }), ()=>sats.forEach((w, i)=>{ w.curve=satC[i]; w.oversample='2x'; })] };
   const bypass=(key, off)=>{ const f=BYP[key]; if(!f || !!BY[key]===!!off) return !!BY[key]; BY[key]=!!off; try{ f[off ? 0 : 1](); }catch(e){} return BY[key]; };
-  return { play, layer, level, tempo, out, bypass, bypassKeys:Object.keys(BYP), bypassed:()=>({ ...BY }), state:()=>({ notes, plucks:P.size, banks:banks.length, long:lbanks.length, peak, held:held.length, ep:epMode }) }; }
+  return { play, layer, level, tempo, out, bypass, bypassKeys:Object.keys(BYP), bypassed:()=>({ ...BY }), state:()=>({ notes, plucks:P.size, banks:banks.length, long:lbanks.length, peak, held:held.length, ep:epMode, epw:!!epw, epPeak }),
+    /* AUDIO-4: resolves once the one node has every message sent so far (an offline render calls it before startRendering: its thread may not read
+       messages while it renders); without the node at once */
+    settle:()=>{ epFlush(); if(!epw) return Promise.resolve(true); const id=++epSyncN; return new Promise(r=>{ const f=e=>{ if(e.data && e.data.synced===id){ epw.port.removeEventListener('message', f); r(true); } }; epw.port.addEventListener('message', f); epw.port.start(); epw.port.postMessage({ sync:id }); }); } }; }

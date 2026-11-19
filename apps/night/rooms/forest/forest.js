@@ -278,6 +278,9 @@ export function buildForest(T, opt){
      leave the firefly at each echo of a note (timed from the echo's own delay and feedback, not from audio analysis); Warmth / Brightness —
      the light's colour, amber ↔ the firefly lime ↔ a cold green-white; Wave — the light trembles at the effect's own 4.5 Hz */
   let fxv={ echo:0, time:0.625, fb:0, tone:0.5, wave:0 }, now=0; const echoes=[];
+  /* PERF-2: the playing hand's light casts its cube shadow (Detailed) — six renders of the forest a frame; while the light is out (intensity 0: no hand)
+     it adds exactly nothing, so its shadow is not redrawn (shadow.autoUpdate; the frame it lights again redraws it first). shadowAll: always, as before */
+  let shadowAll=true;   // PERF-2: NOT applied — the exact A/B found 264 bytes differ (the shadow pass has a side effect); listed as a «small» risk. false = skip it
   /* RUN 8 (slice 4): the forest answers the music GENTLY — each note adds to a slow energy (its velocity × 0.35, at most 1.5) that fades with
      τ 1.8 s: the wild fireflies glow up to +60 %, their two lights +50 %, the night sky +15 %. Nothing moves faster than the music. */
   let music=0;
@@ -424,7 +427,7 @@ export function buildForest(T, opt){
         const u=Math.abs(fxv.tone-0.5)*2, to= fxv.tone<0.5 ? WARM : COLD; lc.copy(LC).lerp(to,u); hlc.copy(HC).lerp(to,u); r.light.color.copy(lc); r.halo.material.color.copy(hlc);
         if(fxv.wave>0.005 && !reduce){ const ph=2*Math.PI*4.5*t; wob=1+0.3*fxv.wave*Math.sin(ph); r.grp.position.x+=0.06*fxv.wave*Math.sin(ph); r.grp.position.y+=0.04*fxv.wave*Math.cos(ph*1.3); } }
       const gk=handLightK(r.gl);   // NIGHT-13: brighter as the finger closes (1 = as before, at the glow of a view without fingertips)
-      r.light.position.copy(r.grp.position); r.light.intensity= r.on>0.01 ? 1.9*dim*r.on*pul*(1+r.glint)*wob*gk : 0; r.core.scale.setScalar((i?0.1:0.16)*(1+r.glint*0.7)); r.core.material.opacity=r.on;
+      r.light.position.copy(r.grp.position); r.light.intensity= r.on>0.01 ? 1.9*dim*r.on*pul*(1+r.glint)*wob*gk : 0; if(r.light.castShadow) r.light.shadow.autoUpdate= shadowAll || r.light.intensity>0; r.core.scale.setScalar((i?0.1:0.16)*(1+r.glint*0.7)); r.core.material.opacity=r.on;
       /* RUN 8: the playing light's halo follows the depth — near: small and bright, far: wide and soft (as the 2D fingertip's halo) */
       const dk= i ? 1 : 0.7+0.9*r.d, hs=(i?0.9:1.5)*(1+r.glint*0.9)*pul*dk; r.halo.scale.set(hs,hs,1); r.halo.material.opacity=Math.min(1, 0.55*r.on*dim*(i ? 1 : 1.15-0.45*r.d)*gk);
       r.ht+=dt; if(r.ht>0.03){ r.ht=0; r.hist.unshift(r.cur.clone()); if(r.hist.length>r.trail.length) r.hist.pop(); }
@@ -526,6 +529,7 @@ export function buildForest(T, opt){
   const cullSt= CULL && CL && CL.list && FOREST_CULL.parts.length===NP.size && FOREST_CULL.parts.every(k=>NP.has(k)) ? cullApply(cullT, CULL_EXTRA ? Object.fromEntries([...new Set([...Object.keys(CL.list), ...Object.keys(CULL_EXTRA)])].map(k=>[k, { n:CL.list[k] ? CL.list[k].n : cullT[k] && cullT[k].count, drop:(CL.list[k] ? CL.list[k].drop : []).concat(CULL_EXTRA[k]||[]) }])) : CL.list) : null;
   resize(W,H);
   return { id:FOREST_ROOM.id, scene:s, camera, update, resize, place, glint, project, state, dispose, lightsOf, lifeDbg:life, detailDbg:detail, bed, texBytes, answersDbg:answers, floorDbg:floor, streamDbg:stream, woodDbg:wood, gustDbg:gust, canopyDbg:canopy, dappleDbg:DU, render, paintDbg:paint, mirrorDbg:mirror, hiddenDbg:hidden, foxDbg:FU, fernsDbg:{ fronds, frondM, frondD, fr:FR, apart:apartN }, cullDbg:{ targets:cullT, state:cullSt }, woodPlacesDbg:WP, trunksDbg:{ trunks, branches, spots }, trunkBasesDbg:()=>bases, vegDbg:()=>[wood.parts.moss, wood.parts.ivy, life.parts.caps, life.parts.stems, life.parts.petals].filter(m=>m && m.parent), natDbg:()=>({ on:nat, parts:[...NP], moved:{ ...movedN }, solids:SOL ? SOL.length : 0, files:!!NT && !!NT.barkA && !!NT.rockC }), groundDbg:{ U:macroU, branches, brs:brs.length, litter },   // NIGHT-8: probes   // FOREST-2: probes
+    shadowAllDbg:on=>{ shadowAll=!!on; if(on && rigs[0].light.castShadow) rigs[0].light.shadow.autoUpdate=true; return { all:shadowAll, casts:rigs[0].light.castShadow, auto:rigs[0].light.castShadow ? rigs[0].light.shadow.autoUpdate : null }; },   // PERF-2: the A/B's other side
     held:sec=>{ heldNow= sec>0 ? sec : 0; rare.held(sec); }, rareDbg:kind=>rare.force(kind, now, { light:rigs[0].cur, flies }), viewDbg:o=>{ const lens=v=>!!(v && (v.fov || v.rest)), had=lens(viewOver); viewOver=o||null; if(had || lens(viewOver)) resize(W, H, pxH); else aimCamera(); return viewOver; },
     rest:on=>{ const was=restOn; restOn=!!on; if(restOn && !was){ goalOf(camLook, camGoal); camOff.copy(camGoal); motionK=0; aimCamera(); } return restOn; },   // NIGHT-13: the camera at rest (host sceneRest)
     flyAt, flyPick, flyLand:i=>{ if(flies[i]) lands.push({ i, t0:null }); return !!flies[i]; },   // NIGHT-13: the start's dot becomes one of the fireflies; 13b: its landing swell
