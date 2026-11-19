@@ -38,6 +38,8 @@ export const DICTS = {
     // приложение / стартовая карточка
     'app.title':'Handsong — gesture synth & interactive tunings tutorial',
     'start.tag':'A gesture synth: play with your hands in front of the camera.',
+    'start.demo':'Demo',   // метка карточки: это старое публичное техдемо
+    'start.nightTag':'Calm living music in a night forest, played with your hands',   // подпись карточки-ссылки Handsong Night
     'start.play':'▶ Play',
     'start.learn':'Learn',
     'start.learnTitle':'Interactive lessons — learn by playing',
@@ -334,6 +336,8 @@ export const DICTS = {
   ru: {
     'app.title':'Handsong — жестовый синтезатор и интерактивный учебник ладов',
     'start.tag':'Жестовый синтезатор: играйте руками перед камерой.',
+    'start.demo':'Демо',
+    'start.nightTag':'Тихая живая музыка в ночном лесу — руками',
     'start.play':'▶ Играть',
     'start.learn':'Обучение',
     'start.learnTitle':'Интерактивное обучение — учимся, играя',

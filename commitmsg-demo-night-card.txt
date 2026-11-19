@@ -1,0 +1,31 @@
+Start screen: mark the card as Demo, add a Handsong Night card beside it
+
+The start screen had one light card. It is now one of two cards of the
+same size:
+
+1. The existing card is marked as the demo: a small quiet "Demo" pill
+   next to the Handsong title (RU "Demo" in Cyrillic), through the i18n
+   system (start.demo in both dictionaries).
+
+2. A second, dark card in Night's style: Night's own forest start still
+   (the Standard level, still-reduced.webp, our own render, copied to
+   img/night-forest.webp), the title "Handsong Night", a one-line
+   tagline (start.nightTag, EN + RU) and a lime arrow. The whole card is
+   a link to https://night.handsong.app, same tab.
+
+Layout: .startCards is a grid with equal rows (grid-auto-rows:1fr), so
+the two cards are the same size side by side (>= 760px wide) and when
+stacked on phones (Night second). Column width stays 340px; nothing
+scrolls sideways.
+
+Nothing else changes: sound, camera, code paths and the start flow are
+untouched; no new script, no CSP (the demo has none).
+
+Check: headless captures of the start screen, phone 390x844, laptop
+1280x800 and phone landscape 844x390, English and Russian: both cards
+340x541, no overlap, no sideways scroll, no element wider than its
+card, link and labels correct, no page errors. PASS.
+
+Files: index.html, style.css, src/i18n.js, img/night-forest.webp (new).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

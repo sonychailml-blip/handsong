@@ -34,9 +34,14 @@
      через ОДИН startApp (AudioContext создаётся внутри клика). «Обучение» открывает список уроков, а
      приложение поднимает уже выбор урока — тем же кликом. Демо строёв (demo.js) и мини-учебник (#helpOv)
      живы в коде, но кнопок запуска у них нет — им место внутри обучения, туда и переедут. -->
+<!-- ДВЕ КАРТОЧКИ одного размера (.startCards — сетка с равными рядами): слева/сверху ЭТА, помеченная «Демо»
+     (это старое публичное техдемо); справа/снизу — тёмная карточка Handsong Night: вся карточка — ссылка на
+     night.handsong.app (в той же вкладке), картинка — наш собственный кадр ночного леса (уровень «Стандарт»,
+     скопирован из apps/night). Ничего из кода/звука/камеры демо она не трогает. -->
 <div id="start" class="ov on">
+  <div class="startCards">
   <div class="startCard">
-    <h1>Hand<span>song</span></h1>
+    <h1>Hand<span>song</span> <small class="demoTag" data-i18n="start.demo">Демо</small></h1>
     <p class="startTag" data-i18n="start.tag">Жестовый синтезатор: играйте руками перед камерой.</p>
     <div class="startBtns">
       <button id="startBtn" data-i18n="start.play">▶ Играть</button>
@@ -75,6 +80,12 @@
       <p><span data-i18n="foot.feedbackText">First version — bugs and rough edges are likely. Tell me what breaks:</span> <a id="fbLink" rel="noopener"></a></p>
       <p id="startSupport" class="startSupport"><span data-i18n="foot.supportText">Handsong is made by one person, in spare time, and free for everyone. If you'd like to support its development:</span> <a id="donateLink" rel="noopener"></a></p>
     </div>
+  </div>
+  <a class="nightCard" href="https://night.handsong.app">
+    <span class="nightName">Handsong <span>Night</span></span>
+    <span class="nightTag" data-i18n="start.nightTag">Тихая живая музыка в ночном лесу — руками</span>
+    <span class="nightGo" aria-hidden="true">→</span>
+  </a>
   </div>
 </div>
  
