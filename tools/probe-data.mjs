@@ -2203,6 +2203,30 @@ async function release1Stay(){
   notes.push(`${J.st.length} waiting and talking people over ten minutes: at most ${longest.toFixed(0)} s standing at a time, each walked ≥ ${fewest} times, ${J.pairs} step pairs without sliding; CONTROL standing for ever caught (${cl.toFixed(0)} s)`);
   return { cases:n, total:d.length, differences:d, notes };
 }
+/* RELEASE-1 (B) — «RELEASE-1 vehicle bodies (app)»: the 3D bodies (rooms/rain/pure/vehmesh.js) are the law's sizes — each car type's body (without its shadow)
+   within its VEH.types length, width and height (±6 cm; the taxi's sign and the bus's roof units above), its nose at s = len and its tail at s = 0, every
+   normal a unit vector, no empty or broken triangle; the lamps (carLamps) lie on the nose and tail faces (within 3 cm of the body's end at their height);
+   the tram 28 m (the traffic law's), two sections with the bellows between them, its pantograph's head at the wire (6.2 m, ±10 cm); the paints muted
+   (no channel above 0.8). CONTROL: a body shifted 0.5 m along itself is caught. */
+async function release1Bodies(){
+  const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); return !!c; }, U=f=>import(new URL(f, import.meta.url).href);
+  const M=await U('../apps/night/rooms/rain/pure/vehmesh.js'), V=await U('../apps/night/rooms/rain/pure/vehicles.js'), C=await U('../apps/night/rooms/rain/pure/city.js');
+  const bounds=(B, sh=0, skip=new Set([9]))=>{ const b={ x0:1e9, x1:-1e9, y0:1e9, y1:-1e9, s0:1e9, s1:-1e9 }; for(let i=0;i<B.n;i++){ if(skip.has(B.part[i])) continue; const x=B.pos[i*3], y=B.pos[i*3+1], s=B.pos[i*3+2]+sh; b.x0=Math.min(b.x0, x); b.x1=Math.max(b.x1, x); b.y0=Math.min(b.y0, y); b.y1=Math.max(b.y1, y); b.s0=Math.min(b.s0, s); b.s1=Math.max(b.s1, s); } return b; };
+  const sane=B=>{ let bad=0; for(let i=0;i<B.n;i++){ const l=Math.hypot(B.nrm[i*3], B.nrm[i*3+1], B.nrm[i*3+2]); if(!(Math.abs(l-1)<1e-4) || !isFinite(B.pos[i*3]+B.pos[i*3+1]+B.pos[i*3+2])) bad++; } return bad===0 && B.n%3===0 && B.n>=60; };
+  const fits=(B, T, sh)=>{ const b=bounds(B, sh, new Set([9, 6, 13])); return Math.abs(b.s1-T.len)<0.06 && Math.abs(b.s0)<0.06 && Math.abs((b.x1-b.x0)-T.w)<0.06 && Math.abs(b.y1-T.h)<0.06; };
+  const lampOn=(B, ty)=>{ const Lm=M.carLamps(ty); let front=-1e9, rear=1e9; for(let t=0;t<B.n;t+=3){ if(B.part[t]!==0) continue; for(let e=0;e<3;e++){ const i=t+e, j=t+(e+1)%3, ya=B.pos[i*3+1], yb=B.pos[j*3+1]; if((ya-Lm.y)*(yb-Lm.y)>0 || ya===yb) continue; const u=(Lm.y-ya)/(yb-ya), sv=B.pos[i*3+2]+(B.pos[j*3+2]-B.pos[i*3+2])*u; front=Math.max(front, sv); rear=Math.min(rear, sv); } }   /* the body's ends at the lamps' height (its faces cut there) */
+    return Lm.len-front<0.03 && rear<0.03 && Lm.x<V.VEH.types[ty].w/2; };
+  const rows=[];
+  V.VEH.types.forEach((T, ty)=>{ const B=M.carMesh(ty); ok(`${T.id}: broken triangles or normals`, sane(B)); ok(`${T.id}: the body is not the law's size (${JSON.stringify(bounds(B, 0, new Set([9, 6, 13])))})`, fits(B, T, 0)); ok(`${T.id}: its lamps are not on its ends`, lampOn(B, ty)); rows.push(`${T.id} ${B.n/3}`); });
+  ok('CONTROL: a body shifted 0.5 m passed', !fits(M.carMesh(0), V.VEH.types[0], 0.5));
+  { const B=M.tramMesh(), R=M.VEH3.tram, b=bounds(B), pan=bounds(B, 0, new Set([0, 1, 2, 5, 6, 9, 10, 11, 13])), bel=bounds(B, 0, new Set([0, 1, 2, 5, 6, 9, 10, 12, 13]));
+    ok('the tram: broken triangles or normals', sane(B)); ok(`the tram is not the traffic law's length (${b.s1.toFixed(2)} m vs ${C.TRAFFIC.tramLen})`, Math.abs(b.s1-C.TRAFFIC.tramLen)<0.45 && b.s0>-0.05 && R.len===C.TRAFFIC.tramLen);
+    ok(`the pantograph does not reach the wire (${pan.y1.toFixed(2)} m vs ${C.STREET.wire})`, Math.abs(pan.y1-C.STREET.wire)<0.1); ok('no bellows between the sections', bel.s0>=R.sec[1]-0.01 && bel.s1<=R.sec[1]+R.gap+0.01);
+    rows.push(`tram ${B.n/3}`); }
+  { const loud=M.VEH_PAINT.filter(h=>[0, 2, 4].some(i=>parseInt(h.slice(i, i+2), 16)/255>0.8)); ok(`a paint too loud: ${loud.join(', ')}`, loud.length===0); }
+  notes.push(`triangles: ${rows.join(', ')}; every body the law's size, lamps on its ends; the tram ${C.TRAFFIC.tramLen} m, pantograph at the wire; CONTROL a shifted body caught`);
+  return { cases:n, total:d.length, differences:d, notes };
+}
 async function rain7Law(){
   const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); return !!c; }, U=f=>import(new URL(f, import.meta.url).href);
   const B=await U('../apps/night/rooms/rain/pure/busker.js'), V=await U('../apps/night/rooms/rain/pure/vehicles.js');
@@ -3562,6 +3586,7 @@ const ROWS=[
   ['RAIN-10 gait, clothes and the lamp (app)', ()=>rain10Gait(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-10
   ['RELEASE-1 people clothes (app)', ()=>release1Clothes(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RELEASE-1 (A)
   ['RELEASE-1 people come and go (app)', ()=>release1Stay(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RELEASE-1 (A)
+  ['RELEASE-1 vehicle bodies (app)', ()=>release1Bodies(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RELEASE-1 (B)
   ['NIGHT silent switch (app)', ()=>nightSilentSwitch(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // SAFARI-1
   ['RAIN street law (app)', ()=>rainStreetLaw(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-6b
   ['NIGHT home screen (app)', ()=>nightHomeScreen(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-7c

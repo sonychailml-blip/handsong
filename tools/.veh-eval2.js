@@ -1,0 +1,2 @@
+const A=await import('/tools/probes/night/rain10.js'), B=await import('/tools/probes/night/rainroom.js'), M=await import('/tools/probes/night/release1b.js'); const s=r=>({ cases:r.cases, total:r.total, diff:(r.differences||[]).slice(0, 8) });
+const b=await B.checkRainRoom(), a=await A.checkRain10({ levels:['full'] }), m=await M.checkRelease1B({ levels:['full'] }); return { room:{ ...s(b), notes:(b.notes||[]).slice(0, 1) }, r10:s(a), r1b:s(m) };

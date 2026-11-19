@@ -2171,6 +2171,12 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
     3. Umbrellas: ribs and the scalloped rim on the near ones, the striped golf umbrellas panel by panel, a bag swinging with the step.
     4. Under the plane trees: a walker is hidden only behind leaves and trunks and seen through the gaps (never vanishing in an empty spot); a soft shadow and a faint reflection under every walker on the wet street; nobody floats.
     5. Seen from above: the umbrellas as ovals hiding the heads, feet stepping along the street, the dog trotting ahead of its walker (not sideways); the people waiting at the crossing, on the phone and the talking pair walk up, stay a while and walk on.
+191. RELEASE-1 stage B: the cars and the tram in 3D (laptop, Detailed, then Light — Settings → Quality; `http://127.0.0.1:5500/apps/night/?room=rain`). Five checks:
+    1. Cars drive straight along the road towards its far end — none looks as if it slid sideways; nearer cars larger and seen more from above.
+    2. Types: hatchbacks, sedans, small vans, a taxi with its lit roof sign (and now and then the bus); wet paint catching the street lamps as a car passes under one.
+    3. Head and tail lights sit on the car's ends; their light on the wet road fades out (no edge).
+    4. The tram: two cream-and-red sections with the bellows between, the lit windows with people, the cab's dark windscreen and amber band, the pantograph to the wire (the spark now and then), its warm light on the street.
+    5. Focus near (a hand close): the cars go soft like the street (no stripes, no ghost copies); a car passing behind a trunk or a lamp post is hidden by it.
 ## Superseded at DOC1 (old lines verbatim, replaced in place above by a later slice)
 - NIGHT-2 stage 3 (2026-11-03, the rule of at most five manual checks) updated this line of CLAUDE.md's report format:
   probe verdict lines and fix rounds; what was left undone; docs found stale; the user's remaining steps (ear, camera, phone).

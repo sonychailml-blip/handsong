@@ -96,7 +96,7 @@ export function cityWindows(){
 }
 /* THE LAMPS (RAIN-1): along the left pavement's kerb, between the two rows of plane trees, and along the promenade before the terraces — their heads
    (world), for the lights and their reflections; the bake places its lamp heads exactly here */
-const LAMP_ROWS=F([F([STREET.kerbA+0.6, 0, 7.2]), F([(STREET.treeRows[0]+STREET.treeRows[1])/2, 0.5, 5.2]), F([STREET.terrace[0]-1, 0.25, 4.6])]);   // [x, phase, head height]
+export const LAMP_ROWS=F([F([STREET.kerbA+0.6, 0, 7.2]), F([(STREET.treeRows[0]+STREET.treeRows[1])/2, 0.5, 5.2]), F([STREET.terrace[0]-1, 0.25, 4.6])]);   // [x, phase, head height]
 export function cityLamps(){
   const out=[];
   for(const [x, ph, y] of LAMP_ROWS)

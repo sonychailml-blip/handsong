@@ -6,12 +6,16 @@
    grows by its own depth; the drops are a simulation (pure/drops.js) drawn as sprites into a DROP MAP the glass reads (one pass still); the mist is
    inside the pane, over the drops (wiping never removes a drop). */
 import { WEAR } from './pure/life.js';   // RELEASE-1 (A): the clothes' palettes (LIFE_F's tables)
+import { DEPTH, BEND, LAMP_ROWS, STREET } from './pure/city.js';   // RELEASE-1 (B): the vehicles' shader carries the camera's law, the depth law and the lamps
+import { VEH_PAINT, TAXI_PAINT, VEH3 } from './pure/vehmesh.js';
 export const QUAD_V=`varying vec2 vUv; void main(){ vUv=uv; gl_Position=vec4(position.xy, 0., 1.); }`;
 /* a 9-tap Gaussian along uDir (two taps read between texels, so five reads) */
+/* RELEASE-1 (B): the coverage blurred with the colour (the vehicles' premultiplied layers share this program: one shader fewer); every reader of the
+   city's copies reads their colour only, so they are as before */
 export const BLUR_F=`precision highp float; uniform sampler2D uTex; uniform vec2 uDir; varying vec2 vUv;
-void main(){ vec3 c=texture2D(uTex, vUv).rgb*0.2270;
-  c+=(texture2D(uTex, vUv+uDir*1.3846).rgb+texture2D(uTex, vUv-uDir*1.3846).rgb)*0.3162;
-  c+=(texture2D(uTex, vUv+uDir*3.2308).rgb+texture2D(uTex, vUv-uDir*3.2308).rgb)*0.0703; gl_FragColor=vec4(c, 1.); }`;
+void main(){ vec4 c=texture2D(uTex, vUv)*0.2270;
+  c+=(texture2D(uTex, vUv+uDir*1.3846)+texture2D(uTex, vUv-uDir*1.3846))*0.3162;
+  c+=(texture2D(uTex, vUv+uDir*3.2308)+texture2D(uTex, vUv-uDir*3.2308))*0.0703; gl_FragColor=c; }`;
 /* small fixes (2026-11-17): THE MIST'S SOFT COPY STARTS WITH A TRUE 4 × 4 BOX — four bilinear taps one full-size texel off the quarter texel's centre, each
    averaging 2 × 2: a far car's light (2–3 px) is never missed or gridded by sparse taps (the old first pass sampled the full picture 4.8 px apart) */
 export const DOWN_F=`precision highp float; uniform sampler2D uTex; uniform vec2 uTexel; varying vec2 vUv;
@@ -219,6 +223,7 @@ float seen(float m){ if(uOccl<0.5) return 1.; float o=0.; vec2 r=vec2(max(vR*0.7
   for(int i=0;i<5;i++){ vec2 q=vP+(i==0 ? vec2(0.) : i==1 ? r : i==2 ? -r : i==3 ? r.yx : -r.yx); float bd=texture2D(uDepthMap, clamp(q/uExt*0.5+0.5, 0., 1.)).r; o+=smoothstep(m, m+0.018, vDep-bd); }
   return 1.-o/5.; }
 uniform vec3 uGarA, uGarB, uGarC, uGarD, uSign, uSignWarm, uCross, uWalkR, uWalkG, uNavR, uHead;   // RAIN-5c: the furniture's lights (tokens)
+uniform float uHalves;   // RELEASE-1 (B): the probes' halves
 float el(vec2 p, vec2 c, vec2 r){ return (length((p-c)/r)-1.)*min(r.x, r.y*2.); }
 float seg(vec2 p, vec2 a, vec2 b, float w){ vec2 e=b-a, q=p-a; float t=clamp(dot(q, e)/dot(e, e), 0., 1.); return length(q-e*t)-w; }
 /* RAIN-5c: a person seen from the front or the back (the street runs away from us) at ox: the swinging leg's foot lifts (heel, then toe), the hips
@@ -370,6 +375,7 @@ void main0(){ float k=floor(vK.x+0.5), ph=fract(vK.y), sub=floor(vK.y), face=mod
       if(ty>5.5) col+=vec3(0.42, 0.3, 0.13)*smoothstep(0.3, 0.05, abs(p.x+0.72))*step(0.08, q)*step(q, 0.95)*0.8;   /* a bus's lit side, blurred to a band */
       if(ty>3.5 && ty<4.5) col+=vec3(1., 0.84, 0.5)*exp(-dot(vec2(p.x*1.4, (u-0.47)*(1.-f)*3.), vec2(p.x*1.4, (u-0.47)*(1.-f)*3.))/0.02)*top*0.9;   /* the taxi's roof light */
       col=mix(col, vec3(dot(col, vec3(0.33))), 0.2);
+      if(uHalves>0.5) col= (towards>0.5 ? 1.-step(0.5, p.y) : step(0.5, p.y))>0.5 ? vec3(1., 0., 0.) : vec3(0., 1., 0.);   /* RELEASE-1 (B), the probes only: the front half red, the rear green */
       float al=body*0.92; gl_FragColor=vec4(col*al*win*vK.w, al*win*vK.w); return; }
     if(k<25.5) discard;   /* RAIN-10: the tram is drawn as a lit box of its own (TRAM_V / TRAM_F), never as a sprite here */
     else { float d2=min(min(seg(p, vec2(-0.45, 0.05), vec2(0.2, 0.5), 0.02), seg(p, vec2(0.2, 0.5), vec2(-0.3, 0.95), 0.02)), min(seg(p, vec2(-0.92, 0.95), vec2(0.32, 0.95), 0.018), seg(p, vec2(-0.75, 0.05), vec2(-0.15, 0.05), 0.03)));   /* the pantograph up to the wire; RAIN-10: its bar a capsule (a thin ellipse's soft edge ran far past its quad) */
@@ -437,48 +443,73 @@ void main0(){ float k=floor(vK.x+0.5), ph=fract(vK.y), sub=floor(vK.y), face=mod
   gl_FragColor=vec4(col, a); }
 /* RAIN-10: every item behind the baked city's nearer things (facade things: only what stands clearly before their facade) */
 void main(){ main0(); float k=floor(vK.x+0.5); gl_FragColor*=seen(k>18.5 && k<20.5 || k>26.5 ? 0.035 : vQ.y<0.02 ? 0.04 : 0.012); }   /* RELEASE-1 (A): the shadow and reflection lie on the nearer ground just below the feet */`;
-/* RAIN-10: THE TRAM, a lit box seen in true perspective (the camera is nearly over the tracks: mostly its roof, a thin lit side, its near end).
-   Each face is a quad of four world corners (rain.js tramUpload): aClip the corner in camera space (x·z, y·z, z: the GPU divides, so the face's own
-   metres aUV interpolate exactly), aFace (face: 0 roof, 1 the near side, 2 the near end · the carriage's length · end: 0 bellows, 1 the cab, 2 the
-   rear · the farthest carriage 1), aExt the face's extent in its metres, aSoft which edges are the outline (softened by the pixel and the focus
-   blur; shared edges stay hard so no seam shows), aZD (the carriage's near z, its focus depth). Livery muted deep red under cream, the windows
-   lit warm with people inside (seeded per window: standing, sitting or none), the cab's windscreen and its destination band (lit, no text), the
-   rear window lit, the wet roof catching the lamps. Premultiplied over the view, behind the baked city's nearer things like the life layer */
-export const TRAM_V=`attribute vec3 aClip; attribute vec2 aUV, aZD; attribute vec4 aFace, aExt, aSoft; uniform vec2 uTan;
-varying vec3 vClip; varying vec2 vUV, vZD; varying vec4 vFace, vExt, vSoftE;
-void main(){ vClip=aClip; vUV=aUV; vZD=aZD; vFace=aFace; vExt=aExt; vSoftE=aSoft; gl_Position=vec4(aClip.x/uTan.x, aClip.y/uTan.y, 0., aClip.z); }`;
-export const TRAM_F=`precision highp float; varying vec3 vClip; varying vec2 vUV, vZD; varying vec4 vFace, vExt, vSoftE;
-uniform vec4 uFoc; uniform float uPx, uTime, uWin, uOccl; uniform vec3 uHoney, uAmber; uniform sampler2D uDepthMap; uniform vec2 uExt; ${RAD}
-float h1(float n){ return fract(sin(n*127.1)*43758.5453); }
-float bx(vec2 p, vec2 a, vec2 b, float w){ vec2 s=smoothstep(a-w, a+w, p)*(1.-smoothstep(b-w, b+w, p)); return s.x*s.y; }   /* a soft box a…b, edge w */
-float elp(vec2 p, vec2 c, vec2 r, float w){ return 1.-smoothstep(1.-w, 1.+w, length((p-c)/r)); }
-void main(){ float face=vFace.x, L=vFace.y, endK=vFace.z, last=vFace.w; vec2 uv=vUV, fw=max(fwidth(uv), vec2(1e-5)); float Rpx=radAt(vZD.y)*uPx, wB=max(fw.x, fw.y)*(1.+Rpx);
-  vec2 P=vClip.xy/vClip.z; float lampZ= face<1.5 ? vZD.x+uv.x : vZD.x, dz=fract((lampZ-8.)/24.+0.5)-0.5, sh=0.25+0.75*exp(-(dz*24.)*(dz*24.)/14.);
-  vec3 red=vec3(0.15, 0.045, 0.04), cream=vec3(0.3, 0.27, 0.2), glassD=vec3(0.03, 0.035, 0.045), col; float bel= last>0.5 ? 0. : smoothstep(L-0.45, L-0.4, uv.x);
-  if(face<0.5){   /* the roof: wet grey, its middle catching the lamps, the edges falling away, equipment boxes, the bellows' dark band */
-    float ac=abs(uv.y); col=vec3(0.085, 0.09, 0.095)*(0.8+0.5*sh*exp(-ac*ac/0.25))*(1.-0.45*smoothstep(0.85, 1.2, ac));
-    float eq=bx(uv, vec2(L*0.3, -0.55), vec2(L*0.52, 0.55), wB); col=mix(col, vec3(0.05, 0.052, 0.056)+vec3(0.12, 0.1, 0.07)*sh*0.3*smoothstep(0.35, 0.55, uv.y), eq);
-    col+=uHoney*0.55*smoothstep(0.92, 1.18, ac)*(1.-bel)*(1.-eq);   /* the windows reach up into the roof's curve: their warm light along both long edges */
-    col=mix(col, vec3(0.025), bel); }
-  else if(face<1.5){   /* the near side: the bogies, the red lower body, the lit windows with people, the cream band, the bellows */
-    float v=uv.y, P0=L/max(1., floor(L/1.35+0.5)), n=floor(uv.x/P0), x=uv.x-n*P0, door=step(0.78, h1(n+vFace.y*7.1));
-    col= v<0.38 ? vec3(0.02) : v<1.0 ? red*(0.85+0.3*sh) : v<2.32 ? cream*0.6 : cream*(0.8+0.3*sh);
-    float pane=bx(vec2(x, v), vec2(0.09, door>0.5 ? 0.46 : 1.04), vec2(P0-0.09, 2.28), wB);
-    float s=h1(n*3.7+vZD.x*0.13), cx=0.3+0.5*h1(n*5.3+1.), st=step(0.62, s), sit=step(0.3, s)*(1.-st);   /* someone standing, someone sitting, or nobody */
-    float who=max(st*max(elp(vec2(x, v), vec2(cx*P0, 1.88), vec2(0.11, 0.13), 0.25), elp(vec2(x, v), vec2(cx*P0, 1.5), vec2(0.24, 0.33), 0.2)), sit*max(elp(vec2(x, v), vec2(cx*P0, 1.56), vec2(0.1, 0.12), 0.25), elp(vec2(x, v), vec2(cx*P0, 1.25), vec2(0.22, 0.2), 0.2)));
-    vec3 lit=uHoney*(0.78+0.35*smoothstep(1.1, 2.25, v));   /* the ceiling lights: brighter towards the top */
-    col=mix(col, mix(lit, vec3(0.06, 0.045, 0.035), who*0.88), pane); col=mix(col, vec3(0.03), bel); }
-  else {   /* the near end: the cab (windscreen, destination band, lamp housings), the rear (its lit window), or a bellows between carriages */
-    float u=uv.x, v=uv.y; col= v<0.38 ? vec3(0.02) : v<1.0 ? red : cream*0.75;
-    if(endK>1.5){ float w=bx(uv, vec2(-0.92, 1.12), vec2(0.92, 2.38), wB), s=h1(vZD.x*0.37), who=step(0.4, s)*max(elp(uv, vec2(0.35*(s-0.7), 1.86), vec2(0.13, 0.15), 0.25), elp(uv, vec2(0.35*(s-0.7), 1.45), vec2(0.28, 0.35), 0.2));
-      col=mix(col, mix(uHoney*0.85, vec3(0.06, 0.045, 0.035), who*0.88), w); }
-    else if(endK>0.5){ float w=bx(uv, vec2(-1.02, 1.02), vec2(1.02, 2.56), wB), dest=bx(uv, vec2(-0.78, 2.66), vec2(0.78, 2.98), wB), dots=0.65+0.35*step(0.5, fract(u*9.))*step(0.5, fract(v*9.));
-      col=mix(col, glassD+uHoney*0.12*smoothstep(1.0, 2.5, v)+vec3(0.5, 0.55, 0.62)*exp(-pow((u+0.35)/0.3, 2.))*0.08*(0.4+sh), w); col=mix(col, uAmber*1.25*dots, dest);
-      col=mix(col, vec3(0.04), max(elp(uv, vec2(-0.8, 0.82), vec2(0.17, 0.11), 0.3), elp(uv, vec2(0.8, 0.82), vec2(0.17, 0.11), 0.3))); }
-    else col=vec3(0.03); }
-  /* the outline softened by the pixel and the blur (only the edges flagged in aSoft); the baked city's nearer things hide it */
-  vec4 e=vec4(uv.x-vExt.x, vExt.y-uv.x, uv.y-vExt.z, vExt.w-uv.y)/vec4(fw.x, fw.x, fw.y, fw.y)/(1.2+Rpx);
-  float al=1.; for(int i=0;i<4;i++){ float ei= i==0 ? e.x : i==1 ? e.y : i==2 ? e.z : e.w, fl= i==0 ? vSoftE.x : i==1 ? vSoftE.y : i==2 ? vSoftE.z : vSoftE.w; if(fl>0.5 && uWin>0.5) al*=smoothstep(0., 1., ei); }
-  if(uOccl>0.5){ float bd=texture2D(uDepthMap, clamp(P/uExt*0.5+0.5, 0., 1.)).r; al*=1.-smoothstep(0.012, 0.03, vZD.y-bd); }
-  gl_FragColor=vec4(col*al, al); }`;
+/* RAIN-10's tram as a lit box (TRAM_V / TRAM_F): archive/rain-tram-box-RAIN10.js — RELEASE-1 (B) draws the tram in 3D (VEH_V / VEH_F) */
 /* RAIN-8: our own window (RAIN-7's FRAME_F) removed — archive/rain-frame-RAIN7.js, not loaded */
+
+/* RELEASE-1 (B): THE VEHICLES IN 3D (pure/vehmesh.js) — each corner through the camera's own law (project(): the bend, the basis, the division by the
+   distance along the view: the GPU divides, so every face's perspective is exact), drawn into the cars' layer N times, each copy shifted inside the
+   focus blur's disc (uJit × radAt of the vehicle's depth) and added at weight uW: the vehicles get the city's depth of field and soft edges, never a quad.
+   (Revised the same day: copies shifted across a wide blur showed as stripes — now each vehicle is drawn into the blur LEVEL its depth asks for, the
+   two nearest levels weighted (aMore.w), each level at its own resolution and softened like the city's copies; only the sharp level takes the
+   0.7-px copies, for smooth edges.)
+   aPlace: x, the nearer end's z, dir (+1 away from us, −1 towards), length; aLook: paint, type (7 = the tram), the lamps' half spacing, the lamps' height;
+   aMore: seed, flags (1 the cabin lit), half width, 0. Local s runs from the rear to the front, so the front faces the way it goes */
+const glf=v=>(+v).toFixed(5), DEPTH_GLSL=`float depthLaw(float d){ ${DEPTH.anchors.map((a, i)=>i ? `if(d<=${glf(a[0])}) return mix(${glf(DEPTH.anchors[i-1][1])}, ${glf(a[1])}, log(d/${glf(DEPTH.anchors[i-1][0])})/${glf(Math.log(a[0]/DEPTH.anchors[i-1][0]))}); ` : `if(d<=${glf(a[0])}) return ${glf(a[1])}*max(d, 0.)/${glf(a[0])}; `).join('')}return min(0.99, ${glf(DEPTH.anchors[DEPTH.anchors.length-1][1])}+0.03*log(d/${glf(DEPTH.anchors[DEPTH.anchors.length-1][0])})); }`;
+const BEND_GLSL=`float bendX(float z){ return z<=${glf(BEND.z0)} ? 0. : z<=${glf(BEND.z1)} ? ${BEND.k.toExponential(6)}*(z-${glf(BEND.z0)})*(z-${glf(BEND.z0)}) : ${BEND.k.toExponential(6)}*${glf(BEND.z1-BEND.z0)}*(${glf(BEND.z1-BEND.z0)}+2.*(z-${glf(BEND.z1)})); }`;
+export const VEH_V=`attribute float aPart; attribute vec4 aPlace, aLook, aMore; uniform vec2 uTan, uJit; uniform vec4 uFoc; uniform vec3 uCamP, uCr, uCu, uCf; uniform float uAA, uHalves;
+varying vec3 vLoc, vNl, vN, vW; varying float vPart, vDep; varying vec4 vLook, vPlace, vMore; varying vec2 vTrue; ${RAD} ${DEPTH_GLSL} ${BEND_GLSL}
+void main(){ float dir=aPlace.z>=0. ? 1. : -1., L=aPlace.w; vec3 w=vec3(aPlace.x+position.x*dir, position.y, dir>0. ? aPlace.y+position.z : aPlace.y+L-position.z);
+  vNl=normal; vN=vec3(normal.x*dir, normal.y, normal.z*dir); vW=w; vLoc=position; vPart=aPart; vLook=aLook; vPlace=aPlace; vMore=aMore;
+  vec3 v=w+vec3(bendX(w.z), 0., 0.)-uCamP; float xc=dot(v, uCr), yc=dot(v, uCu), zc=max(dot(v, uCf), 0.05);
+  float dc=depthLaw(length(vec3(aPlace.x, 1., aPlace.y+L*0.5)+vec3(bendX(aPlace.y+L*0.5), 0., 0.)-uCamP)); vDep=depthLaw(length(v)); vec2 j=uJit*uAA;   /* the sharp level's copies: 0.7 px apart — smooth edges (the blur is the levels', rain.js carsPass) */ vTrue=vec2(xc, yc)/zc;
+  float n=1., f=3000.; gl_Position=vec4((xc+j.x*zc)/uTan.x, (yc+j.y*zc)/uTan.y, zc*(f+n)/(f-n)-2.*f*n/(f-n), zc); if(uHalves>0.5 && abs(aPart-9.)>0.5) gl_Position=vec4(2., 2., 2., 1.); }`;
+const LAMPS_GLSL=LAMP_ROWS.map(([x, ph, y])=>`{ float z0=${glf(8+ph*STREET.lampEvery)}, k=floor((P.z-z0)/${glf(STREET.lampEvery)}); for(int j=0;j<2;j++){ vec3 l=vec3(${glf(x)}, ${glf(y)}, z0+(k+float(j))*${glf(STREET.lampEvery)})-P; float d2=dot(l, l); l*=inversesqrt(d2); float a=1./(1.+d2*0.016); d+=a*max(dot(N, l), 0.); sp+=a*pow(max(dot(N, normalize(l+V)), 0.), sh); } }`).join(' ');
+export const VEH_F=`precision highp float; varying vec3 vLoc, vNl, vN, vW; varying float vPart, vDep; varying vec4 vLook, vPlace, vMore; varying vec2 vTrue;
+uniform vec3 uCamP, uAmb, uLampC, uHead, uTail, uHoney, uAmber; uniform float uLamp, uW, uOccl, uHalves, uTime; uniform sampler2D uDepthMap; uniform vec2 uExt;
+vec3 lampTone(vec3 c){ if(uLamp==0.) return c; float L=dot(c, vec3(0.3, 0.5, 0.2)); return uLamp<0. ? mix(c, L*vec3(1.38, 0.8, 0.38)*0.82, -uLamp) : mix(c, L*vec3(0.92, 1.0, 1.12)*1.25, uLamp); }
+${tabV('vPaint', VEH_PAINT)}
+float h1(float n){ return fract(sin(n*127.1)*43758.5453); }
+float bx(vec2 p, vec2 a, vec2 b, float w){ vec2 s=smoothstep(a-w, a+w, p)*(1.-smoothstep(b-w, b+w, p)); return s.x*s.y; }
+/* the street lamps' light at P (normal N, towards the eye V): the two nearest of each row; sp their highlight (shininess sh) */
+float lampsAt(vec3 P, vec3 N, vec3 V, float sh, out float sp){ float d=0.; sp=0.; ${LAMPS_GLSL} return d; }
+void main(){ vec3 N=normalize(vN), V=normalize(uCamP-vW), lc=lampTone(uLampC); float part=floor(vPart+0.5), ty=floor(vLook.y+0.5), L=vPlace.w, s=vLoc.z, y=vLoc.y, x=vLoc.x, ax=abs(x), fw=max(fwidth(s), 1e-4)*1.5;
+  float fr=0.04+0.96*pow(1.-max(dot(N, V), 0.), 5.), sp, df=lampsAt(vW, N, V, part>0.5 && part<1.5 ? 140. : 60., sp);
+  vec3 sky=mix(uAmb*0.12+vec3(0.012, 0.014, 0.022), uAmb*0.32, 0.5-0.5*N.y), amb=mix(uAmb*0.34, uAmb*0.24+vec3(0.02, 0.022, 0.03), smoothstep(-0.2, 0.9, N.y));   /* the city's night glow on what faces up, the lit wet street's warmer glow from below and the sides */
+  vec3 col=vec3(0.); float al=1.;
+  if(part<0.5 || (part>0.5 && part<1.5 && N.y>0.8)){   /* PAINT, wet: its colour in the lamps' light, a clear coat's highlights and the sky in it */
+    vec3 alb= ty>3.5 && ty<4.5 ? ${hexV(TAXI_PAINT)} : ty>5.5 && N.y>0.8 ? vec3(0.6, 0.61, 0.62) : vPaint(floor(vLook.x+0.5));   /* a bus's roof light grey */
+    col=alb*(amb+lc*df*0.85)+lc*sp*(0.35+0.9*fr)+sky*fr*0.9;
+    if(abs(vNl.z)>0.55 && part<0.5){ float front=step(0., vNl.z), lx=vLook.z, ly=vLook.w, lmp=bx(vec2(ax, y), vec2(lx-0.17, ly-0.08), vec2(lx+0.13, ly+0.08), 0.015);   /* the lamps on the ends: white ahead, red behind; a dark grille, a pale plate */
+      col=mix(col, vec3(0.025), front*bx(vec2(ax, y), vec2(0., ly-0.16), vec2(lx-0.24, ly+0.05), 0.02)); col=mix(col, vec3(0.28, 0.28, 0.26)*(amb+lc*df), bx(vec2(ax, y), vec2(0., ly-0.27), vec2(0.26, ly-0.15), 0.01));
+      col=mix(col, front>0.5 ? uHead*1.7 : uTail*1.25, lmp); } }
+  else if(part<1.5){   /* GLASS: dark, the sky and the lamps mirrored in it; a lit cabin (a bus, a taxi's open door) glows warm */
+    float lit= ty>5.5 ? 1. : vMore.y; col=vec3(0.012, 0.014, 0.018)+sky*fr*1.6+lc*sp*1.4*(0.3+fr)+uHoney*0.5*lit*smoothstep(0.3, 0.6, abs(N.x));
+    if(ty>5.5 && abs(vNl.x)>0.5){ float m=fract(s/1.25); col=mix(col, vPaint(floor(vLook.x+0.5))*(amb+lc*df), 1.-smoothstep(0.05, 0.05+fw, min(m, 1.-m))); } }   /* a bus's window posts */
+  else if(part<2.5) col=vec3(0.02)*(1.+amb*4.)+lc*sp*0.08;   /* tyres */
+  else if(part<5.5) col=vec3(0.03)*(1.+amb*3.)+lc*sp*0.1;   /* trim, bogies */
+  else if(part<6.5) col=uAmber*(0.9+0.25*smoothstep(0.5, 1., N.y));   /* the taxi's lit roof sign */
+  else if(part<9.5){ float r=max(ax/max(vMore.z+0.35, 0.1), abs(s-L*0.5)/(L*0.5+0.35)); al=0.55*(1.-smoothstep(0.55, 1., r)); col=vec3(0.); }   /* the soft shadow under it */
+  else if(part<10.5){   /* THE TRAM's body: a light livery that reads from above — cream, a deep red skirt; lit windows with people; the cabs; the roof */
+    vec3 cream=vec3(0.8, 0.76, 0.64), red=vec3(0.52, 0.1, 0.09), roof=vec3(0.56, 0.57, 0.58); float sec= s<${glf(VEH3.tram.sec[1]+VEH3.tram.gap*0.5)} ? 0. : 1., s0= sec<0.5 ? 0. : ${glf(VEH3.tram.sec[1]+VEH3.tram.gap)}, sl=s-s0;
+    if(vNl.y>0.55){ col=roof*(amb+lc*df*0.9)+lc*sp*(0.4+fr)+sky*fr*0.7; }
+    else if(vNl.y>0.2){ col=cream*(amb+lc*df*0.9)+lc*sp*0.3; col=mix(col, uHoney*0.75, 0.55*step(0.7, sl)*step(sl, ${glf(VEH3.tram.sec[1]-0.7)})); }   /* the roof's shoulders: the upper windows' warm light seen from above */
+    else if(abs(vNl.x)>0.6){ float P0=1.42, n=floor((sl-0.7)/P0), xx=sl-0.7-n*P0, door=step(0.72, h1(n+sec*17.+vMore.x*3.1))*step(1., n)*step(n, 7.), w0=${glf(VEH3.tram.win[0])}, w1=${glf(VEH3.tram.win[1])};
+      col= y<0.95 ? red : cream; col=col*(amb+lc*df*0.9)+lc*sp*(0.25+0.7*fr)+sky*fr*0.5;
+      float pane=bx(vec2(xx, y), vec2(0.1, door>0.5 ? 0.5 : w0), vec2(P0-0.1, w1), fw)*step(0., sl-0.7)*step(sl, ${glf(VEH3.tram.sec[1]-0.7)});
+      float q=h1(n*3.7+sec*11.+floor(uTime/90.)+vMore.x), cx=0.3+0.45*h1(n*5.3+1.+sec), st=step(0.6, q), sit=step(0.25, q)*(1.-st);   /* someone standing, someone sitting, or nobody (they change at the stops) */
+      vec2 pq=vec2(xx/P0, y); float who=max(st*max(1.-smoothstep(0.85, 1.1, length((pq-vec2(cx, 2.02))/vec2(0.08, 0.13))), 1.-smoothstep(0.85, 1.1, length((pq-vec2(cx, 1.6))/vec2(0.17, 0.36)))),
+        sit*max(1.-smoothstep(0.85, 1.1, length((pq-vec2(cx, 1.68))/vec2(0.075, 0.12))), 1.-smoothstep(0.85, 1.1, length((pq-vec2(cx, 1.36))/vec2(0.16, 0.22)))));
+      col=mix(col, mix(uHoney*(0.85+0.4*smoothstep(1.2, 2.5, y))+lc*sp*0.3, vec3(0.07, 0.05, 0.04), who*0.9), pane); }
+    else { float front=step(0., vNl.z)*step(${glf(VEH3.tram.len*0.5)}, s); col= y<0.95 ? red : cream; col=col*(amb+lc*df*0.9)+lc*sp*0.3;   /* the cab at each end: the windscreen, the amber destination band, the lamps */
+      float ws=bx(vec2(ax, y), vec2(-1., 1.18), vec2(1.08, 2.62), 0.02), dest=bx(vec2(ax, y), vec2(-1., 2.7), vec2(0.82, 3.0), 0.015), dots=0.7+0.3*step(0.5, fract(x*10.))*step(0.5, fract(y*10.));
+      col=mix(col, vec3(0.015, 0.018, 0.024)+sky*fr*1.5+uHoney*0.08*smoothstep(1.2, 2.6, y), ws); col=mix(col, uAmber*1.3*dots, dest);
+      col=mix(col, front>0.5 ? uHead*1.8 : uTail*1.3, bx(vec2(ax, y), vec2(0.66, 0.78), vec2(1.0, 1.0), 0.02)); } }
+  else if(part<11.5){ float m=fract(s*6.); col=vec3(0.035)*(0.7+0.6*smoothstep(0.2, 0.5, m)*(1.-smoothstep(0.5, 0.8, m)))*(1.+amb*3.); }   /* the bellows' folds */
+  else if(part<12.5) col=vec3(0.035)+lc*sp*0.5+sky*fr*0.4;   /* the pantograph: dark metal, catching the lamps */
+  else col=vec3(0.32)*(amb+lc*df*0.8)+lc*sp*0.3;   /* roof equipment */
+  if(uHalves>0.5){ col= s>L*0.5 ? vec3(1., 0., 0.) : vec3(0., 1., 0.); al=1.; }   /* the probes only: the body's FOOTPRINT on the road (its shadow quad, alone: VEH_V drops the rest) — its front half red, its rear half green */
+  if(uOccl>0.5){ float bd=texture2D(uDepthMap, clamp(vTrue/uExt*0.5+0.5, 0., 1.)).r; al*=1.-smoothstep(0.012, 0.03, vDep-bd); }   /* the baked city's nearer things (a trunk, a crown, a lamp post) hide it */
+  gl_FragColor=vec4(col*al, al)*uW*vMore.w; }`;
+/* RELEASE-1 (B): the cars' layer laid over the view (premultiplied) */
+export const VEHCOMP_F=`precision highp float; uniform sampler2D uT0, uT1, uT2, uT3; varying vec2 vUv;
+void main(){ vec4 c=texture2D(uT3, vUv); vec4 b=texture2D(uT2, vUv); c=b+c*(1.-b.a); b=texture2D(uT1, vUv); c=b+c*(1.-b.a); b=texture2D(uT0, vUv); gl_FragColor=b+c*(1.-b.a); }`;   /* the levels laid far-blurred first */

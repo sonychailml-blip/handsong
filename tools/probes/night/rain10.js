@@ -14,7 +14,7 @@
      (7) THE HEADLIGHTS' POOL reaches 0 inside its quad (ring ≤ 2 / 255) — CONTROL RAIN-8's cut pool (uWin 2) shows its box;
    - in the room itself: (8) RELEASE-1: A PERSON UNDER THE CROWNS shows through the gaps and not through the leaves (see the block). RAIN-10's version: planted where the baked depth says a trunk or crown covers the whole figure, every 10 cm of it (the CPU cull off, so the shader's own test is judged), the
      view's picture there is the picture without them (pixels changed by > 24 / 255: at most 2 more than between two frames without them) — CONTROL the depth test off: > 10 more;
-     (9) a tram on the street is drawn as a lit box (its faces counted). */
+     (9) a tram on the street is drawn as a 3D body (RELEASE-1 (B); it was RAIN-10's lit box). */
 import { row } from '../core/rows.js';
 import { lifeSheet, sheetRenderer, sheetDone } from './rainsheet.js';
 
@@ -132,7 +132,7 @@ export async function checkRain10(o={}){ const d=[], notes=[]; let n=0; const ok
           ok(`${tag}: CONTROL the depth test off still hides them behind the leaves (${Cs.over} px over the leaves vs ${Bs.over} with it on)`, Cs.over>Bs.over+10);
           notes.push(`${tag}: a person under the crowns at x ${best.x.toFixed(1)}, z ${best.z} (${Math.round(best.share*100)} % covered): ${Bs.gaps} px seen through the gaps, ${Bs.leaves} through the leaves (two frames without them: ${N.leaves}); with the depth test off ${Cs.over} over the leaves (on: ${Bs.over})`); } }
       /* (9) the tram as a lit box */
-      { const Rm=R(), q=Rm.tramAtDbg(400, 3000, 30, 110); if(ok(`${tag}: no tram found on the street`, !!q)){ Rm.trafficHoldDbg(q.t); await frames(3); const T=Rm.tramDbg(); ok(`${tag}: the tram is not drawn as a box (${T.quads} faces)`, T.quads>=6); } }
+      { const Rm=R(), q=Rm.tramAtDbg(400, 3000, 30, 110); if(ok(`${tag}: no tram found on the street`, !!q)){ Rm.trafficHoldDbg(q.t); await frames(3); const T=Rm.tramDbg(); ok(`${tag}: the tram is not drawn in 3D (${T.mesh} bodies; RAIN-10's box ${T.quads} faces)`, T.mesh>=1 && T.quads===0); } }   /* RELEASE-1 (B): the tram a 3D body (its RAIN-10 box only with the sprites) */
       R().trafficHoldDbg(null); R().lifeHoldDbg(null); }
   } finally { sheetDone(); try{ const Rm=R(); if(Rm){ Rm.lifeExtraDbg(null); Rm.lifeHoldDbg(null); Rm.trafficHoldDbg(null); Rm.occlDbg(true); Rm.cullDbg(true); } }catch(e){} H.setSceneLight(light0); await H.setSceneLevel(lvl0);
     try{ if(H.sceneRoom()!==room0) await RS.roomSwitch(room0, { fast:true }); if(bg0) await H.setBackground(bg0); }catch(e){} if(PR.profileCurrent()!==was) PR.profileApply(was||'profile.full'); }

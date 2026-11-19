@@ -467,7 +467,7 @@ RAIN-7: THE STREET MUSICIAN under the café's awning, playing along with our mus
 
 ## apps/night/rooms/rain/pure/city.js
 RAIN-0b: THE VIEW LAW — the eye on the 8th floor, looking slightly down and diagonally along the boulevard (concept §3), as ONE pure projection used by the painting, the depth map, the lights, the …
-- const (20): `CAM`, `STREET`, `BEND`, `bendX`, `BAKE_EXT`, `BLOCKS`, `FLOOR`, `FAR`, `camBasis`, `vanishing`, `DEPTH`, `hillsAt`, `RAIN_CITY_SEED`, `NEAR_TREES`, `TRAFFIC`, `DENS_MARGIN`, `RAIN_TRAFFIC`, `EAR`, `trafficAt`, `trafficDensity`
+- const (21): `CAM`, `STREET`, `BEND`, `bendX`, `BAKE_EXT`, `BLOCKS`, `FLOOR`, `FAR`, `camBasis`, `vanishing`, `DEPTH`, `hillsAt`, `RAIN_CITY_SEED`, `LAMP_ROWS`, `NEAR_TREES`, `TRAFFIC`, `DENS_MARGIN`, `RAIN_TRAFFIC`, `EAR`, `trafficAt`, `trafficDensity`
 - fn (8): `project`, `rayOf`, `depthOf`, `sceneAt`, `cityWindows`, `cityLamps`, `lampLitAt`, `cityTrees`
 
 ## apps/night/rooms/rain/pure/drops.js
@@ -547,6 +547,11 @@ RAIN-6b (1, 3): THE VEHICLES' BODIES and THE TAXI — a pure seeded law (rule #3
 - const (6): `VK`, `VEH`, `vehColour`, `sheenAt`, `taxiAt`, `SWEEP`
 - fn (3): `vehType`, `vehicleItems`, `sweepAt`
 
+## apps/night/rooms/rain/pure/vehmesh.js
+RELEASE-1 (B): THE VEHICLES IN 3D — low-poly bodies as plain arrays (rule #36: pure, no Web Audio, no DOM, no WebGL): a car of each type (pure/vehicles.js VEH.types: sedan, hatchback, estate, small…
+- const (4): `VEH3`, `carLamps`, `VEH_PAINT`, `TAXI_PAINT`
+- fn (2): `carMesh`, `tramMesh`
+
 ## apps/night/rooms/rain/pure/windows.js
 RAIN-0: THE WINDOWS — their places, which one a note lights, and how a lit window fades (pure, rule #36; data rows «RAIN window pick (app)», «RAIN window fade (app)»).
 - const (12): `RAIN_SEED`, `windowsLayout`, `winQuad`, `winCover`, `PICK_REACH`, `TRACE`, `AMB_LEVEL`, `windowLight`, `WINLIFE`, `winGarland`, `winOnOff`, `FLY_SHAPES`
@@ -559,7 +564,7 @@ RAIN-0b: THE STAND-IN CITY's prepared picture and its DEPTH MAP, painted ONCE on
 
 ## apps/night/rooms/rain/rain-glass.js
 RAIN-0: THE RAIN ROOM'S SHADERS (our own, written from the physics: a drop is a small strong lens that shows the view upside down and wide, darker at its rim; a running drop leaves a wet lane and b…
-- const (16): `QUAD_V`, `BLUR_F`, `DOWN_F`, `VIEW_F`, `WIN_V`, `WIN_F`, `LIGHT_V`, `LIGHT_F`, `DROP_V`, `DROP_F`, `glassShader`, `LIFE_DN`, `LIFE_V`, `LIFE_F`, `TRAM_V`, `TRAM_F`
+- const (17): `QUAD_V`, `BLUR_F`, `DOWN_F`, `VIEW_F`, `WIN_V`, `WIN_F`, `LIGHT_V`, `LIGHT_F`, `DROP_V`, `DROP_F`, `glassShader`, `LIFE_DN`, `LIFE_V`, `LIFE_F`, `VEH_V`, `VEH_F`, `VEHCOMP_F`
 
 ## apps/night/rooms/rain/rain.js
 RAIN-0 — THE RAIN ROOM's picture (docs/night/design/RAIN/CONCEPT.md; the plan and what is still a placeholder: PLAN.md).
@@ -1495,6 +1500,7 @@ SPLIT-2: the probe entry of the Night page: its own rows and the core rows flagg
 - → ./night/rain7.js (1): `checkRain7`
 - → ./night/rainnature.js (1): `checkRainNature`
 - → ./night/rainroom.js (1): `checkRainRoom`
+- → ./night/release1b.js (1): `checkRelease1B`
 - → ./night/roomswitch.js (1): `checkNightRoomSwitch`
 - → ./night/scales.js (1): `checkNightScales`
 - → ./night/stream.js (1): `checkNightStream`
@@ -1661,6 +1667,10 @@ RAIN-0: row «RAIN room» (P.night, drawn) — the rain room (apps/night/rooms/r
 RAIN-10 — THE LIFE SHEET (dev tool and the rows' drawing): the room's own life shader (rooms/rain/rain-glass.js LIFE_V / LIFE_F) draws chosen items on a transparent canvas, with the room's uniforms.
 - fn (3): `sheetRenderer`, `sheetDone`, `lifeSheet`
 
+## tools/probes/night/release1b.js
+RELEASE-1 (B) — «RELEASE-1 vehicles in 3D» (drawn): the founder saw the cars and the tram drive slightly sideways — flat sprites facing the screen on a road that runs slanted across it.
+- fn (1): `checkRelease1B`
+
 ## tools/probes/night/roomswitch.js
 NIGHT-3 stage 5 part 2: row «NIGHT room switch» (P.night, drawn) — the switching machinery, on the test room (./testroom.js), judged on EXACT controls (the user, 2026-11-09): (1) hand detection tak…
 - fn (1): `checkNightRoomSwitch`
@@ -1687,7 +1697,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 UI-1 — «NIGHT labels follow the room»: the founder entered the rain and the Sound button still read «Firefly» while another timbre played.
 - fn (1): `checkNightLabels`
 
-_335 modules, 3243 exported names._
+_337 modules, 3253 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 
