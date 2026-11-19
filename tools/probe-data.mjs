@@ -2129,6 +2129,36 @@ async function nightSilentSwitch(){ const d=[], notes=[]; let n=0; const ok=(wha
 /* RAIN-7 — «RAIN-7 law (app)»: the street musician (rooms/rain/pure/busker.js) plays ONLY the bar's chord tones, on its beats inside the bar, rests
    between sets (some bars silent, some sets silent) — CONTROL a note a step off the chord is caught; a turning car's sweep (pure/vehicles.js) stays on
    the facade's span, brightest in its middle, its sweeps at least the shortest gap apart. */
+/* RAIN-10 — «RAIN-10 gait and clothes (app)»: the founder saw people float. The law (rooms/rain/pure/life.js): every walker's step phase advances
+   EXACTLY with the distance walked — Δph ≡ Δs / (2 × step) (mod 1), Δs read from their own z each 0.1 s over a minute, every walker, every mood — and
+   advances at all (whole steps taken); the walkers wear at least six of the eight clothes colours and four umbrella colours. CONTROLS: a walker whose
+   phase is frozen is caught; a street where everyone wears one colour is caught. + the street lamp that flickers now and then (its schedule; CONTROL). (The drawing — feet, domes, colours on screen — is P.night's
+   «RAIN-10 people, cars and the tram».) */
+async function rain10Gait(){
+  const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); return !!c; }, U=f=>import(new URL(f, import.meta.url).href);
+  const { lifeAt, LK }=await U('../apps/night/rooms/rain/pure/life.js'), WALK=[LK.walk, LK.couple, LK.dog, LK.child, LK.old, LK.group];
+  const judge=(look, frozen)=>{ let pairs=0, bad=0, cyc=0, dist=0; let prev=lifeAt(100, look).filter(q=>WALK.includes(q.kind) && typeof q.lane==='number');
+    for(let k=1;k<=600;k++){ const t=100+k*0.1, cur=lifeAt(t, look).filter(q=>WALK.includes(q.kind) && typeof q.lane==='number');
+      for(const q of cur){ let best=null, bd=1e9; for(const p of prev) if(p.lane===q.lane && Math.abs(p.z-q.z)<bd){ bd=Math.abs(p.z-q.z); best=p; } if(!best || bd>1) continue;
+        const ph1= frozen ? best.ph : q.ph, dph=((ph1-best.ph)%1+1)%1, want=((bd/(2*q.step))%1+1)%1, e=Math.min(Math.abs(dph-want), 1-Math.abs(dph-want)); pairs++; if(e>1e-6) bad++; cyc+=bd/(2*q.step); dist+=bd; }
+      prev=cur; }
+    return { pairs, bad, cyc, dist }; };
+  for(const look of ['evening', 'after', 'late']){ const J=judge(look, false); ok(`${look}: a walker's step does not follow the distance walked (${J.bad} of ${J.pairs})`, J.pairs>50 && J.bad===0); ok(`${look}: the walkers take no steps (${J.cyc.toFixed(1)} strides over ${J.dist.toFixed(0)} m)`, J.cyc>J.pairs*0.03);
+    if(look==='evening') notes.push(`Evening: ${J.pairs} step pairs over a minute, every phase = distance / stride (${J.cyc.toFixed(0)} strides, ${J.dist.toFixed(0)} m walked)`); }
+  { const J=judge('evening', true); ok('CONTROL: walkers with a frozen phase passed', J.bad>J.pairs*0.5); notes.push(`CONTROL: a frozen phase caught (${J.bad} of ${J.pairs} pairs wrong)`); }
+  const spread=W=>({ clothes:new Set(W.map(q=>q.c%8)).size, umb:new Set(W.filter(q=>Math.floor(q.c/8)%8===1 || Math.floor(q.c/8)%8===3).map(q=>Math.floor(q.c/64)%4)).size });
+  { const W=lifeAt(10, 'evening').filter(q=>WALK.includes(q.kind)), S=spread(W); ok(`the walkers wear too few colours (${S.clothes} clothes, ${S.umb} umbrella colours; 6 and 4 wanted)`, S.clothes>=6 && S.umb>=4);
+    const C=spread(W.map(q=>({ ...q, c:q.c-(q.c%8)-64*(Math.floor(q.c/64)%4) }))); ok('CONTROL: everyone in one colour passed', !(C.clothes>=6 && C.umb>=4));
+    notes.push(`Evening: ${S.clothes} of 8 clothes colours, ${S.umb} of 4 umbrella colours; CONTROL one colour caught (${C.clothes}, ${C.umb})`); }
+  /* the street lamp that flickers now and then (pure/far.js lampFlickerAt): one lamp at a time, each stutter ≤ its duration, at least 50 s apart,
+     about every one to two minutes, its light back to full at its end; CONTROL a schedule with two stutters 10 s apart is caught */
+  { const FL=await U('../apps/night/rooms/rain/pure/far.js'); let n0=0, last=-1e9, gap=1e9, longest=0, run=0, prev=null, endFull=true; const gaps=list=>{ let g=1e9; for(let i=1;i<list.length;i++) g=Math.min(g, list[i]-list[i-1]); return g; }, starts=[];
+    for(let t=0;t<7200;t+=0.05){ const f=FL.lampFlickerAt(t, 8); if(f){ if(!prev){ n0++; starts.push(t); run=0; } run+=0.05; longest=Math.max(longest, run); if(f.j<0 || f.j>=8 || !(f.k>=0 && f.k<=1)) endFull=false; } else if(prev && prev.k!==1) endFull=false; prev=f; }
+    ok(`the lamp's stutters are wrong (${n0} in 2 h, longest ${longest.toFixed(2)} s, nearest ${gaps(starts).toFixed(0)} s apart)`, n0>=50 && n0<=140 && longest<=FL.LAMP_FLICKER.dur+0.06 && gaps(starts)>=50);
+    ok('a stutter does not end with the lamp at full', endFull); ok('CONTROL: two stutters 10 s apart passed', !(gaps([100, 110])>=50));
+    notes.push(`the flickering lamp: ${n0} stutters in 2 h, each ≤ ${FL.LAMP_FLICKER.dur} s, at least ${gaps(starts).toFixed(0)} s apart`); }
+  return { cases:n, total:d.length, differences:d, notes };
+}
 async function rain7Law(){
   const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); return !!c; }, U=f=>import(new URL(f, import.meta.url).href);
   const B=await U('../apps/night/rooms/rain/pure/busker.js'), V=await U('../apps/night/rooms/rain/pure/vehicles.js');
@@ -3484,6 +3514,7 @@ const ROWS=[
   ['CORE-27 idle search cadence (core)', ()=>idleSearch(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // CORE-27
   ['RAIN effects hand (app)', ()=>rainFxLaw(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-6
   ['RAIN-7 law (app)', ()=>rain7Law(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-7
+  ['RAIN-10 gait, clothes and the lamp (app)', ()=>rain10Gait(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-10
   ['NIGHT silent switch (app)', ()=>nightSilentSwitch(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // SAFARI-1
   ['RAIN street law (app)', ()=>rainStreetLaw(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-6b
   ['NIGHT home screen (app)', ()=>nightHomeScreen(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-7c

@@ -47,3 +47,9 @@ export function farEventAt(t, seed=FAR_LIFE.seed){ let s=SCH.get(seed); if(!s ||
   for(const e of s.list){ if(e.t>t) break; if(t<=e.t+e.dur) return { kind:e.kind, u:(t-e.t)/e.dur, k:e.k }; } return null; }
 /* the smoker's glow through the event: in, a draw every 10–18 s (brighter for 1.5 s), out → 0…1 */
 export function smokerGlow(u, dur, k, L=FAR_LIFE){ const t=u*dur, D=L.smoker.draw, per=D[0]+(D[1]-D[0])*k, ph=frac(t/per), fade=Math.min(1, u*12, (1-u)*12); return fade*(0.25+0.75*(ph<1.5/per ? Math.sin(ph*per/1.5*Math.PI) : 0)); }
+/* RAIN-10 (RAIN-7's list: «a street lamp that flickers now and then»): one near lamp of n at a time stutters for `dur` s — every `every` s on a seeded
+   schedule (absolute time: every device the same moment) → null, or { j (the lamp's index), k (its brightness now, 0…1) } */
+export const LAMP_FLICKER=F({ seed:0x464C4B52, every:F([55, 120]), dur:2.6 });
+export function lampFlickerAt(t, n, L=LAMP_FLICKER){ if(!(n>0) || !(t>=0)) return null; const per=L.every[1], k=Math.floor(t/per);
+  for(const kk of [k, k-1]){ if(kk<0) continue; const h=frac(Math.sin((kk+L.seed%977)*127.1)*43758.5453), t0=kk*per+h*(per-L.every[0]), u=(t-t0)/L.dur;
+    if(u>=0 && u<1){ const j=Math.floor(frac(h*7.31)*n), f=frac(Math.sin(Math.floor((t-t0)*14)*91.7+kk)*43758.5); return { j, k: u>0.85 ? 1 : f<0.45 ? 0.08 : f<0.7 ? 0.5 : 1 }; } } return null; }

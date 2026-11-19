@@ -477,8 +477,8 @@ RAIN-0b: THE DROPS ON THE PANE — a stateful simulation, so drops see each othe
 
 ## apps/night/rooms/rain/pure/far.js
 RAIN-5d: LIFE AT EVERY DISTANCE — a pure seeded law of time (rule #36; data row «RAIN far life (app)»).
-- const (5): `FAR_LIFE`, `slope`, `roadLen`, `blink`, `twinkle`
-- fn (7): `hillTop`, `roadAt`, `farCars`, `cableAt`, `farEvents`, `farEventAt`, `smokerGlow`
+- const (6): `FAR_LIFE`, `slope`, `roadLen`, `blink`, `twinkle`, `LAMP_FLICKER`
+- fn (8): `hillTop`, `roadAt`, `farCars`, `cableAt`, `farEvents`, `farEventAt`, `smokerGlow`, `lampFlickerAt`
 
 ## apps/night/rooms/rain/pure/focus.js
 RAIN-0: DEPTH IS FOCUS — the law (pure, rule #36; data row «RAIN focus law (app)»).
@@ -559,7 +559,7 @@ RAIN-0b: THE STAND-IN CITY's prepared picture and its DEPTH MAP, painted ONCE on
 
 ## apps/night/rooms/rain/rain-glass.js
 RAIN-0: THE RAIN ROOM'S SHADERS (our own, written from the physics: a drop is a small strong lens that shows the view upside down and wide, darker at its rim; a running drop leaves a wet lane and b…
-- const (13): `QUAD_V`, `BLUR_F`, `DOWN_F`, `VIEW_F`, `WIN_V`, `WIN_F`, `LIGHT_V`, `LIGHT_F`, `DROP_V`, `DROP_F`, `glassShader`, `LIFE_V`, `LIFE_F`
+- const (15): `QUAD_V`, `BLUR_F`, `DOWN_F`, `VIEW_F`, `WIN_V`, `WIN_F`, `LIGHT_V`, `LIGHT_F`, `DROP_V`, `DROP_F`, `glassShader`, `LIFE_V`, `LIFE_F`, `TRAM_V`, `TRAM_F`
 
 ## apps/night/rooms/rain/rain.js
 RAIN-0 — THE RAIN ROOM's picture (docs/night/design/RAIN/CONCEPT.md; the plan and what is still a placeholder: PLAN.md).
@@ -1486,6 +1486,7 @@ SPLIT-2: the probe entry of the Night page: its own rows and the core rows flagg
 - → ./night/nightprofile.js (1): `checkNightProfile`
 - → ./night/perf2.js (1): `checkPerfInvisible`
 - → ./night/pixels.js (2): `checkNightPixels`, `checkNightDetailedGuard`
+- → ./night/rain10.js (1): `checkRain10`
 - → ./night/rain4.js (1): `checkForestBed`
 - → ./night/rain4e.js (1): `checkRainClicks`
 - → ./night/rain5.js (1): `checkRainQuads`
@@ -1615,6 +1616,10 @@ PERF-2 / PERF-4 — «PERF invisible» (drawn, slow): every optimisation applied
 NIGHT-11 part 5 — rows «NIGHT pixel budget» and «NIGHT Detailed guard», on the running app with the forest open.
 - fn (2): `checkNightPixels`, `checkNightDetailedGuard`
 
+## tools/probes/night/rain10.js
+RAIN-10 — «RAIN-10 people, cars and the tram» (drawn): the founder saw people float, look alike, a dark square fly along the street, cars as boxes, people through the trunks and crowns.
+- fn (1): `checkRain10`
+
 ## tools/probes/night/rain4.js
 RAIN-4 — «RAIN forest bed unchanged»: the forest's music bed v2 rendered offline (bed2Plan, the worklet for real; Still, Drift, Glimmer, 20 s at 48 kHz, the live view) equals, sample for sample, th…
 - fn (1): `checkForestBed`
@@ -1652,6 +1657,10 @@ RAIN-3: row «RAIN nature» (P.night) — the rain room's layered recordings in 
 RAIN-0: row «RAIN room» (P.night, drawn) — the rain room (apps/night/rooms/rain/, a development room: the row adds it and takes it out again).
 - fn (1): `checkRainRoom`
 
+## tools/probes/night/rainsheet.js
+RAIN-10 — THE LIFE SHEET (dev tool and the rows' drawing): the room's own life shader (rooms/rain/rain-glass.js LIFE_V / LIFE_F) draws chosen items on a transparent canvas, with the room's uniforms.
+- fn (3): `sheetRenderer`, `sheetDone`, `lifeSheet`
+
 ## tools/probes/night/roomswitch.js
 NIGHT-3 stage 5 part 2: row «NIGHT room switch» (P.night, drawn) — the switching machinery, on the test room (./testroom.js), judged on EXACT controls (the user, 2026-11-09): (1) hand detection tak…
 - fn (1): `checkNightRoomSwitch`
@@ -1678,7 +1687,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 UI-1 — «NIGHT labels follow the room»: the founder entered the rain and the Sound button still read «Firefly» while another timbre played.
 - fn (1): `checkNightLabels`
 
-_333 modules, 3225 exported names._
+_335 modules, 3234 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 
@@ -1708,3 +1717,6 @@ NIGHT-8b (2026-11-11): `apps/night/fullscreen.js` `fsFlowTap` and `fsFlowEnd` de
 RAIN-0b (2026-11-14): `apps/night/rooms/rain/pure/windows.js` `HOUSES`, `HILL`, `hillAt` deleted (the placeholder houses; the windows now come from `pure/city.js cityWindows`, the far lights from `sceneAt`); `apps/night/rooms/rain/rain-glass.js` `PT_V`, `PT_F` deleted (the point lights became the instanced `LIGHT_V`/`LIGHT_F`); `buildRain`'s `depthReadDbg` became `rtReadDbg`; the rain record's levels `drops` (layers) → `drops` (the simulation's cap), `rivulets` → `fine` (procedural fine-droplet layers), + `cars`.
 
 NIGHT-16 (2026-11-17): the Lightweight switch `#nightLightTg` deleted (Light is the third choice of `#nightQualSeg`); texts `night.set.light`, `night.set.lightNote`, `night.set.level` and the old unused `night.set.quality` ('Picture') replaced by `night.set.quality` ('Quality'), `night.q.light`, `night.q.lightNote`; storage `handsong.nightLightScene` no longer read (removed at load). RAIN-R1 (2026-11-17): `apps/night/rooms/dev.js` deleted with `devRoomWord`, `devRoomInstall`, `DEV_ROOMS` (the rain is a real room); `apps/night/rooms/rain/install.js` `rainInstall` → `rainSetup` (the one-time setup; the room is listed in `rooms/index.js`); storage `handsong.nightRoom` no longer read (a random start room every visit; removed at load); the data row «RAIN stays out of the players' edition (app)» → «NIGHT two rooms (app)».
+
+
+RAIN-9 (2026-11-19): `apps/night/rooms/rain/pure/carsprites.js` moved to `archive/rain-cars-baked-RAIN8/` (not loaded) with its exports `CARS`, `BAKED_OF`, `cellOf`, `cellRC`, `CELLS`, `viewDir`, `viewAxes`, `boxOf`, `frameOf`, `binsOf`, `seenOf` (RAIN-8's baked car trial; the founder chose the cinematic cars); the rain room's probe hook `carsDbg` and uniforms `uCars`, `uCarMode`, `uCrown` deleted (one sway map `uTree`); `tools/rain-cars-bake.mjs` and `tools/design/rain/cars/` moved to the same archive folder; the data row «RAIN-8 cars (app)» and `tools/rain-snap.mjs --rain8` deleted; the musician's `BUSKER` and LIFE_F kind 29 moved to `archive/rain-busker-RAIN7-9.js`.

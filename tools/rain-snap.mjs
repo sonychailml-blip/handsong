@@ -29,7 +29,7 @@ let QS='';   // RAIN-6b: extra query words for a page (the «before» captures)
 async function open(vp, level, dpr=1, ctxOpt={}){
   const ctx=await browser.newContext({ viewport:vp, deviceScaleFactor:dpr, locale:'en-US', ...ctxOpt });   // RAIN-9: ctxOpt — e.g. a video of the page
   await ctx.grantPermissions(['camera', 'microphone'], { origin:`http://127.0.0.1:${port}` });
-  await ctx.addInitScript(l=>{ try{ localStorage.setItem('handsong.nightBg', 'forest'); localStorage.setItem('handsong.sceneLevel', l); localStorage.setItem('handsong.night.lang', 'en'); }catch(e){} }, level);
+  await ctx.addInitScript(l=>{ try{ localStorage.setItem('handsong.nightBg', 'forest'); localStorage.setItem('handsong.sceneLevel', l==='light' ? 'reduced' : l); localStorage.setItem('handsong.nightLight', l==='light' ? '1' : '0'); localStorage.setItem('handsong.night.lang', 'en'); }catch(e){} }, level);   // RAIN-10: 'light' = Standard + Light
   const p=await ctx.newPage(), errs=[]; p.on('pageerror', e=>errs.push(String(e))); p.on('console', m=>{ if(m.type()==='error' || /THREE\.WebGLProgram|shader/i.test(m.text())) errs.push(m.text().slice(0, 600)); }); p.on('response', r=>{ if(r.status()===404) errs.push('404 '+new URL(r.url()).pathname); });
   await p.goto(`http://127.0.0.1:${port}/apps/night/index.html?probe${FOREST ? '' : '&room=rain'}${QS}`);
   try{ await p.waitForFunction(()=>window.P && window.__nightBoot && window.__nightBoot.state().done, null, { timeout:120e3 }); }catch(e){ console.log('[rain-snap] the page did not boot:', errs.slice(0, 6)); throw e; }
@@ -55,6 +55,43 @@ try{
   } else if(argv.includes('--row')){   // the browser row «RAIN room» alone (a quick look while working; the judged run is the Night suite's)
     const { ctx, p, errs }=await open({ width:1280, height:800 }, LEVEL);
     console.log(JSON.stringify(await p.evaluate(async ()=>(await import('/tools/probes/night/rainroom.js')).checkRainRoom()), null, 1), errs.slice(0, 5)); await ctx.close();
+  } else if(argv.includes('--sheet')){   // RAIN-10: the life sheet (tools/probes/night/rainsheet.js) — people, colours, cars, the tram drawn large, sharp and blurred → tools/.ui-snap/rain10/<tag>-sheet.png
+    const O=path.join(ROOT, 'tools/.ui-snap/rain10'), TAG=val('--tag')||'after'; await mkdir(O, { recursive:true });
+    const ctx=await browser.newContext({ viewport:{ width:800, height:600 } }), p=await ctx.newPage(); await p.goto(`http://127.0.0.1:${port}/apps/night/index.html?probe&room=rain`);
+    await p.waitForFunction(()=>window.P && window.__nightBoot && window.__nightBoot.state().done, null, { timeout:120e3 });
+    const GAIT=argv.includes('--gaitsheet'), url=await p.evaluate(async GAIT=>{ const S=await import('/tools/probes/night/rainsheet.js'), it=[], W=1600, H=900, tan=[1.6, 0.9];
+      if(GAIT){ [0, 1/6, 2/6, 3/6, 4/6, 5/6].forEach((ph, i)=>it.push({ x:-1.33+i*0.53, y:-0.8, hh:0.75, hw:0.3, k:0, ph, c:3+8*4, dep:0.5 })); return (await S.lifeSheet(it, { W, H, tan, foc:[0.5, 4, 0, 0], url:true, bg:0x2a2622, done:true })).url; }
+      const row=(y, list, hh)=>list.forEach((q, i)=>it.push({ x:-1.45+i*(2.9/Math.max(1, list.length-1)), y, hh, hw:hh*(q.w||0.42), dep:q.dep==null ? 0.5 : q.dep, ...q }));
+      row(0.5, [0, 1, 2, 3, 4, 5, 6, 7].map(ci=>({ k:0, ph:0.15, c:ci+8*4 }))
+        .concat([0, 1, 2, 3].map(u=>({ k:0, ph:0.4, c:(u*2)%8+8*(u===3 ? 3 : u)+64*u, w:0.6 }))), 0.16);
+      row(0.1, [0, 1/6, 2/6, 3/6, 4/6, 5/6].map(ph=>({ k:0, ph, c:3+8*4 }))
+        .concat([0, 0.25, 0.5].map(ph=>({ k:0, ph:ph+1, c:5+8*1+64*2 }))).concat([{ k:14, ph:0.2, c:1+8*3, w:0.8 }, { k:1, ph:0.3, c:2+8*0, w:0.8 }, { k:18, ph:0.3, c:4+8*3+64, w:1.1 }]), 0.16);
+      row(-0.5, [0, 1, 2, 3, 4, 5, 6].map(ty=>({ k:24, ph:3+0.4, c:ty+8*((ty*3)%8), w:0.62 })).concat([{ k:24, ph:6+0.25, c:2+8*3+64, w:0.62 }, { k:25, ph:5+0.3, c:1, w:0.7 }, { k:25, ph:5+0.3, c:0, w:0.7 }, { k:26, ph:0, c:0, w:0.6 }]), 0.22);
+      row(-0.85, [0, 1, 2, 3, 4, 5, 6].map(ty=>({ k:24, ph:3+0.4, c:ty+8*((ty*3)%8), w:0.62, dep:0.9 })).concat([0, 1, 2].map(ci=>({ k:0, ph:0.2, c:ci*3+8*4, dep:0.9 }))), 0.12);
+      return (await S.lifeSheet(it, { W, H, tan, foc:[0.5, 4, 0.03, 0], url:true, bg:0x2a2622, done:true })).url; }, GAIT);
+    await writeFile(path.join(O, `${TAG}-${GAIT ? 'gaitsheet' : 'sheet'}.png`), Buffer.from(url.split(',')[1], 'base64')); await ctx.close(); console.log(`[rain-snap] --sheet → tools/.ui-snap/rain10/${TAG}-sheet.png`);
+  } else if(argv.includes('--rain10')){   // RAIN-10: the street's people, cars and tram at the three qualities → tools/.ui-snap/rain10/<tag>-<level>-*.png (--tag before|after)
+    const O=path.join(ROOT, 'tools/.ui-snap/rain10'), TAG=val('--tag')||'after', LVS=(val('--levels')||'full,reduced,light').split(','); await mkdir(O, { recursive:true }); const made=[];
+    const DPR=+(val('--dpr')||1); for(const lv of LVS){ const vp={ width:1280, height:800 }, { ctx, p, errs }=await open(vp, lv, DPR);
+      await p.evaluate(old=>{ const R=window.__H.sceneRoomDbg(); R.mistDbg(0.06); R.lookDbg('evening'); if(old){ R.winDbg(2); R.occlDbg(false); } }, argv.includes('--old'));   // --old: RAIN-9's window and no depth test (the regressions reproduced)
+      await hand(p, 0.5, 0.45, 0.2, false, 10);
+      const mid=await p.evaluate(async ()=>{ const FO=await import('/apps/night/rooms/rain/pure/focus.js'), R=window.__H.sceneRoomDbg(); let lo=0.08, hi=0.34, best=0.17;
+        for(let it=0;it<8;it++){ const s=(lo+hi)/2; best=s; const G=window.__G, c=window.__clk; for(let i=0;i<40;i++){ c.t+=1000/30; G.processHandsProbe({ landmarks:[window.__PO.pose({ x:0.5, y:0.45, s, gaps:[1, 1, 1, 1] })], handednesses:[[{ categoryName:'Right' }]] }); }
+          await new Promise(r=>setTimeout(r, 250)); if(FO.focusDepth(R.state().target)>FO.LAYER_DEPTH.street) lo=s; else hi=s; } return best; });
+      await hand(p, 0.5, 0.45, mid, false, 12); await p.waitForTimeout(2500);
+      const tb=await p.evaluate(()=>{ const R=window.__H.sceneRoomDbg(), b=R.busiestDbg(600, 900); R.trafficHoldDbg(b.t); return b; });
+      const shot=async (name, ru, clip, scale)=>{ const f=`${TAG}-${lv}-${name}.png`; await hand(p, 0.5, 0.45, mid, false, 2); await p.screenshot({ path:path.join(O, f), clip }); made.push({ f, ru, lv }); };
+      await p.waitForTimeout(1500); await shot('street', 'Улица целиком, фокус на улице');
+      if(argv.includes('--occl')){ await p.evaluate(()=>window.__H.sceneRoomDbg().occlDbg(false)); await shot('street-noocl', 'Без проверки глубины (как было): люди поверх стволов и крон'); await p.evaluate(()=>window.__H.sceneRoomDbg().occlDbg(true)); }
+      const crops=JSON.parse(val('--crops')||'{"left":[0.02,0.42,0.42,0.42],"mid":[0.3,0.38,0.4,0.42],"right":[0.55,0.4,0.43,0.45]}');
+      for(const [nm, c] of Object.entries(crops)) await shot('crop-'+nm, 'Крупно: '+nm, { x:Math.round(c[0]*vp.width), y:Math.round(c[1]*vp.height), width:Math.round(c[2]*vp.width), height:Math.round(c[3]*vp.height) });
+      for(const [z0, z1, nm] of [[30, 55, 'near'], [60, 110, 'mid']]){ const tr=await p.evaluate(([a, b])=>{ const R=window.__H.sceneRoomDbg(), q=R.tramAtDbg(400, 3000, a, b); if(q) R.trafficHoldDbg(q.t); return q; }, [z0, z1]);
+        if(tr){ await p.waitForTimeout(900); await shot('tram-'+nm, 'Трамвай '+(nm==='near' ? 'близко' : 'дальше')+(tr.dir<0 ? ', едет к нам' : ', уезжает')); await shot('tram-'+nm+'-crop', 'Трамвай крупно', { x:Math.round(vp.width*0.28), y:Math.round(vp.height*0.45), width:Math.round(vp.width*0.36), height:Math.round(vp.height*0.55) }); } }
+      await p.evaluate(()=>window.__H.sceneRoomDbg().trafficHoldDbg(null));
+      const g=JSON.parse(val('--gait')||'[0.55,0.78,0.2,0.2]'), gc={ x:Math.round(g[0]*vp.width), y:Math.round(g[1]*vp.height), width:Math.round(g[2]*vp.width), height:Math.round(g[3]*vp.height) };
+      for(let k=0;k<6;k++){ await shot('gait-'+k, 'Походка: кадр '+(k+1)+' (через 0,15 с)', gc); await p.waitForTimeout(150); }
+      if(errs.length) console.log('[rain-snap] '+lv+' errors:', errs.slice(0, 5)); await ctx.close(); }
+    console.log('[rain-snap] --rain10: '+made.length+' captures ('+TAG+') → tools/.ui-snap/rain10/');
   } else if(argv.includes('--rain9')){   // RAIN-9: the musician (an arrow at him) at the focus near / on the boulevard / far, close-ups; the crowns' sway as frame sequences
     const O=path.join(ROOT, 'tools/.ui-snap/rain9'); await mkdir(O, { recursive:true }); const made=[];
     for(const [tag, vp, dpr] of [['laptop', { width:1280, height:800 }, 1], ['phone', { width:390, height:844 }, 2.75]]){

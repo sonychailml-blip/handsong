@@ -45,6 +45,7 @@ export { checkNightLab } from './night/audio3.js';   // AUDIO-3: the development
 export { checkPianoLight } from './night/audio4.js';   // AUDIO-4: the bed's piano in one node, the same sound
 export { checkRainStreet } from './night/rain6b.js';   // RAIN-6b: the street (the cull, the sleep, the bodies, the trams)
 export { checkRain7 } from './night/rain7.js';   // RAIN-7: the starred street details
+export { checkRain10 } from './night/rain10.js';   // RAIN-10: people walk, dressed apart, behind the trees; cars not boxes; the tram a lit box
 export { checkPerfInvisible } from './night/perf2.js';   // PERF-2: the invisible optimisations, each by an exact A/B
 export { checkForestApart } from './night/forest2e.js';   // FOREST-2e: plants apart
 export { checkForestCull } from './night/forestcull.js';   // FOREST-2e: the cull (?forest=cull) keeps the frames

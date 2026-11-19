@@ -2159,6 +2159,12 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
     3. Settings → Quality: Detailed, Standard, Light — each draws, no freeze.
     4. A second visit in airplane mode (from the build: night.handsong.app or a preview, after one full visit): Night opens and plays.
     5. A link opened in Telegram: the «open in Safari» hint; then the same link in Safari works.
+189. RAIN-10: the rain room's street (laptop; look at Detailed, Standard and Light — Settings → Quality). Page: tools/.ui-snap/rain10/index.html. Five checks:
+    1. People walk: the near ones step (their feet move), umbrellas in colour (yellow, red, striped, clear), clothes differ.
+    2. A minute with Wave up (the effects hand): no dark square flies along the street (leaves, pigeons stay small shapes).
+    3. Cars: no box round a car or round its headlights' light on the road; the car reads as a car seen from above.
+    4. Someone walking under the plane trees disappears behind the crowns and trunks and comes out again.
+    5. The tram: its roof, the lit windows (people inside on the side we see), the cab's amber band, the warm light on the wet asphalt — natural? (If not: say what to change.)
 ## Superseded at DOC1 (old lines verbatim, replaced in place above by a later slice)
 - NIGHT-2 stage 3 (2026-11-03, the rule of at most five manual checks) updated this line of CLAUDE.md's report format:
   probe verdict lines and fix rounds; what was left undone; docs found stale; the user's remaining steps (ear, camera, phone).

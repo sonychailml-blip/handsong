@@ -8891,3 +8891,15 @@ not a control · run a "random" failure many times and print WHERE and HOW MUCH 
 - `tools/perf1.mjs` on the HD 4000: forest GPU-bound (81 / 35 ms), the hand model blocks the main thread when the GPU is full. Applied invisibly: our window only where it shows (0 bytes). Light: the forest at 0.75 pixels (35 → 24 ms, steady 30 fps), the rain's sustaining piano (2.36 → 1.1 ms). Not applied (small risk): the hand light's shadow skip (−13 ms Detailed, 264 bytes differ). Waiting: the Poco numbers.
 ### RAIN-7 (2026-11-19): the starred details. Log: `docs/night/WORK-LOG.md`
 - Rain in the lamps' cones; a turning car's headlights sweep the house opposite; the pharmacy cross animates (green, no text); the crowns sway (a mask from the baked depth; more with Wave); the street musician plays the bar's chord tones; our own window (frame, brass latch, tea with steam, plant; sharp near, soft far). `?rain=noframe,nocones,nosway`. Rows «RAIN-7 law (app)» 6/0, P.night «RAIN-7 street details» 9/0. Captures `tools/.ui-snap/rain7/`.
+
+## Moved from docs/night/HANDOFF.md at RAIN-10 (2026-11-19)
+### RAIN-8 (2026-11-19): our window removed, two trial cars, the musician findable. Log: `docs/night/WORK-LOG.md`
+- Our window (frame, latch, sill, cup, plant) removed; its code word for word in `archive/rain-frame-RAIN7.js` (not loaded). AUDIO-4 kept.
+- Cars, two trials (the founder picks): `?rain=carsbaked` — five types modelled by code and baked offline (`tools/rain-cars-bake.mjs`, `rooms/rain/pure/carsprites.js`, `rooms/rain/cars/cars.webp` 484 KB, loaded only in that mode); `?rain=carscine` (the default for now) — soft silhouette, lamp light on the wet roof and glass, glints, headlight pools (light kind 4). `carsbox` = RAIN-6b's boxes. Trams unchanged.
+- People: unchanged since RAIN-5c in code (shader, law); the cull hides ~5 % (behind houses / crowns); cap raised 320 → 480 (0 dropped). Nothing to bring back.
+- Musician: x 36, z 55 (the first café's awning edge), every mood, inside the upright phone's crop, his own lamp and pool, hat, guitar case.
+- Rows: data «RAIN-8 cars (app)» 8/0; P.night «RAIN-7 street details» updated. Captures `node tools/rain-snap.mjs --rain8` → `tools/.ui-snap/rain8/`. Step 185.
+### FIX-STILL (2026-11-19): the rain's still on an upright phone. Log: `docs/night/WORK-LOG.md`
+- The row's live photograph showed the controls (a child's own `visibility:visible` beats the hidden `#nightShell`); hide rule + a guard; the still and the frame always matched. Every screen passes; the rain upright 0.040 → 0.232 edge match at scale 1.0000.
+### PERF-4 (2026-11-19): founder-approved. Log: `docs/night/WORK-LOG.md`
+- The forest hand light's shadow not redrawn with no hand (`shadowAll` false). A weak GPU (renderer name: Intel HD ≤ Haswell, GMA, old Mali / Adreno / PowerVR) starts at Light on the first visit only (`pure/quality.js weakGpu`, `firstQualityOf`). Step 186.

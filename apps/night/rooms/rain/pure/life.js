@@ -88,7 +88,7 @@ export function lifeAt(t, look, cars=[], wave=0, seed=LIFE.seed, L=LIFE, hist=nu
   for(let k=0;k<L.steam.length;k++) for(let j=0;j<5;j++){ const P=L.steam[k], age=frac(t/4.5+j/5); out.push({ kind:LK.steam, x:P[0]+Math.sin(t*0.4+j)*0.3*age, y:P[1]+age*3.2, z:P[2], h:0.9+age*1.4, w:0.9+age*1.6, ph:age, c:0, a:0.32*(1-age)*Math.min(1, age*6), lane:'air' }); }
   L.puddles.forEach((P, i)=>{ const ph=frac(t*0.55+hash(i, 21)); out.push({ kind:LK.ring, x:P[0], y:0.02, z:P[1], h:0.05, w:0.4+ph*1.2, ph, c:0, a:0.5*(1-ph), lane:'ground' }); });
   for(const c of cars) if(c.kind!=='tram') for(const P of L.roadPuddles) if(Math.abs(c.x-P[0])<1.2 && Math.abs(c.z-P[1])<2.2){ const ph=1-Math.abs(c.z-P[1])/2.2; out.push({ kind:LK.splash, x:P[0]+0.9, y:0, z:P[1], h:0.7*ph, w:1.4, ph, c:0, a:0.7*ph, lane:'ground' }); }
-  for(const c of cars) if(c.kind==='tram') for(let k=0;k<6;k++) if(hash(Math.round(c.id||c.t0||0)+k, 31)<0.62) out.push({ kind:LK.head, x:c.x, y:1.55, z:c.z-c.dir*(2+k*4.3)+0.6, h:0.6, w:0.55, ph:0, c:0, a:1, lane:'tram' });
+  /* RAIN-10: the tram's passengers are drawn inside its lit windows by the tram itself (rain-glass.js TRAM_F) — no heads floating over its roof */
   /* RAIN-5c: the street's furniture — bunting over the terraces (swaying with Wave), the lit pictogram signs, the crossing's lights and its pedestrian signals
      (the vehicles' green = the walkers' red; o.signal: the room's music-driven light) */
   { const B=L.bunting; for(const [a, b] of L.tables.cafes){ const n=Math.floor((b-a)/B.every); for(let j=0;j<=n;j++){ const z=a+j*B.every, u=frac((z-a)/B.posts), sag=B.sag*4*u*(1-u), sw=Math.sin(t*1.3+z*0.7)*(0.08+0.25*Math.max(0, wave));

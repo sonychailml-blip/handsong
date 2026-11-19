@@ -260,6 +260,40 @@ Each slice is one run for Opus at high effort. Each ends with something to look 
 - **Windows:** a cat on a sill, someone opening a balcony door, someone shaking out a rug (TVs already flicker).
 - **Our own window** (concept layer 0, not built yet): ★ the windowsill with a cup of tea with rising steam and a potted plant; the painted wooden frame with a brass latch.
 
+## 5c. RAIN-10 audit «the city is alive» (2026-11-19)
+| Asked for | State | Where it lives |
+|---|---|---|
+| Pedestrians varied: clothes, height, umbrellas, pace | done (drawing restored at RAIN-10) | `pure/life.js` (8 clothes, 7 umbrella kinds, 4 colours, 1.6–1.92 m, 7 lane paces + drift, gear); `rain-glass.js LIFE_F` |
+| Gradual arrivals, not all at once | done | `life.js` gates and stagger (RAIN-5b) |
+| A natural gait | done (broken in the drawing since RAIN-5e, fixed RAIN-10) | `life.js` phase = distance / stride; `LIFE_F person()` |
+| Pigeons | done | `life.js` on the tram wire, rising when a tram passes |
+| Balconies and life in windows | done | the bake (balconies); `pure/windows.js` TV flicker, curtain, walk-up, on/off; `far.js` attic |
+| Cafés and terraces | done | `life.js` tables, sitters, waiter, bunting; `rain.js` string lights, awning fringes |
+| The street not ending at the frame edge | done | `pure/city.js` BEND, 1.6 km |
+| Cinematic cars | done (shape and pool fixed RAIN-10) | `LIFE_F` kind 24, `rain.js` lights and pools |
+| The tram | done RAIN-10 (a lit box in perspective) | `rain-glass.js TRAM_V/TRAM_F`, `rain.js tramUpload` |
+| ★ rain seen in the lamps' light | done | light kind 3 (RAIN-7) |
+| splashes on asphalt and in puddles | partly — rings in puddles, splashes where cars cross road puddles | `life.js` ring, splash |
+| water off awnings, balconies, cornices | partly — the cornice's drips by the pane | `rain.js` drips (RAIN-3) |
+| overflowing gutters, rivulets along the kerb | not done | — |
+| reflections trembling as cars pass | not done | — |
+| ★ headlights sweeping the facades | done | `vehicles.js sweepAt` |
+| ★ the pharmacy cross animated | done | `LIFE_F` sign kind |
+| signs blinking, one failing; a dot ticker | partly — a sign flickers (rare event); no ticker | `far.js` flicker |
+| a street lamp that flickers now and then | done RAIN-10 | `far.js lampFlickerAt`, `rain.js lampFlicker` |
+| ★ crowns sway, falling leaves (more with Wave) | done | `VIEW_F` uTree (RAIN-9), `life.js` leaves |
+| awnings and flags moving | done | kind 27 fringes, bunting |
+| chimney smoke drifting | not done (steam at street level only) | `life.js` steam |
+| a gust turning an umbrella inside out | not done | — |
+| ★ the street musician | dropped by the founder's decision (RAIN-9: no visible near place; his notes stay) | `archive/rain-busker-RAIN7-9.js` |
+| children jumping in puddles after the rain | not done | — |
+| a couple dancing under one umbrella | not done (couples walk) | — |
+| sweeper, courier, someone with a torch | partly — the delivery scooter (rare) | `far.js` scooter |
+| shops closing late: shutters, signs going out | partly — one shutter down at Late night; windows go out with the sleep timer | kind 28, `pure/sleep.js` |
+| a cat on a sill | partly — a cat on the pavement at Late night | `life.js` cat |
+| a balcony door opening, a rug shaken out | not done | — |
+| ★ our own window (sill, tea, plant, frame) | dropped by the founder's decision (RAIN-8) | `archive/rain-frame-RAIN7.js` |
+
 ## 6. Cost per item
 
 Laptop = Intel HD 4000, Standard. «Fill» = extra pixels shaded, as a share of one full screen. All est. unless under «RAIN-0 as built».

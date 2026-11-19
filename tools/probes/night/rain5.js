@@ -2,6 +2,7 @@
    own life shader (rooms/rain/rain-glass.js LIFE_V / LIFE_F) draws every kind of item — people (RAIN-5c: with their gear, groups, the cyclist's lamp), birds, leaves,
    steam, rings, the bunting, the lit signs and the crossing's lights — at three sizes and
    three focus blurs on a transparent canvas; on a ring two pixels inside each quad's border the alpha must stay at most 2 / 255 (no edge can show).
+   RAIN-10: the quads are LIFE_V's new ones (padding = the shape's widest soft edge + 2.2 px, people 45 % wider and 30 % higher); cars, facade things: «RAIN-10 people, cars and the tram».
    CONTROL: the same with the border window off (uWin 0) must show an edge somewhere. Small fixes (2026-11-17): + the mist's soft copy of a far light is round. */
 import { row } from '../core/rows.js';
 
@@ -12,7 +13,8 @@ export async function checkRainQuads(){ const d=[], notes=[]; let n=0; const mis
   const N=items.length, g=new T.InstancedBufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute([-1,-1,0, 1,-1,0, 1,1,0, -1,1,0], 3)); g.setIndex([0,1,2, 0,2,3]);
   const R4=new Float32Array(N*4), K4=new Float32Array(N*4), D1=new Float32Array(N), cols=12, foc=new T.Vector4(0.1, 4, 0.04, 0), uPx=Hh/2/0.5, quads=[];
   items.forEach(([k, sz, dep], i)=>{ const cx=-0.9+(i%cols)*0.16, cy=-0.42+Math.floor(i/cols)*0.2, hw=sz*(k===9 || k===7 ? 1 : 0.4), hh=sz/2; R4.set([cx, cy, hw, hh], i*4); K4.set([k, 0.3+(k===3 ? 3 : 0), 3+8*(k%4)+64+256*(k%8), 1], i*4); D1[i]=dep;
-    const R=foc.z*Math.min(1, Math.abs(dep-foc.x)*foc.y), pad=R+1.5/uPx; quads.push([cx-(hw+pad), cx+(hw+pad), cy+hh-(hh+pad), cy+hh+(hh+pad)]); });
+    const R=foc.z*Math.min(1, Math.abs(dep-foc.x)*foc.y), soft=Math.max(R+0.8/uPx, 0.04*hh), pad=soft+2.2/uPx, padX=Math.max(soft, soft*hw/(2*hh))+2.2/uPx, ex=(k<=2 || (k>=14 && k<=18)) ? [1.45, 1.3] : k===20 ? [1.3, 1] : [1, 1];   // RAIN-10: the quad as LIFE_V builds it now (the shape's soft edge inside, people's reach)
+    quads.push([cx-(hw*ex[0]+padX), cx+(hw*ex[0]+padX), cy-pad, cy+2*hh*ex[1]+pad]); });
   g.setAttribute('aRect', new T.InstancedBufferAttribute(R4, 4)); g.setAttribute('aK', new T.InstancedBufferAttribute(K4, 4)); g.setAttribute('aDep', new T.InstancedBufferAttribute(D1, 1)); g.instanceCount=N;
   const m=new T.ShaderMaterial({ uniforms:{ uTan:{ value:new T.Vector2(1, 0.5) }, uFoc:{ value:foc }, uPx:{ value:uPx }, uWin:{ value:1 } }, vertexShader:G.LIFE_V, fragmentShader:G.LIFE_F,
     transparent:true, depthTest:false, depthWrite:false, blending:T.CustomBlending, blendSrc:T.OneFactor, blendDst:T.OneMinusSrcAlphaFactor, blendSrcAlpha:T.OneFactor, blendDstAlpha:T.OneMinusSrcAlphaFactor });
