@@ -5,11 +5,12 @@
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`, `archive/NIGHT-RUN-LOG-2026-10.md`. New runs start at `NIGHT-1`.
 
 # RELEASE-1 last notes (NIGHT track, 2026-11-20: windscreens, windows sharp and soft, the flugelhorn)
-Tree hashes before: core 8b4b3eac7543581e · apps/full 0148bb454440c3e3 · apps/night 8d479c72311511a4. After: core 8b4b3eac7543581e · apps/full 0148bb454440c3e3 · apps/night c70bd8000c6e5392 (core and Full untouched).
+Tree hashes before: core 8b4b3eac7543581e · apps/full 0148bb454440c3e3 · apps/night 8d479c72311511a4. After: core 8b4b3eac7543581e · apps/full 0148bb454440c3e3 · apps/night 51331f079ef11452 (core and Full untouched).
 - `rain-glass.js` VEH_F: paint only where `part<0.5` (the old `part<1.5 && N.y>0.8` clause painted shallow windscreens). WIN_V `aVis`, WIN_F `uVisOff` (the CONTROL) — a hidden window: reveal ×0.2 inside, spill ×(1+0.6·hid), the disc ×(vis+0.3·hid).
 - `pure/windows.js` `WIN_VIS`, `winVisOf` (5×5 samples in the window's quad of lit−evening luminance, over the 80th percentile, floor 0.02); `rain.js` computes it once from the bake, hooks `winVisDbg`, `winsShowDbg`.
 - `tools/probes/night/release1w.js` (row at 1009.98812), mounted in `tools/probes/night.js`.
 - `rooms/rain/timbres/flugelhorn.json` (lvl 1.3 after a render: 0.8 sat 5 dB under the e-piano), `pure/room.js` + `roomdoors.js` FILES, `tname.rain/flugelhorn` in de/es/fr/it/pt/ka. `tools/probe-data.mjs` «RAIN timbres»: + one held voice, its CONTROL.
+- Balance: `rain/pure/room.js` bed2.master 0.7 → 1; `flugelhorn.json` lvl 1.9. Measured with a scratch eval (live, `audio.probeCapture` at the master: each room's bed with its ambience 40 s, the ambience alone 12 s, power-subtracted; four notes per timbre at vol 0.7 through `leadOn`, kLoud). Before: forest bed −48.3 integrated / −44.1 RMS, instruments −34.9…−35.7; rain bed −50.7 / −48.5, instruments −40.7…−43.3, flugelhorn −41.8. After: rain bed −46.5 / −45.7 (the lo-fi varies ±1.5 dB run to run), flugelhorn −38.0, the others unchanged.
 - Checks (iteration mode): static PASS · licences PASS · data PASS 106/0 · `--eval` release1b 54/0, release1w 4/0 · a render eval of the flugelhorn (installed live in the rain, loudness, clicks, sustain) · `rain-snap --rain10 --levels full --dpr 2 --tag glass` (the cars' windscreens dark).
 
 # RELEASE-1 night run (NIGHT track, 2026-11-19/20: the founder's notes, D, E, F)

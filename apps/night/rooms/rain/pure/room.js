@@ -69,7 +69,7 @@ export const RAIN_ROOM=F({
       drift:F({ voices:3, every:F([16, 26]), drift:F({ every:F([8, 14]), depth:0.22 }), glim:null }),
       glimmer:F({ voices:3, every:F([16, 26]), drift:F({ every:F([8, 14]), depth:0.22 }), glim:F({ every:F([9, 19]) }) }),
     }) }),
-  bed2:F({ master:0.7, level:0.6,
+  bed2:F({ master:1, level:0.6,   // RELEASE-1: the lo-fi bed +3.1 dB — the forest's loudness (the founder: the music under the hands too quiet)
     arc:F({ period:F([320, 640]) }), breath:F({ every:F([9, 12.5]) }), color:F({ every:F([24, 64]), tc:F([9, 18]), spread:0.45 }),
     ground:F({ amp:0.065, fifth:0.4, beat:0.08, send:0.2 }),
     pad:F({ amp:0.07, attack:F([5.5, 8.5]), release:F([5.5, 8]), detune:F([3, 8]), send:0.45 }),
