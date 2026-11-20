@@ -227,7 +227,8 @@ async function precacheRows(dir){
   cpSync(B,C,{ recursive:true }); appendFileSync(path.join(C,CHANGED),'/* bytes the list does not know */\n');
   const LA=readPrecache(A), LB=readPrecache(B), listed=new Set(LA.files.map(f=>f[0]));
   if(LA.version===LB.version) miss('a changed file did not change the version');
-  if(LA.files.some(f=>/^tools\/|^apps\/night\/rooms\/rain\/samples\//.test(f[0]))) miss('the list holds a tool or a development file');   // RELEASE-1: the rain is a real room since RAIN-R1 (its development samples stay out)
+  if(LA.files.some(f=>/^tools\//.test(f[0]))) miss('the list holds a tool');
+  { const sm=LA.files.filter(f=>/^apps\/night\/rooms\/rain\/samples\//.test(f[0])); if(sm.length<2) miss('the list lacks the rain music recordings (rooms/rain/samples/: '+sm.length+')'); else notes.push(`the rain music's recordings listed: ${sm.length}`); }   // RELEASE-1: the lo-fi bed plays from them (a players' build without them: no rain music)
   /* cur.refuse: paths answered 503 (an install cut short); cur.sw: the worker script served instead of the folder's (the exact CONTROL) */
   const cur={ dir:A, refuse:null, sw:null }, log=[], served={ n:0, bytes:0 }, srv=http.createServer(async (q,r)=>{ let p=decodeURIComponent(new URL(q.url,'http://x').pathname); if(p.endsWith('/')) p+='index.html';
     if(cur.refuse && cur.refuse.test(p)){ r.writeHead(503); r.end(); return; }

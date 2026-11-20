@@ -26,13 +26,13 @@ export const NIGHT_LATER=Object.freeze([/^icons\//, /^apps\/night\/rooms\/forest
 /* RAIN-R1: files fetched ON DEMAND (stage 2) — the rain room's media (its baked city, its recordings, its session timbres): listed and hashed like every
    file, never installed nor topped up; the worker caches each the first time the page fetches it (hash checked), so a room met once opens offline
    afterwards. The rain's code and its stills stay start files (the start screen may show the rain; its code is small). */
-export const NIGHT_DEMAND=Object.freeze([/^apps\/night\/rooms\/rain\/(city|sound|timbres)\//]);
+export const NIGHT_DEMAND=Object.freeze([/^apps\/night\/rooms\/rain\/(city|sound|timbres|samples)\//]);   // RELEASE-1: + the music's recordings
 const listAll=d=>readdirSync(d,{ withFileTypes:true }).flatMap(e=>e.isDirectory() ? listAll(path.join(d,e.name)) : [path.join(d,e.name)]);
 const rel=(OUT,f)=>path.relative(OUT,f).replace(/\\/g,'/');
 export const groupOf=p=>/^core\/vendor\/mediapipe\/[^/]+\/wasm\/vision_wasm_nosimd_internal\./.test(p) ? 'nosimd' : /^core\/vendor\/mediapipe\/[^/]+\/wasm\/vision_wasm_internal\./.test(p) ? 'simd' : '';
 /* NIGHT-14b: files a room record names (pure/room.js: the stills, the still's sprites, the stream's recording — addresses made at run time) — the
    build's walk cannot see them, so every room's still/ and sound/ folders are listed (the development rooms stay out through NEVER). Data row «NIGHT precache list (app)» proves every media file a room record names is covered. */
-export const NIGHT_INCLUDE=Object.freeze([/^apps\/night\/rooms\/[^/]+\/(still|sound)\//, /^apps\/night\/rooms\/rain\/(city|timbres)\//]);   // RAIN-R1: the rain's city and timbres (addresses made at run time)
+export const NIGHT_INCLUDE=Object.freeze([/^apps\/night\/rooms\/[^/]+\/(still|sound)\//, /^apps\/night\/rooms\/rain\/(city|timbres|samples)\//]);   // RAIN-R1: the rain's city and timbres (addresses made at run time)
 /* the paths to list: seen ∪ page-level ∪ core/data ∪ MediaPipe ∪ the files matching include, existing files only, minus NEVER and the app's skip list */
 export function precachePaths(OUT, seen, skip=[], include=[]){
   const isFile=p=>existsSync(path.join(OUT,p)) && statSync(path.join(OUT,p)).isFile(), out=new Set();

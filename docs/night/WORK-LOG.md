@@ -4,6 +4,10 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`, `archive/NIGHT-RUN-LOG-2026-10.md`. New runs start at `NIGHT-1`.
 
+# RELEASE-1 the rain's music on the site — the recordings left out of the players' build (NIGHT track, 2026-11-20; the founder: still no rain music on the site after the race fix)
+- The site served the race fix (checked: bed2LofiMissed in the live bed.js) but `apps/night/rooms/rain/samples/samples.json` and every recording answered 404. `tools/build.mjs` removed `rooms/rain/samples/` from every players' (release) build as «RAIN-4b's development A/B (?bedrec)» — yet the lo-fi bed (RAIN-4d, rain/lofi.js) loads them at its start (`sampledLoad`: bass, vibraphone, kick, hats): the engine failed, the bed fell back to v1 (the founder: «only the background, as without music»). Local builds, previews and Live Server keep the folder (dev edition) — no check entered the rain with music on a release tree.
+- Fix: `tools/build.mjs` keeps the folder; its release check now FAILS when the recordings (samples.json and every file it lists) are missing (was: when present). `tools/precache.mjs` NIGHT_DEMAND / NIGHT_INCLUDE + `samples` (stage 2, on demand: offline after a first visit). `tools/smoke-paths.mjs` precache rows: the list must hold the recordings (was: must not). Data row «NIGHT two rooms» (6): the build removes nothing of the rain and checks the recordings; `samples/samples.json` and a recording are on demand.
+
 # RELEASE-1 the rain's music on a first visit (NIGHT track, 2026-11-20; the founder after the publish: the site's rain had no music, the forest had; Live Server both)
 Tree hashes before: core 73236228bd3394c7 · apps/full 0148bb454440c3e3 · apps/night 51331f079ef11452. After: core and Full unchanged · apps/night 3e1698631139f953.
 - Checks: static PASSED · `[probe-data] PASS — 106 checks, 0 differences` (NAME-INDEX regenerated: `bed2LofiMissed`) · UI «NIGHT rain music on the first visit» PASS · «NIGHT music and full screen» PASS · rows «NIGHT room switch» 40/0, «RAIN hand events and the bed» 8/0.

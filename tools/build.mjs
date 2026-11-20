@@ -31,9 +31,9 @@ copyFileSync(path.join(ROOT,'THIRD-PARTY-LICENSES.md'),path.join(OUT,'THIRD-PART
 const nightLicences=()=>{ rmSync(path.join(OUT,'apps/night/licences.html'),{ force:true });
   writeFileSync(path.join(OUT,'licences.html'), renderNightLicences(JSON.parse(readFileSync(path.join(ROOT,'tools/licences.json'),'utf8')), f=>existsSync(path.join(OUT,f)))); };
 if(RELEASE) writeFileSync(path.join(OUT,'core/edition.js'),"export const EDITION='release';\n");
-/* RAIN-R1: the rain is a real room — a players' build carries it (its media are listed on demand: tools/precache.mjs NIGHT_DEMAND); only its recorded A/B
-   (rooms/rain/samples/, «?bedrec=on», a development tool) stays out */
-if(RELEASE && app==='night') rmSync(path.join(OUT,'apps/night/rooms/rain/samples'),{ recursive:true, force:true });
+/* RAIN-R1: the rain is a real room — a players' build carries it (its media are listed on demand: tools/precache.mjs NIGHT_DEMAND). RELEASE-1: its
+   recordings (rooms/rain/samples/) too — the lo-fi bed plays its bass, vibraphone and drums from them (rain/lofi.js sampledLoad); a players' build
+   without them had no rain music (the founder heard it on the site) */
 if(app==='night') nightLicences();
 
 /* the page: its references gain the app's folder; page-level ones and addresses stay. Production loses the probes tag */
@@ -72,7 +72,8 @@ else if(existsSync(path.join(OUT,'apps',other)) && (other==='full' || all.some(f
 if(!/rel="handsong-profile"/.test(page)) bad.push('the page declares no profile');
 if(RELEASE && app==='night'){ for(const f of ['apps/night/rooms/rain/rain.js', 'apps/night/rooms/rain/install.js', 'apps/night/rooms/rain/still/still-reduced.webp', 'apps/night/rooms/rain/still/still-full.webp', 'apps/night/rooms/rain/city/windows.json'])
     if(!existsSync(path.join(OUT, f))) bad.push(`a players' build lacks the rain room's ${f} (RAIN-R1: a real room)`);
-  if(existsSync(path.join(OUT,'apps/night/rooms/rain/samples'))) bad.push("a players' build holds the rain's development samples"); }
+  { const sm=path.join(OUT,'apps/night/rooms/rain/samples'), M=existsSync(path.join(sm,'samples.json')) ? JSON.parse(readFileSync(path.join(sm,'samples.json'),'utf8')) : null;   // RELEASE-1: the music's recordings, every one
+    if(!M) bad.push("a players' build lacks the rain music's recordings (rooms/rain/samples/samples.json)"); else for(const f of Object.values(M.files)) if(!existsSync(path.join(sm,f.file))) bad.push("a players' build lacks the rain music's "+f.file); } }
 if(bad.length){ for(const b of bad.slice(0,30)) console.error('  '+b); die(bad.length+' problem(s)'); }
 /* CORE-20 (audit P5 item 3): the page's module script and its STATIC closure (import … from / import '…' / export … from; never import()) as
    <link rel="modulepreload"> before </head>, so the built page fetches its modules in one wave instead of one per import depth */

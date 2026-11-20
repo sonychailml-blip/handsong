@@ -2648,7 +2648,7 @@ async function rainNature(){
    startRoom, run here on made-up addresses): the address's word wins; an automated browser starts in the forest unless asked «room=random»; otherwise the
    draw — both rooms reachable; CONTROL: a draw that always gives the forest fails «both reachable». (4) The first paint: night.css shows the rain's two
    stills under html[data-room="room.rain"] exactly as its record names them. (5) Begin waits for the start room with an upper limit and falls back to
-   the first room. (6) The players' build keeps the rain (removes only its development samples); its media are stage 2 «on demand», its code and stills
+   the first room. (6) The players' build keeps the rain whole (RELEASE-1: its music's recordings too); its media are stage 2 «on demand», its code and stills
    not; CONTROL: a demand pattern catching a still is caught. (7) THE DOT'S WINDOW (pure/windows.js flyWindow): on the house opposite, inside the view
    of every screen shape 9 : 19.5 … 2.4 : 1 by the lens law, dark in the first look; CONTROL: a pick that ignores the shared view (the house opposite's
    nearest dark window) is outside a phone upright's view. (8) The start drops (pure/startdrops.js): seeded, inside the screen's band, each holding still
@@ -2694,10 +2694,10 @@ async function nightTwoRooms(){
     ok('Begin works before the start room is settled', /startRoomReady\(\)\.catch\(\(\)=>'failed'\)\.then\(how=>\{ startRoomHow=how; if\(window\.__nightBoot\) window\.__nightBoot\.ready\(\); \}\);/.test(M)); }
   /* (6) */
   { const B=await rd('tools/build.mjs'), PC=await import(new URL('./precache.mjs', import.meta.url).href);
-    ok('the players\' build does not keep the rain (or removes more than its samples)', /if\(RELEASE && app==='night'\) rmSync\(path\.join\(OUT,'apps\/night\/rooms\/rain\/samples'\)/.test(B) && !/rmSync\(path\.join\(OUT,'apps\/night\/rooms\/rain'\)/.test(B) && /a players' build lacks the rain room's/.test(B));
+    ok('the players\' build does not keep the rain whole (RELEASE-1: its music recordings removed, or the rain)', !/rmSync\(path\.join\(OUT,'apps\/night\/rooms\/rain/.test(B) && /a players' build lacks the rain room's/.test(B) && /a players' build lacks the rain music's recordings/.test(B));
     ok('the build does not write the on-demand stage', /writePrecache\(OUT, precachePaths\(OUT, seen, NIGHT_SKIP, NIGHT_INCLUDE\), NIGHT_LATER, NIGHT_DEMAND\)/.test(B));
     const R='apps/night/rooms/rain/', judge=pats=>{ const dem=p=>pats.some(r=>r.test(p)); const bad=[];
-      for(const p of [R+'city/reduced/late.webp', R+'city/windows.json', R+'sound/pane.mp3', R+'timbres/e-piano.json']) if(!dem(p)) bad.push(p+' is not on demand');
+      for(const p of [R+'city/reduced/late.webp', R+'city/windows.json', R+'sound/pane.mp3', R+'timbres/e-piano.json', R+'samples/samples.json', R+'samples/bass-A1.mp3']) if(!dem(p)) bad.push(p+' is not on demand');
       for(const p of [R+'rain.js', R+'pure/room.js', R+'still/still-reduced.webp', R+'still/still-full.webp', 'apps/night/rooms/forest/still/still-reduced.webp', 'apps/night/rooms/forest/tex/floor-1024.png']) if(dem(p)) bad.push(p+' is on demand (a start file)');
       return bad; };
     { const b=judge(PC.NIGHT_DEMAND); ok('the on-demand stage: '+b.join('; '), !b.length); }
