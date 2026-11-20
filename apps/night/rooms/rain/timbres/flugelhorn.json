@@ -1,0 +1,47 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "rain/flugelhorn",
+ "family": "solo",
+ "engine": "breath",
+ "name": {
+  "en": "Flugelhorn",
+  "ru": "Флюгельгорн"
+ },
+ "recipe": {
+  "harm": [
+   { "m": 1, "g": 0.4 },
+   { "m": 2, "g": 0.27 },
+   { "m": 3, "g": 0.15 },
+   { "m": 4, "g": 0.085 },
+   { "m": 5, "g": 0.045 },
+   { "m": 6, "g": 0.024 },
+   { "m": 7, "g": 0.012 },
+   { "m": 8, "g": 0.006 }
+  ],
+  "lvl": 1.3,
+  "lp": 3600,
+  "vb": 0.55,
+  "body": { "hz": 1150, "q": 1.3, "db": 3 },
+  "formants": [
+   { "hz": 1200, "q": 2.2, "g": 0.22 },
+   { "hz": 2500, "q": 3, "g": 0.08 }
+  ],
+  "noise": { "g": 0.1, "q": 4, "m": 1, "on": 2 },
+  "air": { "g": 0.018, "hz": 4200, "q": 0.6 },
+  "chiff": { "g": 0.3, "m": 1, "q": 2, "d": 0.05 },
+  "vib": { "rate": 4.8, "cents": 11, "amp": 0.04, "delay": 0.45, "rise": 0.9 },
+  "drift": { "cents": 3, "rate": 0.11 },
+  "scoop": -22
+ },
+ "env": {
+  "att": 0.085,
+  "rel": 0.38
+ },
+ "policies": {
+  "voiceMode": "poly",
+  "glide": 0.03,
+  "register": "solo",
+  "quant": 0
+ }
+}

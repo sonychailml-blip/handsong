@@ -143,7 +143,7 @@ export default Object.freeze({
   'night.update.ready':'ახალი ვერსია მზადაა. შეეხეთ გასახსნელად.',
   'night.write':'მოგვწერეთ', 'night.write.copied':'მისამართი დაკოპირდა', 'night.write.copy':'მისამართის კოპირება', 'night.write.mail':'ფოსტის გახსნა',
   'tname.solo.firefly':'ციცინათელა', 'tname.solo.breath-flute':'სუნთქვის ფლეიტა', 'tname.solo.handpan':'ჰენდპანი', 'tname.solo.singing-bowl':'მომღერალი თასი',
-  'tname.rain/e-piano':'ელექტროპიანინო', 'tname.rain/vibraphone':'ვიბრაფონი', 'tname.rain/nylon':'ნეილონის გიტარა', 'tname.rain/celesta':'ჩელესტა',
+  'tname.rain/e-piano':'ელექტროპიანინო', 'tname.rain/vibraphone':'ვიბრაფონი', 'tname.rain/nylon':'ნეილონის გიტარა', 'tname.rain/celesta':'ჩელესტა', 'tname.rain/flugelhorn':'ფლიუგელჰორნი',
   'privacy.title':'კონფიდენციალურობა',
   'prof.bgCamera':'კამერა', 'prof.bgDark':'ბნელი', 'prof.bgForest':'ტყე',
   'start.retry':'ხელახლა ცდა',

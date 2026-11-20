@@ -87,13 +87,13 @@ const QUAD_SD=`float sdQ(vec2 p, vec2 a, vec2 b, vec2 c, vec2 d){ float s=1., m=
 /* A LIT WINDOW (one instance each: aRect its centre and half size, aLit its light, aWarm honey … amber, aDepth its depth). In focus: the pane
    behind a curtain, its bars, a little light spilling on the wall. Out of focus (its own radius by its depth): the same light spread over the
    window grown by that radius into a soft rounded rectangle, dimmer by the area. Premultiplied: the pane covers the dark window, the disc adds. */
-export const WIN_V=`attribute vec4 aRect, aQ0, aQ1, aEv; attribute float aLit, aWarm, aDepth; uniform vec2 uTan; uniform vec4 uFoc; uniform float uPad;
-varying vec2 vP, vH, vV; varying vec4 vQ0, vQ1, vEv; varying float vLit, vWarm, vR, vA0, vPer; ${RAD}
+export const WIN_V=`attribute vec4 aRect, aQ0, aQ1, aEv; attribute float aLit, aWarm, aDepth, aVis; uniform vec2 uTan; uniform vec4 uFoc; uniform float uPad;
+varying vec2 vP, vH, vV; varying vec4 vQ0, vQ1, vEv; varying float vLit, vWarm, vR, vA0, vPer, vVis; ${RAD}
 void main(){ vR=radAt(aDepth); vec2 mn=min(min(aQ0.xy, aQ0.zw), min(aQ1.xy, aQ1.zw)), mx=max(max(aQ0.xy, aQ0.zw), max(aQ1.xy, aQ1.zw)), c=(mn+mx)*0.5, hs=(mx-mn)*0.5+vR+uPad*min(1., aRect.w*8.);
-  vV=c+position.xy*hs; vP=vV-aRect.xy; vH=aRect.zw; vLit=aLit; vWarm=aWarm; vQ0=aQ0; vQ1=aQ1; vEv=aEv;   /* RAIN-2: the quad's bounds grown by the radius */
+  vV=c+position.xy*hs; vP=vV-aRect.xy; vH=aRect.zw; vLit=aLit; vWarm=aWarm; vQ0=aQ0; vQ1=aQ1; vEv=aEv; vVis=aVis;   /* RAIN-2: the quad's bounds grown by the radius */
   vA0=0.5*abs((aQ0.x*aQ0.w-aQ0.z*aQ0.y)+(aQ0.z*aQ1.y-aQ1.x*aQ0.w)+(aQ1.x*aQ1.w-aQ1.z*aQ1.y)+(aQ1.z*aQ0.y-aQ0.x*aQ1.w)); vPer=distance(aQ0.xy, aQ0.zw)+distance(aQ0.zw, aQ1.xy)+distance(aQ1.xy, aQ1.zw)+distance(aQ1.zw, aQ0.xy);
   gl_Position= aLit>0.004 ? vec4(vV/uTan, 0., 1.) : vec4(2., 2., 2., 1.); }`;
-export const WIN_F=`precision highp float; uniform float uPad, uBaked, uTime; uniform vec3 uHoney, uAmber, uGarA, uGarB, uGarC, uGarD; uniform sampler2D uLit; uniform vec2 uExt; varying vec2 vP, vH, vV; varying vec4 vQ0, vQ1, vEv; varying float vLit, vWarm, vR, vA0, vPer; ${QUAD_SD}
+export const WIN_F=`precision highp float; uniform float uPad, uBaked, uTime, uVisOff; uniform vec3 uHoney, uAmber, uGarA, uGarB, uGarC, uGarD; uniform sampler2D uLit; uniform vec2 uExt; varying vec2 vP, vH, vV; varying vec4 vQ0, vQ1, vEv; varying float vLit, vWarm, vR, vA0, vPer, vVis; ${QUAD_SD}
 float wel(vec2 p, vec2 c, vec2 r){ return length((p-c)/r)-1.; }
 void main(){ float d=sdQ(vV, vQ0.xy, vQ0.zw, vQ1.xy, vQ1.zw), R=max(vR, 1e-4), k=clamp(vR/(vH.y*0.9+0.002), 0., 1.);   /* RAIN-2: the distance to the window's own quad */
   vec3 warm=mix(uHoney, uAmber, vWarm); vec2 u=vP/vH, lp=u-vec2(0.3*sin(vWarm*40.), -0.4);
@@ -111,7 +111,12 @@ void main(){ float d=sdQ(vV, vQ0.xy, vQ0.zw, vQ1.xy, vQ1.zw), R=max(vR, 1e-4), k
     inner*=1.-0.85*sil; }
   if(vEv.x>0.5) for(int b=0;b<9;b++){ float fb=float(b), x=-0.82+fb*0.205, y=0.74-0.12*(1.-x*x), tw=0.5+0.5*sin(uTime*(1.1+0.31*fb)+fb*2.1+vWarm*30.), m4=mod(fb, 4.);   /* a twinkling garland */
     vec3 gc= m4<0.5 ? uGarA : m4<1.5 ? uGarB : m4<2.5 ? uGarC : uGarD; vec2 dd=(u-vec2(x, y))*vec2(1., vH.y/max(vH.x, 1e-5)); inner+=gc*(0.25+1.2*tw)*exp(-dot(dd, dd)/0.0035); }
-  vec3 c=mix(inner*inA, warm*0.85*gain*disc*(vEv.x>0.5 ? 1.08 : 1.), k)+warm*spill;
+  /* RELEASE-1: the light SEEN (vis, pure/windows.js winVisOf: the bake's lit picture over this window): the soft glow is that share (and the reveal's
+     own little light) — a window whose room the angle hides no longer glows when the picture goes soft; in focus such a window lights its reveal: a warm
+     edge inside its quad and a little more spill on the wall (uVisOff 1: the old full glow — the probes' CONTROL) */
+  float vis= uVisOff>0.5 ? 1. : vVis, hid=1.-vis, rev=smoothstep(e*4., e*0.5, -d)*inA;
+  inner+=warm*0.2*rev*hid; spill*=1.+0.6*hid;
+  vec3 c=mix(inner*inA, warm*0.85*gain*disc*(vEv.x>0.5 ? 1.08 : 1.)*(vis+0.3*hid), k)+warm*spill;
   gl_FragColor=vec4(c*vLit, inA*(1.-k)*min(1., vLit*1.5)); }`;
 /* A LIGHT (one instance each): aRect its centre and half size, aCol its colour and strength, aDK its depth and kind — 0 a point (a lamp, a far
    light, a car's light: a small glow in focus), 1 a reflection in the wet street (a streak below its light, fading downwards), 2 a lit rectangle
@@ -513,7 +518,7 @@ void main(){ vec3 N=normalize(vN), V=normalize(uCamP-vW), lc=lampTone(uLampC); f
   if(part<0.5 && ty<6.5 && above>0.5){ if(s>=cz.x && s<cz.y) gls=1.; else if(s>=cz.y && s<cab.z) gls=side; else if(s>=cab.z && s<cz.z) gls=1.;
     if(side>0.5 && ty<5.5 && (abs(s-cab.y)<0.06 || abs(s-cz.y)<0.05 || abs(s-cab.z)<0.05)) gls=0.; }   /* the B-, C- and A-pillars */
   if(gls>0.5) part=1.;
-  if(part<0.5 || (part>0.5 && part<1.5 && N.y>0.8)){   /* PAINT, wet: its colour in the lamps' light, a clear coat's highlights and the sky in it */
+  if(part<0.5){   /* PAINT, wet: its colour in the lamps' light, a clear coat's highlights and the sky in it (RELEASE-1: glass is decided by its place; the old «glass facing up is roof» rule painted shallow windscreens) */
     vec3 alb= ty>3.5 && ty<4.5 ? ${hexV(TAXI_PAINT)} : ty>5.5 && N.y>0.8 ? vec3(0.6, 0.61, 0.62) : vPaint(floor(vLook.x+0.5));   /* a bus's roof light grey */
     col=alb*(amb+lc*df*0.85)+lc*sp*(0.35+0.9*fr)+sky*fr*0.9;
     if(abs(vNl.z)>0.55 && part<0.5){ float front=step(0., vNl.z), lx=vLook.z, ly=vLook.w, lmp=bx(vec2(ax, y), vec2(lx-0.17, ly-0.08), vec2(lx+0.13, ly+0.08), 0.015);   /* the lamps on the ends: white ahead, red behind; a dark grille, a pale plate */

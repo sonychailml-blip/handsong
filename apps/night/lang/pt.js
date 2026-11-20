@@ -142,7 +142,7 @@ export default Object.freeze({
   'night.update.ready':'Há uma nova versão. Toque para abri-la.',
   'night.write':'Fale conosco', 'night.write.copied':'Endereço copiado', 'night.write.copy':'Copiar endereço', 'night.write.mail':'Abrir o e-mail',
   'tname.solo.firefly':'Vaga-lume', 'tname.solo.breath-flute':'Flauta de sopro', 'tname.solo.handpan':'Handpan', 'tname.solo.singing-bowl':'Taça tibetana',
-  'tname.rain/e-piano':'Piano elétrico', 'tname.rain/vibraphone':'Vibrafone', 'tname.rain/nylon':'Violão de náilon', 'tname.rain/celesta':'Celesta',
+  'tname.rain/e-piano':'Piano elétrico', 'tname.rain/vibraphone':'Vibrafone', 'tname.rain/nylon':'Violão de náilon', 'tname.rain/celesta':'Celesta', 'tname.rain/flugelhorn':'Flugelhorn',
   'privacy.title':'Privacidade',
   'prof.bgCamera':'Câmera', 'prof.bgDark':'Escuro', 'prof.bgForest':'Floresta',
   'start.retry':'Tentar de novo',

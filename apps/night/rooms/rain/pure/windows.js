@@ -77,3 +77,14 @@ export function flyWindow(W, view, dark=()=>true, shapes=FLY_SHAPES){ const C=fl
     if(Math.abs(w.x)+w.hw>C.tw*FLY_MARGIN || Math.abs(w.y)+w.hh>C.th*FLY_MARGIN) continue;
     if(best<0 || w.dist<W[best].dist) best=i; }
   return best; }
+/* RELEASE-1: HOW MUCH OF A WINDOW'S LIGHT IS SEEN from our window (the founder: a window lit by a note showed nothing in focus — its room hidden by the
+   angle — yet glowed when the picture went soft). From the bake's light of the windows (lum(x, y): its every-window-lit picture minus its dark one at a view point), each window's
+   mean over a 5 × 5 grid inside its own quad, over the 80th percentile of all windows' → vis 0…1. The soft glow takes this share; a window seen edge-on
+   lights its reveal instead (the shader). */
+export const WIN_VIS=Object.freeze({ grid:5, ref:0.8, floor:0.02 });
+export function winVisOf(W, lum, V=WIN_VIS){ const m=W.map(w=>{ const q=winQuad(w); let s=0, n=0;
+    for(let i=0;i<V.grid;i++) for(let j=0;j<V.grid;j++){ const u=(i+0.5)/V.grid, v=(j+0.5)/V.grid, a=[q[0][0]+(q[1][0]-q[0][0])*u, q[0][1]+(q[1][1]-q[0][1])*u], b=[q[3][0]+(q[2][0]-q[3][0])*u, q[3][1]+(q[2][1]-q[3][1])*u];
+      s+=lum(a[0]+(b[0]-a[0])*v, a[1]+(b[1]-a[1])*v); n++; }
+    return s/n; });
+  const sorted=m.slice().sort((a, b)=>a-b), ref=Math.max(1e-4, sorted[Math.min(sorted.length-1, Math.floor(sorted.length*V.ref))]);
+  return m.map(x=>{ const v=Math.max(0, Math.min(1, x/ref)); return v<V.floor ? 0 : v; }); }

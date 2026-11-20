@@ -3023,17 +3023,21 @@ async function forestNatural(){
   return { cases:n, total:d.length, differences:d, notes };
 }
 /* RAIN-4 — «RAIN timbres (app)»: the rain room's own timbres for the playing hand (Night's session records, apps/night/rooms/rain/timbres/): each
-   record passes core's checkTimbre, its id is «rain/<file>», it is one the room lists, struck or plucked by an existing engine (tine, modal, ks),
+   record passes core's checkTimbre, its id is «rain/<file>», it is one the room lists, struck or plucked by an existing engine (tine, modal, ks)
+   — RELEASE-1: plus AT MOST ONE sustained voice (breath; the founder: a held voice like the forest's flute) —,
    and the room gives it a level ≤ 0 dB and a strike cap of 1…6 (a fast phrase stays gentle on a phone). CONTROLS: a record with its level out of
-   bounds is refused; a room entry without a cap is caught. Full never sees them (no core file names them). */
+   bounds is refused; a room entry without a cap is caught; two sustained voices are caught. Full never sees them (no core file names them). */
 async function rainTimbres(){ const d=[], notes=[]; let n=0; const miss=x=>d.push(x), fs=await import('node:fs');
   const TM=await import(new URL('../core/pure/timbre.js', import.meta.url).href), RR=(await import(new URL('../apps/night/rooms/rain/pure/room.js', import.meta.url).href)).RAIN_ROOM;
   const dir=new URL('../apps/night/rooms/rain/timbres/', import.meta.url), files=fs.readdirSync(dir).filter(f=>f.endsWith('.json')), M=RR.music;
+  const STRUCK=['tine', 'modal', 'ks'], HELD=['breath'], heldOver=engs=>engs.filter(e=>HELD.includes(e)).length>1;
   const capOk=T=>T && Number.isFinite(T.level) && T.level<=0 && Number.isInteger(T.voices) && T.voices>=1 && T.voices<=6;
-  for(const f of files){ const rec=JSON.parse(fs.readFileSync(new URL(f, dir), 'utf8')), why=TM.checkTimbre(rec), T=M.timbres.find(x=>x.id===rec.id); n+=4;
+  const engs=[]; for(const f of files){ const rec=JSON.parse(fs.readFileSync(new URL(f, dir), 'utf8')), why=TM.checkTimbre(rec), T=M.timbres.find(x=>x.id===rec.id); n+=4;
     if(why) miss(`${f}: ${why}`); if(rec.id!=='rain/'+f.replace(/\.json$/, '')) miss(`${f}: its id «${rec.id}» is not rain/<file>`);
-    if(!['tine', 'modal', 'ks'].includes(rec.engine)) miss(`${f}: engine ${rec.engine} (struck or plucked wanted)`); if(!capOk(T)) miss(`${f}: the room gives it no level ≤ 0 dB and cap 1…6 (${JSON.stringify(T)})`); }
+    engs.push(rec.engine); if(!STRUCK.includes(rec.engine) && !HELD.includes(rec.engine)) miss(`${f}: engine ${rec.engine} (struck, plucked or one held voice wanted)`); if(!capOk(T)) miss(`${f}: the room gives it no level ≤ 0 dB and cap 1…6 (${JSON.stringify(T)})`); }
   n++; if(M.timbres.length!==files.length) miss(`the room lists ${M.timbres.length} timbres, ${files.length} files`);
+  n++; if(heldOver(engs)) miss(`more than one sustained voice: ${engs.join(', ')}`);
+  n++; if(!heldOver([...engs, 'breath', 'breath'])) miss('CONTROL: two sustained voices passed');
   n+=2; { const r=JSON.parse(fs.readFileSync(new URL(files[0], dir), 'utf8')); r.recipe.lvl=5; if(!TM.checkTimbre(r)) miss('CONTROL: a record with its level out of bounds passed'); if(capOk({ level:-3 })) miss('CONTROL: an entry without a cap passed'); }
   notes.push(`the rain room's timbres: ${M.timbres.map(T=>`${T.id} ${T.level} dB, cap ${T.voices}`).join(' · ')}`);
   return { cases:n, total:d.length, differences:d, notes }; }

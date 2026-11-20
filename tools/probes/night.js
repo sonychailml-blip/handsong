@@ -47,6 +47,7 @@ export { checkRainStreet } from './night/rain6b.js';   // RAIN-6b: the street (t
 export { checkRain7 } from './night/rain7.js';   // RAIN-7: the starred street details
 export { checkRain10 } from './night/rain10.js';   // RAIN-10: people walk, dressed apart, behind the trees; cars not boxes; the tram a lit box
 export { checkRelease1B } from './night/release1b.js';   // RELEASE-1 (B): the vehicles in 3D, the camera's own law
+export { checkRelease1W } from './night/release1w.js';   // RELEASE-1: a window's light seen alike in focus and soft
 export { checkPerfInvisible } from './night/perf2.js';   // PERF-2: the invisible optimisations, each by an exact A/B
 export { checkForestApart } from './night/forest2e.js';   // FOREST-2e: plants apart
 export { checkForestCull } from './night/forestcull.js';   // FOREST-2e: the cull (?forest=cull) keeps the frames

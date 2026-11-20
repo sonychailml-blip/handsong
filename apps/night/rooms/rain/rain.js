@@ -36,6 +36,7 @@ import { showDue, flashOf, breathOf, SHOWN } from './pure/shown.js';   // RAIN-5
 import { QUAD_V, BLUR_F, DOWN_F, VIEW_F, WIN_V, WIN_F, LIGHT_V, LIGHT_F, DROP_V, DROP_F, LIFE_V, LIFE_F, VEH_V, VEH_F, VEHCOMP_F, glassShader } from './rain-glass.js';
 import { carMesh, tramMesh as tramBody, carLamps, VEH3, streamMesh } from './pure/vehmesh.js';   // RELEASE-1 (B): the vehicles in 3D
 import { cityUniforms, CITY_F, BAKED_F } from './rain-city.js';
+import { winVisOf } from './pure/windows.js';   // RELEASE-1: how much of each window's light is seen
 
 export const RAIN_LEVELS=RAIN_ROOM.levels;
 export const FINGER_GAP=0.25;   // s: a pinch counts as held this long after its last held moment or note-on
@@ -126,9 +127,13 @@ export function buildRain(T, opt){
   { const Q=WIN.map(winQuad); wg.setAttribute('aQ0', new T.InstancedBufferAttribute(new Float32Array(Q.flatMap(q=>[q[0][0], q[0][1], q[1][0], q[1][1]])), 4)); wg.setAttribute('aQ1', new T.InstancedBufferAttribute(new Float32Array(Q.flatMap(q=>[q[2][0], q[2][1], q[3][0], q[3][1]])), 4)); }   // RAIN-2: its own projected quad
   wg.setAttribute('aWarm', new T.InstancedBufferAttribute(new Float32Array(WIN.map(w=>w.warm)), 1)); wg.setAttribute('aDepth', new T.InstancedBufferAttribute(new Float32Array(WIN.map(w=>w.depth)), 1));
   wg.setAttribute('aLit', litAttr); wg.instanceCount=WIN.length;
+  const VIS=(()=>{ const dark=BK && BK.moods && BK.moods.evening; if(!BK || !BK.lit || !dark) return WIN.map(()=>1); try{ const c=document.createElement('canvas'), w=c.width=BK.lit.width, h=c.height=BK.lit.height, g=c.getContext('2d'); g.drawImage(BK.lit, 0, 0); const D=g.getImageData(0, 0, w, h).data; g.drawImage(dark, 0, 0, w, h); const E=g.getImageData(0, 0, w, h).data;   // RELEASE-1: read once — the bake's every-window-lit picture minus the same mood's dark windows (lit.webp is Evening's): the windows' own light
+      const lum=(x, y)=>{ const i=Math.max(0, Math.min(w-1, Math.floor((x/BAKE_EXT[0]*0.5+0.5)*w))), j=Math.max(0, Math.min(h-1, Math.floor((0.5-y/BAKE_EXT[1]*0.5)*h))), k=(j*w+i)*4; return Math.max(0, (0.3*(D[k]-E[k])+0.5*(D[k+1]-E[k+1])+0.2*(D[k+2]-E[k+2]))/255); };
+      return winVisOf(WIN, lum); }catch(e){ return WIN.map(()=>1); } })();
+  wg.setAttribute('aVis', new T.InstancedBufferAttribute(new Float32Array(VIS), 1));
   const evArr=new Float32Array(WIN.length*4), evAttr=dyn(evArr, 4); for(let i=0;i<WIN.length;i++) evArr[i*4]=winGarland(i) ? 1 : 0; wg.setAttribute('aEv', evAttr);   // RAIN-5c: garland, event kind, its phase
   let winEv=null, winEvPrev=-1;
-  const winM=mat({ uniforms:{ uTan:{ value:UT }, uFoc:{ value:FOC }, uPad:{ value:BOKEH.pad }, uHoney:{ value:HONEY }, uAmber:{ value:AMBER }, uTime:UTIME, uGarA:{ value:col('garland-a') }, uGarB:{ value:col('garland-b') }, uGarC:{ value:col('garland-c') }, uGarD:{ value:col('garland-d') }, uLit:{ value:litTex }, uExt:{ value:EXT }, uBaked:{ value:BK ? 1 : 0 } }, vertexShader:WIN_V, fragmentShader:WIN_F,
+  const winM=mat({ uniforms:{ uTan:{ value:UT }, uFoc:{ value:FOC }, uPad:{ value:BOKEH.pad }, uHoney:{ value:HONEY }, uAmber:{ value:AMBER }, uTime:UTIME, uGarA:{ value:col('garland-a') }, uGarB:{ value:col('garland-b') }, uGarC:{ value:col('garland-c') }, uGarD:{ value:col('garland-d') }, uLit:{ value:litTex }, uExt:{ value:EXT }, uBaked:{ value:BK ? 1 : 0 }, uVisOff:{ value:0 } }, vertexShader:WIN_V, fragmentShader:WIN_F,
     transparent:true, blending:T.CustomBlending, blendSrc:T.OneFactor, blendDst:T.OneMinusSrcAlphaFactor, blendSrcAlpha:T.OneFactor, blendDstAlpha:T.OneMinusSrcAlphaFactor });
   const wins=add(new T.Mesh(wg, winM), 0.3);   // RELEASE-1 (C): drawn before the vehicles (0.4) and the life (0.5): what stands before the facade covers its windows (it was 1: over them)
 
@@ -264,7 +269,7 @@ export function buildRain(T, opt){
   const CATW=WIN.findIndex(w=>w.id===CAT.win); let catNow=null;   // RELEASE-1 (C): the cat's window in the bake's map
   /* RELEASE-1 (night): a car going away brakes on its way up to a red at the crossing (the vehicles' light: !signal), 34…68 m */
   const brakeOf=c=>c.kind==='car' && c.dir>0 && !signal && c.z>34 && c.z<68;
-  let vehLaw=[], streamNow=0; const gustTest=typeof location!=='undefined' && (new URLSearchParams(location.search).get('rain')||'').split(',').includes('gust');   // RELEASE-1: ?rain=gust — an inside-out umbrella every 12 s (to see it)   // the probes: the traffic law's vehicles this frame (the picture and the sound read the same law)
+  let vehLaw=[], streamNow=0, litForce=null; const gustTest=typeof location!=='undefined' && (new URLSearchParams(location.search).get('rain')||'').split(',').includes('gust');   // RELEASE-1: ?rain=gust — an inside-out umbrella every 12 s (to see it)   // the probes: the traffic law's vehicles this frame (the picture and the sound read the same law)
   function vehUpload(cars, t){ VREC.length=0; vehN=0; vehLaw=cars.map(c=>({ kind:c.kind, x:c.x, near:c.kind==='tram' && c.dir>0 ? c.z-c.len : c.z, dir:c.dir })); if(vehMode!=='mesh' || !bodiesOn) return;
     const put=(ty, x, near, dir, len, paint, lx, ly, seed, lit, w2)=>{ const c=project([x, 1, near+len*0.5]); if(c.z<=1) return; VREC.push({ ty, P:[x, near, dir, len], L:[paint, ty, lx, ly], M:[seed, lit, w2], dep:depthOf(c.dist), w:null }); vehN++; };
     if(vehPlant){ for(const q of vehPlant){ if(q.ty===7) put(7, q.x, q.near, q.dir, VEH3.tram.len, 0, 0.85, 0.9, 1.7, 0, VEH3.tram.w/2); else { const T0=VEH.types[q.ty], Lm=carLamps(q.ty); put(q.ty, q.x, q.near, q.dir, T0.len, q.paint||0, Lm.x, Lm.y, 0.3, q.lit||0, T0.w/2); } } return; }
@@ -434,6 +439,7 @@ export function buildRain(T, opt){
     if(!simFrozen) dropsStep(SIM, dt, rainOver==null ? rainEff : rainOver); dropsUpload();
     if(wl || wipe.live || SIM.laneLive || mapDirty){ mapDirty=wipe.live || SIM.laneLive; const A=wipe.a, Ln=SIM.lane; for(let i=0;i<A.length;i++){ mapBytes[i*2]=A[i]*255; mapBytes[i*2+1]=Ln[i]*255; } mapTex.needsUpdate=true; }
     for(let i=0;i<WIN.length;i++) lit[i]=windowLight(WIN[i], litK+winExtra, t-litAt[i]);   // RAIN-6c: Bright lights more windows
+    if(litForce!=null){ if(Array.isArray(litForce)) for(let i=0;i<lit.length;i++) lit[i]=litForce[i]||0; else lit.fill(litForce); }   // RELEASE-1, probes only
     catNow= CATW>=0 && bodiesOn ? catAt(lifeHold!=null ? lifeHold : t) : null; if(catNow) lit[CATW]=Math.max(lit[CATW], 0.8);   // RELEASE-1 (C): the cat's room stays lit while it sits there
     if(sleepE>0){ if(!sleepM || sleepM.at!==picks){ sleepM=sleepMine(litAt); sleepM.at=picks; }   // RAIN-6b (8): the city falls asleep — window by window, yours last
       for(let i=0;i<WIN.length;i++){ const m=sleepM.has(i) ? sleepM.get(i) : -1; lit[i]=(m>=0 ? Math.max(lit[i], 0.85) : lit[i])*sleepWinKeep(sleepWinAt(i, m, sleepM.size), sleepE); } }
@@ -484,7 +490,8 @@ export function buildRain(T, opt){
     rain7Dbg:()=>{ let cones=0; for(let j=0;j<nLights;j++) if(lDK[j*2+1]===3 && lCol[j*4+3]>0) cones++; let cs=0; if(crownTex){ const D=crownTex.image.data, N=D.length/4; for(let i=0;i<N;i++) if(D[i*4+3]>0) cs++; cs/=N; }   // RAIN-9: the mask rides in the tree map's alpha
       return { cones, crownShare:cs, sway:viewM.uniforms.uSway.value, focus, buskAt, t:now, busker:false }; },   // RAIN-7; RAIN-9: the musician's figure removed (no place near enough to be seen)
     litSumDbg:()=>{ let x=0; for(let i=0;i<lit.length;i++) x+=lit[i]; return x; },   // RAIN-6b (8): how lit the windows are, all together
-    winsShowDbg:on=>{ if(on!=null) wins.material.visible=!!on; return wins.material.visible; },   // RELEASE-1: the lit-window layer on / off (captures)
+    winsShowDbg:on=>{ if(on!=null) wins.material.visible=!!on; return wins.material.visible; },
+    winVisDbg:o=>{ if(o && o.off!=null) winM.uniforms.uVisOff.value=o.off ? 1 : 0; if(o && o.lit!=null){ litForce=o.lit; } return { vis:VIS.slice(), off:winM.uniforms.uVisOff.value }; },   // RELEASE-1: the windows' seen share; o.lit — every window forced to that light (the probes)   // RELEASE-1: the lit-window layer on / off (captures)
     catDbg:()=>({ streams:VREC.filter(q=>q.ty===8).length, rain:rainEff, inst:(()=>{ for(let i=0;i<lifeN;i++) if(Math.round(fK[i*4])===LK.sillcat) return { rect:Array.from(fRect.slice(i*4, i*4+4)), k:Array.from(fK.slice(i*4, i*4+4)), d:fD[i] }; return null; })(), lifeN, win:CATW, now:catNow, lit:CATW>=0 ? lit[CATW] : null, at:CATW>=0 ? { x:WIN[CATW].x, y:WIN[CATW].y, hw:WIN[CATW].hw, hh:WIN[CATW].hh } : null }),   // RELEASE-1 (C)
     carAtDbg:(t0, t1, z0=12, z1=40)=>{ for(let t=t0;t<=t1;t+=0.5){ const c=trafficAt(t, book||dens).find(c=>c.kind==='car' && c.z>z0 && c.z<z1); if(c) return { t, x:c.x, z:c.z, dir:c.dir, ty:vehType(c.lane, c.slot) }; } return null; },   // RELEASE-1 (B)
     tramAtDbg:(t0, t1, z0=35, z1=70)=>{ for(let t=t0;t<=t1;t+=0.5){ const c=trafficAt(t, book||dens).find(c=>c.kind==='tram' && (c.dir>0 ? c.z-c.len : c.z)>z0 && (c.dir>0 ? c.z-c.len : c.z)<z1); if(c) return { t, x:c.x, dir:c.dir }; } return null; },   // RAIN-10, captures only: a moment with a tram near

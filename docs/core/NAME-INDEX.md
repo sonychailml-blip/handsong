@@ -554,8 +554,8 @@ RELEASE-1 (B): THE VEHICLES IN 3D — low-poly bodies as plain arrays (rule #36:
 
 ## apps/night/rooms/rain/pure/windows.js
 RAIN-0: THE WINDOWS — their places, which one a note lights, and how a lit window fades (pure, rule #36; data rows «RAIN window pick (app)», «RAIN window fade (app)»).
-- const (12): `RAIN_SEED`, `windowsLayout`, `winQuad`, `winCover`, `PICK_REACH`, `TRACE`, `AMB_LEVEL`, `windowLight`, `WINLIFE`, `winGarland`, `winOnOff`, `FLY_SHAPES`
-- fn (8): `winQuadSd`, `farLights`, `windowPick`, `traceLevel`, `winEvents`, `winEventAt`, `flyCommon`, `flyWindow`
+- const (13): `RAIN_SEED`, `windowsLayout`, `winQuad`, `winCover`, `PICK_REACH`, `TRACE`, `AMB_LEVEL`, `windowLight`, `WINLIFE`, `winGarland`, `winOnOff`, `FLY_SHAPES`, `WIN_VIS`
+- fn (9): `winQuadSd`, `farLights`, `windowPick`, `traceLevel`, `winEvents`, `winEventAt`, `flyCommon`, `flyWindow`, `winVisOf`
 
 ## apps/night/rooms/rain/rain-city.js
 RAIN-0b: THE STAND-IN CITY's prepared picture and its DEPTH MAP, painted ONCE on the GPU (an opening, a resize, a mood): one ray per pixel through the view law (pure/city.js — this shader is its po…
@@ -1501,6 +1501,7 @@ SPLIT-2: the probe entry of the Night page: its own rows and the core rows flagg
 - → ./night/rainnature.js (1): `checkRainNature`
 - → ./night/rainroom.js (1): `checkRainRoom`
 - → ./night/release1b.js (1): `checkRelease1B`
+- → ./night/release1w.js (1): `checkRelease1W`
 - → ./night/roomswitch.js (1): `checkNightRoomSwitch`
 - → ./night/scales.js (1): `checkNightScales`
 - → ./night/stream.js (1): `checkNightStream`
@@ -1671,6 +1672,10 @@ RAIN-10 — THE LIFE SHEET (dev tool and the rows' drawing): the room's own life
 RELEASE-1 (B) — «RELEASE-1 vehicles in 3D» (drawn): the founder saw the cars and the tram drive slightly sideways — flat sprites facing the screen on a road that runs slanted across it.
 - fn (1): `checkRelease1B`
 
+## tools/probes/night/release1w.js
+RELEASE-1 — «RELEASE-1 windows seen sharp and soft» (drawn): the founder lit a window with a note and saw nothing in focus (its room hidden by the angle) yet a glow when the picture went soft.
+- fn (1): `checkRelease1W`
+
 ## tools/probes/night/roomswitch.js
 NIGHT-3 stage 5 part 2: row «NIGHT room switch» (P.night, drawn) — the switching machinery, on the test room (./testroom.js), judged on EXACT controls (the user, 2026-11-09): (1) hand detection tak…
 - fn (1): `checkNightRoomSwitch`
@@ -1697,7 +1702,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 UI-1 — «NIGHT labels follow the room»: the founder entered the rain and the Sound button still read «Firefly» while another timbre played.
 - fn (1): `checkNightLabels`
 
-_337 modules, 3261 exported names._
+_338 modules, 3265 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

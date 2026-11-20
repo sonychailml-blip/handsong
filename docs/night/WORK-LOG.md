@@ -4,6 +4,14 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`, `archive/NIGHT-RUN-LOG-2026-10.md`. New runs start at `NIGHT-1`.
 
+# RELEASE-1 last notes (NIGHT track, 2026-11-20: windscreens, windows sharp and soft, the flugelhorn)
+Tree hashes before: core 8b4b3eac7543581e · apps/full 0148bb454440c3e3 · apps/night 8d479c72311511a4. After: core 8b4b3eac7543581e · apps/full 0148bb454440c3e3 · apps/night c70bd8000c6e5392 (core and Full untouched).
+- `rain-glass.js` VEH_F: paint only where `part<0.5` (the old `part<1.5 && N.y>0.8` clause painted shallow windscreens). WIN_V `aVis`, WIN_F `uVisOff` (the CONTROL) — a hidden window: reveal ×0.2 inside, spill ×(1+0.6·hid), the disc ×(vis+0.3·hid).
+- `pure/windows.js` `WIN_VIS`, `winVisOf` (5×5 samples in the window's quad of lit−evening luminance, over the 80th percentile, floor 0.02); `rain.js` computes it once from the bake, hooks `winVisDbg`, `winsShowDbg`.
+- `tools/probes/night/release1w.js` (row at 1009.98812), mounted in `tools/probes/night.js`.
+- `rooms/rain/timbres/flugelhorn.json` (lvl 1.3 after a render: 0.8 sat 5 dB under the e-piano), `pure/room.js` + `roomdoors.js` FILES, `tname.rain/flugelhorn` in de/es/fr/it/pt/ka. `tools/probe-data.mjs` «RAIN timbres»: + one held voice, its CONTROL.
+- Checks (iteration mode): static PASS · licences PASS · data PASS 106/0 · `--eval` release1b 54/0, release1w 4/0 · a render eval of the flugelhorn (installed live in the rain, loudness, clicks, sustain) · `rain-snap --rain10 --levels full --dpr 2 --tag glass` (the cars' windscreens dark).
+
 # RELEASE-1 night run (NIGHT track, 2026-11-19/20: the founder's notes, D, E, F)
 Tree hashes before: core 8b4b3eac7543581e · apps/full 0148bb454440c3e3 · apps/night 14403ea3224c4030 (stage C's after). After: core 8b4b3eac7543581e · apps/full 0148bb454440c3e3 · apps/night 8d479c72311511a4 (core and Full untouched).
 - The founder's notes: the near «rectangles» were the bake's shutters (flat boxes a window tall, open 23–75°; the lit-window layer off changed nothing) → `tools/design/rain/bake/city.js` louvred shutters (frame, slats, a dark backing) folded back 3–11°, hinged at the opening, the same R() draws; `rain-bake --city` (93 s, 187 windows); the old city in the session scratchpad only. Tracks: STREET.tracks [8.35, 9.85, 11.25, 12.75], tramTrack [9.1, 12.0], STREET.mastX 13.55 (masts at 12.6 were inside the trams), LIFE.wire x 12. Car glass: `cabZ(ty)` zones (rear window, side windows between the pillars, windscreen) above the beltline. Streams: `life.js` STREAMS / streamK / streamSegs, `vehmesh.js streamMesh`, VEH_F part 14 (lamps mirrored sharp, flowing glints), type 8 in VTY, `uStream` eased; the kind-30 sprites removed. Gust: `pi` on walkers, the near walker at the gust's start (z 20–48), GUST_TEST and `?rain=gust`.

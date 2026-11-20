@@ -93,6 +93,7 @@ THERE in full and here as one index entry):
   188 SAFARI-1: Night on a real iPhone — the silent switch, the camera and hands, quality, offline, Telegram
   189 RAIN-10: the rain room's street — people walk, dressed apart, hidden by the trees; cars without boxes; the tram a lit box
   193 RELEASE-1 night run: the five checks before the release (docs/night/HANDOFF.md «Before the release»)
+  194 RELEASE-1 last notes: every windscreen glass, a window lit by a note soft only as it shows sharp, the rain's flugelhorn held
   192 RELEASE-1 stage C: smooth car shells, no vehicle through another (the near lane, the taxi's line), the cat on a sill, the kerbs' streams, a gust's inside-out umbrella, the windows drawn first
   191 RELEASE-1 stage B: the cars and the tram in 3D through the camera's own law — direction, types, wet paint, lights, the two-section tram, the focus
   190 RELEASE-1 stage A: the rain room's people dressed part by part (coat, trousers or skirt, shoes, hat / scarf / hood, bag, hair, umbrella ribs), lit by the lamps and the mood
