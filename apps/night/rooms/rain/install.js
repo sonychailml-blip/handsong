@@ -18,7 +18,8 @@ let SET=false;
 /* the one-time setup (→ a promise: the other modes loaded) */
 export function rainSetup(){ if(SET) return READY; SET=true;
   try{ if(new URLSearchParams(location.search).get('bedrec')==='on') import('./sampled.js').then(M=>bed2SamplerSet((ac, out, ev, when, pv)=>{ if(!SAMPLES){ if(!SLOAD) SLOAD=M.sampledLoad(ac, RAIN.base).then(b=>{ SAMPLES=b; }, ()=>{ SLOAD=null; }); return false; } if(ev.kind!=='chord') M.sampledPlay(ac, out, null, SAMPLES, ev, when, pv); return true; })); }catch(e){}
-  bed2LofiSet((ac, dest)=>import('./lofi.js').then(M=>M.lofiEngine(ac, dest, RAIN.base, { ep:new URLSearchParams(location.search).get('bedep')==='short' ? 'short' : 'long' })));   // PERF-3: Light plays the sustaining piano too — since AUDIO-4 it costs less than the short one (1.1 vs 2.4 ms a block); RAIN-R1: (was) Light — the short piano (from the engine's first note)   // RAIN-4e: ?bedep=short — RAIN-4d's piano   // RAIN-4c: the lo-fi bed's engine (its files fetched with its first note)
+  const lofiSet=()=>bed2LofiSet((ac, dest)=>import('./lofi.js').then(M=>M.lofiEngine(ac, dest, RAIN.base, { ep:new URLSearchParams(location.search).get('bedep')==='short' ? 'short' : 'long' })));   // PERF-3: Light plays the sustaining piano too — since AUDIO-4 it costs less than the short one (1.1 vs 2.4 ms a block); RAIN-R1: (was) Light — the short piano (from the engine's first note)   // RAIN-4e: ?bedep=short — RAIN-4d's piano   // RAIN-4c: the lo-fi bed's engine (its files fetched with its first note)
+  if(/[?&]probe(&|=|$)/.test(location.search) && /[?&]lofilate(&|$)/.test(location.search)) window.__lofiLate=lofiSet; else lofiSet();   // RELEASE-1: ?probe&lofilate — the probe installs the engine after the switch (a slow first visit: the race made certain)
   bed2BuskSet(buskNotes);   // RAIN-7
   READY=scalesLoadRest().catch(e=>{ console.warn('[night] the modes of the rain room did not load:', e); });   // eslint-disable-line no-console
   return READY;

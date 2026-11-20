@@ -96,6 +96,9 @@ let LOFI=null; export const bed2LofiSet=f=>{ LOFI=f||null; };
 export const bed2BuskSet=f=>{ LF.busk=f||null; };
 const LF={ busk:null, eng:null, loading:null, fail:false, on:false, R:null, level:'full', origin:0, view:null, players:[], tick:null, late:0, skipped:0, worst:0 };   // AUDIO-2: late — notes that came late, skipped — late beats left out, worst — the latest (s, < 0)
 const lofiWanted=R=>!!(R && R.lofi && LOFI && !BEDJAZZ);
+/* RELEASE-1: the room wants the lo-fi bed, it is neither playing nor loading nor failed — the engine was installed after the bed was put on (the room's
+   setup and the switch's fades race; the founder heard no music on a first visit to the rain on the site) → the door puts the bed on again */
+export const bed2LofiMissed=R=>lofiWanted(R) && !LF.on && !LF.fail && !(LF.loading && !LF.eng);
 const pieceOf=(R, v)=>{ const L=R.lofi, id=modeIdOf(v); return L.pieces[id] || L.pieces[L.first]; };
 const pcOf=P=>{ const m=scaleById(P.parent); return m && m.iv && m.iv.length===7 ? m.iv.slice() : undefined; };   // RAIN-4d: the parent's pitch classes (the phrases' safe notes)
 const lofiLevelOf=(R, preset)=>(R.lofi.levels && R.lofi.levels[preset]) || 'full';

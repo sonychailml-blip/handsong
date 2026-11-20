@@ -28,6 +28,8 @@ Every older open step (120–192) is kept word for word in `archive/HANDOFF-hist
 Moved to `archive/HANDOFF-history.md` (RELEASE-1, still open there).
 
 ## Records (English, at most about 15 lines each; older ones go to `archive/HANDOFF-history.md`)
+### RELEASE-1 the rain's music on a first visit (2026-11-20). Log: `docs/night/WORK-LOG.md`
+- On the site the rain was silent on its first visit: the switch put the music on before the room's setup had installed the lo-fi engine (a race; local files usually won it). The music door now puts the bed on again whenever the room wants the lo-fi bed and it is not playing or loading. New UI check «NIGHT rain music on the first visit» (the race made certain with `?lofilate`; CONTROL `?bedheal=off` silent). Step 196.
 ### RELEASE-1 full check (2026-11-20): ready to publish. Log: `docs/night/WORK-LOG.md`
 - static PASSED · data 106/0 · Full `P.all` 122/0 · Night `P.night` 81/0 · `[smoke] PASS` with builds (precache 485 files, 28.3 MB to start). «NIGHT dot flight» failed twice on the resize case: the check undercounted the dot's hold (hidden frames × 16 ms) — now the dot's logged hold (exact), window unchanged, a new CONTROL; rerun PASS. Next: the founder's checks above, then «Publishing».
 ### RELEASE-1 last notes (2026-11-20): windscreens, windows sharp and soft, a held voice in the rain. Log: `docs/night/WORK-LOG.md`

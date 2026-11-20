@@ -13,8 +13,9 @@ import { BUS } from '../../core/pure/bus.js';
 import { seeded } from '../../core/pure/dsp.js';
 import { BED_OFF, BED_PRESETS, BED_ANSWER, bedInit, bedStep, bedSoon } from './pure/bed.js';
 import { BED_POOL, buildBed, bedVoice, bedVoicePark, bedFilter, bedGround, bedGlim, bedLevel, bedPark } from './sound/bed.js';
-import { bed2On, bed2Off, bed2Volume, bed2Tick, bed2Failed, bed2Dbg, bed2ViewOver } from './bed2.js';
+import { bed2On, bed2Off, bed2Volume, bed2Tick, bed2Failed, bed2Dbg, bed2ViewOver, bed2LofiMissed } from './bed2.js';
 
+const HEAL=!(typeof location!=='undefined' && /[?&]bedheal=off(&|$)/.test(location.search));   // RELEASE-1: ?bedheal=off — the probe's CONTROL (the old way: never put on again)
 export const BED_SEED=0x42454431, BED_AHEAD=0.5, BED_PARK_S=9, BED_QUIET_TC=8;   // a released voice parks after 8 time constants (−70 dB)
 export const BED_ENGINES=Object.freeze(['v2','v1']), BED_PALETTES=Object.freeze(['a','b']);
 let mode=BED_OFF, vol=null, answer=false, recipe=null, bed=null, st=null, origin=0, view=null, parkAt=0, ons=0, notesSeq=0;
@@ -122,6 +123,7 @@ export function bedTick(at){
     for(const it of N.items) if(it.kind==='on' && it.role==='ld' && Number.isInteger(it.deg)) played.push({ pc:((it.deg%n)+n)%n, t:now });
     while(played.length && played[0].t<now-BED_ANSWER.window) played.shift(); }
   if(v2want){ const r=bed2On(AC, E, E.master.in, recipe2, mode, bedVolumeOf(), now, opts()); if(r!=='pending') v2want=false; if(r==='failed') v1Set(mode, now, E); }
+  else if(HEAL && !holding && mode!==BED_OFF && useV2() && bed2LofiMissed(recipe2)) apply();   // RELEASE-1: the room's lo-fi engine came after the bed was put on
   bed2Tick(E, now, played.map(p=>p.pc), answer, opts());
   if(!bed) return;
   if(!v1on){ if(parkAt && now>=parkAt){ bedPark(E, bed, true); parkAt=0; } return; }

@@ -1145,6 +1145,39 @@ function dotJudge(R){
   let gap=0, slow=0; { const ff=F.filter(f=>f.st==='fly' && f.shown); for(let i=1;i<ff.length;i++){ const g=ff[i].t-ff[i-1].t; if(g>gap) gap=g; if(g>100) slow+=g-100; } }   // reported only: the dot's clock steps ≤ 100 ms a frame, so slower frames stretch the wall time
   return { bad, off, jump, flyMs:flyMs-held, holds, peak:D.peak, gap, slow };
 }
+/* RELEASE-1 — «NIGHT rain music on the first visit» (the founder: on the site the rain had no music, the forest had; on Live Server both): a fresh page,
+   Begin in the forest, then the rain (roomSwitch — what the Room button calls, with its fades); the lo-fi bed must be playing within RFM.limitMs.
+   (1) as is; (2) ?lofilate — the room's engine installed by the probe 1.5 s after the switch is over (a slow first visit: the race made certain;
+   not installed before — checked) — the bed's heal must still put it on; CONTROL (3) ?lofilate&bedheal=off — the old way: still silent RFM.ctlMs after
+   the late install (the race reproduced). */
+const RFM=Object.freeze({ limitMs:30000, ctlMs:12000 });
+async function rainFirstRun(page, q){
+  const c=await freshPage(page, { q, init:[()=>{ try{ localStorage.setItem('handsong.nightBg','forest'); localStorage.setItem('handsong.sceneLevel','reduced'); }catch(e){} }, null] });
+  try{
+    await c.p.goto(c.url); await c.p.waitForFunction(()=>window.__nightBoot && window.__nightBoot.state().done, null, { timeout:60e3 });
+    await tapAt(c.p, '#nightBegin'); await c.p.waitForFunction(()=>!document.getElementById('start').classList.contains('on'), null, { timeout:LIMIT_START });
+    await c.p.waitForTimeout(3000);
+    const before=await c.p.evaluate(async ()=>{ const H=await import('/apps/night/scene/host.js'), B=await import('/apps/night/bed.js'); return { room:H.sceneRoom(), mode:B.bedModeOf() }; });
+    await c.p.evaluate(async ()=>{ window.__b2=await import('/apps/night/bed2.js'); });
+    const t0=Date.now(); await c.p.evaluate(async ()=>{ const RS=await import('/apps/night/roomswitch.js'); await RS.roomSwitch('room.rain'); });
+    let late=null; if(/lofilate/.test(q)){ await c.p.waitForTimeout(1500); late=await c.p.evaluate(()=>{ const B=window.__b2.bed2LofiDbg(); if(!window.__lofiLate) return { err:'no late install hook' }; const was={ wanted:B.wanted, on:B.on }; window.__lofiLate(); return was; }); }   // the switch is over, the bed put back on: only now the engine
+    const lim=/bedheal=off/.test(q) ? RFM.ctlMs : RFM.limitMs;
+    const on=await c.p.waitForFunction(()=>{ const B=window.__b2.bed2LofiDbg(); return B.on && B.loaded; }, null, { timeout:lim, polling:250 }).then(()=>true, ()=>false);
+    const st=await c.p.evaluate(async ()=>{ const H=await import('/apps/night/scene/host.js'), B=(await import('/apps/night/bed2.js')).bed2LofiDbg(); return { room:H.sceneRoom(), wanted:B.wanted, loaded:B.loaded, on:B.on, fail:B.fail }; });
+    return { on, ms:Date.now()-t0, before, st, late };
+  } finally { await c.ctx.close().catch(()=>{}); }
+}
+async function uiNightRainFirst(page, label){
+  const lines=[], bad=[], fmt=r=>`after ${(r.ms/1000).toFixed(1)} s: room ${r.st.room}, engine ${r.st.wanted ? 'installed' : 'not installed'}, loaded ${r.st.loaded}, playing ${r.st.on}${r.st.fail ? ', FAILED' : ''} (before: ${r.before.room}, music ${r.before.mode})`;
+  for(const [name, q] of [['as is', ''], ['the engine installed late (?lofilate)', '&lofilate']]){ const r=await rainFirstRun(page, q);
+    if(r.late && (r.late.err || r.late.wanted)) bad.push(`${name}: the engine was not held back (${JSON.stringify(r.late)})`);
+    if(r.before.room!=='room.forest' || r.before.mode==='off') bad.push(`${name}: the start was not the forest with music (${JSON.stringify(r.before)})`);
+    else if(!r.on) bad.push(`${name}: no lo-fi music in the rain — ${fmt(r)}`); else lines.push(`${name}: the rain's music on — ${fmt(r)}`); }
+  { const r=await rainFirstRun(page, '&lofilate&bedheal=off');
+    if(!r.late || r.late.err || r.late.wanted) bad.push(`CONTROL: the engine was not held back (${JSON.stringify(r.late)})`);
+    if(r.on || !r.st.wanted) bad.push(`CONTROL: the old way (no heal) with the late engine ${r.on ? 'played' : 'never installed the engine'} — the check cannot fail (${fmt(r)})`); else lines.push(`CONTROL: the old way with the late engine stays silent — ${fmt(r)}`); }
+  return { pass:!bad.length, lines:[...lines.map(l=>`${label}: ${l}`), ...bad.map(b=>`${label}: NOT A PASS — ${b}`)] };
+}
 async function uiNightDot(page, label){
   const lines=[], bad=[];
   const CASES=[['phone upright, full screen before', { vp:{ width:390, height:844 } }], ['phone upright, full screen at Begin', { from:{ width:390, height:760 }, vp:{ width:390, height:844 } }],
@@ -1521,6 +1554,7 @@ async function session(port, plan, label){
         ['NIGHT reveal', uiNightReveal, 4*LIMIT_START, true],   // DESIGN-1 part D
         ['NIGHT still matches the live room', uiNightStillMatch, 9*LIMIT_START, true],   // NIGHT-13
         ['NIGHT dot flight', uiNightDot, 10*LIMIT_START, true],   // NIGHT-13b
+        ['NIGHT rain music on the first visit', uiNightRainFirst, 6*LIMIT_START, false],   // RELEASE-1
         ['NIGHT start timeline', uiNightTimeline, (THROTTLE ? 25 : 8)*60e3, false],   // NIGHT-12, NIGHT-11 part 3
         ['NIGHT first contact order', uiNightOrder, 4*LIMIT_START, true]];   // NIGHT-11 part 4
       const all=[];

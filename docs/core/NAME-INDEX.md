@@ -33,7 +33,7 @@ NIGHT-3 stage 4: THE MUSIC BED's DOOR AND ITS v1 DRIVER (live) — the state the
 
 ## apps/night/bed2.js
 NIGHT-4: THE MUSIC BED v2's DRIVER (live and offline).
-- const (17): `BED2_AHEAD`, `LOFI_AHEAD`, `bed2LofiEngine`, `lofiAheadDbg`, `bedBrushDbg`, `jazzMoodOf`, `bedJazzDbg`, `bed2LofiSet`, `bed2BuskSet`, `bed2LofiDbg`, `bed2ViewOver`, `bed2Failed`, `bed2SamplerSet`, `bed2Dbg`, `bed2StatsLive`, `bed2NodeDbg`, `bed2ViewDbg`
+- const (18): `BED2_AHEAD`, `LOFI_AHEAD`, `bed2LofiEngine`, `lofiAheadDbg`, `bedBrushDbg`, `jazzMoodOf`, `bedJazzDbg`, `bed2LofiSet`, `bed2BuskSet`, `bed2LofiMissed`, `bed2LofiDbg`, `bed2ViewOver`, `bed2Failed`, `bed2SamplerSet`, `bed2Dbg`, `bed2StatsLive`, `bed2NodeDbg`, `bed2ViewDbg`
 - fn (6): `bed2Load`, `bed2On`, `bed2Off`, `bed2Volume`, `bed2Tick`, `bed2Plan`
 - → ./sound/bed2.js (1): `bed2Stats`
 
@@ -1702,7 +1702,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 UI-1 — «NIGHT labels follow the room»: the founder entered the rain and the Sound button still read «Firefly» while another timbre played.
 - fn (1): `checkNightLabels`
 
-_338 modules, 3265 exported names._
+_338 modules, 3266 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 
