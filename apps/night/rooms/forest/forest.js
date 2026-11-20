@@ -269,7 +269,7 @@ export function buildForest(T, opt){
   /* the hands' lights: 0 = the playing hand (shadow-casting at full / reduced), 1 = the effects hand (dimmer, no shadow) */
   const small=Math.min(opt.w||800, opt.h||600)<600, SH= opt.shadow===false ? 0 : small ? Lv.shadowSmall : Lv.shadow;   // RUN 9: only high casts the light's shadow
   const rigs=[0,1].map(i=>{ const grp=new T.Group(), light=new T.PointLight(i ? col('fx') : col('light'), 0, i?4.5:7.5, 2);
-    if(i===0 && SH){ light.castShadow=true; light.shadow.mapSize.set(SH,SH); light.shadow.bias=-0.005; light.shadow.camera.near=0.08;
+    if(i===0 && SH){ light.castShadow=true; light.shadow.mapSize.set(SH,SH); light.shadow.bias=-0.005; light.shadow.camera.near=0.08; light.shadow.needsUpdate=true;   /* RELEASE-1: drawn once in the first frame — its shadow pass's programs compile there, not at the first hand (PERF-4's skip left them for the hand: 28 → 30, a stall) */
       own.push({ dispose:()=>{ if(light.shadow.map){ light.shadow.map.dispose(); light.shadow.map=null; } } }); }   // FULL CHECK: the renderer makes the shadow map; nothing freed it on leaving (one render target per build)
     const core=sprite(col('core')), halo=sprite(i?col('fx'):col('halo'),0.5); grp.add(core,halo); grp.visible=false; s.add(grp, light);   // RUN 9: the light stays in the scene (intensity 0 when off) — a light count that changes recompiles every lit shader
     const trail=[]; for(let j=0;j<Lv.trail;j++){ const t=sprite(col('trail'),0); t.scale.set(0.05,0.05,1); s.add(t); trail.push(t); }

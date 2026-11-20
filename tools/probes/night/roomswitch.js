@@ -16,7 +16,7 @@
        their baseline (FULL CHECK: the textures counted in the test room, the 1st switch vs the 19th — exact) — CONTROL: the leaking test room is caught (a texture above).
    Lighter cases: a failed opening shows the room's 2D stand-in (no renderer, detection free); an opening past its deadline shows the stand-in
    and lets detection run; Dark → Room opens veiled and paused, then unveils; a switch moves the nature to the new recipe and the bed to the
-   new room's recipes, playing again; the Room button shows with two rooms, switches, and hides with one; only a real room is remembered.
+   new room's recipes, playing again; the Room button shows with two rooms, switches to the next, and hides with one (RELEASE-1: the forest and the rain — shown); no room is remembered (RAIN-R1: a random room every visit); the brand follows the tint (UI-1).
    PRINTED, not judged: the browser's dropouts during switches, during as many quiet windows, and during the old way's switches. */
 import { row } from '../core/rows.js';
 import { clickOf } from './night.js';
@@ -110,11 +110,11 @@ export async function checkNightRoomSwitch(){
          root's tint and a tint accent (a link) both; the brand (Begin) unmoved. CONTROL: the tint pinned back to lime in the test room is caught */
       { await sleep(Math.max(0, 1500-(performance.now()-ts)));
         const rgb=tok=>{ const h=getComputedStyle(document.documentElement).getPropertyValue('--cv-'+tok).trim(); return `rgb(${parseInt(h.slice(1,3),16)}, ${parseInt(h.slice(3,5),16)}, ${parseInt(h.slice(5,7),16)})`; }, lnk=()=>getComputedStyle($('nightHowTo')).color, brand=()=>getComputedStyle($('nightBegin')).backgroundColor;
-        const follows=()=>TN.tintNow()===rgb(TR.TEST_ROOM.tint) && lnk()===rgb(TR.TEST_ROOM.tint) && brand()===rgb(FR.tint);
+        const follows=()=>TN.tintNow()===rgb(TR.TEST_ROOM.tint) && lnk()===rgb(TR.TEST_ROOM.tint) && brand()===rgb(TR.TEST_ROOM.tint);   /* RELEASE-1: UI-1 made the brand the room's tint (Begin amber in the rain, night.css --night-brand) — DESIGN-1's «Begin unmoved» is superseded */
         n+=4; notes.push(`the tint: forest ${tint0} → 650 ms into the switch ${tintMid} → the test room ${TN.tintNow()} (a link ${lnk()}, Begin ${brand()})`);
         if(tint0!==rgb(FR.tint)) miss(`in the forest the tint reads ${tint0}, not the forest's ${rgb(FR.tint)}`);
         if(!(tintMid!==tint0 && tintMid!==rgb(TR.TEST_ROOM.tint))) miss(`650 ms into the switch the tint is ${tintMid} — not eased (it should lie between ${tint0} and ${rgb(TR.TEST_ROOM.tint)})`);
-        if(!follows()) miss(`in the test room the tint did not follow: root ${TN.tintNow()}, a link ${lnk()}, Begin ${brand()} (wanted ${rgb(TR.TEST_ROOM.tint)}, Begin ${rgb(FR.tint)})`);
+        if(!follows()) miss(`in the test room the tint did not follow: root ${TN.tintNow()}, a link ${lnk()}, Begin ${brand()} (wanted ${rgb(TR.TEST_ROOM.tint)} for all three)`);
         TN.tintApply({ tint:FR.tint }, { now:true }); const ctl=follows(); TN.tintApply(TR.TEST_ROOM, { now:true });
         if(ctl) miss('CONTROL: the tint pinned to lime in the test room still read as following — the check cannot fail'); else notes.push('CONTROL: the tint pinned to lime in the test room is caught'); }
       const nat=RS.roomSwitchDbg().nature, B=BD.bedDbg(); await sleep(200); const B2=BD.bedDbg();
@@ -134,8 +134,7 @@ export async function checkNightRoomSwitch(){
       if(!nat || nat.id!==TR.TEST_ROOM.nature.id || !amb0 || nat.cur===amb0.cur) miss(`the nature did not move to the test room's recipe on its other slot: ${JSON.stringify(amb0)} → ${JSON.stringify(nat)}`);
       if(B.recipe2!==TR.TEST_ROOM.bed2 || B.recipe!==TR.TEST_ROOM.bed) miss('the music bed did not take the test room\'s recipes');
       if(B2.holding || !B2.v2.on) miss(`the music bed did not play again after the switch: holding ${B2.holding}, v2 on ${B2.v2.on}`);
-      { const S=RS.roomSwitchDbg(); if(S.stored===TEST) miss('the test room was remembered (only real rooms are)');
-        if(S.stored!==FOREST) miss(`back in the forest, the remembered room is ${S.stored}`); } }
+      { const S=RS.roomSwitchDbg(); if(S.stored!=null) miss(`a room was remembered (${S.stored}) — since RAIN-R1 every visit draws its room, none is kept`); n--; } }   /* RELEASE-1: RAIN-R1 dropped the remembered room (roomswitch.js) */
     /* (3) the nature crossfade, offline: no click, the first 2 s untouched, the new nature after; CONTROL an instant swap clicks */
     { const R=await import('../../../core/render.js'), AM=await import('../../../apps/night/sound/ambience.js'), S=await import('../../../core/scales.js');
       const SEC=14, root=S.tonicFreq()/2, fifth=S.droneSecondHz(), copy={ ...FR.nature };   // copy: the forest's numbers in another object (the CONTROL of «gone»)
@@ -156,9 +155,10 @@ export async function checkNightRoomSwitch(){
       if(!(spc>2)) miss(`CONTROL: an instant swap reads ${spc.toFixed(2)} × its neighbourhood — the click check cannot fail`);
       if(!(moved>0.3)) miss(`after the crossfade the nature is still the old one (${moved.toFixed(2)})`); }
     /* the Room button switches; printed: the browser's dropouts (switches, quiet windows, the old way) */
-    { const d0=drops(), t0=performance.now(); $('nightRoom').click(); const to=H.sceneRoom(); for(let k=0;k<100 && !(RS.roomSwitchDbg().last && RS.roomSwitchDbg().last.id===to);k++) await sleep(50);
-      await frames(2); n+=2; if(to!==TEST) miss(`the Room button went to ${to}, not the next room`);
-      if($('nightRoom').querySelector('.night-val').textContent!==I18.L(TR.TEST_ROOM.name)) miss('the Room button does not show the test room\'s name after the switch');
+    { const L0=RS.roomSwitchDbg().rooms, from=H.sceneRoom(), want=L0[(L0.indexOf(from)+1)%L0.length];   /* RELEASE-1: the next room in the list (the rain is a real room since RAIN-R1) */
+      const d0=drops(), t0=performance.now(); $('nightRoom').click(); const to=H.sceneRoom(); for(let k=0;k<100 && !(RS.roomSwitchDbg().last && RS.roomSwitchDbg().last.id===to);k++) await sleep(50);
+      await frames(2); n+=2; if(to!==want) miss(`the Room button went to ${to}, not the next room ${want} (of ${L0.join(', ')})`);
+      { const nm=$('nightRoom').querySelector('.night-val').textContent; if(!nm || (want===TEST && nm!==I18.L(TR.TEST_ROOM.name))) miss(`the Room button does not show the new room's name after the switch (${nm})`); }
       for(const id of [FOREST, TEST]) await RS.roomSwitch(id);
       const sw=(performance.now()-t0)/1000, d1=drops(); await sleep(sw*1000); const d2=drops();
       H.sceneOpenDbg({ pause:false }); const t1=performance.now(); for(const id of [FOREST, TEST, FOREST]) await RS.roomSwitch(id, { fast:true }); H.sceneOpenDbg({ pause:true });
@@ -174,7 +174,7 @@ export async function checkNightRoomSwitch(){
     try{ await H.setBackground(keep.bg); }catch(e){}
     try{ if(keep.key==null) localStorage.removeItem(RS.ROOM_KEY); else localStorage.setItem(RS.ROOM_KEY, keep.key); }catch(e){}
   }
-  { n++; if(!$('nightRoom').hidden) miss('the Room button still shows after the test room left (one room)'); }
+  { n++; const nr=RS.roomSwitchDbg().rooms.length; if($('nightRoom').hidden!==(nr<2)) miss(`after the test room left the Room button is ${$('nightRoom').hidden ? 'hidden' : 'shown'} with ${nr} real room(s) (shown from two)`); }   /* RELEASE-1: the forest and the rain — two real rooms */
   return { cases:n, total:d.length, differences:d, notes };
 }
 row({ at:1009.98, night:true, name:'NIGHT room switch', drawn:true, run:()=>checkNightRoomSwitch(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });

@@ -2227,6 +2227,59 @@ async function release1Bodies(){
   notes.push(`triangles: ${rows.join(', ')}; every body the law's size, lamps on its ends; the tram ${C.TRAFFIC.tramLen} m, pantograph at the wire; CONTROL a shifted body caught`);
   return { cases:n, total:d.length, differences:d, notes };
 }
+/* RELEASE-1 (C) — «RELEASE-1 no vehicle through another (app)»: the founder saw cars drive through each other when the taxi stops. Over half an hour of the
+   street, every 0.25 s (the busiest density, 1.6), each vehicle's footprint (its body's width and length: pure/vehicles.js types, the tram's
+   VEH3.tram) — every car, every tram and the taxi (the kerb law: approaching, stopped, pulling away) — overlaps no other, no kerb lamp post (x, r 0.1) and
+   (RELEASE-1, night) no wire mast (STREET.mastX, r 0.11; CONTROL the masts at RAIN-10's 12.6 m).
+   CONTROL: RAIN-10's places (the near lane at 2.6, the taxi at 1.25, the tram 2.65 wide) are caught. */
+async function release1NoOverlap(){
+  const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); return !!c; }, U=f=>import(new URL(f, import.meta.url).href);
+  const C=await U('../apps/night/rooms/rain/pure/city.js'), V=await U('../apps/night/rooms/rain/pure/vehicles.js'), M=await U('../apps/night/rooms/rain/pure/vehmesh.js'), PS=await U('../apps/night/pure/passes.js');
+  const posts=C.cityLamps().filter(l=>Math.abs(l.p[0]-C.LAMP_ROWS[0][0])<1e-6).map(l=>l.p[2]), masts=[]; for(let z=10;z<C.STREET.len*0.7;z+=30) masts.push(z);   // RELEASE-1 (night): + the wire masts
+  const run=(lanes, stopX, tramW, track=C.RAIN_TRAFFIC.tram.track, mastX=C.STREET.mastX)=>{ const P={ ...C.RAIN_TRAFFIC, lanes, tram:{ ...C.RAIN_TRAFFIC.tram, track } }, S={ ...C.RAIN_TRAFFIC.stop, x:stopX }; let hits=0, first=null, seen=0;
+    for(let t=0;t<1800;t+=0.25){ const A=PS.passTraffic(P, t, 1.6).map(c=>{ if(c.kind==='tram'){ const near= c.dir>0 ? c.z-c.len : c.z; return { x0:c.x-tramW/2, x1:c.x+tramW/2, z0:near, z1:near+c.len, k:'tram' }; }
+        const T=V.VEH.types[V.vehType(c.lane, c.slot)]; return { x0:c.x-T.w/2, x1:c.x+T.w/2, z0:c.z, z1:c.z+T.len, k:'car' }; });
+      const tx=PS.stopAt(S, t); if(tx){ const T=V.VEH.types[4]; A.push({ x0:S.x-T.w/2, x1:S.x+T.w/2, z0:tx.z, z1:tx.z+T.len, k:'taxi' }); seen++; }
+      for(let i=0;i<A.length;i++){ const a=A[i]; for(let j=i+1;j<A.length;j++){ const b=A[j]; if(a.x0<b.x1 && b.x0<a.x1 && a.z0<b.z1 && b.z0<a.z1){ hits++; if(!first) first=`${a.k} and ${b.k} at t ${t}`; } }
+        for(const z of posts) if(C.LAMP_ROWS[0][0]+0.1>a.x0 && C.LAMP_ROWS[0][0]-0.1<a.x1 && z+0.1>a.z0 && z-0.1<a.z1){ hits++; if(!first) first=`${a.k} through the lamp post at z ${z}`; }
+        for(const z of masts) if(mastX+0.11>a.x0 && mastX-0.11<a.x1 && z+0.11>a.z0 && z-0.11<a.z1){ hits++; if(!first) first=`${a.k} through the wire mast at z ${z}`; } } }
+    return { hits, first, seen }; };
+  const G=run(C.STREET.lanes, C.RAIN_TRAFFIC.stop.x, M.VEH3.tram.w);
+  ok(`vehicles overlap: ${G.hits} times (first: ${G.first})`, G.hits===0 && G.seen>100);
+  const B=run([{ ...C.STREET.lanes[0], x:2.6 }, C.STREET.lanes[1]], 1.25, 2.65, [9.65, 12.15], 12.6); ok(`CONTROL: RAIN-10's places passed (${B.hits})`, B.hits>0);
+  { const M2=run(C.STREET.lanes, C.RAIN_TRAFFIC.stop.x, M.VEH3.tram.w, C.RAIN_TRAFFIC.tram.track, 12.6); ok(`CONTROL: the masts at RAIN-10's place passed (${M2.hits})`, M2.hits>0); }
+  notes.push(`half an hour at density 1.6: no vehicle through another or a lamp post (the taxi seen ${G.seen} times); CONTROL RAIN-10's places: ${B.hits} overlaps (first ${B.first})`);
+  return { cases:n, total:d.length, differences:d, notes };
+}
+/* RELEASE-1 (C) — «RELEASE-1 small life (app)» (rooms/rain/pure/life.js): (1) THE CAT on its sill keeps changing — over two hours every state (sit, wash, walk, lie)
+   and going in, no state longer than 140 s, out at least 60 % of the time, always within the sill (|at| ≤ 1), a walk ending where the next state starts —
+   CONTROL a cat that only sits is caught; (2) THE KERBS' STREAMS follow the rain: none dry, more and stronger in Evening's rain (0.65) than after it (0.14)
+   — CONTROL streams ignoring the rain caught; (3) A GUST TURNS AN UMBRELLA INSIDE OUT only with a strong Wave (none in an hour at Wave 0.5 or less), now
+   and then at Wave 1 (2…12 in ten minutes), each 4.6 s, one at a time, and the walker chosen carries a black or coloured umbrella — CONTROL a flip at Wave 0
+   is caught. */
+async function release1Small(){
+  const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); return !!c; }, U=f=>import(new URL(f, import.meta.url).href);
+  const L=await U('../apps/night/rooms/rain/pure/life.js');
+  { const judge=f=>{ const seen=new Set(), run={ st:null, t:0 }; let longest=0, out=0, all=0, bad=0, prev=null;
+      for(let t=0;t<7200;t+=0.5){ const c=f(t); all++; const st=c ? c.state : 'inside'; seen.add(st); if(c){ out++; if(!(Math.abs(c.at)<=1)) bad++; } if(st===run.st){ longest=Math.max(longest, t-run.t); } else { run.st=st; run.t=t; }
+        if(prev && c && prev.state==='walk' && c.state!=='walk' && Math.abs(c.at-prev.at)>0.06) bad++; prev=c; } return { seen, longest, out:out/all, bad }; };
+    const J=judge(t=>L.catAt(t)); ok(`the cat does not change enough (${[...J.seen].join(', ')}, longest ${J.longest.toFixed(0)} s, out ${(J.out*100).toFixed(0)} %, ${J.bad} off the sill or jumping)`, J.seen.size===5 && J.longest<=140 && J.out>=0.6 && J.bad===0);
+    const C=judge(t=>({ state:'sit', at:0, u:0, look:0, dir:1 })); ok('CONTROL: a cat that only sits passed', !(C.seen.size===5 && C.longest<=140));
+    notes.push(`the cat: ${[...J.seen].join(', ')}; longest ${J.longest.toFixed(0)} s; out ${(J.out*100).toFixed(0)} % of two hours`); }
+  { const follows=K=>{ const wet=K(0.65), after=K(0.14), dry=K(0); return { ok:dry===0 && after>0 && wet>after*2 && wet<=1, wet, after, dry }; };   /* RELEASE-1 (night): the streams are ribbons now — their strength by the rain, their pieces along both kerbs */
+    const G=follows(L.streamK), segs=L.streamSegs(), kerbs=new Set(segs.map(q=>q.x)), gaps=segs.filter((q, i)=>i && segs[i-1].x===q.x && Math.abs(segs[i-1].z0+segs[i-1].len-q.z0)>1e-6).length;
+    ok(`the streams do not follow the rain (dry ${G.dry}, after ${G.after.toFixed(2)}, rain ${G.wet.toFixed(2)})`, G.ok); ok(`the streams' ribbons leave gaps or miss a kerb (${kerbs.size} kerbs, ${gaps} gaps)`, kerbs.size===2 && gaps===0 && segs.length>=40);
+    ok('CONTROL: streams ignoring the rain passed', !follows(()=>0.6).ok);
+    notes.push(`the streams: strength ${G.wet.toFixed(2)} in Evening's rain, ${G.after.toFixed(2)} after it, 0 dry; ${segs.length} ribbon pieces along both kerbs`); }
+  { const countBy=(law, w, T)=>{ let k=0, prev=null, longest=0, run=0; for(let t=0;t<T;t+=0.25){ const g=law(t, w); if(g){ run+=0.25; if(!prev || prev.slot!==g.slot) k++; } else { longest=Math.max(longest, run); run=0; } prev=g; } return { k, longest }; }, count=(w, T)=>countBy(L.gustFlip, w, T);
+    let low=0; for(const w of [0, 0.3, 0.5]) low+=count(w, 3600).k; const hi=count(1, 600);
+    ok(`the umbrellas flip without a strong Wave (${low} in an hour at ≤ 0.5)`, low===0); ok(`at Wave 1 the flips are wrong (${hi.k} in ten minutes, the longest ${hi.longest.toFixed(1)} s)`, hi.k>=2 && hi.k<=12 && hi.longest<=L.GUST.dur+0.3);
+    const W=L.lifeAt(L.GUST.every*3, 'evening', [], 1).filter(q=>q.flip!=null), bad=W.filter(q=>Math.floor((q.c%2048)/8)%8>1);
+    let any=0; for(let t=0;t<600 && !any;t+=0.5) any+=L.lifeAt(t, 'evening', [], 1).filter(q=>q.flip!=null).length; ok(`a flipped umbrella is not a black or coloured one (${bad.length}) or none is ever drawn`, bad.length===0 && any>0);
+    { let lowC=0; for(const w of [0, 0.3, 0.5]) lowC+=countBy((t)=>L.gustFlip(t, 1), w, 3600).k; ok(`CONTROL: a gust law blind to the Wave passed (${lowC} flips at ≤ 0.5)`, lowC>0); }
+    notes.push(`gusts: none at Wave ≤ 0.5 in an hour; ${hi.k} umbrellas inside out in ten minutes at Wave 1, each ≤ ${hi.longest.toFixed(1)} s`); }
+  return { cases:n, total:d.length, differences:d, notes };
+}
 async function rain7Law(){
   const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); return !!c; }, U=f=>import(new URL(f, import.meta.url).href);
   const B=await U('../apps/night/rooms/rain/pure/busker.js'), V=await U('../apps/night/rooms/rain/pure/vehicles.js');
@@ -3587,6 +3640,8 @@ const ROWS=[
   ['RELEASE-1 people clothes (app)', ()=>release1Clothes(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RELEASE-1 (A)
   ['RELEASE-1 people come and go (app)', ()=>release1Stay(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RELEASE-1 (A)
   ['RELEASE-1 vehicle bodies (app)', ()=>release1Bodies(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RELEASE-1 (B)
+  ['RELEASE-1 no vehicle through another (app)', ()=>release1NoOverlap(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RELEASE-1 (C)
+  ['RELEASE-1 small life (app)', ()=>release1Small(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RELEASE-1 (C)
   ['NIGHT silent switch (app)', ()=>nightSilentSwitch(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // SAFARI-1
   ['RAIN street law (app)', ()=>rainStreetLaw(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-6b
   ['NIGHT home screen (app)', ()=>nightHomeScreen(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-7c

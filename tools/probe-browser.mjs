@@ -923,7 +923,8 @@ async function uiNightSettings(page, label){
       }
       if(lang==='en'){ await c.p.setViewportSize({ width:1280, height:800 }); await c.p.click('#nightSetTabs [data-tab="picture"]'); await c.p.waitForTimeout(100);
         const st=()=>c.p.evaluate(async ()=>{ const S=await import('/core/state.js'), on=document.querySelector('#nightQualSeg .on'); return { light:!!on && on.dataset.q==='light', q:on ? on.dataset.q : null, stored:localStorage.getItem('handsong.nightLight'), field:!!(S.nightView && S.nightView.fieldAll) }; });   // NIGHT-16: Light is a quality choice
-        const s0=await st(), back=s0.q||'reduced'; await c.p.click('#nightQualSeg [data-q="light"]'); await c.p.waitForTimeout(200); const s1=await st(); await c.p.click(`#nightQualSeg [data-q="${back}"]`); await c.p.waitForTimeout(200); const s2=await st();
+        let s0=await st(); if(s0.light){ await c.p.click('#nightQualSeg [data-q="reduced"]'); await c.p.waitForTimeout(200); s0=await st(); }   // RELEASE-1: a weak GPU's first visit starts at Light (PERF-4) — the test starts from Standard
+        const back=s0.q||'reduced'; await c.p.click('#nightQualSeg [data-q="light"]'); await c.p.waitForTimeout(200); const s1=await st(); await c.p.click(`#nightQualSeg [data-q="${back}"]`); await c.p.waitForTimeout(200); const s2=await st();
         await c.p.click('#nightFieldTg'); await c.p.waitForTimeout(100); const f1=await st(); await c.p.click('#nightFieldTg'); await c.p.waitForTimeout(100); const f2=await st();
         if(!s1.light || s1.stored!=='1' || s2.q!==back || s2.stored!=='0') bad.push('the quality choice Light and back: '+JSON.stringify([s0, s1, s2]));
         else if(f1.field===s0.field || f2.field!==s0.field) bad.push('the note-field switch: '+JSON.stringify([s0, f1, f2]));

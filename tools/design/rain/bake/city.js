@@ -216,7 +216,13 @@ function house(T, m, mats, img, side, h, o, out){
     m.put(new T.PlaneGeometry(winW, winH), mats.glass, P, xc, y0+winH/2, fd-0.02);
     const id=out.windows.length, life=Math.floor(R()*16), amb=R(), warm=R();   // RAIN-5b: 16 rooms (the same one draw)
     { const g=new T.PlaneGeometry(winW*1.05, winH*1.05), uv=g.attributes.uv, cu=(life%4)/4, cv=Math.floor(life/4)/4; for(let i=0;i<uv.count;i++) uv.setXY(i, cu+uv.getX(i)/4, cv+uv.getY(i)/4); m.put(g, mats.life, P, xc, y0+winH/2, -0.6); }
-    if((style==='classical' || style==='wooden') && R()<0.35*wear){ const open=0.4+R()*0.9, c=mats.shut[Math.floor(R()*mats.shut.length)]; for(const sd of [-1, 1]) m.put(new T.BoxGeometry(winW/2, winH, 0.04), c, P, xc+sd*(winW/2+Math.cos(open)*winW/4), y0+winH/2, Math.sin(open)*winW/4, sd*open); }
+    if((style==='classical' || style==='wooden') && R()<0.35*wear){ const open=0.4+R()*0.9, c=mats.shut[Math.floor(R()*mats.shut.length)];   /* RELEASE-1: LOUVRED SHUTTERS folded back against the wall (3–11°), hinged at the opening: a frame and slats (they were flat boards a window tall, standing out 23–75°: pasted planks up close). The same random draws: the city is otherwise unchanged */
+      const a=0.06+(open-0.4)*0.16, lw=winW/2, hx=winW/2+0.02, n=Math.max(8, Math.round((winH-0.12)/0.075));
+      for(const sd of [-1, 1]){ const cx=xc+sd*(hx+Math.cos(a)*lw/2), cz=0.035+Math.sin(a)*lw/2, ry=-sd*a, rot=(x, z)=>[cx+x*Math.cos(ry)+z*Math.sin(ry), cz-x*Math.sin(ry)+z*Math.cos(ry)];
+        for(const ex of [-1, 1]){ const [px, pz]=rot(ex*(lw/2-0.025), 0); m.put(new T.BoxGeometry(0.05, winH, 0.035), c, P, px, y0+winH/2, pz, ry); }
+        for(const ey of [0.03, winH-0.03]){ const [px, pz]=rot(0, 0); m.put(new T.BoxGeometry(lw, 0.06, 0.035), c, P, px, y0+ey, pz, ry); }
+        for(let k=0;k<n;k++){ const [px, pz]=rot(0, 0.004); m.put(new T.BoxGeometry(lw-0.09, 0.012, 0.055), c, P, px, y0+0.07+(k+0.5)*(winH-0.14)/n, pz, ry, 0.55); }
+        { const [px, pz]=rot(0, -0.01); m.put(new T.BoxGeometry(lw-0.08, winH-0.1, 0.006), mats.dark, P, px, y0+winH/2, pz, ry); } } }
     if(!balc.has(w) && R()<0.14){ m.put(new T.BoxGeometry(winW+0.2, 0.25, 0.3), mats.pot, P, xc, y0+0.06, 0.32); plantAt(m, T, P, mats, R, xc, y0+0.3, 0.32, 1.2); }
     const C=[[xc-winW/2, y0], [xc+winW/2, y0], [xc+winW/2, y0+winH], [xc-winW/2, y0+winH]].map(([u, v])=>new T.Vector3(u, v, fd).applyMatrix4(P));
     out.windows.push({ id, side, block:h.block, house:h.id, bay:w.k, floor:w.f, corners:C.map(p=>[p.x, p.y, p.z]), centre:new T.Vector3(xc, y0+winH/2, fd).applyMatrix4(P).toArray(), life, amb, warm }); }
@@ -289,7 +295,7 @@ export function buildCity(T, mats, img, o={}){
   for(const xk of [S.kerbA, S.kerbB]) m.put(new T.BoxGeometry(0.3, 0.22, L+80, 1, 1, SEG), mats.kerb, null, xk, 0.08, Lz-40);   // RAIN-5: segments along the street, so the bend bends them
   for(const xr of S.tracks) m.put(new T.BoxGeometry(0.08, 0.04, L+80, 1, 1, SEG), mats.rail, null, xr, 0.02, Lz-40);
   for(const xw of [(S.tracks[0]+S.tracks[1])/2, (S.tracks[2]+S.tracks[3])/2]) m.put(new T.CylinderGeometry(0.008, 0.008, L+80, 3, SEG), mats.dark, null, xw, S.wire, Lz-40, 0, Math.PI/2, 0);
-  for(let z=10;z<L*0.7;z+=30) m.put(new T.CylinderGeometry(0.09, 0.11, S.wire+0.6, 6), mats.iron, null, S.kerbB-0.4, (S.wire+0.6)/2, z), m.put(new T.BoxGeometry(S.kerbB-S.tracks[0]+0.6, 0.06, 0.06), mats.iron, null, (S.kerbB+S.tracks[0])/2, S.wire+0.1, z);
+  for(let z=10;z<L*0.7;z+=30) m.put(new T.CylinderGeometry(0.09, 0.11, S.wire+0.6, 6), mats.iron, null, S.mastX, (S.wire+0.6)/2, z), m.put(new T.BoxGeometry(S.mastX-S.tracks[0]+0.3, 0.06, 0.06), mats.iron, null, (S.mastX+S.tracks[0]-0.3)/2, S.wire+0.1, z);   // RELEASE-1: the masts on the promenade's edge, clear of the trams
   /* the plane trees: two rows between the road and the promenade (mottled trunks, crowns of leaf clusters) */
   /* RAIN-2: real plane trees (planeTree); o.oldTrees — the RAIN-1 crowns of spheres, kept only for the crown-cover CONTROL */
   if(o.oldTrees) for(const t of o.trees||[]){ const [x, , z]=t.p; m.put(new T.CylinderGeometry(0.22, 0.32, t.p[1]-1, 7), mats.bark, null, x, (t.p[1]-1)/2, z);

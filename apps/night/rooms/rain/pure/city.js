@@ -16,8 +16,8 @@ export const CAM=F({ x:8, y:25, z:0, yaw:14, pitch:-13 });   // 8th floor (25 m)
    tracks, the wires over them), then the PROMENADE — a double row of plane trees along the road, benches, lamps, a kiosk, and the café terraces in
    front of the house opposite (the right row). kerbA / kerbB the road's kerbs; alleyA / alleyB the promenade's edges (the stand-in paints it as the
    alley); treeRows the two rows of plane trees; zFrom: the vehicles drive on past our house (under the window) to here. Rows begin at `rows`. */
-export const STREET=F({ left:-4, rows:12, kerbA:0, kerbB:13, alleyA:13, alleyB:40, opp:40, tracks:F([8.9, 10.4, 11.4, 12.9]), wire:6.2,
-  lanes:F([F({ x:2.6, dir:-1 }), F({ x:6.2, dir:1 })]),   // dir −1 comes towards us (headlights), +1 goes away (tail lights): driving on the right
+export const STREET=F({ left:-4, rows:12, kerbA:0, kerbB:13, alleyA:13, alleyB:40, opp:40, tracks:F([8.35, 9.85, 11.25, 12.75]), wire:6.2, mastX:13.55,   /* RELEASE-1: the tracks 2.9 m apart (two trams pass with half a metre between them; they were 2.5: 10 cm), the car road narrower; the wire masts on the promenade's edge (at 12.6 the trams drove through them) */
+  lanes:F([F({ x:3.75, dir:-1 }), F({ x:6.2, dir:1 })]),   // dir −1 comes towards us (headlights), +1 goes away (tail lights): driving on the right. RELEASE-1 (C): the near lane 3.75 (was 2.6) — a taxi at the kerb (stop.x) and a passing car never overlap
   treeRows:F([14.6, 17.6]), terrace:F([34, 40]), len:1600, zFrom:-80, lampEvery:24, treeEvery:11 });   // RAIN-5: the boulevard goes on to 1.6 km (it was 520 m: the founder saw it end)
 /* RAIN-5: THE BEND — beyond z0 the boulevard curves gently to the right (x grows ∝ (z − z0)², then straight on at that angle from z1), so the houses of
    the row opposite close the view and its end is never seen. One law for every consumer: project() bends any world point, the bake bends its
@@ -119,13 +119,13 @@ export function cityTrees(){
    room's sound reads too, so every car in the picture is heard as it passes under the window and every pass heard has its car. → [{ kind: 'car' |
    'tram', lane, slot, dir, z (front, m), x (m), len (m), v }]. Each lane: one slot every `every` s, a car with chance p × density (Wave and the mood
    set the density), all cars of a lane at one speed (none catches another); they drive from zFrom (behind our house) to the far end, or back. */
-export const TRAFFIC=F({ every:F([10, 12]), p:0.6, speed:F([11.5, 12.5]), carLen:4.4, tram:84, tramP:0.75, tramSpeed:8, tramLen:28, tramTrack:F([9.65, 12.15]) });
+export const TRAFFIC=F({ every:F([10, 12]), p:0.6, speed:F([11.5, 12.5]), carLen:4.4, tram:84, tramP:0.75, tramSpeed:8, tramLen:28, tramTrack:F([9.1, 12.0]) });
 /* RAIN-2: a vehicle's existence is decided by the density booked COMMIT s before it enters (≥ the sound's lead 9 s + the margin); a change is booked
    DENS_MARGIN s ahead of the picture's audio time, so the audio thread has it before it counts (pure/passes.js passBook) */
 export const DENS_MARGIN=0.5, DENS_COMMIT=10;
 export const RAIN_TRAFFIC=F({ commit:DENS_COMMIT, len:520, zFrom:STREET.zFrom, every:TRAFFIC.every, p:TRAFFIC.p, speed:TRAFFIC.speed, carLen:TRAFFIC.carLen, lanes:STREET.lanes,
   tram:F({ every:TRAFFIC.tram, p:TRAFFIC.tramP, speed:TRAFFIC.tramSpeed, len:TRAFFIC.tramLen, track:TRAFFIC.tramTrack, bellZ:70, bellAhead:30, bellP:0.5, curveZ:470 }),
-  stop:F({ every:F([150, 260]), x:1.25, z:F([420, 58]), stop:58, v:9, brake:6, wait:F([4, 7]), walk:2.5, door:1.2, go:2.6, person:F({ x:-0.4, z:58.8 }) }) });   // RAIN-6b (3): the taxi that stops by a doorway of the left row   // RAIN-6b (2): the bell before the crossing, the squeal where the line curves off
+  stop:F({ every:F([150, 260]), x:1.7, z:F([420, 58]), stop:58, v:9, brake:6, wait:F([4, 7]), walk:2.5, door:1.2, go:2.6, person:F({ x:-0.4, z:58.8 }) }) });   // RAIN-6b (3): the taxi that stops by a doorway of the left row   // RAIN-6b (2): the bell before the crossing, the squeal where the line curves off
 /* the listener: the eye at the window (its right vector for the pan) */
 export const EAR=F({ x:CAM.x, y:CAM.y, z:CAM.z, r:F(camBasis().r) });
 export const trafficAt=(t, density=1)=>passTraffic(RAIN_TRAFFIC, t, density);   // density: a number or a book (RAIN-2)

@@ -227,7 +227,7 @@ async function precacheRows(dir){
   cpSync(B,C,{ recursive:true }); appendFileSync(path.join(C,CHANGED),'/* bytes the list does not know */\n');
   const LA=readPrecache(A), LB=readPrecache(B), listed=new Set(LA.files.map(f=>f[0]));
   if(LA.version===LB.version) miss('a changed file did not change the version');
-  if(LA.files.some(f=>/^tools\/|^apps\/night\/rooms\/rain\//.test(f[0]))) miss('the list holds a tool or a development room');
+  if(LA.files.some(f=>/^tools\/|^apps\/night\/rooms\/rain\/samples\//.test(f[0]))) miss('the list holds a tool or a development file');   // RELEASE-1: the rain is a real room since RAIN-R1 (its development samples stay out)
   /* cur.refuse: paths answered 503 (an install cut short); cur.sw: the worker script served instead of the folder's (the exact CONTROL) */
   const cur={ dir:A, refuse:null, sw:null }, log=[], served={ n:0, bytes:0 }, srv=http.createServer(async (q,r)=>{ let p=decodeURIComponent(new URL(q.url,'http://x').pathname); if(p.endsWith('/')) p+='index.html';
     if(cur.refuse && cur.refuse.test(p)){ r.writeHead(503); r.end(); return; }
@@ -243,7 +243,7 @@ async function precacheRows(dir){
   const census=(p, files)=>p.evaluate(async ({ files, prefix })=>{ const names=await caches.keys(), mine=names.filter(n=>n.startsWith(prefix)), out={ names, extra:[], missing:[], wrong:[] };
     if(mine.length!==1) return out; const c=await caches.open(mine[0]), keys=(await c.keys()).map(q=>new URL(q.url).pathname.slice(1)), want=new Map(files.map(f=>[f[0], f[1]]));
     const simd=WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,1,5,1,96,0,1,123,3,2,1,0,10,10,1,8,0,65,0,253,15,253,98,11]));
-    out.extra=keys.filter(k=>!want.has(k)); out.missing=files.filter(f=>!(f[3]==='simd'&&!simd) && !(f[3]==='nosimd'&&simd) && !keys.includes(f[0])).map(f=>f[0]);
+    out.extra=keys.filter(k=>!want.has(k)); out.missing=files.filter(f=>f[4]!==2 && !(f[3]==='simd'&&!simd) && !(f[3]==='nosimd'&&simd) && !keys.includes(f[0])).map(f=>f[0]);   /* RELEASE-1: stage 2 (on demand) cached only once fetched */
     for(const k of keys) if(want.has(k)){ const b=await (await c.match('/'+k)).arrayBuffer(), h=[...new Uint8Array(await crypto.subtle.digest('SHA-256', b))].map(x=>x.toString(16).padStart(2,'0')).join(''); if(h!==want.get(k)) out.wrong.push(k); }
     return out; }, { files, prefix:'handsong-night-precache-' });
   try{
@@ -268,7 +268,7 @@ async function precacheRows(dir){
     if(filled){ const after=await stamps(p), again=Object.keys(before).filter(k=>after[k]!==before[k]);
       if(again.length) miss(`the resumed install downloaded again ${again.length} file(s) it had: ${again.slice(0,4).join(', ')}`); else notes.push(`the next visit resumed the install: the ${n0} kept files not downloaded again`); }
     if(filled && await started(p,'first visit')){
-      await until(p, async ([pre, n])=>{ const k=(await caches.keys()).find(x=>x.startsWith(pre)); return !!k && (await (await caches.open(k)).keys()).length>=n; }, [PRE, LA.files.filter(f=>f[3]!=='nosimd').length], 120e3, 'first visit: the top-up (every listed file)');
+      await until(p, async ([pre, n])=>{ const k=(await caches.keys()).find(x=>x.startsWith(pre)); return !!k && (await (await caches.open(k)).keys()).length>=n; }, [PRE, LA.files.filter(f=>f[3]!=='nosimd' && f[4]!==2).length], 120e3, 'first visit: the top-up (every listed file)');
       const k=await census(p, LA.files); if(k.names.filter(n=>n.startsWith('handsong-night-precache-')).length!==1 || k.names.length!==1) miss('caches after the first visit: '+k.names.join(', '));
       if(k.extra.length) miss('cached outside the list: '+k.extra.slice(0,5).join(', ')); if(k.missing.length) miss('listed but not cached: '+k.missing.slice(0,5).join(', ')); if(k.wrong.length) miss('cached with another hash: '+k.wrong.slice(0,5).join(', '));
       /* not counted: the Vercel counter, the worker's own script, the browser's own icon request (NIGHT-14b: this check sat behind a comment and never ran) */
@@ -292,7 +292,7 @@ async function precacheRows(dir){
        room misses its pictures (the check must see it). */
     await p.close().catch(()=>{});
     { const LATER=LA.files.filter(f=>f[4]===1 && f[0].startsWith('apps/night/rooms/')).map(f=>f[0]);
-      const H='/apps/night/scene/host.js', drop=q=>q.evaluate(async ([pre, list])=>{ const c=await caches.open((await caches.keys()).find(k=>k.startsWith(pre))); for(const p of list) await c.delete('/'+p); localStorage.setItem('handsong.sceneLevel', 'full'); }, [PRE, LATER]);
+      const H='/apps/night/scene/host.js', drop=q=>q.evaluate(async ([pre, list])=>{ const c=await caches.open((await caches.keys()).find(k=>k.startsWith(pre))); for(const p of list) await c.delete('/'+p); localStorage.setItem('handsong.sceneLevel', 'full'); localStorage.setItem('handsong.nightLight', '0'); }, [PRE, LATER]);   // RELEASE-1: a weak GPU's first visit stored Light (PERF-4) — Detailed chosen means Light off
       const booted=q=>until(q, ()=>!!(window.__nightBoot && window.__nightBoot.state().done), null, 90e3, 'Detailed held: Night booted');
       const roomUp=(q, lv, what)=>until(q, async ([H, lv])=>{ const m=await import(H), i=m.sceneInfo(); return !!(i.id && !i.opening && i.webgl && i.level===lv); }, [H, lv], 90e3, what);
       const look=q=>q.evaluate(async H=>{ const m=await import(H), i=m.sceneInfo(), r=m.sceneRoomDbg(), f=r && r.state ? r.state().files : null, seg=document.querySelector('#nightQualSeg .on');
@@ -320,7 +320,7 @@ async function precacheRows(dir){
         await q.evaluate(async H=>(await import(H)).sceneHoldDbg({ off:false }), H).catch(()=>{}); await ctx.setOffline(false);
         /* back to a whole cache and the default level for the rows below */
         await q.evaluate(()=>{ localStorage.removeItem('handsong.sceneLevel'); navigator.serviceWorker.controller.postMessage({ type:'handsong-night-topup' }); });
-        await until(q, async ([pre, n])=>{ const k=(await caches.keys()).find(x=>x.startsWith(pre)); return !!k && (await (await caches.open(k)).keys()).length>=n; }, [PRE, LA.files.filter(f=>f[3]!=='nosimd').length], 120e3, 'Detailed held: the cache whole again');
+        await until(q, async ([pre, n])=>{ const k=(await caches.keys()).find(x=>x.startsWith(pre)); return !!k && (await (await caches.open(k)).keys()).length>=n; }, [PRE, LA.files.filter(f=>f[3]!=='nosimd' && f[4]!==2).length], 120e3, 'Detailed held: the cache whole again');
         p=q; } }
     if(p.isClosed()){ p=await ctx.newPage(); await p.goto(origin+'/'); }
     /* (3) version C: a file that does not match its hash — the install must fail, the running version stays */
@@ -368,7 +368,7 @@ async function updateRows(dir){
   const bad=[], notes=[], miss=s=>bad.push(s), WORK=path.join(BUILD_DIR,'night-update'), A=path.join(WORK,'A'), B=path.join(WORK,'B'), CHANGED='apps/night/texts.js', MARK='NIGHT-14d smoke: version B';
   rmSync(WORK,{ recursive:true, force:true }); cpSync(dir,A,{ recursive:true }); cpSync(dir,B,{ recursive:true });
   appendFileSync(path.join(B,CHANGED),`\n/* ${MARK} */\n`); rehashPrecache(B);
-  const LA=readPrecache(A), LB=readPrecache(B), PRE='handsong-night-precache-', nAll=LA.files.filter(f=>f[3]!=='nosimd').length;
+  const LA=readPrecache(A), LB=readPrecache(B), PRE='handsong-night-precache-', nAll=LA.files.filter(f=>f[3]!=='nosimd' && f[4]!==2).length;
   const cur={ dir:A }, srv=http.createServer(async (q,r)=>{ let p=decodeURIComponent(new URL(q.url,'http://x').pathname); if(p.endsWith('/')) p+='index.html';
     try{ const b=await readFile(path.join(cur.dir,p)); r.writeHead(200,{ 'content-type':MIME[path.extname(p).toLowerCase()]||'application/octet-stream', 'cache-control':'no-store' }); r.end(b); }catch(e){ r.writeHead(404); r.end(); } });
   await new Promise(res=>srv.listen(0,'127.0.0.1',res)); const origin=`http://127.0.0.1:${srv.address().port}`;
@@ -471,7 +471,7 @@ async function precacheUrlRow(url, phone=false){
     notes.push(`first visit: HTTP ${r0 && r0.status()}${secret ? ' (protection bypass: a cookie set, as a login does)' : ''}`);
     const L=await p.evaluate(async ()=>{ const m=/^const PRECACHE=(\{.*\});/m.exec(await (await fetch('sw.js',{ cache:'no-store' })).text()); return m ? JSON.parse(m[1]) : null; }).catch(()=>null);
     if(!L){ miss('the deployed sw.js carries no precache list (a repository tree, or protection answered instead)'); throw STOP; }
-    const NAME='handsong-night-precache-'+L.version, nStart=L.files.filter(f=>!f[4] && f[3]!=='nosimd').length, nAll=L.files.filter(f=>f[3]!=='nosimd').length;
+    const NAME='handsong-night-precache-'+L.version, nStart=L.files.filter(f=>!f[4] && f[3]!=='nosimd').length, nAll=L.files.filter(f=>f[3]!=='nosimd' && f[4]!==2).length;   // RELEASE-1: stage 2 (on demand, RAIN-R1) is cached when first fetched, never by the top-up
     notes.push(`list ${L.version}: ${L.files.length} files, ${nStart} to start (with SIMD), ${nAll} in all`);
     let last='', lastAt=0, ok=false; const t1=Date.now(), ready=s=>!!(s.controlled && s.active==='activated' && (s.caches && s.caches[NAME]||0)>=nStart);
     while(Date.now()-t1<(phone ? PHONE.playMs : 300e3)){ const s=await state(p), shape=JSON.stringify({ ...s, caches:Object.keys(s.caches||{}) });

@@ -2177,6 +2177,13 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
     3. Head and tail lights sit on the car's ends; their light on the wet road fades out (no edge).
     4. The tram: two cream-and-red sections with the bellows between, the lit windows with people, the cab's dark windscreen and amber band, the pantograph to the wire (the spark now and then), its warm light on the street.
     5. Focus near (a hand close): the cars go soft like the street (no stripes, no ghost copies); a car passing behind a trunk or a lamp post is hidden by it.
+192. RELEASE-1 stage C: smooth cars, no car through another, the cat, the kerbs' streams, the inside-out umbrella (laptop, Detailed; `http://127.0.0.1:5500/apps/night/?room=rain`). Five checks:
+    1. Cars: rounded bodies (bonnet, windscreen, roof, rounded ends), glossy; wait for the taxi stopping at the kerb (every few minutes): passing cars go by it, never through it or a lamp post.
+    2. The cat: a lit window of the left row, low on the screen's left (a laptop; an upright phone does not show it) — a small dark cat sits, washes, walks along the sill, lies down, now and then goes in.
+    3. In rain (Evening boulevard, Late night): small glints running along both kerbs; After the rain fainter.
+    4. The effects hand's Wave up strongly for a minute: now and then an umbrella blows inside out, shakes and is put right; with a gentle Wave never.
+    5. The windows: things before the facade (people, the cat, cars, the awnings) now cover the lit windows behind them — nothing looks pasted wrong.
+193. RELEASE-1 night run — before the release: the founder's five checks are in `docs/night/HANDOFF.md` «Before the release» (the laptop by ear, the rain by eye with `?rain=gust`, hands in both rooms, the Poco's two measurements, night.handsong.app after the push with an offline second visit).
 ## Superseded at DOC1 (old lines verbatim, replaced in place above by a later slice)
 - NIGHT-2 stage 3 (2026-11-03, the rule of at most five manual checks) updated this line of CLAUDE.md's report format:
   probe verdict lines and fix rounds; what was left undone; docs found stale; the user's remaining steps (ear, camera, phone).

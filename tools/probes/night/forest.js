@@ -13,7 +13,7 @@
    the second time exactly as the first (closing the room is not a lost context). */
 import { row } from '../core/rows.js';
 import { cv } from '../../../core/palette.js';
-import { loadThree, setBackground, sceneInfo, setSceneLevel, sceneLevel, sceneRoomDbg, sceneSnapDbg, sceneProgramsDbg, sceneHeldDbg, sceneBedDbg, sceneClockDbg } from '../../../apps/night/scene/host.js';   // RUN 8: + the quality levels and the room (NIGHT forest picture)
+import { loadThree, setBackground, sceneInfo, setSceneLevel, sceneLevel, sceneRoomDbg, sceneSnapDbg, sceneProgramsDbg, sceneHeldDbg, sceneBedDbg, sceneClockDbg, sceneGuardDbg, setSceneLight } from '../../../apps/night/scene/host.js';   // RUN 8: + the quality levels and the room (NIGHT forest picture)
 import { buildForest as buildForest0, forestAssets, forestNewDbg, forestCullDbg } from '../../../apps/night/rooms/forest/forest.js';
 /* FULL CHECK (2026-11-17): the rows here count the forest's content — built without the cull (FOREST-2f's default: it re-packs the instance lists; its own row proves the frames the same) */
 const buildForest=(T, o)=>{ const c=forestCullDbg(); forestCullDbg(false); try{ return buildForest0(T, o); } finally { forestCullDbg(c); } };   // FULL CHECK (2026-11-17): forestNewDbg — the old rows build the forest they were written for
@@ -364,10 +364,11 @@ row({ night:true, at:1008.66, name:'FOREST rare events', run:()=>checkForestRare
    in the scene does make new programs. */
 export async function checkForestLevels(){
   const d=[]; let n=0; const miss=s=>d.push(s), notes=[];
-  const was=profileCurrent(), keepLevel=sceneLevel();
+  const was=profileCurrent(), keepLevel=sceneLevel(), light0=(()=>{ try{ return localStorage.getItem('handsong.nightLight')==='1'; }catch(e){ return false; } })();
   try{
     const why=profileApply('profile.night'); n++; if(why){ miss('Night refused: '+why); return { cases:n, total:d.length, differences:d, notes }; }
     const dp=Math.min(devicePixelRatio||1, 1), WANT={ full:{ pr:0.85*dp, fps:60, shadow:true }, reduced:{ pr:0.6*dp, fps:30, shadow:false } };
+    setSceneLight(false); sceneGuardDbg({ sample:()=>({ fps:60, cap:60, det:30, cam:30 }), reset:true });   /* RELEASE-1: Light off (a weak GPU's first visit starts at Light: its forest at 0.75 of the pixels, PERF-4); and the levels' own law, the resolution guard held at its first step by steady samples (on the HD 4000 the Detailed forest's 15 fps stepped it down within a second: 0.6375 for 0.85) — the guard is «NIGHT pixel budget»'s */
     for(const lv of ['full','reduced','minimal']){
       await setBackground('dark'); await setSceneLevel(lv); await setBackground('forest'); const I0=sceneInfo(); await frames(3); const I=sceneInfo(); n+=2;
       if(lv==='minimal'){ if(I.webgl || I.contextsLive!==0) miss('low made a WebGL context'); notes.push('low: no WebGL (the 2D stand-in)'); continue; }
@@ -386,7 +387,7 @@ export async function checkForestLevels(){
     const T=globalThis.THREE; if(room && T){ const extra=new T.PointLight(0xffffff, 0.5, 3); room.scene.add(extra); await frames(3); const p2=sceneInfo().programs; room.scene.remove(extra); n++;
       if(!(p2>p1)) miss(`CONTROL: one more light made no new program (${p1} → ${p2}) — the recompile check cannot fail`); notes.push(`programs: ${p0} before the hands, ${p1} with them; CONTROL one more light ${p2}`); }
   } catch(e){ miss('error: '+(e&&e.stack||e)); }
-  finally{ try{ await setSceneLevel(keepLevel); }catch(e){} if(profileCurrent()!==was) profileApply(was); await setBackground('camera'); await sleep(30); }
+  finally{ try{ sceneGuardDbg({ sample:null, reset:true }); }catch(e){} try{ setSceneLight(light0); }catch(e){} try{ await setSceneLevel(keepLevel); }catch(e){} if(profileCurrent()!==was) profileApply(was); await setBackground('camera'); await sleep(30); }
   return { cases:n, total:d.length, differences:d, notes };
 }
 row({ night:true, at:1008.68, name:'FOREST levels', drawn:true, run:()=>checkForestLevels(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });

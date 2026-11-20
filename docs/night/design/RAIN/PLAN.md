@@ -270,12 +270,12 @@ Each slice is one run for Opus at high effort. Each ends with something to look 
 | Balconies and life in windows | done | the bake (balconies); `pure/windows.js` TV flicker, curtain, walk-up, on/off; `far.js` attic |
 | Cafés and terraces | done | `life.js` tables, sitters, waiter, bunting; `rain.js` string lights, awning fringes |
 | The street not ending at the frame edge | done | `pure/city.js` BEND, 1.6 km |
-| Cinematic cars | done (shape and pool fixed RAIN-10) | `LIFE_F` kind 24, `rain.js` lights and pools |
-| The tram | done RAIN-10 (a lit box in perspective) | `rain-glass.js TRAM_V/TRAM_F`, `rain.js tramUpload` |
+| Cinematic cars | done; RELEASE-1 B/C: in 3D through the camera's law, smooth shells, no car through another | `pure/vehmesh.js`, `rain-glass.js VEH_V/VEH_F`, `rain.js vehUpload / carsPass` |
+| The tram | done; RELEASE-1 B: two sections in 3D, pantograph, spark at its head | `pure/vehmesh.js tramMesh` (RAIN-10's box: `archive/rain-tram-box-RAIN10.js`) |
 | ★ rain seen in the lamps' light | done | light kind 3 (RAIN-7) |
 | splashes on asphalt and in puddles | partly — rings in puddles, splashes where cars cross road puddles | `life.js` ring, splash |
 | water off awnings, balconies, cornices | partly — the cornice's drips by the pane | `rain.js` drips (RAIN-3) |
-| overflowing gutters, rivulets along the kerb | not done | — |
+| overflowing gutters, rivulets along the kerb | done RELEASE-1 C — glints running along both kerbs, with the rain (fainter after it) | `life.js streamsAt`, `LIFE_F` kind 30 |
 | reflections trembling as cars pass | not done | — |
 | ★ headlights sweeping the facades | done | `vehicles.js sweepAt` |
 | ★ the pharmacy cross animated | done | `LIFE_F` sign kind |
@@ -284,15 +284,30 @@ Each slice is one run for Opus at high effort. Each ends with something to look 
 | ★ crowns sway, falling leaves (more with Wave) | done | `VIEW_F` uTree (RAIN-9), `life.js` leaves |
 | awnings and flags moving | done | kind 27 fringes, bunting |
 | chimney smoke drifting | not done (steam at street level only) | `life.js` steam |
-| a gust turning an umbrella inside out | not done | — |
+| a gust turning an umbrella inside out | done RELEASE-1 C — only with a strong Wave, now and then; it shakes and is put right | `life.js gustFlip`, `LIFE_F dome()` |
 | ★ the street musician | dropped by the founder's decision (RAIN-9: no visible near place; his notes stay) | `archive/rain-busker-RAIN7-9.js` |
 | children jumping in puddles after the rain | not done | — |
 | a couple dancing under one umbrella | not done (couples walk) | — |
 | sweeper, courier, someone with a torch | partly — the delivery scooter (rare) | `far.js` scooter |
 | shops closing late: shutters, signs going out | partly — one shutter down at Late night; windows go out with the sleep timer | kind 28, `pure/sleep.js` |
-| a cat on a sill | partly — a cat on the pavement at Late night | `life.js` cat |
+| a cat on a sill | done RELEASE-1 C — on a lit window of the left row (laptop screens; not in an upright phone's crop): sits and watches, washes, walks, lies, goes in | `life.js catAt`, `LIFE_F` kind 29 |
 | a balcony door opening, a rug shaken out | not done | — |
 | ★ our own window (sill, tea, plant, frame) | dropped by the founder's decision (RAIN-8) | `archive/rain-frame-RAIN7.js` |
+
+## 5d. AFTER RELEASE (RELEASE-1 stage C, 2026-11-19) — what is left of the wishes, for after Night goes public
+Not built, kept for later, in no particular order:
+- Reflections in the wet asphalt trembling as cars pass (the baked reflections are still pictures).
+- Water running off awnings, balconies and cornices (only the cornice's drips by the pane today); splashes on the asphalt beyond the road's puddles.
+- A dot ticker without text on a shop; more signs blinking, one with a failing lamp as a standing state (today a rare flicker).
+- Chimney smoke drifting over the roofs (steam only at street level).
+- Children jumping in puddles after the rain; a couple dancing under one umbrella (rare).
+- A street sweeper machine, someone with a torch (the delivery scooter exists).
+- Shops closing late: more shutters coming down and signs going out one by one (one shutter today).
+- A balcony door opening, someone shaking out a rug.
+- A cat that an upright phone sees too (every lit window in a phone's crop is 68 m or more away: a cat there would be 3 px).
+- Pedestrians crossing at the crossing when their light is green (they would need a side view of the walk).
+- Vehicles: brake lights and indicators as a car slows for the taxi; a car's wipers; the bus's lit interior with people.
+- People seen from above in true 3D (today 2D figures drawn for the angle we look down at them: RELEASE-1 A).
 
 ## 6. Cost per item
 

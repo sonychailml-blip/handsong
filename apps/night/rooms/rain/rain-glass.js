@@ -8,6 +8,7 @@
 import { WEAR } from './pure/life.js';   // RELEASE-1 (A): the clothes' palettes (LIFE_F's tables)
 import { DEPTH, BEND, LAMP_ROWS, STREET } from './pure/city.js';   // RELEASE-1 (B): the vehicles' shader carries the camera's law, the depth law and the lamps
 import { VEH_PAINT, TAXI_PAINT, VEH3 } from './pure/vehmesh.js';
+import { VEH } from './pure/vehicles.js';
 export const QUAD_V=`varying vec2 vUv; void main(){ vUv=uv; gl_Position=vec4(position.xy, 0., 1.); }`;
 /* a 9-tap Gaussian along uDir (two taps read between texels, so five reads) */
 /* RELEASE-1 (B): the coverage blurred with the colour (the vehicles' premultiplied layers share this program: one shader fewer); every reader of the
@@ -49,6 +50,7 @@ vec3 skyOver(vec3 c, vec2 p, float r){ if(uSkyA.w<0.5) return c; float hgt=clamp
   return c; }`;
 export const VIEW_F=`precision highp float; uniform sampler2D uBase, uL1, uL2, uL3, uDepth; uniform vec3 uRad; uniform vec4 uFoc; uniform vec2 uTan; uniform vec3 uLight, uLightCol; varying vec2 vUv;
 uniform vec2 uStreak; uniform float uTime;   /* RAIN-6: the falling streaks (Echo, Wave: amount, slant) */
+uniform vec4 uRip[6]; uniform float uRipD[6];   /* RELEASE-1 (night): the wet road's reflections tremble round a passing vehicle — its ground spot (view units), its size, strength; its depth */
 uniform sampler2D uTree; uniform vec2 uCExt, uTreeN; uniform float uSway;   /* RAIN-7: the crowns' mask (bake space) and how far they sway (view units; 0: still); RAIN-9: uTree — each cell's tree and the mask (a), uTreeN its size */
 ${RAD}
 ${SKY_GLSL}
@@ -62,6 +64,9 @@ void main(){ vec2 uv=vUv; if(uSway>0.){ vec2 pp=(vUv*2.-1.)*uTan, cq=clamp(pp/uC
       float bend=st*(0.45*sin(uTime*w+ph+2.4*cl)+0.25*sin(uTime*w*2.3+ph*1.7+3.*cl2)+1.4*g)*(0.55+0.9*cl);
       vec2 fl=vec2(vn(pp*140.+vec2(uTime*1.9, 0.))-0.5, vn(pp*140.+vec2(3.1, uTime*1.6))-0.5)*(0.5+2.2*g);
       vec2 o=uSway*m*hgt*(vec2(bend, 0.18*bend)+fl*1.2); uv+=o/uTan*0.5; } }
+  { vec2 pp=(vUv*2.-1.)*uTan; float d0=texture2D(uDepth, vUv).a;   /* RELEASE-1 (night): only the road's own pixels near the vehicle (its depth): the lamps' bright reflections wobble, the dark asphalt hardly shows it */
+    for(int k=0;k<6;k++){ vec4 R6=uRip[k]; if(R6.w<=0.) continue; vec2 d=(pp-R6.xy)/vec2(R6.z*1.7, R6.z*2.4); float e=dot(d, d); if(e>=1. || abs(d0-uRipD[k])>0.06) continue;
+      float a=R6.w*(1.-e)*(1.-e); uv.x+=(sin(pp.y*900.+uTime*14.+float(k)*1.7)*0.6+sin(pp.y*2300.-uTime*21.)*0.4)*a*R6.z*0.03/uTan.x*0.5; } }
   float dep=texture2D(uDepth, uv).a, r=radAt(dep);   /* the depth rides in the picture's alpha */
   vec3 c0=texture2D(uBase, uv).rgb, c1=texture2D(uL1, uv).rgb, c2=texture2D(uL2, uv).rgb, c3=texture2D(uL3, uv).rgb, c;
   if(r<uRad.x) c=mix(c0, c1, r/uRad.x); else if(r<uRad.y) c=mix(c1, c2, (r-uRad.x)/(uRad.y-uRad.x)); else c=mix(c2, c3, clamp((r-uRad.y)/(uRad.z-uRad.y), 0., 1.));
@@ -226,6 +231,7 @@ uniform vec3 uGarA, uGarB, uGarC, uGarD, uSign, uSignWarm, uCross, uWalkR, uWalk
 uniform float uHalves;   // RELEASE-1 (B): the probes' halves
 float el(vec2 p, vec2 c, vec2 r){ return (length((p-c)/r)-1.)*min(r.x, r.y*2.); }
 float seg(vec2 p, vec2 a, vec2 b, float w){ vec2 e=b-a, q=p-a; float t=clamp(dot(q, e)/dot(e, e), 0., 1.); return length(q-e*t)-w; }
+float elm(vec2 p, vec2 c, vec2 r){ return (length((p-c)/r)-1.)*min(r.x, r.y); }   /* RELEASE-1 (C): an ellipse in metres (the cat) */
 /* RAIN-5c: a person seen from the front or the back (the street runs away from us) at ox: the swinging leg's foot lifts (heel, then toe), the hips
    sway over the standing leg, the body bobs twice a step, the arms swing against the legs (the one forward looks shorter); with an umbrella one arm
    holds its handle steady at the middle. st 1 = standing; bend = a stoop; sw = the swing's size.
@@ -272,8 +278,11 @@ vec2 tilt(vec2 p, float y, float k){ if(uWind<=0.) return p; float a=-uWind*(0.3
    a·(width unit / height unit)·sin(look-down angle) (gV.z); the dome rises over it by 0.17·cos (a side view: RAIN-5's half dome; from high above: an oval
    that hides the head). Eight ribs from the top to the rim (each point placed on the cone between them: cRib, the panel's parity cPan for the golf
    umbrellas, cT how far out), the rim's shade (cRim), the shaft from the hand (cHand) and the ferrule. gRtL: the width unit's ratio in this canopy's frame */
-float cRib=0., cRim=0., cPan=0., cHand=1e3, cTo=0., cSp=0.; vec2 cDQ=vec2(0.); float gRtL=0.25;
+float cRib=0., cRim=0., cPan=0., cHand=1e3, cTo=0., cSp=0., cFlip=0.; vec2 cDQ=vec2(0.); float gRtL=0.25;   /* cFlip: inside out 0…1 (RELEASE-1 (C)) */
 float dome(vec2 p, float ox, float w, float y){ float sE=clamp(gV.z, 0., 0.98), cE=sqrt(1.-sE*sE), a=w*0.9, dn=a*gRtL*sE, up=0.17*cE+dn, hc=0.17*cE;
+  if(cFlip>0.003){ ox+=0.035*sin(uTime*23.)*cFlip; float X=(p.x-ox)/a, q=max(0., 1.-X*X), lift=0.3*cE*cFlip*X*X+0.12*sE*cFlip, yl=y+lift-dn*sqrt(q)-0.01, yu=y+lift+0.05*cE+dn*sqrt(q)+0.01;   /* INSIDE OUT: the rim blown up over the ferrule into a cup (its hollow seen), shaking */
+    float dc=max((abs(X)-1.)*a*0.5, max(yl-p.y, p.y-yu)*0.6); cRib=(1.-smoothstep(0.05, 0.14, abs(fract(X*2.+0.5)-0.5)))*0.6; cRim=0.; cPan=mod(floor(X*2.+2.), 2.); cTo=abs(X); cSp=-0.5; cDQ=vec2(X, 0.);
+    dc=min(dc, seg(p, vec2(ox, y-0.02), vec2(ox, y+lift+0.02), 0.016)); if(cHand<100.) dc=min(dc, seg(p, vec2(cHand, 0.85), vec2(ox, y+0.01), 0.018)); return dc; }
   float d= p.y>=y ? el(p, vec2(ox, y), vec2(a, max(up, 1e-3))) : dn>0.004 ? el(p, vec2(ox, y), vec2(a, dn)) : max(el(p, vec2(ox, y), vec2(a, 0.17)), (y-p.y)*0.6);
   float X=(p.x-ox)/a, Y=p.y-y-hc, A=hc*hc-dn*dn, B=2.*Y*hc, C=Y*Y+X*X*dn*dn, t;   /* the cone: (X/t)² + ((Y + hc·t)/(dn·t))² = 1 */
   if(abs(A)<1e-6) t= abs(B)>1e-6 ? -C/B : 1.; else { float D=max(B*B-4.*A*C, 0.), t1=(-B+sqrt(D))/(2.*A), t2=(-B-sqrt(D))/(2.*A); t= t1>=0. && t1<=1.2 ? t1 : t2; }
@@ -309,14 +318,14 @@ void gear(vec2 p, float acc, float face, float ph, inout float d){ if(acc<0.5) r
   if(acc>5.5 && acc<6.5) gA=min(gA, el(p, vec2(0., 0.925), vec2(0.25, 0.055)));
   if(acc>6.5) gB=min(gB, min(el(p, vec2(-0.45-sw, 0.32+lift), vec2(0.15, 0.14)), seg(p, vec2(-0.45-sw, 0.42+lift), vec2(-0.4, 0.5), 0.02)));
   d=min(d, min(gA, gB)); }
-void main0(){ float k=floor(vK.x+0.5), ph=fract(vK.y), sub=floor(vK.y), face=mod(sub, 2.), xtra=floor(sub/2.), code=floor(vK.z+0.5), ci=mod(code, 8.), uk=mod(floor(code/8.), 8.), uci=mod(floor(code/64.), 4.), acc=floor(code/256.);
+void main0(){ float k=floor(vK.x+0.5), ph=fract(vK.y), sub=floor(vK.y), face=mod(sub, 2.), xtra=floor(sub/2.), code=floor(vK.z+0.5), ci=mod(code, 8.), uk=mod(floor(code/8.), 8.), uci=mod(floor(code/64.), 4.), acc=mod(floor(code/256.), 8.), flipU=floor(code/2048.)/15.;   /* RELEASE-1 (C): the gust's inside-out umbrella (its progress) */
   vec2 p=vQ; if(k<2.5 || (k>13.5 && k<18.5)) p.y*=1.15;   /* RAIN-5c: a person's quad reaches 15 % over the head (rain.js): the umbrella fits */
   float d=1., du=1., da=1., light=0., clear=0., uy=0.9, uw=1., ux=0.012*sin(ph*6.2832), lamp=0.; vec3 lampC=vec3(0.), glowC=vec3(0.);
   float hasU= uk<3.5 ? 1. : 0., wc=floor(vW.x+0.5); gV=vV; gRt=max(vRt, 0.02); gRtL=gRt; gFace=face; gStyle=mod(floor(wc/32768.), 4.); gHs=mod(floor(wc/131072.), 4.);   /* RELEASE-1 (A): the wear's style and hair style */
   if(k<0.5 || (k>14.5 && k<15.5) || (k>15.5 && k<16.5)){ float st= k>15.5 ? 1. : 0., bend= k>14.5 && k<15.5 ? 0.25 : 0.;
     d=person(p, 0., ph, k>14.5 && k<15.5 ? 0.06 : 0.1, st, bend, hasU*(1.-st));
     if(k>15.5 && ph<0.3){ gB=min(gB, el(p, vec2(0.22, 0.74), vec2(0.1, 0.05))); d=min(d, gB); lamp=exp(-dot((p-vec2(0.22, 0.74))/vec2(0.1, 0.05), (p-vec2(0.22, 0.74))/vec2(0.1, 0.05))*1.5)*0.35; lampC=vec3(0.55, 0.66, 0.9); }   /* the phone held up, its screen lit */
-    cHand= st>0.5 ? 1e3 : 0.04;
+    cHand= st>0.5 ? 1e3 : 0.04; cFlip= flipU>0. ? smoothstep(0., 0.12, flipU)*(1.-smoothstep(0.72, 0.95, flipU)) : 0.;   /* RELEASE-1 (C): over, shaken, put right */
     if(uk<1.5 || uk>2.5 && uk<3.5){ uw= uk>2.5 ? 1.4 : 1.; du=dome(tilt(p, uy, ci+uk*3.), ux, uw, uy); } else if(uk>1.5 && uk<2.5){ du=dome(tilt(p, uy, ci+uk*3.), ux, 1., uy); clear=1.; }
     else if(uk>3.5 && uk<4.5){ float hd=el(p, vec2(0., 0.88), vec2(0.32, 0.09)); if(face>0.5) hd=max(hd, -el(p, vec2(0., 0.862), vec2(0.17, 0.052))); gA=min(gA, hd); d=min(d, hd); }   /* a hood (its opening shows the face) */
     else if(uk>4.5 && uk<5.5){ gN=min(gN, seg(p, vec2(-0.52, 0.97), vec2(0.52, 0.97), 0.03)); d=min(d, gN); }   /* a newspaper over the head */
@@ -338,6 +347,24 @@ void main0(){ float k=floor(vK.x+0.5), ph=fract(vK.y), sub=floor(vK.y), face=mod
     d=min(d, seg(p, vec2(-0.47, 0.6), vec2(0.47, 0.6), 0.025));
     if(face>0.5){ lamp=exp(-dot(p-vec2(0., 0.56), p-vec2(0., 0.56))/0.006); lampC=uHead; } else { lamp=exp(-dot(p-vec2(0., 0.44), p-vec2(0., 0.44))/0.005)*xtra; lampC=uNavR; } }
   else if(k<4.5){ d=person(p, 0., ph, 0.22, 0., 0.1, 0.); }
+  else if(k>28.5 && k<29.5){   /* RELEASE-1 (C): THE CAT ON THE SILL of a lit window — a dark silhouette rimmed by the room's light behind it; c: state (0 sit, 1 wash, 2 walk,
+       3 lie) + 4 facing left; ph: its progress, + 4 × (look + 1) (where it looks). The sprite: drawn 1.4 × a real cat (0.6 × 0.44 m of shapes over a sprite
+       the room sizes 0.84 × 0.62 m) so it reads at a window's few pixels; the sill 0.1 m (shapes) above its foot */
+    float sw=clamp(vSoft, 0.02, 0.6)*0.44, win=winOf()*mix(1., vFade, uWin), st=mod(code, 4.), dr= code>3.5 ? -1. : 1., u=fract(vK.y), lk=floor(vK.y)/4.-1.; vec2 m=vec2(p.x*0.3, p.y*0.44-0.1); float d=1e3, eye=0.;
+    if(st<1.5){ float wash= st>0.5 ? 1. : 0., bob=wash*0.007*sin(u*90.); vec2 hc=vec2(lk*0.022+wash*0.012, 0.245+bob);
+      d=min(elm(m, vec2(0., 0.075), vec2(0.085, 0.075)), elm(m, vec2(0., 0.14), vec2(0.058, 0.1))); d=min(d, length(m-hc)-0.05);
+      d=min(d, min(elm(m, hc+vec2(-0.03, 0.043), vec2(0.015, 0.024)), elm(m, hc+vec2(0.03, 0.043), vec2(0.015, 0.024))));
+      d=min(d, min(seg(m, vec2(0.07, 0.02), vec2(0.165, 0.008), 0.012), seg(m, vec2(0.165, 0.008), vec2(0.19, 0.045), 0.011)));
+      if(wash>0.5) d=min(d, seg(m, vec2(0.025, 0.13), hc+vec2(0.032, -0.022), 0.014));
+      eye=(1.-wash)*(1.-smoothstep(0.4, 0.8, abs(lk)))*step(0.06, fract(u*7.3))*(1.-smoothstep(0.004, 0.009, min(length(m-hc-vec2(-0.019, 0.006)), length(m-hc-vec2(0.019, 0.006))))); }
+    else if(st<2.5){ float g=u*22.; vec2 hc=vec2(dr*0.16, 0.17); d=min(elm(m, vec2(0., 0.12), vec2(0.14, 0.055)), length(m-hc)-0.044);
+      d=min(d, min(elm(m, hc+vec2(dr*0.012, 0.042), vec2(0.013, 0.022)), elm(m, hc+vec2(-dr*0.02, 0.038), vec2(0.013, 0.022))));
+      for(int j=0;j<4;j++){ float fj=float(j), lx=(fj<1.5 ? 0.09 : -0.09)+(mod(fj, 2.)<0.5 ? 0.012 : -0.012), sg= mod(fj+floor(fj/2.), 2.)<0.5 ? 1. : -1.; d=min(d, seg(m, vec2(lx, 0.09), vec2(lx+dr*0.025*sin(g)*sg, 0.004), 0.011)); }
+      d=min(d, min(seg(m, vec2(-dr*0.13, 0.13), vec2(-dr*0.19, 0.2), 0.012), seg(m, vec2(-dr*0.19, 0.2), vec2(-dr*0.17, 0.26), 0.011))); }
+    else { vec2 hc=vec2(dr*0.12, 0.115); d=min(elm(m, vec2(0., 0.068), vec2(0.14, 0.066)), length(m-hc)-0.046);
+      d=min(d, min(elm(m, hc+vec2(dr*0.012, 0.043), vec2(0.013, 0.022)), elm(m, hc+vec2(-dr*0.02, 0.04), vec2(0.013, 0.022)))); d=min(d, seg(m, vec2(-dr*0.13, 0.016), vec2(dr*0.08, 0.008), 0.012)); }
+    float cov=smoothstep(sw, -sw, d), rim=smoothstep(-sw*1.8, -sw*0.4, d)*(1.-smoothstep(-sw*0.4, sw, d));
+    vec3 c=vec3(0.018, 0.016, 0.018)+vec3(1., 0.7, 0.4)*rim*0.1+vec3(0.6, 0.66, 0.26)*eye*1.4; float al=max(cov, eye)*win*vK.w; gl_FragColor=vec4(c*al, al); return; }
   else if(k>26.5){   /* RAIN-6b: things on the facade opposite, drawn in its plane (the sprite spans their width along it; sub = its slope's step) —
        27 a café awning's scalloped fringe fluttering in Wave's wind; 28 a shop's roller shutter, half down (ph = how far down), at Late night all the way */
     float sw=clamp(vSoft, 0.02, 0.6), win=winOf()*mix(1., vFade, uWin), kk=sub/16.-0.5, yy=p.y-kk*p.x;
@@ -432,7 +459,8 @@ void main0(){ float k=floor(vK.x+0.5), ph=fract(vK.y), sub=floor(vK.y), face=mod
   else if(k>8.5 && k<9.5) body= ci<0.5 ? vec3(0.1, 0.06, 0.03) : vec3(0.32, 0.31, 0.29);
   else if(k>2.5 && k<3.5 || k>4.5 && k<5.5 || k>22.5) body=oc*0.75*litBy(p.y);   /* the cyclist, the seated, the rider: in their coat */
   else body=vec3(0.025, 0.022, 0.03);
-  vec3 U= uk<0.5 ? vec3(0.05, 0.05, 0.06) : uk>2.5 && uk<3.5 ? mix(wUmb(uci), vec3(0.78, 0.78, 0.76), cPan) : uk>1.5 && uk<2.5 ? vec3(0.72, 0.74, 0.78) : wUmb(uci);   /* a golf umbrella's panels alternate */
+  vec3 U0= uk<0.5 ? vec3(0.05, 0.05, 0.06) : uk>2.5 && uk<3.5 ? mix(wUmb(uci), vec3(0.78, 0.78, 0.76), cPan) : uk>1.5 && uk<2.5 ? vec3(0.72, 0.74, 0.78) : wUmb(uci);   /* a golf umbrella's panels alternate */
+  vec3 U=U0*(1.-0.45*cFlip);   /* inside out: its underside, darker */
   U=U*litBy(1.)*(1.-0.45*cRib*pc)*(1.-0.3*cRim*pc)*(0.85+0.15*cSp)+lampTone(uLampC)*(vW.y*0.6+0.06)*exp(-pow((cTo-0.45)/0.25, 2.))*smoothstep(-0.2, 0.8, cSp)*smoothstep(0.2, -0.6, cDQ.x)*0.35*pc;   /* the ribs, the rim's shade, the wet top's sheen (the far upper side) */
   float ua= clear>0.5 ? 0.35 : 1.; vec3 col=mix(body, wAcc(mod(uci+2., 8.))*litBy(p.y), ma); col=mix(col, U, mu*ua);   /* RELEASE-1 (A): seen from above, the canopy hides the head (it showed through at 40 %) */ float a=max(max(m, ma), mu*ua)*vK.w;
   col=col*a+lampC*lamp*1.6*win*fade*vK.w;
@@ -465,9 +493,11 @@ void main(){ float dir=aPlace.z>=0. ? 1. : -1., L=aPlace.w; vec3 w=vec3(aPlace.x
   float n=1., f=3000.; gl_Position=vec4((xc+j.x*zc)/uTan.x, (yc+j.y*zc)/uTan.y, zc*(f+n)/(f-n)-2.*f*n/(f-n), zc); if(uHalves>0.5 && abs(aPart-9.)>0.5) gl_Position=vec4(2., 2., 2., 1.); }`;
 const LAMPS_GLSL=LAMP_ROWS.map(([x, ph, y])=>`{ float z0=${glf(8+ph*STREET.lampEvery)}, k=floor((P.z-z0)/${glf(STREET.lampEvery)}); for(int j=0;j<2;j++){ vec3 l=vec3(${glf(x)}, ${glf(y)}, z0+(k+float(j))*${glf(STREET.lampEvery)})-P; float d2=dot(l, l); l*=inversesqrt(d2); float a=1./(1.+d2*0.016); d+=a*max(dot(N, l), 0.); sp+=a*pow(max(dot(N, normalize(l+V)), 0.), sh); } }`).join(' ');
 export const VEH_F=`precision highp float; varying vec3 vLoc, vNl, vN, vW; varying float vPart, vDep; varying vec4 vLook, vPlace, vMore; varying vec2 vTrue;
-uniform vec3 uCamP, uAmb, uLampC, uHead, uTail, uHoney, uAmber; uniform float uLamp, uW, uOccl, uHalves, uTime; uniform sampler2D uDepthMap; uniform vec2 uExt;
+uniform vec3 uCamP, uAmb, uLampC, uHead, uTail, uHoney, uAmber; uniform float uLamp, uW, uOccl, uHalves, uTime, uStream; uniform sampler2D uDepthMap; uniform vec2 uExt;
 vec3 lampTone(vec3 c){ if(uLamp==0.) return c; float L=dot(c, vec3(0.3, 0.5, 0.2)); return uLamp<0. ? mix(c, L*vec3(1.38, 0.8, 0.38)*0.82, -uLamp) : mix(c, L*vec3(0.92, 1.0, 1.12)*1.25, uLamp); }
 ${tabV('vPaint', VEH_PAINT)}
+vec3 cabOf(float t){ ${VEH.types.map((T, i)=>`if(t<${i}.5) return vec3(${glf(VEH3.shape[i].belt*T.h)}, ${glf((VEH3.shape[i].rr+VEH3.shape[i].rf)/2*T.len)}, ${glf(VEH3.shape[i].rf*T.len)}); `).join('')}return vec3(9.); }   /* RELEASE-1 (C): each type's beltline, B-pillar and windscreen top */
+vec3 cabZ(float t){ ${VEH.types.map((T, i)=>`if(t<${i}.5) return vec3(${glf(Math.max(0.02, VEH3.shape[i].rb)*T.len)}, ${glf(VEH3.shape[i].rr*T.len)}, ${glf(VEH3.shape[i].ws*T.len)}); `).join('')}return vec3(-9.); }   /* RELEASE-1 (night): the rear window's base, the roof's rear, the windscreen's base (along the car, from its tail) */
 float h1(float n){ return fract(sin(n*127.1)*43758.5453); }
 float bx(vec2 p, vec2 a, vec2 b, float w){ vec2 s=smoothstep(a-w, a+w, p)*(1.-smoothstep(b-w, b+w, p)); return s.x*s.y; }
 /* the street lamps' light at P (normal N, towards the eye V): the two nearest of each row; sp their highlight (shininess sh) */
@@ -476,16 +506,24 @@ void main(){ vec3 N=normalize(vN), V=normalize(uCamP-vW), lc=lampTone(uLampC); f
   float fr=0.04+0.96*pow(1.-max(dot(N, V), 0.), 5.), sp, df=lampsAt(vW, N, V, part>0.5 && part<1.5 ? 140. : 60., sp);
   vec3 sky=mix(uAmb*0.12+vec3(0.012, 0.014, 0.022), uAmb*0.32, 0.5-0.5*N.y), amb=mix(uAmb*0.34, uAmb*0.24+vec3(0.02, 0.022, 0.03), smoothstep(-0.2, 0.9, N.y));   /* the city's night glow on what faces up, the lit wet street's warmer glow from below and the sides */
   vec3 col=vec3(0.); float al=1.;
+  /* RELEASE-1 (night): the shell's GLASS by its place on the car, not its slope (the smooth shading made part of the windscreen read as bonnet: the taxi's
+     yellow windscreen): above the beltline, the rear window [rear base … roof's rear], the side windows [roof's rear … roof's front] on the sides (the roof
+     between them paint), the windscreen [roof's front … its base]; the pillars between the panes paint */
+  vec3 cab=cabOf(ty), cz=cabZ(ty); float above=step(cab.x+0.035, y), side=step(0.42, abs(vNl.x)), gls=0.;
+  if(part<0.5 && ty<6.5 && above>0.5){ if(s>=cz.x && s<cz.y) gls=1.; else if(s>=cz.y && s<cab.z) gls=side; else if(s>=cab.z && s<cz.z) gls=1.;
+    if(side>0.5 && ty<5.5 && (abs(s-cab.y)<0.06 || abs(s-cz.y)<0.05 || abs(s-cab.z)<0.05)) gls=0.; }   /* the B-, C- and A-pillars */
+  if(gls>0.5) part=1.;
   if(part<0.5 || (part>0.5 && part<1.5 && N.y>0.8)){   /* PAINT, wet: its colour in the lamps' light, a clear coat's highlights and the sky in it */
     vec3 alb= ty>3.5 && ty<4.5 ? ${hexV(TAXI_PAINT)} : ty>5.5 && N.y>0.8 ? vec3(0.6, 0.61, 0.62) : vPaint(floor(vLook.x+0.5));   /* a bus's roof light grey */
     col=alb*(amb+lc*df*0.85)+lc*sp*(0.35+0.9*fr)+sky*fr*0.9;
     if(abs(vNl.z)>0.55 && part<0.5){ float front=step(0., vNl.z), lx=vLook.z, ly=vLook.w, lmp=bx(vec2(ax, y), vec2(lx-0.17, ly-0.08), vec2(lx+0.13, ly+0.08), 0.015);   /* the lamps on the ends: white ahead, red behind; a dark grille, a pale plate */
       col=mix(col, vec3(0.025), front*bx(vec2(ax, y), vec2(0., ly-0.16), vec2(lx-0.24, ly+0.05), 0.02)); col=mix(col, vec3(0.28, 0.28, 0.26)*(amb+lc*df), bx(vec2(ax, y), vec2(0., ly-0.27), vec2(0.26, ly-0.15), 0.01));
-      col=mix(col, front>0.5 ? uHead*1.7 : uTail*1.25, lmp); } }
+      col=mix(col, front>0.5 ? uHead*1.7 : uTail*1.25*(1.+1.4*step(1.5, vMore.y)), lmp); } }   /* braking: the tail lamps brighter */
   else if(part<1.5){   /* GLASS: dark, the sky and the lamps mirrored in it; a lit cabin (a bus, a taxi's open door) glows warm */
-    float lit= ty>5.5 ? 1. : vMore.y; col=vec3(0.012, 0.014, 0.018)+sky*fr*1.6+lc*sp*1.4*(0.3+fr)+uHoney*0.5*lit*smoothstep(0.3, 0.6, abs(N.x));
+    float lit= ty>5.5 ? 1. : mod(vMore.y, 2.); col=vec3(0.012, 0.014, 0.018)+sky*fr*1.6+lc*sp*1.4*(0.3+fr)+uHoney*0.5*lit*smoothstep(0.3, 0.6, abs(N.x));
     if(ty>5.5 && abs(vNl.x)>0.5){ float m=fract(s/1.25); col=mix(col, vPaint(floor(vLook.x+0.5))*(amb+lc*df), 1.-smoothstep(0.05, 0.05+fw, min(m, 1.-m))); } }   /* a bus's window posts */
   else if(part<2.5) col=vec3(0.02)*(1.+amb*4.)+lc*sp*0.08;   /* tyres */
+  else if(part<3.5) col=vec3(0.3, 0.31, 0.33)*(amb+lc*df*0.8)+lc*sp*0.6;   /* RELEASE-1 (C): the wheels' light rims */
   else if(part<5.5) col=vec3(0.03)*(1.+amb*3.)+lc*sp*0.1;   /* trim, bogies */
   else if(part<6.5) col=uAmber*(0.9+0.25*smoothstep(0.5, 1., N.y));   /* the taxi's lit roof sign */
   else if(part<9.5){ float r=max(ax/max(vMore.z+0.35, 0.1), abs(s-L*0.5)/(L*0.5+0.35)); al=0.55*(1.-smoothstep(0.55, 1., r)); col=vec3(0.); }   /* the soft shadow under it */
@@ -506,6 +544,9 @@ void main(){ vec3 N=normalize(vN), V=normalize(uCamP-vW), lc=lampTone(uLampC); f
       col=mix(col, front>0.5 ? uHead*1.8 : uTail*1.3, bx(vec2(ax, y), vec2(0.66, 0.78), vec2(1.0, 1.0), 0.02)); } }
   else if(part<11.5){ float m=fract(s*6.); col=vec3(0.035)*(0.7+0.6*smoothstep(0.2, 0.5, m)*(1.-smoothstep(0.5, 0.8, m)))*(1.+amb*3.); }   /* the bellows' folds */
   else if(part<12.5) col=vec3(0.035)+lc*sp*0.5+sky*fr*0.4;   /* the pantograph: dark metal, catching the lamps */
+  else if(part>13.5){   /* RELEASE-1 (C, night): A KERB'S STREAM — dark running water, the lamps mirrored sharp in it, highlights flowing along (uStream: the rain's strength) */
+    float e=1.-smoothstep(0.3, 0.5, abs(x)/max(vMore.z, 0.05)), fl=s+vPlace.y, w1=sin(fl*5.3-uTime*3.4+sin(fl*1.7)*2.)*0.5+0.5, w2=sin(fl*11.-uTime*6.1+x*9.)*0.5+0.5, glint=pow(w1*w2, 3.);
+    float sp2, d2=lampsAt(vW, vec3(0., 1., 0.), V, 420., sp2); col=vec3(0.012, 0.014, 0.018)+lc*sp2*2.6+lc*(0.08+d2*0.5)*glint*1.4+sky*0.4; al=e*uStream*(0.55+0.45*glint); }
   else col=vec3(0.32)*(amb+lc*df*0.8)+lc*sp*0.3;   /* roof equipment */
   if(uHalves>0.5){ col= s>L*0.5 ? vec3(1., 0., 0.) : vec3(0., 1., 0.); al=1.; }   /* the probes only: the body's FOOTPRINT on the road (its shadow quad, alone: VEH_V drops the rest) — its front half red, its rear half green */
   if(uOccl>0.5){ float bd=texture2D(uDepthMap, clamp(vTrue/uExt*0.5+0.5, 0., 1.)).r; al*=1.-smoothstep(0.012, 0.03, vDep-bd); }   /* the baked city's nearer things (a trunk, a crown, a lamp post) hide it */

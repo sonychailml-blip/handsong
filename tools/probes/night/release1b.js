@@ -13,7 +13,7 @@ export async function checkRelease1B(o={}){ const d=[], notes=[]; let n=0; const
   const PR=await import('../../../core/profile.js'), H=await import('../../../apps/night/scene/host.js'), RS=await import('../../../apps/night/roomswitch.js'), VM=await import('../../../apps/night/rooms/rain/pure/vehmesh.js'), V=await import('../../../apps/night/rooms/rain/pure/vehicles.js');
   const wait=ms=>new Promise(r=>setTimeout(r, ms)), R=()=>H.sceneRoomDbg(), st=()=>{ const r=R(); return r && r.state ? r.state() : null; };
   const frames=async (k, lim=20000)=>{ const f0=st() ? st().frames : 0, end=performance.now()+lim; while(performance.now()<end){ const s=st(); if(s && s.frames>=f0+k) return true; await wait(60); } return false; };
-  const lvl0=H.sceneLevel(), light0=(()=>{ try{ return localStorage.getItem('handsong.nightLight')==='1'; }catch(e){ return false; } })();
+  const was=PR.profileCurrent(), room0=H.sceneRoom(), bg0=H.backgroundOf(), lvl0=H.sceneLevel(), light0=(()=>{ try{ return localStorage.getItem('handsong.nightLight')==='1'; }catch(e){ return false; } })();
   try{
     if(PR.profileCurrent()!=='profile.night'){ const why=PR.profileApply('profile.night'); if(why){ ok('Night did not apply: '+why, false); return { cases:n, total:d.length, differences:d, notes }; } }
     if(H.sceneRoom()!=='room.rain') await RS.roomSwitch('room.rain', { fast:true }); await H.setBackground('forest');
@@ -55,6 +55,7 @@ export async function checkRelease1B(o={}){ const d=[], notes=[]; let n=0; const
         ok(`${tag}: a car at the focus is not sharp (levels ${A.join(' ')})`, A[0]>=1); ok(`${tag}: a car far from the focus is not blurred (levels ${B.join(' ')})`, B[1]+B[2]+B[3]>=1 && B[0]===0); notes.push(`${tag}: levels at the focus ${A.join(' ')}, far from it ${B.join(' ')}`); }
       Rm.trafficHoldDbg(null); Rm.lifeHoldDbg(null); }
   } catch(e){ ok('the row threw: '+String(e && e.stack || e).slice(0, 300), false); }
-  finally{ try{ const Rm=R(); if(Rm){ Rm.vehDbg({ mode:'mesh', halves:false, plant:null }); Rm.trafficHoldDbg(null); Rm.lifeHoldDbg(null); } }catch(e){} H.setSceneLight(light0); await H.setSceneLevel(lvl0).catch(()=>{}); }
+  finally{ try{ const Rm=R(); if(Rm){ Rm.vehDbg({ mode:'mesh', halves:false, plant:null }); Rm.trafficHoldDbg(null); Rm.lifeHoldDbg(null); } }catch(e){} H.setSceneLight(light0); await H.setSceneLevel(lvl0).catch(()=>{});
+    try{ if(H.sceneRoom()!==room0) await RS.roomSwitch(room0, { fast:true }); if(bg0) await H.setBackground(bg0); }catch(e){} if(PR.profileCurrent()!==was) PR.profileApply(was||'profile.full'); }   /* the room, its background and the profile back as found (the state guard: the rain's own timbres and mood left on) */
   return { cases:n, total:d.length, differences:d, notes }; }
 row({ at:1009.98762, night:true, name:'RELEASE-1 vehicles in 3D', drawn:true, run:()=>checkRelease1B(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });

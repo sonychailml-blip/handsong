@@ -322,9 +322,10 @@ async function measure(){
   const keep={ bg:backgroundOf(), level:sceneLevel(), light:load(KEY.light)==='1' }, i=timbreIdx('ld', D.timbre()), rows=[];
   const pb=()=>{ try{ return AC.playbackStats ? AC.playbackStats.underrunEvents : NaN; }catch(e){ return NaN; } };
   let k=0; const notes=setInterval(()=>{ const own='measure:'+(k%2); leadOn(own, 330*Math.pow(2,(k%5)/5), 0.6, i); setTimeout(()=>leadOff(own), 300); k++; }, 500);
-  const steps=[['dark', async()=>{ lightApply(false); await setBackground('dark'); }], ['forest high', async()=>{ await setSceneLevel('full'); await setBackground('forest'); }],
-    ['forest medium', async()=>{ await setSceneLevel('reduced'); }], ['forest medium, before NIGHT-6', async()=>{ sceneOptDbg({ lv:BEFORE_N6 }); await setSceneLevel('reduced'); }],
-    ['lighter forest', async()=>{ sceneOptDbg(null); await setSceneLevel('reduced'); lightApply(true); }]];
+  const rn= sceneRoom()==='room.rain' ? 'rain' : 'forest';   // RELEASE-1: the room open now is the one measured (its name in the lines; the forest's NIGHT-6 baseline only in the forest)
+  const steps=[['dark', async()=>{ lightApply(false); await setBackground('dark'); }], [rn+' high (Detailed)', async()=>{ await setSceneLevel('full'); await setBackground('forest'); }],
+    [rn+' medium (Standard)', async()=>{ await setSceneLevel('reduced'); }], ...(rn==='forest' ? [['forest medium, before NIGHT-6', async()=>{ sceneOptDbg({ lv:BEFORE_N6 }); await setSceneLevel('reduced'); }]] : []),
+    ['lighter '+rn+' (Light)', async()=>{ sceneOptDbg(null); await setSceneLevel('reduced'); lightApply(true); }]];
   try{
     out.hidden=false;
     for(let s=0;s<steps.length;s++){ out.textContent=t('night.measuring', { n:s+1, m:steps.length }); await steps[s][1](); await wait(3000);

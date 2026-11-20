@@ -496,8 +496,8 @@ RAIN-0: THE GLASS's law (pure, rule #36; data row «RAIN glass law (app)») — 
 
 ## apps/night/rooms/rain/pure/life.js
 RAIN-5 / RAIN-5b: LIFE ON THE STREET — who is out in the rain, as a pure seeded law of time (rule #36; data row «RAIN life law (app)»).
-- const (10): `LK`, `ACC`, `SIGNS`, `UMB`, `WEAR`, `WEAR_MIN`, `wearCode`, `wearParts`, `LIFE`, `PEOPLE`
-- fn (6): `wearFor`, `outfitOf`, `lifePeople`, `stayAt`, `lifeAt`, `lifeCyclists`
+- const (14): `LK`, `ACC`, `SIGNS`, `UMB`, `WEAR`, `WEAR_MIN`, `wearCode`, `wearParts`, `LIFE`, `CAT`, `STREAMS`, `streamK`, `GUST`, `PEOPLE`
+- fn (9): `wearFor`, `outfitOf`, `catAt`, `streamSegs`, `gustFlip`, `lifePeople`, `stayAt`, `lifeAt`, `lifeCyclists`
 
 ## apps/night/rooms/rain/pure/lofi/after-the-rain.js
 RAIN-4d: «After the rain» — warm lo-fi in C Mixolydian, 76 bpm, 16th swing 0.57.
@@ -550,7 +550,7 @@ RAIN-6b (1, 3): THE VEHICLES' BODIES and THE TAXI — a pure seeded law (rule #3
 ## apps/night/rooms/rain/pure/vehmesh.js
 RELEASE-1 (B): THE VEHICLES IN 3D — low-poly bodies as plain arrays (rule #36: pure, no Web Audio, no DOM, no WebGL): a car of each type (pure/vehicles.js VEH.types: sedan, hatchback, estate, small…
 - const (4): `VEH3`, `carLamps`, `VEH_PAINT`, `TAXI_PAINT`
-- fn (2): `carMesh`, `tramMesh`
+- fn (3): `carMesh`, `tramMesh`, `streamMesh`
 
 ## apps/night/rooms/rain/pure/windows.js
 RAIN-0: THE WINDOWS — their places, which one a note lights, and how a lit window fades (pure, rule #36; data rows «RAIN window pick (app)», «RAIN window fade (app)»).
@@ -1697,7 +1697,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 UI-1 — «NIGHT labels follow the room»: the founder entered the rain and the Sound button still read «Firefly» while another timbre played.
 - fn (1): `checkNightLabels`
 
-_337 modules, 3253 exported names._
+_337 modules, 3261 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 
