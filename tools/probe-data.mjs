@@ -704,7 +704,9 @@ async function busCore(){
 /* RUN 7 (C4b) → RUN 8: the depth → forest curve keeps the LOUDNESS (the user: depth changes the amount of forest, never the loudness): the dry
    part alone never drops more than 1.5 dB (dry ≥ 10^(−1.5/20) at every d — a struck note's loudness follows it), the forest's send rises
    (far ≥ 3× near), the room darkens; clamped outside 0…1; monotone; CONTROL: RUN 7's prototype curve (dry 1 − 0.55·d) must fail the floor.
-   The loudness itself is the browser row «NIGHT depth loudness». */
+   The loudness itself is the browser row «NIGHT depth loudness». CORE-28 (the founder: the far forest clearly heard, growing smoothly): the
+   send's rise in dB is even along the depth (each 1/20 step within ±5 % of the others) and near is exactly 0.5 / 1 / 8900 Hz as before;
+   CONTROL: RUN 8's straight line (0.5 + 2·d: 1.6 dB first step, 0.4 dB last) must fail the evenness. */
 async function nightDepthCore(){
   const d=[]; let n=0; const miss=s=>d.push(s);
   const D=await import(new URL('../core/pure/dsp.js', import.meta.url).href), f=D.nightDepth, FLOOR=Math.pow(10,-1.5/20);
@@ -713,6 +715,10 @@ async function nightDepthCore(){
   if(JSON.stringify([f(-1), f(2)])!==JSON.stringify([f(0), f(1)])) miss('not clamped outside 0…1');
   { let ok=true, p=f(0); for(let k=1;k<=100;k++){ const c=f(k/100); if(!(c.send>p.send && c.dry<p.dry && c.lp<p.lp)) ok=false; p=c; } n++; if(!ok) miss('the curve is not monotone'); }
   { const old=x=>({ dry:1-0.55*x }); n++; if(!([0,0.5,1].some(x=>!(old(x).dry>=FLOOR)))) miss('CONTROL: the RUN 7 prototype curve passed the dry floor — the check cannot fail'); }
+  const even=g=>{ const st=[]; for(let k=0;k<20;k++) st.push(20*Math.log10(g((k+1)/20)/g(k/20))); return Math.max(...st)<=1.05*Math.min(...st) && Math.min(...st)>0; };
+  n++; if(!even(x=>f(x).send)) miss('the forest does not grow evenly in dB along the depth');
+  n++; if(even(x=>0.5+2*x)) miss('CONTROL: the RUN 8 straight line passed the evenness — the check cannot fail');
+  n++; { const c=f(0); if(!(c.send===0.5 && c.dry===1 && c.lp===8900)) miss('near changed: '+JSON.stringify(c)); }
   return { cases:n, total:d.length, differences:d };
 }
 /* RUN 7 (C4c): the crickets' SEEDED schedule — the same seed gives the same chirps (exact); another seed differs (CONTROL); each chirp's gap

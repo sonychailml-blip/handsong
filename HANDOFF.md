@@ -4,7 +4,7 @@ Two apps, one engine. Rules: `CLAUDE.md`. Every run belongs to one track: `CORE-
 
 | Track | Folder | Read | Where it stands |
 |---|---|---|---|
-| **CORE** | `core/` | `docs/core/HANDOFF.md`, `BACKLOG.md`, `WORK-LOG.md` | Stage 3 foundation and `CORE-1`…`CORE-27` done, all opt-in (latest: the audio lab's buffer, search and tap, Night). |
+| **CORE** | `core/` | `docs/core/HANDOFF.md`, `BACKLOG.md`, `WORK-LOG.md` | Stage 3 foundation and `CORE-1`…`CORE-28` done (latest: Night's depth → a clearly heard forest). |
 | **FULL** | `apps/full/` | `docs/full/HANDOFF.md`, `BACKLOG.md`, `WORK-LOG.md`, `UI-MAP.md`, `UX-INVENTORY.md` | Waits for the first release. Next: stage 5 (saving, export, audio take, mixer) and the calibration screen. |
 | **NIGHT** | `apps/night/` | `docs/night/HANDOFF.md`, `BACKLOG.md`, `WORK-LOG.md`, `STAGE4-NIGHT-plan.md`, `QUALITY.md` | The first public release. **`RELEASE-1`** (stages A–G to the public release) — A–E done (190–193; timing fine, full check green); next: the founder pushes `night-release` (track handoff «Publishing»). Waiting for the user's steps 129, 145–190 (the track handoff lists them). The timing pass (stage D) and the full check (stage E) before `night-release`. Then steps 120–124, C8 rest, C10, C12. |
 | **SITE** | `apps/site/` | `docs/site/HANDOFF.md`, `WORK-LOG.md` | handsong.app, the brand site: `SITE-1` built, `SITE-2` Install → Space, `SITE-3` the demo at demo.handsong.app; waits for its Vercel project and DNS. |

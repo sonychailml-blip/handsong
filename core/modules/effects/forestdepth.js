@@ -22,8 +22,9 @@ const FDEPTH_PARAMS=freezeDeep([ {key:'mix', labelKey:'fx.fdepth.mix', short:'MI
   {key:'light', labelKey:'fx.fdepth.light', short:'LITE', unit:'', def:0, min:0, max:1, curve:'lin'} ]);
 /* the light room matched to the forest by measurement (RUN 8, the Medium room through «Forest depth»: the forest's tail falls 31 dB/s —
    T60 ≈ 1.9 s): RT60 = decayK × the room's length, the damping cut-off (the forest's noise IR is bright), the return's level (first try 1:
-   +1.7…+2.8 dB louder far → 0.56) */
-export const FDEPTH_LIGHT=Object.freeze({ decayK:1.4, tone:7000, trim:0.5 });
+   +1.7…+2.8 dB louder far → 0.56). CORE-28: the far send 2.5 → 8 made the light room +3.1 dB louder far (Firefly) → 0.33: every Night sound
+   within ±1.2 dB of the forest at ¼, ½ and far (measured) */
+export const FDEPTH_LIGHT=Object.freeze({ decayK:1.4, tone:7000, trim:0.33 });
 
 function makeForestDepthFx(E){
   const ac=E.ac, fxIn=ac.createGain(), fxOut=ac.createGain(); fxIn.gain.value=1; fxOut.gain.value=1;

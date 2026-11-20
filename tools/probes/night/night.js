@@ -585,7 +585,7 @@ row({ at:1009.87, night:true, name:'NIGHT bars and fireflies', drawn:true, run:(
    (2) VOICES — in low power a struck timbre rings at most 60 % of its cap (the Singing bowl 3 → 2, Firefly 8 → 5) — CONTROL: the same
        passage at full power rings 3 bowls;
    (3) THE LIGHT ROOM sounds like the forest — the K-like loudness of Firefly and Breath flute far and half way within ±1.5 dB of the
-       convolution room (measured +1.2 / +0.3 dB) — CONTROL: the light room with its return untrimmed (×2, +6 dB) leaves the band. */
+       convolution room (measured +1.2 / +0.3 dB) — CONTROL: the light room with its return untrimmed (×1/trim; CORE-28: trim 0.33) leaves the band. */
 export async function checkNightLowPower(){
   const d=[], notes=[]; let n=0; const miss=s=>d.push(s);
   const PR=await import('../../../core/profile.js'), ST=await import('../../../core/state.js'), A=await import('../../../core/audio.js'), D=await import('../../../apps/night/scene/host.js'), T=await import('../../../core/timbreload.js');
@@ -623,8 +623,9 @@ export async function checkNightLowPower(){
     const L=async(id,dp,light,post)=>C.kLoud(mid(await R.goldRender(e=>{ phrase(id)(e); if(post) post(e); }, 6.5, ch(dp,light))),48000);
     for(const id of ['solo.firefly','solo.breath-flute']) for(const dp of [0.5,1]){ const a=await L(id,dp,0), b=await L(id,dp,1); n++;
       notes.push(`${id} d ${dp}: the light room ${(b-a>=0?'+':'')+(b-a).toFixed(2)} dB vs the forest`); if(Math.abs(b-a)>1.5) miss(`${id} d ${dp}: the light room is ${(b-a).toFixed(2)} dB from the forest (±1.5)`); }
-    { const id='solo.breath-flute', a=await L(id,1,0), loud=await L(id,1,1,e=>{ const EE=e.engineCtx(), I2=EE.fx.inst[key] && EE.fx.inst[key].fdepth; if(I2) I2.nodes.gateF.gain.setValueAtTime(2, 0.2); }); n++;
-      notes.push(`CONTROL the light room untrimmed (+6 dB return): ${(loud-a).toFixed(2)} dB`); if(!(Math.abs(loud-a)>1.5)) miss('CONTROL: the light room at +6 dB stays within the band — the loudness check cannot fail'); }
+    { const FD=await import('../../../core/modules/effects/forestdepth.js'), un=1/FD.FDEPTH_LIGHT.trim;   // CORE-28: truly untrimmed (×1/trim) — «×2» was untrimmed only while the trim was 0.5
+      const id='solo.breath-flute', a=await L(id,1,0), loud=await L(id,1,1,e=>{ const EE=e.engineCtx(), I2=EE.fx.inst[key] && EE.fx.inst[key].fdepth; if(I2) I2.nodes.gateF.gain.setValueAtTime(un, 0.2); }); n++;
+      notes.push(`CONTROL the light room untrimmed (×${un.toFixed(2)} return): ${(loud-a).toFixed(2)} dB`); if(!(Math.abs(loud-a)>1.5)) miss('CONTROL: the light room at +6 dB stays within the band — the loudness check cannot fail'); }
   } catch(e){ miss('error: '+(e&&e.stack||e)); }
   finally{ try{ A.setLowPower(false); }catch(e){}
     KEYS.forEach((k,i)=>{ try{ if(keep[i]==null) localStorage.removeItem(k); else localStorage.setItem(k, keep[i]); }catch(e){} });

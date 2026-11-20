@@ -20,10 +20,13 @@ export const FOREST={ sec:3.4, rooms:[0.85, 1.7, 3.4], room:1.7, pow:2.6, wet:0.
    K-like loudness of Night's four sounds): a literal equal-power crossfade keeps the ENERGY but not the loudness of a struck note (its
    attack follows the dry part; the room's energy is in the tail) — far notes lost 4–6 dB; this curve keeps all four within ±1.5 dB (browser
    row «NIGHT depth loudness»). Night's own effect «Forest depth» plays it; Full's Night forest is unchanged. Node row «NIGHT depth curve (core)».
-   (RUN 7's prototype curve — send 0.5 → 1.3, dry 1 → 0.45, the lowpass on both — made a far note ≈ 5–9 dB quieter.) */
-export const NIGHT_DEPTH=Object.freeze({ dryK:0.10, send0:0.5, sendK:2, lp0:2200, lpK:6700, lpPow:1.5 });
+   (RUN 7's prototype curve — send 0.5 → 1.3, dry 1 → 0.45, the lowpass on both — made a far note ≈ 5–9 dB quieter.)
+   CORE-28 (the founder: near as it is, far clearly heard, growing smoothly): the send rises EVENLY IN dB, send0 · (sendFar/send0)^d — near the
+   very same 0.5, far 8 (+10 dB over RUN 8's 2.5); RUN 8's straight line gave half its rise in the first quarter of the hand's travel. */
+export const NIGHT_DEPTH=Object.freeze({ dryK:0.155, send0:0.5, sendFar:5, lp0:2200, lpK:6700, lpPow:1.5 });
 export function nightDepth(d){ const x=Math.max(0, Math.min(1, +d||0)), C=NIGHT_DEPTH;
-  return { send:C.send0+C.sendK*x, dry:1-C.dryK*x, lp:C.lp0+C.lpK*Math.pow(1-x, C.lpPow) }; }
+  const R=C.sendFar/C.send0, g=(Math.pow(R, x)-1)/(R-1);   // g: the send's rise 0…1, the dry dips with it (loudness kept where the forest grows)
+  return { send:C.send0*Math.pow(R, x), dry:1-C.dryK*g, lp:C.lp0+C.lpK*Math.pow(1-x, C.lpPow) }; }
 /* the nearest offered room length (in log space: 0.85 · 1.7 · 3.4 are octave steps) */
 export const forestRoom=sec=> FOREST.rooms.reduce((a,b)=> Math.abs(Math.log(b/sec))<Math.abs(Math.log(a/sec)) ? b : a);
 export function forestIR(rate, sec=FOREST.sec){
