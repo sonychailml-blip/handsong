@@ -1123,6 +1123,8 @@ async function dotRun(page, o){
     return { F, D, z, done, W };
   } finally { await c.ctx.close().catch(()=>{}); }
 }
+/* the time the dot's clock stood still inside [a, b]: its logged 'hold' → 'resume' intervals (still.js dotStep holds the clock while the layout settles) */
+function dotHeldMs(log, a, b){ let h0=null, sum=0; for(const x of log||[]){ if(x.ev==='hold') h0=x.t; else if(x.ev==='resume' && h0!=null){ sum+=Math.max(0, Math.min(b, x.t)-Math.max(a, h0)); h0=null; } } return sum; }
 function dotJudge(R){
   const bad=[], F=R.F, D=R.D;
   if(!R.done) bad.push('the dot did not finish within 150 s');
@@ -1133,14 +1135,15 @@ function dotJudge(R){
   if(!(D.peak>=3)) bad.push(`the flare peaked at ${(+D.peak).toFixed(2)}× (≥ 3× wanted)`);
   const ev=k=>D.log.filter(x=>x.ev===k), fly=ev('fly')[0], end=ev('done')[0], holds=D.log.filter(x=>x.ev==='hold').length;
   const flyFrames=F.filter(f=>f.st==='fly' && f.dot && f.dot.q<0.85), hidden=flyFrames.filter(f=>!f.shown || f.op<0.99);
-  const flyMs=fly && end ? end.t-fly.t : 0, held=F.filter(f=>f.st==='fly' && !f.shown).length*16;
-  if(!(flyMs-held>=2900 && flyMs-held<=4300)) bad.push(`the flight took ${flyMs} ms (${holds} holds) — 3–4 s wanted`);
+  const flyMs=fly && end ? end.t-fly.t : 0, held=fly && end ? dotHeldMs(D.log, fly.t, end.t) : 0;   // RELEASE-1: the dot's own logged holds (exact) — hidden frames × 16 ms undercounted a hold whose frames ran slower (after a resize)
+  if(!(flyMs-held>=2900 && flyMs-held<=4300)) bad.push(`the flight took ${flyMs-held} ms (${holds} holds, ${held} ms held) — 3–4 s wanted`);
   if(hidden.length>(holds ? 40 : 0)) bad.push(`the dot was hidden or faint in ${hidden.length} flight frames before its landing`);
   const last=F.filter(f=>f.st==='fly' && f.dot && f.dot.to && f.dot.q>=0.9).pop();
   if(!last || Math.hypot(last.dot.x-last.dot.to.x, last.dot.y-last.dot.to.y)>last.dot.to.r+2 || !ev('land').length) bad.push(`the dot did not land on a firefly (${last ? JSON.stringify({ x:last.dot.x, y:last.dot.y, to:last.dot.to }) : 'no flight frame'}, landing told ${ev('land').length})`);
   if(!(R.z.dot>R.z.start && R.z.dot>R.z.still && R.z.dot>=R.z.mist)) bad.push('the dot is not above the start card, the still and the mist: '+JSON.stringify(R.z));
   if(!F.some(f=>f.st==='fly' && f.shell)) bad.push('the controls did not come while the dot flew');
-  return { bad, off, jump, flyMs:flyMs-held, holds, peak:D.peak };
+  let gap=0, slow=0; { const ff=F.filter(f=>f.st==='fly' && f.shown); for(let i=1;i<ff.length;i++){ const g=ff[i].t-ff[i-1].t; if(g>gap) gap=g; if(g>100) slow+=g-100; } }   // reported only: the dot's clock steps ≤ 100 ms a frame, so slower frames stretch the wall time
+  return { bad, off, jump, flyMs:flyMs-held, holds, peak:D.peak, gap, slow };
 }
 async function uiNightDot(page, label){
   const lines=[], bad=[];
@@ -1154,8 +1157,10 @@ async function uiNightDot(page, label){
       else { if(W.room!=='room.rain') J.bad.push('the room is '+W.room); if(W.side!=='opp') J.bad.push(`the dot landed on a window of side ${W.side}, not the house opposite`);
         if(!(W.before!=null && W.before<=0.05)) J.bad.push(`CONTROL: the window was already lit (${W.before}) before the landing — the check cannot fail`); if(!(W.lit>0.3)) J.bad.push(`the window is not lit after the landing (${W.lit})`); }
       if(!J.bad.length) lines.push(`${name}: the window #${W.k} of the house opposite — dark before (${(+W.before).toFixed(2)}), lit after (${(+W.lit).toFixed(2)})`); }
-    if(J.bad.length) bad.push(`${name}: ${J.bad.join('; ')}`);
-    else lines.push(`${name}: on the emblem within ${J.off.toFixed(2)} px, largest step ${J.jump.toFixed(1)} px, flare ${J.peak.toFixed(2)}×, flight ${(J.flyMs/1000).toFixed(2)} s (${J.holds} holds), landed on a firefly, above the card and the mist, the controls came while it flew`); }
+    if(J.bad.length) bad.push(`${name}: ${J.bad.join('; ')} (slowest flight frame ${Math.round(J.gap||0)} ms, ${Math.round(J.slow||0)} ms beyond the clock's 100-ms step)`);
+    else lines.push(`${name}: on the emblem within ${J.off.toFixed(2)} px, largest step ${J.jump.toFixed(1)} px, flare ${J.peak.toFixed(2)}×, flight ${(J.flyMs/1000).toFixed(2)} s (${J.holds} holds; slowest frame ${Math.round(J.gap)} ms, ${Math.round(J.slow)} ms beyond the clock's 100-ms step), landed on a firefly, above the card and the mist, the controls came while it flew`); }
+  { const L=[{ ev:'fly', t:0 }, { ev:'hold', t:1000 }, { ev:'resume', t:1400 }, { ev:'done', t:4900 }], fl=4900-dotHeldMs(L, 0, 4900);   // CONTROL: a flight 4.5 s on its clock (+ a 0.4-s hold) must leave the window
+    if(!(fl>4300 && dotHeldMs(L, 0, 4900)===400)) bad.push(`CONTROL: a 4.5-s flight with a 0.4-s hold reads ${fl} ms — the timing check cannot fail`); else lines.push(`CONTROL: a 4.5-s flight with a logged 0.4-s hold reads ${fl} ms — outside 3–4 s, caught`); }
   const k=await dotRun(page, { from:{ width:390, height:760 }, vp:{ width:390, height:844 }, q:'&dotnogate' }), K=dotJudge(k);
   if(!(K.off>1.5)) bad.push(`CONTROL: the old way (no gate, no re-measure) stayed on the emblem (${K.off.toFixed(2)} px) — the check cannot fail`); else lines.push(`CONTROL: the old way with the layout resized at the tap is caught — the dot ${K.off.toFixed(1)} px off the emblem`);
   return { pass:!bad.length, lines:[...lines.map(l=>`${label}: ${l}`), ...bad.map(b=>`${label}: NOT A PASS — ${b}`)] };

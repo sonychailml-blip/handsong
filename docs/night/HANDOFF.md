@@ -28,6 +28,8 @@ Every older open step (120–192) is kept word for word in `archive/HANDOFF-hist
 Moved to `archive/HANDOFF-history.md` (RELEASE-1, still open there).
 
 ## Records (English, at most about 15 lines each; older ones go to `archive/HANDOFF-history.md`)
+### RELEASE-1 full check (2026-11-20): ready to publish. Log: `docs/night/WORK-LOG.md`
+- static PASSED · data 106/0 · Full `P.all` 122/0 · Night `P.night` 81/0 · `[smoke] PASS` with builds (precache 485 files, 28.3 MB to start). «NIGHT dot flight» failed twice on the resize case: the check undercounted the dot's hold (hidden frames × 16 ms) — now the dot's logged hold (exact), window unchanged, a new CONTROL; rerun PASS. Next: the founder's checks above, then «Publishing».
 ### RELEASE-1 last notes (2026-11-20): windscreens, windows sharp and soft, a held voice in the rain. Log: `docs/night/WORK-LOG.md`
 - Windscreens: the shader painted glass facing up as roof — a shallow windscreen got the body colour; glass is now decided by its place on the car only (`rain-glass.js` VEH_F).
 - Windows: a lit window whose room the angle hides showed nothing in focus but a glow when soft. Each window now has a «seen» share from the bake (`pure/windows.js winVisOf`: the lit picture minus the dark, inside its quad); a hidden one keeps a lit corner (the reveal) and a soft spill, not the full disc. Row «RELEASE-1 windows seen sharp and soft» (hidden 0.37 of a seen one in focus, 0.21 soft; the old glow 0.68 caught).
