@@ -594,6 +594,11 @@ THE SCENE HOST and Night's BACKGROUNDS (VIS1b, RUN 6; Night's own since CORE-8 �
 - const (34): `BACKGROUNDS`, `sceneRoomAdd`, `sceneRoomRemove`, `sceneRooms`, `sceneRoom`, `sceneRoomSet`, `SCENE_LEVEL_DEFAULT`, `SCENE_FADE`, `scenePausing`, `COMPILE_LOG`, `sceneFlyPick`, `sceneFlyAt`, `sceneFlyLand`, `sceneRestDbg`, `sceneLitDbg`, `sceneHeardDbg`, `backgroundOf`, `setSceneLight`, `sceneLevel`, `sceneShadowDbg`, `sceneOptDbg`, `sceneInfo`, `sceneRoomDbg`, `sceneLostDbg`, `sceneStartNote`, `sceneStartLevelDbg`, `sceneHoldDbg`, `sceneGuardDbg`, `sceneLevelDbg`, `sceneHeldDbg`, `sceneProgramsDbg`, `sceneClockDbg`, `sceneBedDbg`, `sceneOpenDbg`
 - fn (10): `loadThree`, `sceneOpen`, `sceneSwitch`, `sceneClose`, `sceneRest`, `setBackground`, `setSceneLevel`, `sceneSnapDbg`, `sceneShotDbg`, `sceneLoseDbg`
 
+## apps/night/scene/lightskip.js
+SPEED-1 step 2 — DARK POINT LIGHTS SKIPPED (the host applies it to every room at its opening; `?speedoff` leaves it out).
+- const (2): `SKIP`, `lightSkipDbg`
+- fn (2): `skipDarkLights`, `lightSkipInfo`
+
 ## apps/night/settabs.js
 DESIGN-1 part C: THE SETTINGS IN THREE SHORT TABS — Sound · Picture · Hands (the markup in index.html: #nightSetTabs, the panes [data-pane]).
 - const (2): `SET_TABS`, `setTabOf`
@@ -1706,7 +1711,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 UI-1 — «NIGHT labels follow the room»: the founder entered the rain and the Sound button still read «Firefly» while another timbre played.
 - fn (1): `checkNightLabels`
 
-_339 modules, 3269 exported names._
+_340 modules, 3273 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

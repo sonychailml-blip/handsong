@@ -26,6 +26,7 @@ const browser=await chromium.launch({ channel:'chrome', headless:true, args:['--
 
 /* in the page before any script: the stored choices (Standard, the forest, English), the audio census of the LIVE context, long tasks */
 const INIT=()=>{
+  try{ performance.setResourceTimingBufferSize(100000); }catch(e){}   // SPEED-1: the default 250 entries filled up (app + probe files) — the start set lost its last files and «quiet» read early
   try{ localStorage.setItem('handsong.nightBg', 'forest'); localStorage.setItem('handsong.sceneLevel', 'reduced'); localStorage.setItem('handsong.nightLight', '0'); localStorage.setItem('handsong.night.lang', 'en'); }catch(e){}
   const A=window.__SA={ made:{}, running:new Set() }, live=c=>typeof AudioContext!=='undefined' && c instanceof AudioContext;
   for(const name of Object.getOwnPropertyNames(BaseAudioContext.prototype)) if(/^create/.test(name)){ const f=BaseAudioContext.prototype[name]; if(typeof f!=='function') continue;

@@ -34,7 +34,7 @@ const instr=async p=>{
 async function open(room, q){
   const ctx=await browser.newContext({ viewport:VP, deviceScaleFactor:1, locale:'en-US' }); await ctx.grantPermissions(['camera', 'microphone'], { origin:`http://127.0.0.1:${port}` });
   await ctx.addInitScript(([lv, li])=>{ try{ localStorage.setItem('handsong.nightBg', 'forest'); localStorage.setItem('handsong.sceneLevel', lv); localStorage.setItem('handsong.nightLight', li); localStorage.setItem('handsong.night.lang', 'en'); }catch(e){} }, [q==='full' ? 'full' : 'reduced', q==='light' ? '1' : '0']);
-  const p=await ctx.newPage(); await p.goto(`http://127.0.0.1:${port}/apps/night/index.html?probe${room==='rain' ? '&room=rain' : ''}`);
+  const p=await ctx.newPage(); await p.goto(`http://127.0.0.1:${port}/apps/night/index.html?probe${room==='rain' ? '&room=rain' : ''}${val('--query') ? '&'+val('--query') : ''}`);
   await p.waitForFunction(()=>window.P && window.__nightBoot && window.__nightBoot.state().done, null, { timeout:120e3 }); await p.click('#nightBegin');
   await p.waitForFunction(()=>!document.getElementById('start').classList.contains('on'), null, { timeout:180e3 });
   await p.evaluate(async ([want, passes])=>{ window.__passes=passes; window.__H=await import('/apps/night/scene/host.js'); window.__V=await import('/core/vision.js'); window.__L=await import('/core/legacy-ui/latmeter.js'); const Q=await import('/core/frzqueue.js'); Q.afPause('runner', true); window.__want=want; }, [room, PASSES]);

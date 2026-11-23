@@ -24,7 +24,8 @@ import { NIGHT, nightAt, CLOUD_PASSES } from '../../../apps/night/pure/cycle.js'
 import { FOREST_ROOM } from '../../../apps/night/rooms/forest/pure/room.js';   // NIGHT-3: the moods' looks are the room's
 const MOOD_LOOKS=FOREST_ROOM.looks;
 import { FOREST_LEVELS } from '../../../apps/night/rooms/forest/forest.js';
-import { speedOffDbg } from '../../../apps/night/speed.js';   // SPEED-1: the paint row's exact identity is the undo build's
+import { speedOffDbg } from '../../../apps/night/speed.js';
+import { lightSkipInfo } from '../../../apps/night/scene/lightskip.js';   // SPEED-1: the paint row's exact identity is the undo build's
 import { streamNear } from '../../../apps/night/rooms/forest/pure/forestlife.js';   // RUN 9 (slice 2)
 import { lifePlaces } from '../../../apps/night/rooms/forest/pure/forestlife.js';   // NIGHT-6 slice 5
 import { woodPlaces, barkMoss, barkUv, woodPieces } from '../../../apps/night/rooms/forest/pure/wood.js';   // NIGHT-8b: barkMoss; NIGHT-8c: barkUv, woodPieces
@@ -749,7 +750,8 @@ export async function checkForestPaint(){
     const room=sceneRoomDbg(); if(!room || !sceneInfo().webgl){ notes.push('no WebGL room — the drawn checks do not apply'); return { cases:n, total:d.length, differences:d, notes }; }
     const sizeOk=(st, K)=>{ const b=sceneInfo().guard.buffer; return !!(st.size && b && st.size[0]===Math.max(1, Math.round(b[0]*K)) && st.size[1]===Math.max(1, Math.round(b[1]*K))); };
     { const st=room.paintDbg.state(), K=FOREST_LEVELS.reduced.paintScale; n+=2; if(st.K!==1 || !sizeOk(st, 1)) miss('the undo build: the first picture is not the buffer '+JSON.stringify(st.size)+' vs '+JSON.stringify(sceneInfo().guard.buffer));
-      if(!(K<1) || sizeOk(st, K)) miss('CONTROL: the size check does not tell the undo build ('+JSON.stringify(st.size)+') from paintScale '+K); }
+      if(!(K<1) || sizeOk(st, K)) miss('CONTROL: the size check does not tell the undo build ('+JSON.stringify(st.size)+') from paintScale '+K);
+      const ls=lightSkipInfo(room.scene); n++; if(!(ls.lit>0) || ls.none!==ls.lit) miss('the undo build has the dark-light skip (step 2): '+JSON.stringify(ls)); }   // SPEED-1 step 2
     const P=room.paintDbg, glows=[]; room.scene.traverse(o=>{ if((o.isSprite || o.isPoints) && o.visible){ glows.push(o); o.visible=false; } });
     try{
       const keep=P.set({ uR:0, uSoft:0, uVig:0, uGrain:0, uGrade:0 }); await frames(3);
@@ -765,7 +767,8 @@ export async function checkForestPaint(){
     speedOffDbg(false); await setSceneLevel('reduced'); await frames(6);
     { const r2=sceneRoomDbg(), st=r2 && r2.paintDbg.state(), K=FOREST_LEVELS.reduced.paintScale; n++;
       if(!st || st.K!==K || !sizeOk(st, K)) miss(`the speed build: the first picture ${JSON.stringify(st && st.size)} (K ${st && st.K}) is not round(${JSON.stringify(sceneInfo().guard.buffer)} × ${K})`);
-      else notes.push(`the first picture ${st.size.join('×')} = ${K} × the buffer ${sceneInfo().guard.buffer.join('×')} (the undo build: the buffer itself)`); }
+      else notes.push(`the first picture ${st.size.join('×')} = ${K} × the buffer ${sceneInfo().guard.buffer.join('×')} (the undo build: the buffer itself)`);
+      const ls=r2 && lightSkipInfo(r2.scene); n++; if(!ls || !(ls.compiled>0) || ls.missing) miss('the speed build: the dark-light skip is not in the lit programs '+JSON.stringify(ls)); else notes.push('the speed build\'s lit materials '+JSON.stringify(ls)); }
   } catch(e){ miss('error: '+(e&&e.stack||e)); }
   finally{ speedOffDbg(false); try{ await setSceneLevel(keepLevel); }catch(e){} if(profileCurrent()!==was) profileApply(was); await setBackground('camera'); await sleep(30); }
   return { cases:n, total:d.length, differences:d, notes };
