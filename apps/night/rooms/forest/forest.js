@@ -137,10 +137,12 @@ void main(){vec4 mv=modelViewMatrix*vec4(position,1.);gl_Position=projectionMatr
 const PF=`uniform vec3 uColor;varying float vA;void main(){vec2 c=gl_PointCoord-.5;float r2=dot(c,c)*4.;if(r2>1.)discard;
 float a=exp(-r2*7.)+.4*exp(-r2*2.)*(1.-r2);gl_FragColor=vec4(uColor,a*vA);}`;
 
-/* T — the THREE namespace; opt: { C (palette.cv), level 'full' | 'reduced', w, h (canvas CSS pixels), reduce (reduced motion) } */
+/* SPEED (the founder: always undoable): every level value a SPEED run changed, as it was before — `?speedoff` builds with these */
+export const SPEED_BEFORE=Object.freeze({ paintScale:1 });   // SPEED-1: the paint's first picture at the screen's size
+/* T — the THREE namespace; opt: { C (palette.cv), level 'full' | 'reduced', w, h (canvas CSS pixels), reduce (reduced motion), speedOff (SPEED_BEFORE over the level) } */
 export function buildForest(T, opt){
   const NP=new Set(PARTS), nat=NP.size>0, has=k=>NP.has(k);   // FOREST-2: this build's switches (read once: a later toggle waits for the next opening)
-  const C=opt.C, Lv={ ...(FOREST_LEVELS[opt.level]||FOREST_LEVELS.full), ...(opt.lv||{}) },   // RUN 9: opt.lv — measurement overrides only
+  const C=opt.C, Lv={ ...(FOREST_LEVELS[opt.level]||FOREST_LEVELS.full), ...(opt.speedOff ? SPEED_BEFORE : {}), ...(opt.lv||{}) },   // RUN 9: opt.lv — measurement overrides only; SPEED: speedOff = as before
     reduce=!!opt.reduce, R=seeded(FOREST_SEED), V=(x,y,z)=>new T.Vector3(x,y,z);
   const col=n=>new T.Color(C('forest-'+n));
   const own=[];   // everything to dispose

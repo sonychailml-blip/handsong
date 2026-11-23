@@ -14,6 +14,7 @@ import { ctx, canvas as cv2d, pumpStats } from '../../../core/vision.js';
 import { sceneRatio, stepsOf, guardNew, guardNext } from '../pure/pixels.js';   // NIGHT-11 part 5: the pixel budget and its guard
 import { BUS } from '../../../core/pure/bus.js';
 import { heardMs } from '../pure/heard.js';   // NIGHT-6 slice 1: the music bed's events shown when heard
+import { speedOff } from '../speed.js';   // SPEED-1: the rooms built as before SPEED when asked
 import { handLightNew, handLightStep } from '../pure/handlight.js';   // NIGHT-13: the hand's light between the thumb and the nearest finger
 const READ=BUS.reader();   // RUN 9: the mood at the room's opening, read-only (the frames read the bus they are given)
 
@@ -182,7 +183,7 @@ export async function sceneOpen(id=roomId, opt={}){
   if(level!=='minimal' && !renderer) renderer=makeRenderer();
   if(!renderer) level='minimal';
   if(renderer){ const tb=performance.now();
-    try{ room=build(THREE, { C:cv, level, light:lightOn, w:innerWidth, h:innerHeight, reduce:REDUCE, mood:(READ.get('nightSky')||{}).mood, shadow:shadowOn(), lv:optOver && optOver.lv, gl2:renderer.capabilities.isWebGL2 }); if(room.rest) room.rest(restWant); resize(); }   // NIGHT-6: gl2 — soft edges need WebGL2
+    try{ room=build(THREE, { C:cv, level, light:lightOn, w:innerWidth, h:innerHeight, reduce:REDUCE, mood:(READ.get('nightSky')||{}).mood, shadow:shadowOn(), lv:optOver && optOver.lv, speedOff:speedOff(), gl2:renderer.capabilities.isWebGL2 }); if(room.rest) room.rest(restWant); resize(); }   // NIGHT-6: gl2 — soft edges need WebGL2
     catch(e){ openFail(op, e); return sceneInfo(); }   // a failed build: the renderer goes, the room's 2D stand-in shows (never black)
     last=0; info.t0=0; info.frames=0;
     /* RUN 9 (slice 5): compile every shader NOW (inside the opening, not inside a frame later: a 1–4-s frame) */

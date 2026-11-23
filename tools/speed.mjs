@@ -8,11 +8,12 @@
    model's detection ms, hand → sound (the latency meter's estimate with the frame wait), garbage MB/s, audio underruns; side by side with
    the previous run (tools/.out/speed-last.json → speed-prev.json). The fake camera has no hand: detection = the search path.
    Flags: --cost (no TIME part), --only forest|rain, --renew, --control (the forest's cost with one extra mesh: must fail exactly there),
-   --limit-min N (default 6; the whole run fails past it). Times on the HD 4000: --cost ~3 min, the whole run ~3.5–4, --only forest about half. */
+   --size WxH (the window, default 1920x1080 = the founder's screen; another size is not judged), --limit-min N (default 6; the whole run fails past it). Times on the HD 4000: --cost ~3 min, the whole run ~3.5–4, --only forest about half. */
 import http from 'node:http'; import { readFile, writeFile, mkdir, rename } from 'node:fs/promises'; import { existsSync } from 'node:fs'; import path from 'node:path'; import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), argv=process.argv.slice(2), val=k=>{ const i=argv.indexOf(k); return i>=0 ? argv[i+1] : null; };
 const CONTROL=argv.includes('--control'), COST_ONLY=argv.includes('--cost')||CONTROL, ONLY=CONTROL ? 'forest' : val('--only'), RENEW=argv.includes('--renew'), LIMIT_MIN=+(val('--limit-min')||6);
+const SIZE_DEF='1920x1080', SIZE=(val('--size')||SIZE_DEF).split('x').map(Number), SIZE_OTHER=!!val('--size') && val('--size')!==SIZE_DEF;   // the founder's screen (1280x800 read 40 fps where his Chrome showed 10)
 const BASE=path.join(ROOT, 'tools/prints/night-speed-cost.json'), OUT=path.join(ROOT, 'tools/.out'), LAST=path.join(OUT, 'speed-last.json'), PREV=path.join(OUT, 'speed-prev.json');
 const MIME={ '.html':'text/html', '.js':'text/javascript', '.mjs':'text/javascript', '.css':'text/css', '.json':'application/json', '.png':'image/png', '.webp':'image/webp', '.jpg':'image/jpeg', '.mp3':'audio/mpeg', '.wasm':'application/wasm', '.task':'application/octet-stream', '.woff2':'font/woff2', '.svg':'image/svg+xml', '.ktx2':'image/ktx2', '.bin':'application/octet-stream', '.ogg':'audio/ogg', '.webm':'video/webm' };
 const T0=Date.now(), log=s=>console.log(`[speed] ${s}`);
@@ -39,7 +40,7 @@ const INIT=()=>{
 const res={ machine:null, startSet:null, audioBuilt:null, boot:null, cases:[] };
 let fails=[], notes=[];
 try{
-  const ctx=await browser.newContext({ viewport:{ width:1280, height:800 }, deviceScaleFactor:1, locale:'en-US' }); await ctx.grantPermissions(['camera', 'microphone'], { origin:ORIGIN });
+  const ctx=await browser.newContext({ viewport:{ width:SIZE[0], height:SIZE[1] }, deviceScaleFactor:1, locale:'en-US' }); await ctx.grantPermissions(['camera', 'microphone'], { origin:ORIGIN });
   await ctx.addInitScript(INIT);
   const p=await ctx.newPage(); const errs=[]; p.on('pageerror', e=>errs.push(String(e.message||e)));
   const tNav=Date.now(); await p.goto(`${ORIGIN}/apps/night/index.html?probe`, { timeout:60e3 });
@@ -110,7 +111,8 @@ const FRAME_VARIES=['calls', 'triangles', 'geometries'];   // two runs: the fore
 const costOf=r=>({ startSet:r.startSet, audioBuilt:r.audioBuilt, cases:Object.fromEntries(r.cases.map(c=>[`${c.room} ${c.q}`, Object.fromEntries(Object.entries(c.cost).filter(([k])=>!FRAME_VARIES.includes(k)))])) });
 const now=costOf(res);
 const flat=(o, pre='')=>Object.entries(o||{}).flatMap(([k, v])=>v && typeof v==='object' ? flat(v, pre+k+'.') : [[pre+k, v]]);
-if(!fails.length){
+if(SIZE_OTHER) notes.push(`COST not judged: the window ${SIZE.join('x')} is not the baseline's ${SIZE_DEF}`);
+else if(!fails.length){
   if(RENEW){ await writeFile(BASE, JSON.stringify({ made:new Date().toISOString().slice(0, 10), machine:res.machine, ...now, startPaths:res.startPaths }, null, 1)+'\n'); notes.push('baseline written (declared --renew): tools/prints/night-speed-cost.json'); }
   else if(!existsSync(BASE)) fails.push('no baseline — run with --renew on unchanged code first');
   else { const B=JSON.parse(await readFile(BASE, 'utf8')), bm=new Map(flat({ startSet:B.startSet, audioBuilt:B.audioBuilt, cases:B.cases })), nm=new Map(flat(now)), cheaper=[];

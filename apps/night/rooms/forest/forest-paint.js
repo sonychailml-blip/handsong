@@ -58,10 +58,14 @@ export function buildPaint(ctx){
       uSoft:{ value:1 }, uVig:{ value: lv.vignette ? 1 : 0 }, uGrain:{ value: lv.grain ? 1 : 0 }, uGrade:{ value:1 }, uNow:{ value:0 } }, vertexShader:QV, fragmentShader:compShader(R), depthTest:false, depthWrite:false, toneMapped:false }) : null;
   const quadS=new T.Scene(), quadC=new T.OrthographicCamera(-1, 1, 1, -1, 0, 1), qg=new T.PlaneGeometry(2, 2), quad=new T.Mesh(qg, comp || new T.MeshBasicMaterial()); quad.frustumCulled=false; quadS.add(quad);
   if(comp) own.push(comp); own.push(qg);
-  let rt=null, frames=0, rebuilt=0, direct=false; const size=new T.Vector2(); own.push({ dispose:()=>{ if(rt){ rt.depthTexture.dispose(); rt.dispose(); } } });
-  function ensure(r){ r.getDrawingBufferSize(size); if(rt && rt.width===size.x && rt.height===size.y) return;
+  let rt=null, frames=0, rebuilt=0, direct=false; const size=new T.Vector2(), was=new T.Vector2(); own.push({ dispose:()=>{ if(rt){ rt.depthTexture.dispose(); rt.dispose(); } } });
+  /* SPEED-1: the first picture at K of the screen's buffer (lv.paintScale; 1 = as before, the same sizes); the pass and the glow test keep the
+     SCREEN's pixel (uRes, uRes7), so strokes keep their size on the screen and the smaller picture is read through its linear filter */
+  const K=Math.min(1, Math.max(0.25, +lv.paintScale||1));
+  function ensure(r){ r.getDrawingBufferSize(size); if(rt && was.equals(size)) return; was.copy(size);
     if(rt){ rt.depthTexture.dispose(); rt.dispose(); }
-    rt=new T.WebGLRenderTarget(size.x, size.y, { depthBuffer:true, encoding:T.sRGBEncoding }); rt.depthTexture=new T.DepthTexture(size.x, size.y); rt.depthTexture.type=T.UnsignedIntType; rebuilt++;
+    const w=Math.max(1, Math.round(size.x*K)), h=Math.max(1, Math.round(size.y*K));
+    rt=new T.WebGLRenderTarget(w, h, { depthBuffer:true, encoding:T.sRGBEncoding }); rt.depthTexture=new T.DepthTexture(w, h); rt.depthTexture.type=T.UnsignedIntType; rebuilt++;
     comp.uniforms.uRes.value.set(size.x, size.y); PU.uRes7.value.set(size.x, size.y); }
   /* one frame on the screen */
   function render(r, t=0){
@@ -74,7 +78,7 @@ export function buildPaint(ctx){
     try{ r.render(scene, camera); } finally { r.autoClear=ac; scene.background=bg; r.shadowMap.autoUpdate=su; camera.layers.enableAll(); } }
   /* probes: the pass's switches (uR, uSoft, uVig, uGrain, uGrade; direct: draw in one pass as without painting) → the previous values */
   function set(o){ if(!comp) return null; const U=comp.uniforms, was={}; for(const [k,v] of Object.entries(o||{})){ if(k==='direct'){ was.direct=direct; direct=!!v; } else if(U[k]){ was[k]=U[k].value; U[k].value=v; } } return was; }
-  const state=()=>({ on, R, glow, taps: on ? strokeTaps(R).length : 0, frames, rebuilt, vignette:!!(comp && comp.uniforms.uVig.value), grain:!!(comp && comp.uniforms.uGrain.value), size:rt ? [rt.width, rt.height] : null });
+  const state=()=>({ on, R, K, glow, taps: on ? strokeTaps(R).length : 0, frames, rebuilt, vignette:!!(comp && comp.uniforms.uVig.value), grain:!!(comp && comp.uniforms.uGrain.value), size:rt ? [rt.width, rt.height] : null });
   /* NIGHT-9: the glowing things' own depth test off (another pass draws — the water's mirror — whose depth is not the picture's) */
   const glowDepthOff=()=>{ PU.uUseDepth7.value=0; };
   return { render, state, set, glowDepthOff };

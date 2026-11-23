@@ -326,7 +326,7 @@ NIGHT-6 slice 5 — MOSS, ROOTS AND FALLEN WOOD (parts of the night forest room;
 
 ## apps/night/rooms/forest/forest.js
 VIS1c (RUN 6, Night plan §3) — THE NIGHT FOREST ROOM's picture: a scene module built with three.js r128 (vendored, loaded by the scene host apps/night/scene/host.js).
-- const (14): `FOREST_LEVELS`, `FOREST_BOUNDS`, `GROUND_ALBEDO`, `FOREST_TEX`, `forestGroundDbg`, `FOREST_PARTS`, `FOREST_DEFAULT`, `forestNewDbg`, `forestNewAssets`, `forestCullDbg`, `forestCullListDbg`, `forestApartDbg`, `NIGHT_PRECACHE_PREFIX`, `forestAssetsDbg`
+- const (15): `FOREST_LEVELS`, `FOREST_BOUNDS`, `GROUND_ALBEDO`, `FOREST_TEX`, `forestGroundDbg`, `FOREST_PARTS`, `FOREST_DEFAULT`, `forestNewDbg`, `forestNewAssets`, `forestCullDbg`, `forestCullListDbg`, `forestApartDbg`, `NIGHT_PRECACHE_PREFIX`, `forestAssetsDbg`, `SPEED_BEFORE`
 - fn (3): `forestAssets`, `forestHas`, `buildForest`
 - → ./pure/layout.js (1): `FOREST_SEED`
 
@@ -618,6 +618,10 @@ NIGHT-3 stage 4: THE MUSIC BED's SOUND — built once on the first On into the m
 NIGHT-4: THE MUSIC BED v2's NODE — one AudioWorkletNode («night-bed», apps/night/worklets/bed-worklet.js) into the master's input (the sleep fade and the limiter cover it; live sound, never a track…
 - const (3): `BED2_WORKLET`, `BED2_POOLS`, `BED2_DIV`
 - fn (4): `buildBed2`, `bed2Post`, `bed2Park`, `bed2Stats`
+
+## apps/night/speed.js
+SPEED (the founder, 2026-11-23): every speed change can be undone at once.
+- const (2): `speedOff`, `speedOffDbg`
 
 ## apps/night/start.js
 NIGHT-11 part 2 — THE START'S OWN WORDS (audit W4, W9).
@@ -1702,7 +1706,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 UI-1 — «NIGHT labels follow the room»: the founder entered the rain and the Sound button still read «Firefly» while another timbre played.
 - fn (1): `checkNightLabels`
 
-_338 modules, 3266 exported names._
+_339 modules, 3269 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

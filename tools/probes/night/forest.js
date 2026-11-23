@@ -24,6 +24,7 @@ import { NIGHT, nightAt, CLOUD_PASSES } from '../../../apps/night/pure/cycle.js'
 import { FOREST_ROOM } from '../../../apps/night/rooms/forest/pure/room.js';   // NIGHT-3: the moods' looks are the room's
 const MOOD_LOOKS=FOREST_ROOM.looks;
 import { FOREST_LEVELS } from '../../../apps/night/rooms/forest/forest.js';
+import { speedOffDbg } from '../../../apps/night/speed.js';   // SPEED-1: the paint row's exact identity is the undo build's
 import { streamNear } from '../../../apps/night/rooms/forest/pure/forestlife.js';   // RUN 9 (slice 2)
 import { lifePlaces } from '../../../apps/night/rooms/forest/pure/forestlife.js';   // NIGHT-6 slice 5
 import { woodPlaces, barkMoss, barkUv, woodPieces } from '../../../apps/night/rooms/forest/pure/wood.js';   // NIGHT-8b: barkMoss; NIGHT-8c: barkUv, woodPieces
@@ -722,7 +723,9 @@ row({ night:true, at:1008.6398, name:'FOREST canopy', drawn:true, run:()=>checkF
    and point cloud is in the glow pass with its own depth test, nothing else is — CONTROL a plain mesh has no depth test of its own; the camera
    breathes sideways — CONTROL the baseline (no breath) stands still; the baseline paints nothing; drawn (medium): with the pass set to pass
    through and the glowing things hidden, the painted pipeline gives EXACTLY the one-pass picture; the strokes, the vignette change it —
-   CONTROL one frame twice differs by 0. */
+   CONTROL one frame twice differs by 0. SPEED-1: those drawn checks run on the UNDO build (speedOffDbg(true): the first picture at the
+   screen's size, as before) — the undo gives the old pipeline exactly; then the SPEED build's first picture is exactly round(buffer × the
+   level's paintScale) on each side — CONTROL the undo build's picture is the buffer itself (the size check tells the two apart). */
 export async function checkForestPaint(){
   const d=[], notes=[]; let n=0; const miss=s=>d.push(s);
   const was=profileCurrent(), keepLevel=sceneLevel();
@@ -742,8 +745,11 @@ export async function checkForestPaint(){
       { const m=new T.MeshStandardMaterial(); n++; if(m.userData.depthAware) miss('CONTROL: a plain material has a depth test of its own'); m.dispose(); }
     } finally { for(const r of rooms) r.dispose(); }
     const why=profileApply('profile.night'); n++; if(why){ miss('Night refused: '+why); return { cases:n, total:d.length, differences:d, notes }; }
-    await setSceneLevel('reduced'); await setBackground('forest'); await frames(6);
+    speedOffDbg(true); await setSceneLevel('reduced'); await setBackground('forest'); await frames(6);
     const room=sceneRoomDbg(); if(!room || !sceneInfo().webgl){ notes.push('no WebGL room — the drawn checks do not apply'); return { cases:n, total:d.length, differences:d, notes }; }
+    const sizeOk=(st, K)=>{ const b=sceneInfo().guard.buffer; return !!(st.size && b && st.size[0]===Math.max(1, Math.round(b[0]*K)) && st.size[1]===Math.max(1, Math.round(b[1]*K))); };
+    { const st=room.paintDbg.state(), K=FOREST_LEVELS.reduced.paintScale; n+=2; if(st.K!==1 || !sizeOk(st, 1)) miss('the undo build: the first picture is not the buffer '+JSON.stringify(st.size)+' vs '+JSON.stringify(sceneInfo().guard.buffer));
+      if(!(K<1) || sizeOk(st, K)) miss('CONTROL: the size check does not tell the undo build ('+JSON.stringify(st.size)+') from paintScale '+K); }
     const P=room.paintDbg, glows=[]; room.scene.traverse(o=>{ if((o.isSprite || o.isPoints) && o.visible){ glows.push(o); o.visible=false; } });
     try{
       const keep=P.set({ uR:0, uSoft:0, uVig:0, uGrain:0, uGrade:0 }); await frames(3);
@@ -755,8 +761,13 @@ export async function checkForestPaint(){
         notes.push(`${name} change the mean RGB sum of one frame by ${(ab[0]-ab[1]).toFixed(4)} (CONTROL ${(cc[0]-cc[1]).toFixed(4)})`);
         if(!(Math.abs(ab[0]-ab[1])>0)) miss(name+' do not show'); if(cc[0]!==cc[1]) miss('CONTROL: one frame rendered twice differs by '+(cc[0]-cc[1])); }
     } finally { for(const o of glows) o.visible=true; P.set({ direct:false }); }
+    /* SPEED-1: the speed build — the first picture at the level's paintScale, exactly */
+    speedOffDbg(false); await setSceneLevel('reduced'); await frames(6);
+    { const r2=sceneRoomDbg(), st=r2 && r2.paintDbg.state(), K=FOREST_LEVELS.reduced.paintScale; n++;
+      if(!st || st.K!==K || !sizeOk(st, K)) miss(`the speed build: the first picture ${JSON.stringify(st && st.size)} (K ${st && st.K}) is not round(${JSON.stringify(sceneInfo().guard.buffer)} × ${K})`);
+      else notes.push(`the first picture ${st.size.join('×')} = ${K} × the buffer ${sceneInfo().guard.buffer.join('×')} (the undo build: the buffer itself)`); }
   } catch(e){ miss('error: '+(e&&e.stack||e)); }
-  finally{ try{ await setSceneLevel(keepLevel); }catch(e){} if(profileCurrent()!==was) profileApply(was); await setBackground('camera'); await sleep(30); }
+  finally{ speedOffDbg(false); try{ await setSceneLevel(keepLevel); }catch(e){} if(profileCurrent()!==was) profileApply(was); await setBackground('camera'); await sleep(30); }
   return { cases:n, total:d.length, differences:d, notes };
 }
 row({ night:true, at:1008.6399, name:'FOREST paint', drawn:true, run:()=>checkForestPaint(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });

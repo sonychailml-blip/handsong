@@ -5,8 +5,8 @@
   "cores": 4
  },
  "startSet": {
-  "files": 207,
-  "kb": 4373
+  "files": 208,
+  "kb": 4390
  },
  "audioBuilt": {
   "Worklet:frz-store": 1,
@@ -34,7 +34,7 @@
    "programs": 28,
    "texKB": 33675,
    "textures": 29,
-   "buffer": "768x480",
+   "buffer": "1152x648",
    "audioRunning": {
     "OscillatorNode": 31
    }
@@ -46,7 +46,7 @@
    "programs": 30,
    "texKB": 76683,
    "textures": 30,
-   "buffer": "1088x680",
+   "buffer": "1632x918",
    "audioRunning": {
     "OscillatorNode": 31
    }
@@ -58,7 +58,7 @@
    "programs": 28,
    "texKB": 33675,
    "textures": 29,
-   "buffer": "576x359",
+   "buffer": "863x485",
    "audioRunning": {
     "OscillatorNode": 31
    }
@@ -68,9 +68,9 @@
    "sceneMaterials": 12,
    "sceneTrisCap": 13416,
    "programs": 11,
-   "texKB": 15245,
+   "texKB": 22786,
    "textures": 20,
-   "buffer": "768x480",
+   "buffer": "1152x648",
    "audioRunning": {
     "OscillatorNode": 31
    }
@@ -80,9 +80,9 @@
    "sceneMaterials": 12,
    "sceneTrisCap": 13416,
    "programs": 11,
-   "texKB": 15245,
+   "texKB": 22786,
    "textures": 20,
-   "buffer": "768x480",
+   "buffer": "1152x648",
    "audioRunning": {
     "OscillatorNode": 31
    }
@@ -92,9 +92,9 @@
    "sceneMaterials": 12,
    "sceneTrisCap": 13416,
    "programs": 11,
-   "texKB": 34801,
+   "texKB": 49941,
    "textures": 20,
-   "buffer": "1088x680",
+   "buffer": "1632x918",
    "audioRunning": {
     "OscillatorNode": 31
    }
@@ -156,6 +156,7 @@
   "/apps/night/pure/startdrops.js",
   "/apps/night/pure/still.js",
   "/apps/night/roomdoors.js",
+  "/apps/night/rooms/forest/forest-natural.js",
   "/apps/night/rooms/forest/forest.js",
   "/apps/night/rooms/forest/pure/fireflies.js",
   "/apps/night/rooms/forest/pure/forestlife.js",
