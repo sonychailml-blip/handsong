@@ -2340,6 +2340,21 @@ async function idleSearch(){ const d=[], notes=[]; let n=0; const ok=(what, c)=>
   ok('CONTROL: the default searches every 6th frame', JSON.stringify(idx(run('none', undefined, 18)))!=='[5,11,17]');
   notes.push('no hand: every 3rd frame by default, every 6th / 10th by choice; one hand unchanged');
   return { cases:n, total:d.length, differences:d, notes }; }
+/* CORE-29 — «CORE-29 one-hand search cadence (core)»: schedPlan's fourth argument sets the second hand's search cadence only while ONE hand is
+   tracked (track1 in between); no hand keeps its own (idleEvery); absent = exactly the old schedule. CONTROL: the default must not search every 5th frame. */
+async function oneSearch(){ const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); };
+  const S=await import(new URL('../core/pure/handsched.js', import.meta.url).href);
+  const run=(mode, k, ...a)=>{ const s={ mode, since:0 }, out=[]; for(let i=0;i<k;i++){ const x=S.schedPlan(s, '2s', ...a); out.push(x); s.since= x==='search' ? 0 : s.since+1; } return out; };
+  const idx=a=>JSON.stringify(a.map((x, i)=>x==='search' ? i : -1).filter(i=>i>=0)), same=(a, b)=>JSON.stringify(a)===JSON.stringify(b);
+  ok('one hand, every 5: not every 5th frame — '+idx(run('one', 15, undefined, 5)), idx(run('one', 15, undefined, 5))==='[4,9,14]');
+  ok('one hand, every 5: something else than track1 between the searches', run('one', 15, undefined, 5).every(x=>x==='search' || x==='track1'));
+  ok('no hand changed by the one-hand cadence', same(run('none', 18, undefined, 5), run('none', 18)));
+  ok('no hand every 6 with one hand every 5: '+idx(run('none', 18, 6, 5))+' / '+idx(run('one', 15, 6, 5)), idx(run('none', 18, 6, 5))==='[5,11,17]' && idx(run('one', 15, 6, 5))==='[4,9,14]');
+  ok('two hands changed by the one-hand cadence', same(run('two', 9, undefined, 5), run('two', 9)));
+  ok('the default changed: '+idx(run('one', 9)), idx(run('one', 9))==='[2,5,8]' && same(run('one', 9), run('one', 9, 3, 3)));
+  ok('CONTROL: the default searches every 5th frame with one hand', idx(run('one', 15))!=='[4,9,14]');
+  notes.push('one hand: the second hand searched every 3rd frame by default, every 5th by choice (Night, SPEED-1); no hand and two hands unchanged');
+  return { cases:n, total:d.length, differences:d, notes }; }
 async function rainFocus(){
   const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); };
   const F=await import(new URL('../apps/night/rooms/rain/pure/focus.js', import.meta.url).href), C=F.FOCUS, CT=await import(new URL('../apps/night/rooms/rain/pure/city.js', import.meta.url).href);
@@ -3644,6 +3659,7 @@ const ROWS=[
   ['NIGHT texts both languages (app)', ()=>nightTextsCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-7
   ['NIGHT texts in every language (app)', ()=>nightTextsAll(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // LANG-1
   ['CORE-27 idle search cadence (core)', ()=>idleSearch(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // CORE-27
+  ['CORE-29 one-hand search cadence (core)', ()=>oneSearch(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // CORE-29
   ['RAIN effects hand (app)', ()=>rainFxLaw(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-6
   ['RAIN-7 law (app)', ()=>rain7Law(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-7
   ['RAIN-10 gait, clothes and the lamp (app)', ()=>rain10Gait(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-10

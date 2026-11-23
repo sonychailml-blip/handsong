@@ -4,6 +4,16 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`, `archive/NIGHT-RUN-LOG-2026-10.md`. New runs start at `NIGHT-1`.
 
+# SPEED-1 step 3 (NIGHT track, 2026-11-24, iteration mode): the hands' share of the GPU; the second hand searched every 5th frame (+ CORE-29)
+Tree hashes before: core 73236228bd3394c7 · apps/full 0148bb454440c3e3 · apps/night 1dd9b5b52ab01a4a. After: core 17a6ce078eefa5f4 (CORE-29) · apps/full unchanged · apps/night 8161333f549c8d1b.
+- Measured (HD 4000, 1920×1080, headless, fake camera — no hand): `tools/speed.mjs --detect` per level × path. Forest Light 84 / 125 / 151 / 186 ms (main-GPU / worker-GPU / main-CPU / worker-CPU), Standard 97 / 168 / 156 / 225, Detailed 372 / 617 / 431 / 479. Main-GPU wins everywhere (2 cores / 4 threads).
+- «Hands first» (scratch `handfirst.mjs`, same page, ABAB): with detection every frame («Hands tracked: 1»), Standard 71 ms / picture 12.9 fps today. Room deferred always: 35 ms / 0 fps (starved). Alternating: 52 / 8.8. Drawn right after detection: 52 / 8.6. Light: 58 / 15.5 → 45 / 9.8. In search mode, Standard 104 → 60 ms, 13.1 → 10.4 fps. The founder refused a «hand matters more» switch.
+- The 2D overlay canvas: hidden gains 71.5 → 67.6 ms (Standard) and 58.3 → 54.2 (Light); with nothing drawn, or the layer left still, it gains nothing — the cost is its compositing (screen blend), so it was dropped.
+- Light's forest (`perf1 --passes`, `--meshes`): the scene into 647×364 takes 23.9 of ~28 ms (glow 2.2, composite 1.6). The largest meshes, saved alone: trunks ×95 2.8 ms, leaf cards ×2925 2.65, ×1070 2.1; the ground tiles 0.2–0.9 each.
+- CORE-29 (core log): `schedPlan`'s fourth argument and `setOneHandSearchEvery`; Night 5 in `speed.js` (`?speedoff` 3). Read live: Night {idle 3, one 5}, Full {3, 3}.
+- Checks: static PASSED; `[probe-data] PASS — 107 checks, 0 differences` (new «CORE-29 one-hand search cadence (core)» 7/0); Full: FULL untouched + LAT2a rows 3/0; Night: NIGHT untouched 9/0; `[speed] PASS` (`--only forest --cost`). Not run (iteration mode): the Night suite, Full `--quick`.
+- Noted, not investigated: «Cannot read properties of null (reading 'trim')» once per experiment run with «Hands tracked: 1» after a quality change (default policy: none).
+
 # SPEED-1 step 2 (NIGHT track, 2026-11-23, iteration mode): dark point lights skipped (exact); the speed check's start set measured whole
 Tree hashes before: the founder's commit «SPEED-1 step 1» (not hashed then). After: core 73236228bd3394c7 · apps/full 0148bb454440c3e3 (both unchanged) · apps/night 1dd9b5b52ab01a4a.
 - The founder: Detailed's picture is not simplified (confirmed); continue.

@@ -277,6 +277,10 @@ function takeFrame(id, cap, pres, now, pf=NaN){
 /* CORE-27 (opt-in): the palm search's cadence while no hand is tracked — every n-th camera frame (default HAND_SEARCH_EVERY: as before) */
 let idleEvery=HAND_SEARCH_EVERY;
 const setIdleSearchEvery=n=>{ idleEvery=Math.max(1, Math.min(30, (+n|0)||HAND_SEARCH_EVERY)); return idleEvery; };
+/* CORE-29 (opt-in): the second hand's search cadence while one hand is tracked (default HAND_SEARCH_EVERY: as before) */
+let oneEvery=HAND_SEARCH_EVERY;
+const setOneHandSearchEvery=n=>{ oneEvery=Math.max(1, Math.min(30, (+n|0)||HAND_SEARCH_EVERY)); return oneEvery; };
+const searchCadence=()=>({ idle:idleEvery, one:oneEvery });
 async function pump(){
   if(busy || !pend || !det) return;
   const job=pend; pend=null; busy=true;
@@ -285,7 +289,7 @@ async function pump(){
     if(job.id<=lastId) PS.dup++;              // a frame detected before (must never happen)
     if(job.id<snapMax) PS.notNewest++;        // a newer snapshot existed (must never happen)
     if(job.id>lastId) lastId=job.id;
-    const policy=opts.hands, action=schedPlan(sched, policy, idleEvery), t0=performance.now();   // CORE-27: idleEvery (default the schedule's own)
+    const policy=opts.hands, action=schedPlan(sched, policy, idleEvery, oneEvery), t0=performance.now();   // CORE-27 / CORE-29: idleEvery, oneEvery (defaults the schedule's own)
     const r= action==='skip' ? { res:EMPTY, action, n:0, ms:0, w0:t0, w1:t0, bmp:job.bmp }
                              : await d.run({ bmp:job.bmp, t:job.snapT, action, policy });
     if(delayDbg) await new Promise(res=>setTimeout(res, delayDbg));   // probe: a detector slower than the camera that does not block
@@ -541,5 +545,5 @@ function pumpDbg(o={}){
 /* Экспорт: детектор живёт здесь; кадры и результаты отдаются стоку (main.js). */
 export { video, canvas, ctx, initVision, initDetector, handFilesOf, camHoldOf, camHoldInfo, startCamera, switchCamera, setHandsSink, pollFrame,
   camInfo, camLabel, modelInfo, visionOpts, VISION_DEF, setHandsTracked, setModelDelegate, setCamFps, setDetectPath, setLowLight, lowInfo,
-  pathInfo, pumpStats, pumpDbg, pumpStepDbg, detRunDbg, setIdleSearchEvery, lowDbg, camSimDbg, camOpenDbg, camStats, camStatsDbg, setCameraPick, cameraSwitch, cameraList, cameraPickInfo,
+  pathInfo, pumpStats, pumpDbg, pumpStepDbg, detRunDbg, setIdleSearchEvery, setOneHandSearchEvery, searchCadence, lowDbg, camSimDbg, camOpenDbg, camStats, camStatsDbg, setCameraPick, cameraSwitch, cameraList, cameraPickInfo,
   cameraWatch, cameraWatchRetry, cameraWatchDbg };

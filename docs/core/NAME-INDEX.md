@@ -626,7 +626,7 @@ NIGHT-4: THE MUSIC BED v2's NODE — one AudioWorkletNode («night-bed», apps/n
 
 ## apps/night/speed.js
 SPEED (the founder, 2026-11-23): every speed change can be undone at once.
-- const (2): `speedOff`, `speedOffDbg`
+- const (3): `speedOff`, `speedOffDbg`, `ONE_HAND_SEARCH`
 
 ## apps/night/start.js
 NIGHT-11 part 2 — THE START'S OWN WORDS (audit W4, W9).
@@ -1254,7 +1254,7 @@ Vercel Web Analytics queue stub — a classic script, not a module: calls made b
 
 ## core/vision.js
 (no head comment)
-- const (15): `video`, `canvas`, `ctx`, `handFilesOf`, `camHoldInfo`, `camLabel`, `modelInfo`, `visionOpts`, `VISION_DEF`, `lowInfo`, `pathInfo`, `pumpStats`, `setIdleSearchEvery`, `camStats`, `setCameraPick`
+- const (17): `video`, `canvas`, `ctx`, `handFilesOf`, `camHoldInfo`, `camLabel`, `modelInfo`, `visionOpts`, `VISION_DEF`, `lowInfo`, `pathInfo`, `pumpStats`, `setIdleSearchEvery`, `setOneHandSearchEvery`, `searchCadence`, `camStats`, `setCameraPick`
 - fn (26): `initVision`, `initDetector`, `camHoldOf`, `startCamera`, `switchCamera`, `setHandsSink`, `pollFrame`, `camInfo`, `setHandsTracked`, `setModelDelegate`, `setCamFps`, `setDetectPath`, `setLowLight`, `pumpDbg`, `pumpStepDbg`, `detRunDbg`, `lowDbg`, `camSimDbg`, `camOpenDbg`, `camStatsDbg`, `cameraSwitch`, `cameraList`, `cameraPickInfo`, `cameraWatch`, `cameraWatchRetry`, `cameraWatchDbg`
 
 ## tools/probes/core/calpanel.js
@@ -1711,7 +1711,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 UI-1 — «NIGHT labels follow the room»: the founder entered the rain and the Sound button still read «Firefly» while another timbre played.
 - fn (1): `checkNightLabels`
 
-_340 modules, 3273 exported names._
+_340 modules, 3276 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

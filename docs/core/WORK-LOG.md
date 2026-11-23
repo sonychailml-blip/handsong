@@ -4,6 +4,13 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`. Checkpoints A–E of SPLIT-2 are its last sections.
 
+# CORE-29 (2026-11-24): the second hand's search cadence while one hand plays — for SPEED-1 step 3 (opt-in, Night only)
+Tree hashes before (SPEED-1 step 2's after): core 73236228bd3394c7 · apps/full 0148bb454440c3e3 · apps/night 1dd9b5b52ab01a4a. After: core 17a6ce078eefa5f4 · apps/full unchanged · apps/night 8161333f549c8d1b.
+- `core/pure/handsched.js` `schedPlan(s, policy, idleEvery, oneEvery)`: the fourth argument sets the search's cadence only while ONE hand is tracked (track1 in between); absent = HAND_SEARCH_EVERY, exactly as before. `core/vision.js` `setOneHandSearchEvery(n)` (1…30) and `searchCadence()` → {idle, one}.
+- Night opts in at 5 (`apps/night/speed.js`, the founder: «every 5 frames, not 3»); `?speedoff` keeps 3. Read live: Night {idle 3, one 5}, Full {idle 3, one 3}.
+- Rows: data «CORE-29 one-hand search cadence (core)» 7/0 (CONTROL the default); «LAT2 search schedule (core)» 15/0, «CORE-27 idle search cadence (core)» 4/0 unchanged. Full page: FULL untouched, LAT2a frame once, LAT2a search schedule — 3/0. Night page: NIGHT untouched 9/0. Static PASSED.
+- Not measured: the fake camera shows no hand, so the one-hand path never runs in the runners; the gain and a second hand's later arrival (up to 5 frames instead of 3) are the founder's to judge by hand.
+
 # CORE-28 (2026-11-20): the far forest clearly heard, growing evenly with the hand's depth (the founder; a dedicated CORE run, Night's «Forest depth» only)
 Tree hashes before: core 8b4b3eac7543581e · apps/full 0148bb454440c3e3 · apps/night 51331f079ef11452. After: core 73236228bd3394c7 · apps/full unchanged · apps/night unchanged.
 - Found (live, the effect's own output tapped — the master carried the ambience): the depth moved «Forest depth» in both rooms (send 0.5 → 2.24, the send's cut-off 8900 → 2510 Hz), but a far note's tail after release was the same as near (−27.6 / −27.7 dB): the room's return sat 14–18 dB under the dry note and its tail under the bed at once.
