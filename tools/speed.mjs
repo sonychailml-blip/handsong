@@ -8,11 +8,14 @@
    model's detection ms, hand → sound (the latency meter's estimate with the frame wait), garbage MB/s, audio underruns; side by side with
    the previous run (tools/.out/speed-last.json → speed-prev.json). The fake camera has no hand: detection = the search path.
    Flags: --cost (no TIME part), --only forest|rain, --renew, --control (the forest's cost with one extra mesh: must fail exactly there),
-   --size WxH (the window, default 1920x1080 = the founder's screen; another size is not judged), --limit-min N (default 6; the whole run fails past it). Times on the HD 4000: --cost ~3 min, the whole run ~3.5–4, --only forest about half. */
+   --size WxH (the window, default 1920x1080 = the founder's screen; another size is not judged), --limit-min N (default 6; the whole run fails past it),
+   --detect main-GPU,worker-CPU,… (SPEED-1: TIME again per detection path × processor, through the latency meter's own test switches). Times on the HD 4000: --cost ~3 min, the whole run ~3.5–4, --only forest about half. */
 import http from 'node:http'; import { readFile, writeFile, mkdir, rename } from 'node:fs/promises'; import { existsSync } from 'node:fs'; import path from 'node:path'; import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), argv=process.argv.slice(2), val=k=>{ const i=argv.indexOf(k); return i>=0 ? argv[i+1] : null; };
 const CONTROL=argv.includes('--control'), COST_ONLY=argv.includes('--cost')||CONTROL, ONLY=CONTROL ? 'forest' : val('--only'), RENEW=argv.includes('--renew'), LIMIT_MIN=+(val('--limit-min')||6);
+const DETECT=val('--detect') ? val('--detect').split(',') : null;
+if(DETECT && (COST_ONLY || DETECT.some(v=>!/^(main|worker)-(GPU|CPU)$/.test(v)))){ console.log('[speed] NOT A PASS — --detect takes main|worker-GPU|CPU, comma-separated, and needs the TIME part'); process.exit(1); }
 const SIZE_DEF='1920x1080', SIZE=(val('--size')||SIZE_DEF).split('x').map(Number), SIZE_OTHER=!!val('--size') && val('--size')!==SIZE_DEF;   // the founder's screen (1280x800 read 40 fps where his Chrome showed 10)
 const BASE=path.join(ROOT, 'tools/prints/night-speed-cost.json'), OUT=path.join(ROOT, 'tools/.out'), LAST=path.join(OUT, 'speed-last.json'), PREV=path.join(OUT, 'speed-prev.json');
 const MIME={ '.html':'text/html', '.js':'text/javascript', '.mjs':'text/javascript', '.css':'text/css', '.json':'application/json', '.png':'image/png', '.webp':'image/webp', '.jpg':'image/jpeg', '.mp3':'audio/mpeg', '.wasm':'application/wasm', '.task':'application/octet-stream', '.woff2':'font/woff2', '.svg':'image/svg+xml', '.ktx2':'image/ktx2', '.bin':'application/octet-stream', '.ogg':'audio/ogg', '.webm':'video/webm' };
@@ -86,7 +89,7 @@ try{
     const c={ room, q, cost };
     if(!COST_ONLY){
       await p.evaluate(()=>window.__Sh.nightMusicHoldDbg(false)); await p.waitForTimeout(1500);
-      c.time=await p.evaluate(()=>new Promise(done=>{ const fr=[], heap=[], A=window.__A.AC, ub=()=>{ try{ return A && A.playbackStats ? A.playbackStats.underrunEvents : NaN; }catch(e){ return NaN; } };
+      const TIME=()=>new Promise(done=>{ const fr=[], heap=[], A=window.__A.AC, ub=()=>{ try{ return A && A.playbackStats ? A.playbackStats.underrunEvents : NaN; }catch(e){ return NaN; } };
         const u0=ub(), l0=window.__SL.long, t0=performance.now(), mem=()=>performance.memory ? performance.memory.usedJSHeapSize : NaN;
         const hs=setInterval(()=>heap.push(mem()), 50); const f=t=>{ fr.push(t); if(performance.now()-t0<4000) requestAnimationFrame(f); else end(); };
         const end=()=>{ clearInterval(hs); const sec=(performance.now()-t0)/1000, d=[]; for(let i=1;i<fr.length;i++) d.push(fr[i]-fr[i-1]); const s=d.slice().sort((a, b)=>a-b);
@@ -94,7 +97,17 @@ try{
           const r=window.__L.latReport(), r1=x=>Number.isFinite(x) ? Math.round(x*10)/10 : null;
           done({ fps:r1(1000*d.length/d.reduce((a, b)=>a+b, 0)), frameP95:r1(s[Math.floor(s.length*0.95)]), longMsPerS:r1((window.__SL.long-l0)/sec), detectMs:r.stages.detect.mean, searchMs:r.stages.detSearch.mean,
             detectedFps:r.detection.detectedFps, handToSoundMs:r.handToSoundWithWaitMs, garbageMBs:r1(freed/1048576/sec), underruns:Number.isFinite(u0) ? ub()-u0 : null }); };
-        requestAnimationFrame(f); }));
+        requestAnimationFrame(f); });
+      c.time=await p.evaluate(TIME);
+      /* SPEED-1 --detect: the same case per detection variant (path × processor); the meter restarts once the variant has warmed up */
+      if(DETECT){ c.detect={};
+        for(const v of DETECT){ const [pa, de]=v.split('-'), ids=[pa==='worker' ? 'swPathWorker' : 'swPathMain', de==='CPU' ? 'swModelCPU' : 'swModelGPU'];
+          await p.evaluate(async ids=>{ for(const id of ids) await window.__L.latSwitch(id); }, ids); await p.waitForTimeout(2500);
+          await p.evaluate(id=>window.__L.latSwitch(id), ids[1]);   // the same switch again: nothing changes, the numbers restart without the warm-up
+          const t=await p.evaluate(TIME), w=await p.evaluate(()=>{ const r=window.__L.latReport(); return { runs:r.detection.runs, model:r.model.actual, why:r.detection.why||'' }; });
+          c.detect[v]={ ...t, ...w };
+          log(`  ${room} ${q} · detection ${v} (runs ${w.runs}, ${w.model}${w.why ? ', '+w.why : ''}): detect ${t.detectMs} ms at ${t.detectedFps}/s · picture ${t.fps} fps, p95 ${t.frameP95} ms · long ${t.longMsPerS} ms/s · hand→sound ${t.handToSoundMs} ms`); }
+        await p.evaluate(async ()=>{ await window.__L.latSwitch('swPathMain'); await window.__L.latSwitch('swModelGPU'); }); }
     }
     res.cases.push(c);
     log(`${room} ${q}: calls ${cost.calls}, triangles ${cost.triangles}, scene ${cost.sceneMeshes} meshes / ${cost.sceneTrisCap} triangles at most, programs ${cost.programs}, textures ${cost.texKB} KB, audio pool ${JSON.stringify(cost.audioRunning)}`
@@ -113,6 +126,7 @@ const costOf=r=>({ startSet:r.startSet, audioBuilt:r.audioBuilt, cases:Object.fr
 const now=costOf(res);
 const flat=(o, pre='')=>Object.entries(o||{}).flatMap(([k, v])=>v && typeof v==='object' ? flat(v, pre+k+'.') : [[pre+k, v]]);
 if(SIZE_OTHER) notes.push(`COST not judged: the window ${SIZE.join('x')} is not the baseline's ${SIZE_DEF}`);
+else if(DETECT) notes.push('COST not judged with --detect: the switches change what the next case meets (a later case read one texture more); run without it to judge');
 else if(!fails.length){
   if(RENEW){ await writeFile(BASE, JSON.stringify({ made:new Date().toISOString().slice(0, 10), machine:res.machine, ...now, startPaths:res.startPaths }, null, 1)+'\n'); notes.push('baseline written (declared --renew): tools/prints/night-speed-cost.json'); }
   else if(!existsSync(BASE)) fails.push('no baseline — run with --renew on unchanged code first');
