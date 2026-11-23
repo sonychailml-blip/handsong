@@ -18,3 +18,5 @@ report-*.md
 handoff-*.txt
 tools/design/rain/draft/
 tools/design/rain/lofi/
+# CLEAN-1: reports and commit messages for the founder live here (older ones stay in the root, still ignored above)
+tools/.out/

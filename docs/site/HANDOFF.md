@@ -17,6 +17,7 @@ Vercel → Add New Project → this repository:
 - Cloudflare DNS (DNS only, grey cloud): `A  @  76.76.21.21` and `CNAME  www  cname.vercel-dns.com`. If Vercel's Domains page shows other values (newer projects may show `A 216.198.79.1` or a project-specific `…vercel-dns-0xx.com`), use what it shows. Leave the `night` record and any MX/TXT (mail for hello@handsong.app) as they are. A CAA record, if present, must allow `letsencrypt.org`.
 
 ## State
+- ✅ **Live** (the founder, 2026-11-23): https://handsong.app works — the Vercel project and DNS are set up. The waits below for the project and DNS are done; the founder's look at the pages stays open.
 - `SITE-3` (2026-11-19): the Tech demo card and page link to https://demo.handsong.app (the demo moved; handsong.vercel.app redirects); site-check row «the demo address» (CONTROL a page with the old address).
 - `SITE-2` (2026-11-14): the venue product «Install» renamed «Handsong Space» (the founder: «Install» read as installing software and clashed with «Add to Home Screen»); both languages, page `/space/`, the old address a 308 redirect; site-check row «no product named Install» (CONTROLS: a page naming it, the redirect missing). Mock-ups in `site-design/` keep the old name on purpose. Waits for the founder's look at /space/ and /install on the live site.
 - `SITE-1` (2026-11-13) built; waits for the Vercel project, DNS, and the user's checks: a link in Telegram shows the picture; the pages on a real phone; the RU redirect in a Russian browser.

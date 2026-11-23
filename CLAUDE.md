@@ -134,6 +134,10 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   what a real hand, ears or the Poco can tell; everything else is checked by the runners and screenshots first.
 - **Report format:** documents changed; files changed with a one-line reason; console lines and outputs; static-check result;
   probe verdict lines and fix rounds; what was left undone; docs found stale; the user's remaining steps (ear, camera, phone; at most five).
+- ⛳ **Where reports and commit messages go** (founder, CLEAN-1, 2026-11-23): a run's report is written to `tools/.out/report-<run>.md` and its commit
+  message to `tools/.out/commitmsg-<run>.txt` (git-ignored folder; never the repo root — the old root files stay there as history). The commit
+  block reads it from there: `git commit -F tools/.out/commitmsg-<run>.txt`. Screenshots are working files, not history: a run's captures may
+  be cleared later; what a capture proved goes into the record in words.
 
 ## Conventions — where a feature goes
 - Terse, compact code; match the surrounding idiom. Add a feature in the module that owns it.
