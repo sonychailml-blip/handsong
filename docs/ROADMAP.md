@@ -5,7 +5,7 @@ Goal: a high-quality, commercially successful Night. Order matters; new rooms co
 Handsong Night — the forest and the rain — is public at https://night.handsong.app; the brand site https://handsong.app is live.
 
 ## After release — what to do next (CLEAN-1, 2026-11-23; most important first, the founder picks)
-1. **Speed on weak phones.** The cold first opening (~7 s, shaders), the ~26 MB start set before a second visit works offline, the rare audio dropout right after the forest opens; measure on the Poco with «Measure this device» first. A slow start loses players before they play. (`docs/night/BACKLOG.md`.)
+1. **Speed on weak phones.** The cold first opening (~7 s, shaders), the ~26 MB start set before a second visit works offline, the rare audio dropout right after the forest opens; measure on the Poco with «Measure this device» first. A slow start loses players before they play. (`docs/night/BACKLOG.md`.) ▶ Chosen (2026-11-23): the plan `docs/night/SPEED-PLAN.md` — gesture → sound first, then smoothness everywhere; runs `SPEED-n`.
 2. **Share a video.** The last ~15 s of play as a short clip — scene and music, never the camera image (#33); vertical and landscape, a quiet handsong.app mark. The main growth lever (Stage 2, item 1).
 3. **Events — a reason to come back.** Rare moments in both rooms (the forest's night, the rain's city), the evening ritual, the world remembering the last visit, discoveries without lessons (Stage 2, item 3).
 4. **City life in the rain.** From `docs/night/design/RAIN/PLAN.md` §5d: trembling wet reflections as cars pass, water off awnings and balconies, chimney smoke, children in puddles, a couple under one umbrella, shops closing one by one, brake lights and wipers, people crossing on green.

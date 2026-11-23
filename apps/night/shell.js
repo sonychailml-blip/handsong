@@ -332,7 +332,7 @@ async function measure(){
       const r0=latReport(), u0=pb(), d0=r0.camera.framesDetected, t0=performance.now(); await wait(SEC*1000);
       const r=latReport(), sec=(performance.now()-t0)/1000, sc=sceneInfo();
       const G=sc.guard||{};
-      rows.push(`${steps[s][0]}: dropouts ${Number.isFinite(u0) ? Math.round((pb()-u0)*60/sec) : '—'}/min · detection ${((r.camera.framesDetected-d0)/sec).toFixed(1)}/s, ${r.stages.detect.mean} ms · camera ${r.camera.fps} fps · picture ${sc.webgl ? sc.fps+' fps' : 'no WebGL'}`
+      rows.push(`${steps[s][0]}: dropouts ${Number.isFinite(u0) ? Math.round((pb()-u0)*60/sec) : '—'}/min · detection ${((r.camera.framesDetected-d0)/sec).toFixed(1)}/s, ${r.stages.detect.mean} ms (track ${r.stages.detTrack.mean}, search ${r.stages.detSearch.mean}) · hand → sound ${r.handToSoundWithWaitMs} ms · camera ${r.camera.fps} fps · picture ${sc.webgl ? sc.fps+' fps' : 'no WebGL'}`
         +(sc.webgl ? ` · frame ${sc.frameMs} ms, draws ${sc.calls}, triangles ${sc.triangles}, programs ${sc.programs}, textures ${(sc.texBytes/1048576).toFixed(1)} MB, picture ${G.buffer ? G.buffer.join('×') : '—'} (guard step ${G.step}/${G.steps})` : ''));   /* NIGHT-11 part 5: the buffer and the guard */ }
     const O=sceneInfo().openings, op=o=>`${o.level==='full' ? 'high' : 'medium'} ${o.ms} ms (${o.programs} programs)`;
     const text=['Handsong Night — device measurement', navigator.userAgent, (latReport().gpu||{}).renderer||'', ...rows,
