@@ -26,6 +26,8 @@ const MOOD_LOOKS=FOREST_ROOM.looks;
 import { FOREST_LEVELS } from '../../../apps/night/rooms/forest/forest.js';
 import { speedOffDbg } from '../../../apps/night/speed.js';
 import { lightSkipInfo } from '../../../apps/night/scene/lightskip.js';   // SPEED-1: the paint row's exact identity is the undo build's
+import { SPEED_BEFORE } from '../../../apps/night/rooms/forest/forest.js';   // SPEED-1 step 5
+import { THIN_MIN } from '../../../apps/night/rooms/forest/forest-light.js';
 import { streamNear } from '../../../apps/night/rooms/forest/pure/forestlife.js';   // RUN 9 (slice 2)
 import { lifePlaces } from '../../../apps/night/rooms/forest/pure/forestlife.js';   // NIGHT-6 slice 5
 import { woodPlaces, barkMoss, barkUv, woodPieces } from '../../../apps/night/rooms/forest/pure/wood.js';   // NIGHT-8b: barkMoss; NIGHT-8c: barkUv, woodPieces
@@ -748,9 +750,44 @@ function checkFarTrunks(T, mk, miss, notes, add){
   notes.push(`far trunks: ${far.length} of ${all.length} beyond ${D} m of the eye (${eye.x.toFixed(2)}, ${eye.z.toFixed(2)}) in the plain bark, ${near.length} in the full one; Detailed none`);
   return far.length;
 }
+/* SPEED-1 step 5: the Light quality's forest (rooms built without a renderer) — light(true) on Standard keeps exactly every leafEvery-th card of each plant
+   set over THIN_MIN (matrix, colour and cell, in order; smaller sets whole), draws every plant in a per-vertex copy of its own material (the same map,
+   cut, sides, blending and hooks), hides the wild fireflies' two lights and touches nothing else; light(false) gives Standard back byte for byte (twice
+   over); the undo build (speedOff) and Detailed change nothing. The record: Standard's values are SPEED_BEFORE's. CONTROL the kept cards checked
+   against the cards in between (the card check can fail) */
+function checkLightForest(T, mk, miss, notes, add){
+  const L=FOREST_ROOM.light||{}, R=FOREST_LEVELS.reduced, k=L.leafEvery; add(1);
+  for(const key of ['leafEvery', 'plantsPerVertex', 'wildLights']) if(!(key in L) || R[key]!==SPEED_BEFORE[key] || L[key]===R[key]) miss(`the record: ${key} Light ${L[key]}, Standard ${R[key]}, before ${SPEED_BEFORE[key]}`);
+  const r=mk('reduced'), D=r.lightDbg; if(!D){ miss('the forest has no Light parts'); return; }
+  const { plants, thinable, wild }=D.parts, attrs=o=>[o.instanceMatrix, o.instanceColor, ...Object.values(o.geometry.attributes).filter(a=>a.isInstancedBufferAttribute)].filter(Boolean);
+  const snap=()=>{ const m=new Map(), l=new Map(); r.scene.traverse(o=>{ if(o.isMesh) m.set(o, { mat:o.material, count:o.count, arr:o.isInstancedMesh ? attrs(o).map(a=>a.array.slice()) : [] }); if(o.isLight) l.set(o, o.visible); }); return { m, l }; };
+  const same=(A, B)=>{ let bad=0; for(const [o, x] of A.m){ const y=B.m.get(o); if(!y || y.mat!==x.mat || y.count!==x.count || x.arr.some((a, i)=>a.length!==y.arr[i].length || a.some((v, j)=>!Object.is(v, y.arr[i][j])))) bad++; } for(const [o, v] of A.l) if(B.l.get(o)!==v) bad++; return bad; };
+  const S0=snap(); add(8);
+  if(!(thinable.length>=4) || !(wild.length===2) || !(D.parts.pv.size>=3)) miss(`the Light parts: ${thinable.length} sets to thin, ${wild.length} wild lights, ${D.parts.pv.size} plant materials`);
+  const st=r.light(true), S1=snap();
+  if(st.every!==k || st.perVertex!==true || st.wildLights!==false) miss('light(true): '+JSON.stringify(st));
+  let badSet=0, badCtl=0, cards=0, kept=0;
+  for(const o of plants){ const x=S0.m.get(o), y=S1.m.get(o), thin=thinable.includes(o);
+    if(o.isInstancedMesh && (thin ? y.count!==Math.ceil(x.count/k) : y.count!==x.count)) badSet++;
+    if(thin){ cards+=x.count; kept+=y.count; attrs(o).forEach((a, q)=>{ const s=a.itemSize, A0=x.arr[q], A1=y.arr[q]; let off=0;
+      for(let j=0;j<y.count;j++){ for(let c=0;c<s;c++) if(!Object.is(A1[j*s+c], A0[j*k*s+c])) badSet++; if(j*k+1<x.count){ for(let c=0;c<s;c++) if(!Object.is(A1[j*s+c], A0[(j*k+1)*s+c])){ off++; break; } } }
+      if(q===0 && !(off>y.count/2)) badCtl++; }); }
+    else if(o.isInstancedMesh && o.count>THIN_MIN) badSet++;
+    const m0=x.mat, m1=o.material; if(!m1.isMeshLambertMaterial || m1.map!==m0.map || m1.alphaTest!==m0.alphaTest || m1.side!==m0.side || m1.transparent!==m0.transparent || m1.depthWrite!==m0.depthWrite || m1.onBeforeCompile!==D.parts.pv.get(m0).onBeforeCompile || !/\.pv$/.test(m1.customProgramCacheKey())) badSet++; }
+  if(badSet) miss(`light(true): ${badSet} plant values off (counts, kept cards, the per-vertex copies)`);
+  if(badCtl) miss(`CONTROL: in ${badCtl} sets the cards in between equal the kept ones (the card check cannot fail)`);
+  let other=0; for(const [o, x] of S0.m) if(!plants.includes(o)){ const y=S1.m.get(o); if(y.mat!==x.mat || y.count!==x.count) other++; }
+  for(const [l, v] of S0.l) if(S1.l.get(l)!==(wild.includes(l) ? false : v)) other++;
+  if(other) miss(`light(true) changed ${other} things outside the plants and the wild lights`);
+  r.light(false); const B1=same(S0, snap()); r.light(true); r.light(true); const S2=snap(), again=same(S1, S2); r.light(false); const B2=same(S0, snap());
+  if(B1 || B2) miss(`light(false) left ${B1} / ${B2} things unlike Standard`); if(again) miss(`light(true) a second time differs in ${again} things`);
+  const u=mk('reduced', { speedOff:true }), U0=u.lightDbg.state(), su=u.light(true); if(su.every!==1 || su.perVertex || !su.wildLights || su.sets.join()!==U0.sets.join()) miss('the undo build changes under Light: '+JSON.stringify(su));
+  const f=mk('full'), sf=f.light(false); if(sf.every!==1 || sf.perVertex || !sf.wildLights) miss('Detailed is not the plain plants: '+JSON.stringify(sf));
+  notes.push(`Light: ${kept} of ${cards} cards kept in ${thinable.length} sets (every ${k}th), ${plants.length} plant meshes in ${D.parts.pv.size} per-vertex materials, ${wild.length} wild lights off; Standard back exactly`);
+}
 export async function checkForestPaint(){
   const d=[], notes=[]; let n=0, farCount=-1; const miss=s=>d.push(s);
-  const was=profileCurrent(), keepLevel=sceneLevel();
+  const was=profileCurrent(), keepLevel=sceneLevel(), light0=(()=>{ try{ return localStorage.getItem('handsong.nightLight')==='1'; }catch(e){ return false; } })();
   try{
     const T=await loadThree(); await forestAssets('full'); await forestAssets('reduced'); const w=844, h=390, rooms=[], mk=(lv, o={})=>{ const r=buildForest(T,{ C:cv, level:lv, w, h, gl2:true, ...o }); rooms.push(r); return r; };
     const NIN={ mood:'major-penta', sleep:0 };
@@ -766,6 +803,7 @@ export async function checkForestPaint(){
         if(st.on || st.breath) miss('the baseline still paints or breathes: '+JSON.stringify(st)); if(x(10)!==x(12)) miss('CONTROL: the baseline camera moves sideways'); }
       { const m=new T.MeshStandardMaterial(); n++; if(m.userData.depthAware) miss('CONTROL: a plain material has a depth test of its own'); m.dispose(); }
       farCount=checkFarTrunks(T, mk, miss, notes, k=>{ n+=k; });   // SPEED-1 step 4
+      checkLightForest(T, mk, miss, notes, k=>{ n+=k; });   // SPEED-1 step 5
     } finally { for(const r of rooms) r.dispose(); }
     const why=profileApply('profile.night'); n++; if(why){ miss('Night refused: '+why); return { cases:n, total:d.length, differences:d, notes }; }
     speedOffDbg(true); await setSceneLevel('reduced'); await setBackground('forest'); await frames(6);
@@ -792,9 +830,12 @@ export async function checkForestPaint(){
       if(!st || st.K!==K || !sizeOk(st, K)) miss(`the speed build: the first picture ${JSON.stringify(st && st.size)} (K ${st && st.K}) is not round(${JSON.stringify(sceneInfo().guard.buffer)} × ${K})`);
       else notes.push(`the first picture ${st.size.join('×')} = ${K} × the buffer ${sceneInfo().guard.buffer.join('×')} (the undo build: the buffer itself)`);
       const ls=r2 && lightSkipInfo(r2.scene); n++; if(!ls || !(ls.compiled>0) || ls.missing) miss('the speed build: the dark-light skip is not in the lit programs '+JSON.stringify(ls)); else notes.push('the speed build\'s lit materials '+JSON.stringify(ls));
-      const fc=r2 && r2.farTrunksDbg ? r2.farTrunksDbg.count : 0; n++; if(!(fc>0) || fc!==farCount) miss(`the speed build: ${fc} plain far trunks, the built room had ${farCount}`); }   // SPEED-1 step 4
+      const fc=r2 && r2.farTrunksDbg ? r2.farTrunksDbg.count : 0; n++; if(!(fc>0) || fc!==farCount) miss(`the speed build: ${fc} plain far trunks, the built room had ${farCount}`);   // SPEED-1 step 4
+      setSceneLight(false); const lOn=(setSceneLight(true), r2 && r2.lightDbg.state()), lOff=(setSceneLight(false), r2 && r2.lightDbg.state()); n+=2;   // SPEED-1 step 5: the host turns it on and off in place
+      if(!lOn || lOn.every!==FOREST_ROOM.light.leafEvery || !lOn.perVertex || lOn.wildLights) miss('the host: Light on, the room '+JSON.stringify(lOn));
+      if(!lOff || lOff.every!==1 || lOff.perVertex || !lOff.wildLights) miss('the host: Light off, the room '+JSON.stringify(lOff)); }
   } catch(e){ miss('error: '+(e&&e.stack||e)); }
-  finally{ speedOffDbg(false); try{ await setSceneLevel(keepLevel); }catch(e){} if(profileCurrent()!==was) profileApply(was); await setBackground('camera'); await sleep(30); }
+  finally{ speedOffDbg(false); try{ setSceneLight(light0); }catch(e){} try{ await setSceneLevel(keepLevel); }catch(e){} if(profileCurrent()!==was) profileApply(was); await setBackground('camera'); await sleep(30); }
   return { cases:n, total:d.length, differences:d, notes };
 }
 row({ night:true, at:1008.6399, name:'FOREST paint', drawn:true, run:()=>checkForestPaint(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });

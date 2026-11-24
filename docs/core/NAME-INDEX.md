@@ -296,6 +296,11 @@ RUN 9 (slice 2) — THE FOREST ANSWERS THE PLAYING, softly (never busy).
 - const (1): `WATER_GL`
 - fn (5): `patchGroundWaves`, `patchSway`, `patchWetGround`, `patchSoftEdges`, `buildLife`
 
+## apps/night/rooms/forest/forest-light.js
+SPEED-1 step 5 — THE LIGHT QUALITY'S FOREST (the founder chose all three after looking live, 2026-11-24).
+- const (1): `THIN_MIN`
+- fn (1): `buildLightParts`
+
 ## apps/night/rooms/forest/forest-mirror.js
 NIGHT-9 — THE WATER'S MIRROR (a part of the night forest room; forest.js builds it after the paint pass).
 - const (2): `MIRROR_LAYER`, `MIRROR_LOOK`
@@ -1711,7 +1716,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 UI-1 — «NIGHT labels follow the room»: the founder entered the rain and the Sound button still read «Firefly» while another timbre played.
 - fn (1): `checkNightLabels`
 
-_340 modules, 3276 exported names._
+_341 modules, 3278 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

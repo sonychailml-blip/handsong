@@ -36,6 +36,7 @@ import { groundRoots, groundOcclusion } from './pure/relief.js';   // NIGHT-9: t
 import { buildGust } from './forest-gust.js';   // NIGHT-6 slice 6: the effects hand moves the forest
 import { buildCanopy, patchDapple } from './forest-canopy.js';   // NIGHT-6 slice 7: the canopy, the stars, the dappled moonlight
 import { buildPaint } from './forest-paint.js';   // NIGHT-6 slice 8: the painted distance and the film
+import { buildLightParts } from './forest-light.js';   // SPEED-1 step 5: the Light quality's forest
 import { buildHidden, foxUniforms } from './forest-hidden.js';   // NIGHT-6 slice 9: hidden things the light finds
 import { breathAt } from './pure/paint.js';   // NIGHT-6 slice 5: moss, roots, fallen wood, contact shadows
 import { handLightK, HANDLIGHT_GLOW_OLD } from '../../pure/handlight.js';   // NIGHT-13: the hand's light brighter as its finger closes
@@ -138,7 +139,7 @@ const PF=`uniform vec3 uColor;varying float vA;void main(){vec2 c=gl_PointCoord-
 float a=exp(-r2*7.)+.4*exp(-r2*2.)*(1.-r2);gl_FragColor=vec4(uColor,a*vA);}`;
 
 /* SPEED (the founder: always undoable): every level value a SPEED run changed, as it was before — `?speedoff` builds with these */
-export const SPEED_BEFORE=Object.freeze({ paintScale:1, farTrunks:0 });   // SPEED-1: the paint's first picture at the screen's size; step 4: every trunk in the full bark
+export const SPEED_BEFORE=Object.freeze({ paintScale:1, farTrunks:0, leafEvery:1, plantsPerVertex:false, wildLights:true });   // SPEED-1: the paint's first picture at the screen's size; step 4: every trunk in the full bark; step 5: Light's forest as Standard's
 /* T — the THREE namespace; opt: { C (palette.cv), level 'full' | 'reduced', w, h (canvas CSS pixels), reduce (reduced motion), speedOff (SPEED_BEFORE over the level) } */
 export function buildForest(T, opt){
   const NP=new Set(PARTS), nat=NP.size>0, has=k=>NP.has(k);   // FOREST-2: this build's switches (read once: a later toggle waits for the next opening)
@@ -539,8 +540,13 @@ export function buildForest(T, opt){
   /* FOREST-2e: the cull (?forest=cull, the default parts only): the instances no view ever shows left out (./forest-cull.js, the list ./pure/cull.js) */
   const cullT=cullTargets({ trunks, branches, ferns:fronds, floor:floor.parts, canopy:canopy.parts, stream:stream.parts, wood:wood.parts, grass:detail.grass, bases }), CL=FOREST_CULL[opt.level];
   const cullSt= CULL && CL && CL.list && FOREST_CULL.parts.length===NP.size && FOREST_CULL.parts.every(k=>NP.has(k)) ? cullApply(cullT, CULL_EXTRA ? Object.fromEntries([...new Set([...Object.keys(CL.list), ...Object.keys(CULL_EXTRA)])].map(k=>[k, { n:CL.list[k] ? CL.list[k].n : cullT[k] && cullT[k].count, drop:(CL.list[k] ? CL.list[k].drop : []).concat(CULL_EXTRA[k]||[]) }])) : CL.list) : null;
+  /* SPEED-1 step 5: the Light quality's forest, applied in place by the host (light(on)); its values: the record's `light` over this level */
+  const plantMats=new Set([floor.parts.material, canopy.parts.material, canopy.parts.cards && canopy.parts.cards.material].filter(Boolean)), plants=[];
+  s.traverse(o=>{ if(o.isMesh && plantMats.has(o.material)) plants.push(o); });
+  const lightParts=buildLightParts({ T, plants, wild, own });
+  const lightLv=on=>({ ...(FOREST_LEVELS[opt.level]||FOREST_LEVELS.full), ...(on && FOREST_ROOM.light ? FOREST_ROOM.light : {}), ...(opt.speedOff ? SPEED_BEFORE : {}), ...(opt.lv||{}) });
   resize(W,H);
-  return { id:FOREST_ROOM.id, scene:s, camera, update, resize, place, glint, project, state, dispose, lightsOf, lifeDbg:life, detailDbg:detail, bed, texBytes, answersDbg:answers, floorDbg:floor, streamDbg:stream, woodDbg:wood, gustDbg:gust, canopyDbg:canopy, dappleDbg:DU, render, paintDbg:paint, mirrorDbg:mirror, farTrunksDbg:trunksFar, hiddenDbg:hidden, foxDbg:FU, fernsDbg:{ fronds, frondM, frondD, fr:FR, apart:apartN }, cullDbg:{ targets:cullT, state:cullSt }, woodPlacesDbg:WP, trunksDbg:{ trunks, branches, spots }, trunkBasesDbg:()=>bases, vegDbg:()=>[wood.parts.moss, wood.parts.ivy, life.parts.caps, life.parts.stems, life.parts.petals].filter(m=>m && m.parent), natDbg:()=>({ on:nat, parts:[...NP], moved:{ ...movedN }, solids:SOL ? SOL.length : 0, files:!!NT && !!NT.barkA && !!NT.rockC }), groundDbg:{ U:macroU, branches, brs:brs.length, litter },   // NIGHT-8: probes   // FOREST-2: probes
+  return { id:FOREST_ROOM.id, light:on=>lightParts.set(lightLv(!!on)), lightDbg:lightParts, scene:s, camera, update, resize, place, glint, project, state, dispose, lightsOf, lifeDbg:life, detailDbg:detail, bed, texBytes, answersDbg:answers, floorDbg:floor, streamDbg:stream, woodDbg:wood, gustDbg:gust, canopyDbg:canopy, dappleDbg:DU, render, paintDbg:paint, mirrorDbg:mirror, farTrunksDbg:trunksFar, hiddenDbg:hidden, foxDbg:FU, fernsDbg:{ fronds, frondM, frondD, fr:FR, apart:apartN }, cullDbg:{ targets:cullT, state:cullSt }, woodPlacesDbg:WP, trunksDbg:{ trunks, branches, spots }, trunkBasesDbg:()=>bases, vegDbg:()=>[wood.parts.moss, wood.parts.ivy, life.parts.caps, life.parts.stems, life.parts.petals].filter(m=>m && m.parent), natDbg:()=>({ on:nat, parts:[...NP], moved:{ ...movedN }, solids:SOL ? SOL.length : 0, files:!!NT && !!NT.barkA && !!NT.rockC }), groundDbg:{ U:macroU, branches, brs:brs.length, litter },   // NIGHT-8: probes   // FOREST-2: probes
     shadowAllDbg:on=>{ shadowAll=!!on; if(on && rigs[0].light.castShadow) rigs[0].light.shadow.autoUpdate=true; return { all:shadowAll, casts:rigs[0].light.castShadow, auto:rigs[0].light.castShadow ? rigs[0].light.shadow.autoUpdate : null }; },   // PERF-2: the A/B's other side
     held:sec=>{ heldNow= sec>0 ? sec : 0; rare.held(sec); }, rareDbg:kind=>rare.force(kind, now, { light:rigs[0].cur, flies }), viewDbg:o=>{ const lens=v=>!!(v && (v.fov || v.rest)), had=lens(viewOver); viewOver=o||null; if(had || lens(viewOver)) resize(W, H, pxH); else aimCamera(); return viewOver; },
     rest:on=>{ const was=restOn; restOn=!!on; if(restOn && !was){ goalOf(camLook, camGoal); camOff.copy(camGoal); motionK=0; aimCamera(); } return restOn; },   // NIGHT-13: the camera at rest (host sceneRest)

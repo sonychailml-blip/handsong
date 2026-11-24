@@ -187,6 +187,7 @@ export async function sceneOpen(id=roomId, opt={}){
     try{ room=build(THREE, { C:cv, level, light:lightOn, w:innerWidth, h:innerHeight, reduce:REDUCE, mood:(READ.get('nightSky')||{}).mood, shadow:shadowOn(), lv:optOver && optOver.lv, speedOff:speedOff(), gl2:renderer.capabilities.isWebGL2 }); if(room.rest) room.rest(restWant); resize(); }   // NIGHT-6: gl2 — soft edges need WebGL2
     catch(e){ openFail(op, e); return sceneInfo(); }   // a failed build: the renderer goes, the room's 2D stand-in shows (never black)
     if(!speedOff()) skipDarkLights(THREE, room.scene);   // SPEED-1 step 2: dark point lights skipped, the same pixels (lightskip.js)
+    if(room.light) room.light(lightOn);   // SPEED-1 step 5: a room's Light picture, after the skip (its per-vertex plants keep their own hooks) and before the compile
     last=0; info.t0=0; info.frames=0;
     /* RUN 9 (slice 5): compile every shader NOW (inside the opening, not inside a frame later: a 1–4-s frame) */
     const rm=room, rr=renderer;
@@ -309,7 +310,7 @@ export function setSceneLevel(v){
 }
 /* RAIN-R1: the Light quality (the shell): a room may draw less under it (its record's `light`); read at each build — the shell rebuilds through setSceneLevel */
 let lightOn=false;
-export const setSceneLight=v=>{ const was=lightOn; lightOn=!!v; if(was!==lightOn && renderer && room) resize(); return lightOn; };   // PERF-3: its pixel ratio follows at once
+export const setSceneLight=v=>{ const was=lightOn; lightOn=!!v; if(was!==lightOn && renderer && room){ resize(); if(room.light) room.light(lightOn); } return lightOn; };   // PERF-3: its pixel ratio follows at once; SPEED-1 step 5: a room's Light picture too (in place)
 export const sceneLevel=()=>held||level;   // NIGHT-14c: the player's choice (a held Detailed included); sceneInfo().level is what is drawn
 const shadowOn=()=> shadowOver!=null ? shadowOver : LV[level].shadow;
 export const sceneShadowDbg=v=>{ shadowOver= v==null ? null : !!v; return shadowOver; };
