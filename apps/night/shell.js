@@ -22,7 +22,7 @@ import { profileOf } from '../../core/profile.js';
 import { fsBegin, fsStarted, fsToggle, fsOn, fsOnChange, fsCanToggle } from './fullscreen.js';   // NIGHT-7c: full screen (NIGHT-8b: never while the camera is undecided)
 import { devItems } from './edition.js';   // NIGHT-7b: the release edition (a players' build, or ?release) hides the development items
 import { calWire, calOfferIfNew, calActive, calSideApply, calSideSet, calSettingsRender, calAbort, calDueNow, calOffered, calStep } from './calib.js';   // NIGHT-2: the hand's calibration (its picture is drawn by the loop: main.js afterDraw)
-import { setSceneLevel, setSceneLight, sceneLevel, setBackground, backgroundOf, sceneInfo, sceneRoom, sceneRooms, sceneOptDbg, sceneStartNote } from './scene/host.js';   // RUN 8 (slice 4): the scene's quality (development switch); C8 the measurement
+import { setSceneLevel, setSceneLight, sceneLightInPlace, sceneLevel, setBackground, backgroundOf, sceneInfo, sceneRoom, sceneRooms, sceneOptDbg, sceneStartNote } from './scene/host.js';   // RUN 8 (slice 4): the scene's quality (development switch); C8 the measurement
 import { roomSwitch, roomNext, natureLight } from './roomswitch.js';
 import { setTabsWire } from './settabs.js';   // DESIGN-1 part C: the settings in three tabs (revert: docs/night/design/DESIGN-1-settings-before.html)   // NIGHT-3 stage 5 part 2: the Room button
 import { persistInfo } from './persist.js';   // NIGHT-15: whether the browser keeps Night's files
@@ -292,8 +292,8 @@ function lightApply(v){
 }
 /* NIGHT-16: the player's quality choice → the Light flag, the sound, the picture level (a promise: the level may load its pictures) */
 export function qualitySet(q){ if(!QUALITIES.includes(q)) return Promise.resolve(false);
-  const S=qualityState(q); save(KEY.light, S.light); lightApply(S.light==='1');
-  return Promise.resolve(setSceneLevel(S.level)).then(()=>true); }
+  const S=qualityState(q), inPlace=sceneLightInPlace(S.level); save(KEY.light, S.light); lightApply(S.light==='1');
+  return inPlace ? Promise.resolve(true) : Promise.resolve(setSceneLevel(S.level)).then(()=>true); }   // SPEED-1 step 6: Standard ↔ Light in the forest without a rebuild (the room turns it in place)
 export const qualityOf=()=>quality();
 /* UI-1, probes only: the labels of Sound, Music and Mood against what plays; stale (the CONTROL): the room-music word ignored (the old way) */
 let labelsStale=false;

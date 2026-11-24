@@ -28,6 +28,7 @@ import { speedOffDbg } from '../../../apps/night/speed.js';
 import { lightSkipInfo } from '../../../apps/night/scene/lightskip.js';   // SPEED-1: the paint row's exact identity is the undo build's
 import { SPEED_BEFORE } from '../../../apps/night/rooms/forest/forest.js';   // SPEED-1 step 5
 import { THIN_MIN } from '../../../apps/night/rooms/forest/forest-light.js';
+import { forestMemoDbg } from '../../../apps/night/rooms/forest/forest-memo.js';   // SPEED-1 step 6
 import { streamNear } from '../../../apps/night/rooms/forest/pure/forestlife.js';   // RUN 9 (slice 2)
 import { lifePlaces } from '../../../apps/night/rooms/forest/pure/forestlife.js';   // NIGHT-6 slice 5
 import { woodPlaces, barkMoss, barkUv, woodPieces } from '../../../apps/night/rooms/forest/pure/wood.js';   // NIGHT-8b: barkMoss; NIGHT-8c: barkUv, woodPieces
@@ -752,7 +753,7 @@ function checkFarTrunks(T, mk, miss, notes, add){
 }
 /* SPEED-1 step 5: the Light quality's forest (rooms built without a renderer) — light(true) on Standard keeps exactly every leafEvery-th card of each plant
    set over THIN_MIN (matrix, colour and cell, in order; smaller sets whole), draws every plant in a per-vertex copy of its own material (the same map,
-   cut, sides, blending and hooks), hides the wild fireflies' two lights and touches nothing else; light(false) gives Standard back byte for byte (twice
+   cut, sides, blending and hooks), holds the wild fireflies' two lights dark (CONTROL: lit without Light) and touches nothing else; light(false) gives Standard back byte for byte (twice
    over); the undo build (speedOff) and Detailed change nothing. The record: Standard's values are SPEED_BEFORE's. CONTROL the kept cards checked
    against the cards in between (the card check can fail) */
 function checkLightForest(T, mk, miss, notes, add){
@@ -777,12 +778,14 @@ function checkLightForest(T, mk, miss, notes, add){
   if(badSet) miss(`light(true): ${badSet} plant values off (counts, kept cards, the per-vertex copies)`);
   if(badCtl) miss(`CONTROL: in ${badCtl} sets the cards in between equal the kept ones (the card check cannot fail)`);
   let other=0; for(const [o, x] of S0.m) if(!plants.includes(o)){ const y=S1.m.get(o); if(y.mat!==x.mat || y.count!==x.count) other++; }
-  for(const [l, v] of S0.l) if(S1.l.get(l)!==(wild.includes(l) ? false : v)) other++;
+  for(const [l, v] of S0.l) if(S1.l.get(l)!==v) other++;   // step 6: the wild lights stay in the scene (held dark by the frame)
   if(other) miss(`light(true) changed ${other} things outside the plants and the wild lights`);
   r.light(false); const B1=same(S0, snap()); r.light(true); r.light(true); const S2=snap(), again=same(S1, S2); r.light(false); const B2=same(S0, snap());
   if(B1 || B2) miss(`light(false) left ${B1} / ${B2} things unlike Standard`); if(again) miss(`light(true) a second time differs in ${again} things`);
+  { const F={ mood:'major-penta', sleep:0 }, I=()=>wild.map(l=>l.intensity); r.light(true); r.update(1/60, 10, [], null, F); const on=I(); r.light(false); r.update(1/60, 10.1, [], null, F); const off=I(); add(2);   // after the exact comparisons: a frame moves the room
+    if(on.some(v=>v!==0)) miss('Light: the wild lights not dark: '+on.join()); if(!off.some(v=>v>0)) miss('CONTROL: without Light the wild lights are dark too ('+off.join()+'): the darkness check cannot fail'); }
   const u=mk('reduced', { speedOff:true }), U0=u.lightDbg.state(), su=u.light(true); if(su.every!==1 || su.perVertex || !su.wildLights || su.sets.join()!==U0.sets.join()) miss('the undo build changes under Light: '+JSON.stringify(su));
-  const f=mk('full'), sf=f.light(false); if(sf.every!==1 || sf.perVertex || !sf.wildLights) miss('Detailed is not the plain plants: '+JSON.stringify(sf));
+  const f=mk('full'), sf=f.light(true); if(sf.every!==1 || sf.perVertex || !sf.wildLights) miss('Detailed is not the plain plants: '+JSON.stringify(sf));
   notes.push(`Light: ${kept} of ${cards} cards kept in ${thinable.length} sets (every ${k}th), ${plants.length} plant meshes in ${D.parts.pv.size} per-vertex materials, ${wild.length} wild lights off; Standard back exactly`);
 }
 export async function checkForestPaint(){
@@ -839,6 +842,29 @@ export async function checkForestPaint(){
   return { cases:n, total:d.length, differences:d, notes };
 }
 row({ night:true, at:1008.6399, name:'FOREST paint', drawn:true, run:()=>checkForestPaint(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });
+/* SPEED-1 step 6: row «FOREST places remembered» — rooms built without a renderer, at Standard and Detailed: the world's first build records its place
+   searches, the second replays them; every mesh's and point set's instance matrices, colours and positions equal byte for byte, the replay hit every
+   recorded call (no miss, nothing searched afresh). CONTROL: one recorded answer moved by hand shows in the next replayed room (the comparison can fail) */
+export async function checkForestMemo(){
+  const d=[], notes=[]; let n=0; const miss=s=>d.push(s), was=forestMemoDbg();
+  try{
+    const T=await loadThree(); await forestAssets('full'); await forestAssets('reduced'); const w=844, h=390, rooms=[], mk=lv=>{ const r=buildForest(T,{ C:cv, level:lv, w, h, gl2:true }); rooms.push(r); return r; };
+    const print=r=>{ const out=[]; r.scene.traverse(o=>{ if(!o.isMesh && !o.isPoints) return; const a=[o.type, o.count|0, o.isInstancedMesh ? o.instanceMatrix.array : null, o.isInstancedMesh && o.instanceColor ? o.instanceColor.array : null, o.geometry && o.geometry.attributes.position ? o.geometry.attributes.position.array : null]; out.push(a); }); return out; };
+    const diff=(A, B)=>{ if(A.length!==B.length) return `${A.length} vs ${B.length} objects`; let bad=0; A.forEach((a, i)=>{ const b=B[i]; if(a[0]!==b[0] || a[1]!==b[1]){ bad++; return; } for(let k=2;k<5;k++){ const x=a[k], y=b[k]; if(!x && !y) continue; if(!x || !y || x.length!==y.length || x.some((v, j)=>!Object.is(v, y[j]))){ bad++; return; } } }); return bad ? bad+' objects differ' : ''; };
+    try{
+      forestMemoDbg({ off:false, clear:true });
+      for(const lv of ['reduced', 'full']){ const B=mk(lv), C=mk(lv), sb=B.memoDbg(), sc=C.memoDbg(), all=Object.values(sb.calls).reduce((a, b)=>a+b, 0); n+=3;
+        if(sb.replay || !(all>100)) miss(`${lv}: the first build did not record: ${JSON.stringify(sb)}`);
+        if(!sc.replay || sc.misses || sc.hits!==all) miss(`${lv}: the replay ${JSON.stringify(sc)} of ${all} recorded calls`);
+        const pb=print(B), e=diff(pb, print(C)); if(e) miss(`${lv}: the replayed room differs from the searched one: ${e}`);
+        notes.push(`${lv}: ${all} searches recorded (${Object.entries(sb.calls).map(([k, v])=>k+' '+v).join(', ')}), all replayed; ${pb.length} objects equal`);
+        if(lv==='reduced'){ forestMemoDbg({ poke:'grass' }); const D=mk(lv), e2=diff(pb, print(D)); n++; if(!e2) miss('CONTROL: a recorded answer moved by hand does not show in the replayed room'); else notes.push('CONTROL: one grass answer moved → '+e2); } }
+    } finally { for(const r of rooms) r.dispose(); }
+  } catch(e){ miss('error: '+(e&&e.stack||e)); }
+  finally{ forestMemoDbg({ off:was.off, clear:true }); }
+  return { cases:n, total:d.length, differences:d, notes };
+}
+row({ night:true, at:1008.6401, name:'FOREST places remembered', run:()=>checkForestMemo(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });
 /* NIGHT-6 slice 9: row «FOREST hidden» — the room built without a renderer: the foxfire's trail as long as the level asks and the wood's and
    bark's shaders carry it (their program keys), the flowers counted; the baseline has neither; the playing light moved through the room's
    update leaves a trail and opens the flower it reaches — CONTROL a flower it never reaches stays closed; drawn (medium): the foxfire on the

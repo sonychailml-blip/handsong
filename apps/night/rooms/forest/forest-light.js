@@ -2,7 +2,8 @@
    Light is on (the room's record `light`, over Standard's level):
    - leafEvery 2: every other card of each dense plant set (crown sprays, spruce cards, herbs, fine ferns; a set of ≤ THIN_MIN cards stays whole);
    - plantsPerVertex: the plants lit per vertex (Lambert; the same sway, cells and soft edges — their patches touch only the vertex and alpha stages);
-   - wildLights false: the wild fireflies keep their glow but lose their own two point lights.
+   - wildLights false: the wild fireflies keep their glow but lose their own two point lights (held at intensity 0 — the dark-light skip passes them by;
+     hiding them would change every lit program: SPEED-1 step 6 measured a 5-s first switch).
    Applied and undone in place, without a rebuild (the host calls the room's `light(on)` at the opening and when Light turns on or off):
    Standard's arrays, counts and materials come back exactly. Neutral values (Standard, ?speedoff) change nothing. */
 export const THIN_MIN=20;
@@ -27,8 +28,8 @@ export function buildLightParts(ctx){
     const e=Math.max(1, Math.floor(L.leafEvery)||1), p=!!L.plantsPerVertex, w=L.wildLights!==false;
     if(e!==every){ if(undoThin){ undoThin(); undoThin=null; } if(e>1) undoThin=thin(e); every=e; }
     if(p!==perVertex){ for(const o of plants) o.material= p ? pv.get(orig.get(o)) : orig.get(o); perVertex=p; }
-    if(w!==wildOn){ for(const l of wild) l.visible=w; wildOn=w; }
+    wildOn=w;   // the room's frame holds them at 0 (wildOff)
     return state(); }
   const state=()=>({ every, perVertex, wildLights:wildOn, sets:thinable.map(o=>o.count), plants:plants.length, materials:pv.size });
-  return { set, state, parts:{ plants, thinable, wild, pv } };   // parts: probes
+  return { set, state, wildOff:()=>!wildOn, parts:{ plants, thinable, wild, pv } };   // parts: probes
 }

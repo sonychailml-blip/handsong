@@ -5,8 +5,8 @@
   "cores": 4
  },
  "startSet": {
-  "files": 261,
-  "kb": 27014
+  "files": 262,
+  "kb": 27019
  },
  "audioBuilt": {
   "Worklet:frz-store": 1,
@@ -20,10 +20,10 @@
   "Oscillator": 31,
   "WaveShaper": 2,
   "Buffer": 3,
+  "Worklet:night-bed": 1,
   "Convolver": 1,
   "BufferSource": 1,
   "StereoPanner": 6,
-  "Worklet:night-bed": 1,
   "Worklet:night-nature": 1
  },
  "cases": {
@@ -31,7 +31,7 @@
    "sceneMeshes": 58,
    "sceneMaterials": 34,
    "sceneTrisCap": 428589,
-   "programs": 29,
+   "programs": 30,
    "texKB": 33675,
    "textures": 29,
    "buffer": "1152x648",
@@ -55,7 +55,7 @@
    "sceneMeshes": 58,
    "sceneMaterials": 34,
    "sceneTrisCap": 428589,
-   "programs": 29,
+   "programs": 30,
    "texKB": 33675,
    "textures": 29,
    "buffer": "863x485",
@@ -166,6 +166,7 @@
   "/apps/night/rooms/forest/forest-hidden.js",
   "/apps/night/rooms/forest/forest-life.js",
   "/apps/night/rooms/forest/forest-light.js",
+  "/apps/night/rooms/forest/forest-memo.js",
   "/apps/night/rooms/forest/forest-mirror.js",
   "/apps/night/rooms/forest/forest-natural.js",
   "/apps/night/rooms/forest/forest-paint.js",

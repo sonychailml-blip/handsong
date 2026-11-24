@@ -193,6 +193,7 @@ export async function sceneOpen(id=roomId, opt={}){
     const rm=room, rr=renderer;
     try{ await compileSliced(rr, rm.scene, rm.camera, ()=>room===rm && renderer===rr && opening===op); }catch(e){ errors.push('compile: '+(e&&e.message||e)); }
     if(room!==rm || renderer!==rr || opening!==op) return sceneInfo();   // superseded meanwhile: the newer opening is in charge
+    if(rm.light){ try{ rm.light(!lightOn); rr.compile(rm.scene, rm.camera); }catch(e){ errors.push('compile (Light): '+(e&&e.message||e)); } finally{ rm.light(lightOn); } }   // SPEED-1 step 6: the other Light picture's programs too (the per-vertex plants) — its first switch waits for nothing
     info.openMs=Math.round(performance.now()-tb);
     OPEN_LOG.push({ id, level, ms:info.openMs, programs:(renderer.info.programs||[]).length }); if(OPEN_LOG.length>24) OPEN_LOG.splice(1, 1);   // NIGHT-6 slice 0: the first stays
     bedSeq=READ.seq('bed'); }   // NIGHT-6: a new room starts with the bed's next events (older ones were heard before it)
@@ -308,8 +309,10 @@ export function setSceneLevel(v){
   if(room){ room.dispose(); room=null; } dropRenderer(true); stackSet('scene', false);
   return sceneOpen(roomId).catch(e=>{ errors.push(String(e&&e.message||e)); level='minimal'; return sceneInfo(); });
 }
-/* RAIN-R1: the Light quality (the shell): a room may draw less under it (its record's `light`); read at each build — the shell rebuilds through setSceneLevel */
+/* RAIN-R1: the Light quality (the shell): a room may draw less under it (its record's `light`); read at each build — the shell rebuilds through setSceneLevel.
+   SPEED-1 step 6: a room that turns its Light picture on and off in place (its `light(on)`, the forest) needs no rebuild at the same level — sceneLightInPlace(v) */
 let lightOn=false;
+export const sceneLightInPlace=v=> bg==='forest' && !!room && !!room.light && !opening && !held && level===v && room.id===roomId;
 export const setSceneLight=v=>{ const was=lightOn; lightOn=!!v; if(was!==lightOn && renderer && room){ resize(); if(room.light) room.light(lightOn); } return lightOn; };   // PERF-3: its pixel ratio follows at once; SPEED-1 step 5: a room's Light picture too (in place)
 export const sceneLevel=()=>held||level;   // NIGHT-14c: the player's choice (a held Detailed included); sceneInfo().level is what is drawn
 const shadowOn=()=> shadowOver!=null ? shadowOver : LV[level].shadow;
