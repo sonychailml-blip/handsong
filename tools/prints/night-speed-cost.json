@@ -1,12 +1,12 @@
 {
- "made": "2026-11-23",
+ "made": "2026-11-24",
  "machine": {
   "gpu": "ANGLE (Intel, Intel(R) HD Graphics 4000 (0x00000166) Direct3D11 vs_5_0 ps_5_0, D3D11)",
   "cores": 4
  },
  "startSet": {
   "files": 260,
-  "kb": 27008
+  "kb": 27010
  },
  "audioBuilt": {
   "Worklet:frz-store": 1,
@@ -28,10 +28,10 @@
  },
  "cases": {
   "forest reduced": {
-   "sceneMeshes": 57,
-   "sceneMaterials": 33,
-   "sceneTrisCap": 395389,
-   "programs": 28,
+   "sceneMeshes": 58,
+   "sceneMaterials": 34,
+   "sceneTrisCap": 428589,
+   "programs": 29,
    "texKB": 33675,
    "textures": 29,
    "buffer": "1152x648",
@@ -52,10 +52,10 @@
    }
   },
   "forest light": {
-   "sceneMeshes": 57,
-   "sceneMaterials": 33,
-   "sceneTrisCap": 395389,
-   "programs": 28,
+   "sceneMeshes": 58,
+   "sceneMaterials": 34,
+   "sceneTrisCap": 428589,
+   "programs": 29,
    "texKB": 33675,
    "textures": 29,
    "buffer": "863x485",

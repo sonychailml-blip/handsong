@@ -138,7 +138,7 @@ const PF=`uniform vec3 uColor;varying float vA;void main(){vec2 c=gl_PointCoord-
 float a=exp(-r2*7.)+.4*exp(-r2*2.)*(1.-r2);gl_FragColor=vec4(uColor,a*vA);}`;
 
 /* SPEED (the founder: always undoable): every level value a SPEED run changed, as it was before — `?speedoff` builds with these */
-export const SPEED_BEFORE=Object.freeze({ paintScale:1 });   // SPEED-1: the paint's first picture at the screen's size
+export const SPEED_BEFORE=Object.freeze({ paintScale:1, farTrunks:0 });   // SPEED-1: the paint's first picture at the screen's size; step 4: every trunk in the full bark
 /* T — the THREE namespace; opt: { C (palette.cv), level 'full' | 'reduced', w, h (canvas CSS pixels), reduce (reduced motion), speedOff (SPEED_BEFORE over the level) } */
 export function buildForest(T, opt){
   const NP=new Set(PARTS), nat=NP.size>0, has=k=>NP.has(k);   // FOREST-2: this build's switches (read once: a later toggle waits for the next opening)
@@ -521,16 +521,26 @@ export function buildForest(T, opt){
   function texBytes(){ let b=0; for(const o of own){ if(!o || !o.isTexture) continue; const im=o.image||{}, w=im.width||0, h=im.height||0, pot=!(w&(w-1)) && !(h&(h-1));
     b+=w*h*(o.format===T.RedFormat ? 1 : 4)*(o.generateMipmaps!==false && pot ? 4/3 : 1); } return Math.round(b); }   // NIGHT-6 slice 5: one byte a texel for one channel
   const hidden=buildHidden({ T, s, C, own, lv:Lv, FU, herbs:floor.state().places, glowMat:life.glowMat });   // NIGHT-6 slice 9 (before the paint: its glow goes to the glow pass)
+  /* SPEED-1 step 4 (the founder chose the bold rule): every trunk farther than Lv.farTrunks metres from the eye gets the bark map alone, lit per vertex
+     (no moss, lichen, natural maps, per-pixel light or foxfire — accepted: the hand's light gone deep no longer marks them). Their slots in `trunks` are
+     emptied (indices kept); 0 = off */
+  let trunksFar=null;
+  if(Lv.farTrunks>0){ const m=new T.Matrix4(), zero=new T.Matrix4().makeScale(0, 0, 0), far=[];
+    for(let i=0;i<trunks.count;i++){ trunks.getMatrixAt(i, m); const e=m.elements; if(Math.hypot(e[0], e[1], e[2])===0) continue;   // a seen trunk (drawn with its roots) is empty here
+      if(Math.hypot(e[12]-camPos.x, e[14]-camPos.z)>Lv.farTrunks) far.push(i); }
+    if(far.length){ const fm=new T.MeshLambertMaterial({ map:barkM.map }); own.push(fm); trunksFar=new T.InstancedMesh(trunkG, fm, far.length);
+      far.forEach((i, j)=>{ trunks.getMatrixAt(i, m); trunksFar.setMatrixAt(j, m); trunks.setMatrixAt(i, zero); }); trunks.instanceMatrix.needsUpdate=true;
+      trunksFar.castShadow=trunks.castShadow; trunksFar.receiveShadow=trunks.receiveShadow; trunksFar.layers.mask=trunks.layers.mask; s.add(trunksFar); } }
   const paint=buildPaint({ T, scene:s, camera, lv:Lv, gl2:opt.gl2, own });   // NIGHT-6 slice 8: after every object is in the scene (it sorts the glowing ones into their pass)
   /* NIGHT-9: the water's mirror — the silhouettes against the sky drawn from below the water's plane (the mean water level in view) */
   const waterY=(()=>{ const P=STREAM_LINE.filter(q=>q.z>-12 && q.z<4); return P.reduce((a,q)=>a+q.y,0)/Math.max(1, P.length); })();
-  const mirror=buildMirror({ T, s, camera, lv:Lv, y:waterY, WU:life.WU, paint, silhouettes:[trunks, branches, canopy.parts.wood, canopy.parts.leaves, canopy.parts.stars, moonS, moonD, ...clouds], own, skyCol:pal.sky });
+  const mirror=buildMirror({ T, s, camera, lv:Lv, y:waterY, WU:life.WU, paint, silhouettes:[trunks, trunksFar, branches, canopy.parts.wood, canopy.parts.leaves, canopy.parts.stars, moonS, moonD, ...clouds], own, skyCol:pal.sky });
   const render=r=>{ mirror.render(r, now*1000); paint.render(r, now); };   // NIGHT-9: the mirror first, when due by the room's own clock (one frame drawn twice stays one picture)   // the room's own frame time: one frame drawn twice is the same picture (the grain too)
   /* FOREST-2e: the cull (?forest=cull, the default parts only): the instances no view ever shows left out (./forest-cull.js, the list ./pure/cull.js) */
   const cullT=cullTargets({ trunks, branches, ferns:fronds, floor:floor.parts, canopy:canopy.parts, stream:stream.parts, wood:wood.parts, grass:detail.grass, bases }), CL=FOREST_CULL[opt.level];
   const cullSt= CULL && CL && CL.list && FOREST_CULL.parts.length===NP.size && FOREST_CULL.parts.every(k=>NP.has(k)) ? cullApply(cullT, CULL_EXTRA ? Object.fromEntries([...new Set([...Object.keys(CL.list), ...Object.keys(CULL_EXTRA)])].map(k=>[k, { n:CL.list[k] ? CL.list[k].n : cullT[k] && cullT[k].count, drop:(CL.list[k] ? CL.list[k].drop : []).concat(CULL_EXTRA[k]||[]) }])) : CL.list) : null;
   resize(W,H);
-  return { id:FOREST_ROOM.id, scene:s, camera, update, resize, place, glint, project, state, dispose, lightsOf, lifeDbg:life, detailDbg:detail, bed, texBytes, answersDbg:answers, floorDbg:floor, streamDbg:stream, woodDbg:wood, gustDbg:gust, canopyDbg:canopy, dappleDbg:DU, render, paintDbg:paint, mirrorDbg:mirror, hiddenDbg:hidden, foxDbg:FU, fernsDbg:{ fronds, frondM, frondD, fr:FR, apart:apartN }, cullDbg:{ targets:cullT, state:cullSt }, woodPlacesDbg:WP, trunksDbg:{ trunks, branches, spots }, trunkBasesDbg:()=>bases, vegDbg:()=>[wood.parts.moss, wood.parts.ivy, life.parts.caps, life.parts.stems, life.parts.petals].filter(m=>m && m.parent), natDbg:()=>({ on:nat, parts:[...NP], moved:{ ...movedN }, solids:SOL ? SOL.length : 0, files:!!NT && !!NT.barkA && !!NT.rockC }), groundDbg:{ U:macroU, branches, brs:brs.length, litter },   // NIGHT-8: probes   // FOREST-2: probes
+  return { id:FOREST_ROOM.id, scene:s, camera, update, resize, place, glint, project, state, dispose, lightsOf, lifeDbg:life, detailDbg:detail, bed, texBytes, answersDbg:answers, floorDbg:floor, streamDbg:stream, woodDbg:wood, gustDbg:gust, canopyDbg:canopy, dappleDbg:DU, render, paintDbg:paint, mirrorDbg:mirror, farTrunksDbg:trunksFar, hiddenDbg:hidden, foxDbg:FU, fernsDbg:{ fronds, frondM, frondD, fr:FR, apart:apartN }, cullDbg:{ targets:cullT, state:cullSt }, woodPlacesDbg:WP, trunksDbg:{ trunks, branches, spots }, trunkBasesDbg:()=>bases, vegDbg:()=>[wood.parts.moss, wood.parts.ivy, life.parts.caps, life.parts.stems, life.parts.petals].filter(m=>m && m.parent), natDbg:()=>({ on:nat, parts:[...NP], moved:{ ...movedN }, solids:SOL ? SOL.length : 0, files:!!NT && !!NT.barkA && !!NT.rockC }), groundDbg:{ U:macroU, branches, brs:brs.length, litter },   // NIGHT-8: probes   // FOREST-2: probes
     shadowAllDbg:on=>{ shadowAll=!!on; if(on && rigs[0].light.castShadow) rigs[0].light.shadow.autoUpdate=true; return { all:shadowAll, casts:rigs[0].light.castShadow, auto:rigs[0].light.castShadow ? rigs[0].light.shadow.autoUpdate : null }; },   // PERF-2: the A/B's other side
     held:sec=>{ heldNow= sec>0 ? sec : 0; rare.held(sec); }, rareDbg:kind=>rare.force(kind, now, { light:rigs[0].cur, flies }), viewDbg:o=>{ const lens=v=>!!(v && (v.fov || v.rest)), had=lens(viewOver); viewOver=o||null; if(had || lens(viewOver)) resize(W, H, pxH); else aimCamera(); return viewOver; },
     rest:on=>{ const was=restOn; restOn=!!on; if(restOn && !was){ goalOf(camLook, camGoal); camOff.copy(camGoal); motionK=0; aimCamera(); } return restOn; },   // NIGHT-13: the camera at rest (host sceneRest)

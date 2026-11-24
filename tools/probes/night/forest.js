@@ -727,8 +727,29 @@ row({ night:true, at:1008.6398, name:'FOREST canopy', drawn:true, run:()=>checkF
    CONTROL one frame twice differs by 0. SPEED-1: those drawn checks run on the UNDO build (speedOffDbg(true): the first picture at the
    screen's size, as before) — the undo gives the old pipeline exactly; then the SPEED build's first picture is exactly round(buffer × the
    level's paintScale) on each side — CONTROL the undo build's picture is the buffer itself (the size check tells the two apart). */
+/* SPEED-1 step 4: the far trunks (rooms built without a renderer) — at Standard every trunk beyond the level's farTrunks metres of the eye (x, z) is in
+   the plain mesh (the bark map alone, the main mesh's layers), every other one stays in the full bark; nothing lost or doubled against the same room
+   built with farTrunks 0; Detailed has none — CONTROL the room built with 0 has trunks beyond that distance (the distance check can fail). Returns the count */
+function checkFarTrunks(T, mk, miss, notes, add){
+  const D=FOREST_LEVELS.reduced.farTrunks, m=new T.Matrix4(), e=m.elements;
+  const slots=o=>{ const a=[]; for(let i=0;i<o.count;i++){ o.getMatrixAt(i, m); if(Math.hypot(e[0], e[1], e[2])>0) a.push([e[12], e[14]]); } return a; };
+  const mainOf=(r, like)=>{ let w=null; r.scene.traverse(o=>{ if(o.isInstancedMesh && o!==r.farTrunksDbg && (like.geometry ? o.geometry===like.geometry : o.count===like.count && o.geometry.attributes.position.count===like.pos)) w=o; }); return w; };   // the main mesh shares the plain one's geometry; in another room: its count and size
+  const full=mk('full'), on=mk('reduced'), off=mk('reduced', { lv:{ farTrunks:0 } }), f=on.farTrunksDbg; add(6);
+  if(full.farTrunksDbg) miss('Detailed has plain far trunks: '+full.farTrunksDbg.count);
+  if(off.farTrunksDbg) miss('farTrunks 0 still builds plain far trunks');
+  if(!(D>0) || !f){ miss('Standard has no plain far trunks (farTrunks '+D+')'); return -1; }
+  const main=mainOf(on, f), main0=main && mainOf(off, { count:main.count, pos:main.geometry.attributes.position.count }); if(!main || !main0){ miss('the trunk mesh not found'); return -1; }
+  const eye=on.camera.position, dist=([x, z])=>Math.hypot(x-eye.x, z-eye.z), far=slots(f), near=slots(main), all=slots(main0), key=a=>a.map(p=>p.map(v=>v.toFixed(4)).join(',')).sort().join(';');
+  if(key([...far, ...near])!==key(all)) miss(`trunks lost or doubled: ${far.length} plain + ${near.length} full vs ${all.length}`);
+  const badFar=far.filter(p=>!(dist(p)>D)).length, badNear=near.filter(p=>dist(p)>D).length; if(badFar || badNear) miss(`${badFar} plain trunks within ${D} m, ${badNear} full ones beyond`);
+  if(!f.material.isMeshLambertMaterial || f.material.map!==main.material.map) miss('the plain trunks are not the bark map alone');
+  if(f.layers.mask!==main.layers.mask) miss('the plain trunks are not on the full ones\' layers (the mirror, the paint)');
+  const beyond=all.filter(p=>dist(p)>D).length; if(!(beyond>0) || beyond!==far.length) miss(`CONTROL: the room built with 0 has ${beyond} trunks beyond ${D} m (plain ${far.length})`);
+  notes.push(`far trunks: ${far.length} of ${all.length} beyond ${D} m of the eye (${eye.x.toFixed(2)}, ${eye.z.toFixed(2)}) in the plain bark, ${near.length} in the full one; Detailed none`);
+  return far.length;
+}
 export async function checkForestPaint(){
-  const d=[], notes=[]; let n=0; const miss=s=>d.push(s);
+  const d=[], notes=[]; let n=0, farCount=-1; const miss=s=>d.push(s);
   const was=profileCurrent(), keepLevel=sceneLevel();
   try{
     const T=await loadThree(); await forestAssets('full'); await forestAssets('reduced'); const w=844, h=390, rooms=[], mk=(lv, o={})=>{ const r=buildForest(T,{ C:cv, level:lv, w, h, gl2:true, ...o }); rooms.push(r); return r; };
@@ -744,6 +765,7 @@ export async function checkForestPaint(){
       { const r=mk('reduced', { lv:{ paint:false, paintR:0, vignette:false, grain:false, breath:false } }), st=r.state().paint, x=t=>{ r.update(1/60, t, [], null, NIN); return r.camera.position.x; }; n+=2;
         if(st.on || st.breath) miss('the baseline still paints or breathes: '+JSON.stringify(st)); if(x(10)!==x(12)) miss('CONTROL: the baseline camera moves sideways'); }
       { const m=new T.MeshStandardMaterial(); n++; if(m.userData.depthAware) miss('CONTROL: a plain material has a depth test of its own'); m.dispose(); }
+      farCount=checkFarTrunks(T, mk, miss, notes, k=>{ n+=k; });   // SPEED-1 step 4
     } finally { for(const r of rooms) r.dispose(); }
     const why=profileApply('profile.night'); n++; if(why){ miss('Night refused: '+why); return { cases:n, total:d.length, differences:d, notes }; }
     speedOffDbg(true); await setSceneLevel('reduced'); await setBackground('forest'); await frames(6);
@@ -751,7 +773,8 @@ export async function checkForestPaint(){
     const sizeOk=(st, K)=>{ const b=sceneInfo().guard.buffer; return !!(st.size && b && st.size[0]===Math.max(1, Math.round(b[0]*K)) && st.size[1]===Math.max(1, Math.round(b[1]*K))); };
     { const st=room.paintDbg.state(), K=FOREST_LEVELS.reduced.paintScale; n+=2; if(st.K!==1 || !sizeOk(st, 1)) miss('the undo build: the first picture is not the buffer '+JSON.stringify(st.size)+' vs '+JSON.stringify(sceneInfo().guard.buffer));
       if(!(K<1) || sizeOk(st, K)) miss('CONTROL: the size check does not tell the undo build ('+JSON.stringify(st.size)+') from paintScale '+K);
-      const ls=lightSkipInfo(room.scene); n++; if(!(ls.lit>0) || ls.none!==ls.lit) miss('the undo build has the dark-light skip (step 2): '+JSON.stringify(ls)); }   // SPEED-1 step 2
+      const ls=lightSkipInfo(room.scene); n++; if(!(ls.lit>0) || ls.none!==ls.lit) miss('the undo build has the dark-light skip (step 2): '+JSON.stringify(ls));   // SPEED-1 step 2
+      n++; if(room.farTrunksDbg) miss('the undo build has plain far trunks (step 4): '+room.farTrunksDbg.count); }
     const P=room.paintDbg, glows=[]; room.scene.traverse(o=>{ if((o.isSprite || o.isPoints) && o.visible){ glows.push(o); o.visible=false; } });
     try{
       const keep=P.set({ uR:0, uSoft:0, uVig:0, uGrain:0, uGrade:0 }); await frames(3);
@@ -768,7 +791,8 @@ export async function checkForestPaint(){
     { const r2=sceneRoomDbg(), st=r2 && r2.paintDbg.state(), K=FOREST_LEVELS.reduced.paintScale; n++;
       if(!st || st.K!==K || !sizeOk(st, K)) miss(`the speed build: the first picture ${JSON.stringify(st && st.size)} (K ${st && st.K}) is not round(${JSON.stringify(sceneInfo().guard.buffer)} × ${K})`);
       else notes.push(`the first picture ${st.size.join('×')} = ${K} × the buffer ${sceneInfo().guard.buffer.join('×')} (the undo build: the buffer itself)`);
-      const ls=r2 && lightSkipInfo(r2.scene); n++; if(!ls || !(ls.compiled>0) || ls.missing) miss('the speed build: the dark-light skip is not in the lit programs '+JSON.stringify(ls)); else notes.push('the speed build\'s lit materials '+JSON.stringify(ls)); }
+      const ls=r2 && lightSkipInfo(r2.scene); n++; if(!ls || !(ls.compiled>0) || ls.missing) miss('the speed build: the dark-light skip is not in the lit programs '+JSON.stringify(ls)); else notes.push('the speed build\'s lit materials '+JSON.stringify(ls));
+      const fc=r2 && r2.farTrunksDbg ? r2.farTrunksDbg.count : 0; n++; if(!(fc>0) || fc!==farCount) miss(`the speed build: ${fc} plain far trunks, the built room had ${farCount}`); }   // SPEED-1 step 4
   } catch(e){ miss('error: '+(e&&e.stack||e)); }
   finally{ speedOffDbg(false); try{ await setSceneLevel(keepLevel); }catch(e){} if(profileCurrent()!==was) profileApply(was); await setBackground('camera'); await sleep(30); }
   return { cases:n, total:d.length, differences:d, notes };
