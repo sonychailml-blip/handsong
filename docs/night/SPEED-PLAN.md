@@ -41,8 +41,8 @@ Quality is kept. Runs are named `SPEED-n` (NIGHT track; a core part is its own s
 6. A steady 30 fps picture on weak devices (frees the GPU for the hands).
 7. A one-time hint to switch the browser to the high-performance GPU when an integrated one is in use.
 
-## Stage 2 — faster sound
-1. A smaller audio buffer where the device holds it with zero underruns.
+## Stage 2 — faster sound — ⏸ POSTPONED, every item (the founder, 2026-11-25: no sound work for now; to come back to later)
+1. ~~A smaller audio buffer~~ — skipped (the founder, 2026-11-25: the gain unclear and small; we already ask for 'interactive', Windows adds its own part).
 2. A lighter engine: voices built when needed, cached and gated after (rule #3), not 24 up front — the same sound (sample-exact proof).
 3. ~~A faster audible onset for slow-attack timbres~~ — struck (the founder, 2026-11-25).
 4. ~~Adaptive smoothing of volume and depth~~ — struck (the founder, 2026-11-25).
@@ -51,7 +51,7 @@ Quality is kept. Runs are named `SPEED-n` (NIGHT track; a core part is its own s
 ## Stage 3 — smoothness of the whole app
 1. A stutter recorder: each late frame logged with its cause (picture, hands, sound, garbage collection).
 2. No per-frame garbage: reuse objects in the hot paths.
-3. The Detailed forest (15 fps): its costliest parts made cheaper invisibly (trunks, the hand light's cube shadow, undergrowth, ground).
+3. ~~The Detailed forest made cheaper~~ — struck (the founder, 2026-11-25: Detailed stays exactly as it is).
 4. The interface: menus, cards and transitions without effects too costly for weak GPUs.
 5. Largest step, last: the room's picture in its own thread (OffscreenCanvas), so the interface and gestures never wait for the picture.
 
@@ -64,7 +64,7 @@ first visit the whole app kept on the device. (A bigger hand model is SLOWER —
 Shader setup in parallel with the hand model's load (the founder: may be tried); the long pre-publish check shortened. ~~The quality picked by the device's strength~~ — struck (no automatic quality change).
 
 ## The founder's order after step 8 (2026-11-25)
-Stage 2 items 1–2 (a smaller audio buffer, a lighter engine — the same sound); stage 3 (the stutter recorder; less garbage — the rain's 7–10 MB/s): go; stage 4 (baking): try, kept only if faster AND the picture loses nothing; stage 5's parallel shader setup: try. Every picture change at Standard and Light only.
+Stage 2 postponed whole (the sound: the buffer, the lighter engine, the predicted pinch — later); stage 3 (the stutter recorder; less garbage — the rain's 7–10 MB/s): go; stage 4 (baking): try, kept only if faster AND the picture loses nothing; stage 5's parallel shader setup: try. Every picture change at Standard and Light only.
 
 ## Expected (to be proved by measurement)
 Gesture → sound on the laptop by day ≈ 120–125 → 70–90 ms (more inside a room); the Detailed and Standard forest clearly smoother; a repeat

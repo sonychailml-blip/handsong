@@ -9,12 +9,15 @@
    the previous run (tools/.out/speed-last.json → speed-prev.json). The fake camera has no hand: detection = the search path.
    Flags: --cost (no TIME part), --only forest|rain, --renew, --control (the forest's cost with one extra mesh: must fail exactly there),
    --size WxH (the window, default 1920x1080 = the founder's screen; another size is not judged), --limit-min N (default 6; the whole run fails past it),
-   --detect main-GPU,worker-CPU,… (SPEED-1: TIME again per detection path × processor, through the latency meter's own test switches). Times on the HD 4000: --cost ~3 min, the whole run ~3.5–4, --only forest about half. */
+   --detect main-GPU,worker-CPU,… (SPEED-1: TIME again per detection path × processor, through the latency meter's own test switches),
+   --why (SPEED-1 stage 3: per case, 6 s more — the allocation sites by Chrome's sampling heap profiler, collected objects included, and the long
+   animation frames with their scripts → tools/.out/speed-why.json; reported only). Times on the HD 4000: --cost ~3 min, the whole run ~3.5–4, --only forest about half. */
 import http from 'node:http'; import { readFile, writeFile, mkdir, rename } from 'node:fs/promises'; import { existsSync } from 'node:fs'; import path from 'node:path'; import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), argv=process.argv.slice(2), val=k=>{ const i=argv.indexOf(k); return i>=0 ? argv[i+1] : null; };
 const CONTROL=argv.includes('--control'), COST_ONLY=argv.includes('--cost')||CONTROL, ONLY=CONTROL ? 'forest' : val('--only'), RENEW=argv.includes('--renew'), LIMIT_MIN=+(val('--limit-min')||6);
-const DETECT=val('--detect') ? val('--detect').split(',') : null;
+const DETECT=val('--detect') ? val('--detect').split(',') : null, WHY=argv.includes('--why');
+if(WHY && COST_ONLY){ console.log('[speed] NOT A PASS — --why needs the TIME part (not --cost / --control)'); process.exit(1); }
 if(DETECT && (COST_ONLY || DETECT.some(v=>!/^(main|worker)-(GPU|CPU)$/.test(v)))){ console.log('[speed] NOT A PASS — --detect takes main|worker-GPU|CPU, comma-separated, and needs the TIME part'); process.exit(1); }
 const SIZE_DEF='1920x1080', SIZE=(val('--size')||SIZE_DEF).split('x').map(Number), SIZE_OTHER=!!val('--size') && val('--size')!==SIZE_DEF;   // the founder's screen (1280x800 read 40 fps where his Chrome showed 10)
 const BASE=path.join(ROOT, 'tools/prints/night-speed-cost.json'), OUT=path.join(ROOT, 'tools/.out'), LAST=path.join(OUT, 'speed-last.json'), PREV=path.join(OUT, 'speed-prev.json');
@@ -38,6 +41,8 @@ const INIT=()=>{
   const S=window.AudioScheduledSourceNode && AudioScheduledSourceNode.prototype; if(S){ const st=S.start, sp=S.stop;   // exact: a source started and never told to stop = a pool voice (rule #3); one-shots always get a stop()
     S.start=function(...a){ if(live(this.context)) A.running.add(this); return st.apply(this, a); };
     S.stop=function(...a){ A.running.delete(this); return sp.apply(this, a); }; }
+  window.__LOAF={ on:false, list:[] }; try{ new PerformanceObserver(l=>{ if(!window.__LOAF.on) return; for(const e of l.getEntries()) window.__LOAF.list.push({ d:e.duration, render:e.renderStart ? e.startTime+e.duration-e.renderStart : 0,
+    scripts:(e.scripts||[]).map(x=>({ d:x.duration, src:(x.sourceURL||'').replace(/^https?:\/\/[^/]+/, '')+(x.sourceFunctionName ? ' '+x.sourceFunctionName : ''), inv:x.invokerType||'', layout:x.forcedStyleAndLayoutDuration||0 })) }); }).observe({ type:'long-animation-frame', buffered:false }); }catch(e){}   // SPEED-1 --why
   window.__SL={ long:0 }; try{ new PerformanceObserver(l=>{ for(const e of l.getEntries()) window.__SL.long+=e.duration; }).observe({ type:'longtask', buffered:false }); }catch(e){}
 };
 
@@ -109,11 +114,28 @@ try{
           log(`  ${room} ${q} · detection ${v} (runs ${w.runs}, ${w.model}${w.why ? ', '+w.why : ''}): detect ${t.detectMs} ms at ${t.detectedFps}/s · picture ${t.fps} fps, p95 ${t.frameP95} ms · long ${t.longMsPerS} ms/s · hand→sound ${t.handToSoundMs} ms`); }
         await p.evaluate(async ()=>{ await window.__L.latSwitch('swPathMain'); await window.__L.latSwitch('swModelGPU'); }); }
     }
+    /* SPEED-1 --why: where the garbage is made (sampling heap profiler, collected objects included: bytes allocated per site) and what the long frames held */
+    if(WHY){ await p.evaluate(()=>window.__Sh.nightMusicHoldDbg(false)); const cdp=await ctx.newCDPSession(p); await cdp.send('HeapProfiler.enable');
+      await cdp.send('HeapProfiler.startSampling', { samplingInterval:8192, includeObjectsCollectedByMajorGC:true, includeObjectsCollectedByMinorGC:true });
+      await p.evaluate(()=>{ window.__LOAF.list=[]; window.__LOAF.on=true; }); const tw=Date.now(); await p.waitForTimeout(6000);
+      const { profile }=await cdp.send('HeapProfiler.stopSampling'); const sec=(Date.now()-tw)/1000; const loaf=await p.evaluate(()=>{ window.__LOAF.on=false; return window.__LOAF.list; });
+      await cdp.detach().catch(()=>{});
+      const site=new Map(), walk=(n, up)=>{ const f=n.callFrame, here=f.url ? f.url.replace(/^https?:\/\/[^/]+/, '')+':'+(f.lineNumber+1)+' '+(f.functionName||'(anon)') : null, own=here||up||'('+(f.functionName||'native')+')';
+        if(n.selfSize) site.set(own, (site.get(own)||0)+n.selfSize); for(const k of n.children||[]) walk(k, here||up); };   // a native frame's bytes go to the script frame that called it
+      walk(profile.head, null); const tot=[...site.values()].reduce((a, b)=>a+b, 0);
+      const sites=[...site].sort((a, b)=>b[1]-a[1]).slice(0, 15).map(([k, b])=>({ site:k, MBs:Math.round(b/1048576/sec*100)/100, share:Math.round(b*100/Math.max(1, tot)) }));
+      const scr=new Map(); let render=0, script=0, layout=0; for(const e of loaf){ render+=e.render; for(const x of e.scripts){ script+=x.d; layout+=x.layout; const k=x.inv+' '+x.src; scr.set(k, (scr.get(k)||0)+x.d); } }
+      c.why={ allocMBs:Math.round(tot/1048576/sec*100)/100, sites, longFrames:{ n:loaf.length, perS:Math.round(loaf.length/sec*10)/10, msPerS:Math.round(loaf.reduce((a, e)=>a+e.d, 0)/sec), scriptMsPerS:Math.round(script/sec), renderMsPerS:Math.round(render/sec), layoutMsPerS:Math.round(layout/sec),
+        scripts:[...scr].sort((a, b)=>b[1]-a[1]).slice(0, 10).map(([k, d])=>({ what:k, msPerS:Math.round(d/sec*10)/10 })) } };
+      log(`  ${room} ${q} · why: allocated ${c.why.allocMBs} MB/s; long frames ${c.why.longFrames.perS}/s, ${c.why.longFrames.msPerS} ms/s (scripts ${c.why.longFrames.scriptMsPerS}, render ${c.why.longFrames.renderMsPerS})`);
+      for(const x of sites.slice(0, 8)) log(`      ${String(x.MBs).padStart(6)} MB/s ${String(x.share).padStart(3)} %  ${x.site}`);
+      for(const x of c.why.longFrames.scripts.slice(0, 5)) log(`      long-frame script ${x.msPerS} ms/s  ${x.what}`); }
     res.cases.push(c);
     log(`${room} ${q}: calls ${cost.calls}, triangles ${cost.triangles}, scene ${cost.sceneMeshes} meshes / ${cost.sceneTrisCap} triangles at most, programs ${cost.programs}, textures ${cost.texKB} KB, audio pool ${JSON.stringify(cost.audioRunning)}`
       +(c.time ? ` · ${c.time.fps} fps, frame p95 ${c.time.frameP95} ms, long ${c.time.longMsPerS} ms/s, detect ${c.time.detectMs} ms, hand→sound ${c.time.handToSoundMs} ms, garbage ${c.time.garbageMBs} MB/s, underruns ${c.time.underruns}` : ''));
   }
   if(errs.length) fails.push('page errors: '+errs.slice(0, 3).join(' | '));
+  if(WHY) await writeFile(path.join(OUT, 'speed-why.json'), JSON.stringify(res.cases.filter(c=>c.why).map(c=>({ room:c.room, q:c.q, ...c.why })), null, 1));
   await ctx.close();
 } catch(e){ fails.push('the run broke: '+(e && e.message || e).toString().split('\n')[0]); }
 finally { await browser.close(); srv.close(); }

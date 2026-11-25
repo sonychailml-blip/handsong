@@ -4,6 +4,14 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`, `archive/NIGHT-RUN-LOG-2026-10.md`. New runs start at `NIGHT-1`.
 
+# SPEED-1 step 9 (NIGHT track, 2026-11-25, iteration mode): stage 3 — where the stutter and the garbage come from (measured only)
+Tree hashes before: core 17a6ce078eefa5f4 · apps/full 0148bb454440c3e3 · apps/night 79ec4fb4f4e589e8. After: all unchanged (only tools/speed.mjs and docs).
+- The founder (2026-11-25): the sound's stage 2 postponed whole; Detailed stays exactly as it is; the camera's 60 fps and the automatic quality struck (SPEED-PLAN.md).
+- `tools/speed.mjs --why` (new): allocation sites (sampling heap profiler) and long animation frames per case.
+- The rain, HD 4000, 1920×1080: ~8 MB/s allocated at every level (the forest ~0). Sites: rain.js:304 lifeUpload 16–19 %; pure/city.js project (:44) and depthOf (:55) together ~20 %; pure/drops.js gridBuild / gridPut ~12 %; pure/life.js:127 lifeAt ~5 %; rain.js put / lightAt (:163–165, :274) ~10 %; drops tick ~4 %.
+- Long frames: 4–5 a second, 400 ms/s at Light/Standard, 790 at Detailed; their script time is almost all the hand model (core/vision.js onVF 310–570 ms/s), boot's loop 14–22 ms/s; render ~350 ms/s. Garbage is a small share of the stutter; the hand model and the GPU are the large ones (as at step 3).
+- Found: the judged COST «rain reduced / full audioRunning.OscillatorNode» reads 41 in three runs (baseline 31; the code is step 7's byte for byte) — the rain's lo-fi engine (lofi.js: 9 LFOs + 1) is built lazily after a dynamic import, so whether it is counted is a race: a lottery measure inside a judged part. To be made exact (wait for the engine), then renewed by declaration.
+
 # SPEED-1 step 8 (NIGHT track, 2026-11-25, iteration mode): the automatic quality on a first visit (the founder's answer «A + B»)
 Tree hashes before: core 17a6ce078eefa5f4 · apps/full 0148bb454440c3e3 · apps/night 79ec4fb4f4e589e8 (step 7's after). After: core and apps/full unchanged · apps/night 4564f7fd89e7c045.
 - When: a first visit (no Light flag, no level, no mark stored; a weak GPU by name is already Light), the forest shown at Standard, the hand model running (≥ 10 frames detected), nothing opening, Measure this device not running. Only the forest (the thresholds are its own); the rain first → measured when the forest first shows.
