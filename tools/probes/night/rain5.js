@@ -3,7 +3,7 @@
    steam, rings, the bunting, the lit signs and the crossing's lights — at three sizes and
    three focus blurs on a transparent canvas; on a ring two pixels inside each quad's border the alpha must stay at most 2 / 255 (no edge can show).
    RAIN-10: the quads are LIFE_V's new ones (padding = the shape's widest soft edge + 2.2 px, people 45 % wider and 30 % higher); cars, facade things: «RAIN-10 people, cars and the tram».
-   CONTROL: the same with the border window off (uWin 0) must show an edge somewhere. Small fixes (2026-11-17): + the mist's soft copy of a far light is round. */
+   CONTROL: the same with the border window off (uWin 0) must show an edge somewhere. Small fixes (2026-11-17): + the mist's soft copy of a far light is round. RAIN-11: + the lit windows out of focus (no rim, a soft edge; in focus exact). */
 import { row } from '../core/rows.js';
 
 export async function checkRainQuads(){ const d=[], notes=[]; let n=0; const miss=x=>d.push(x);
@@ -71,6 +71,34 @@ export async function checkRainQuads(){ const d=[], notes=[]; let n=0; const mis
       if(!judgeL([...L0.list, [0, 0.1, 0.0022, 0.0015, 0.95, 2, 1]]).length) miss('CONTROL: a planted 2-px rectangle light passed'); else notes.push('CONTROL: a planted 2-px rectangle light is caught'); }
     finally{ room.dispose(); } }
   catch(e){ miss('the soft chain check: '+(e && e.message || e)); }
+  /* RAIN-11: THE LIT WINDOWS OUT OF FOCUS (the founder: a square semi-transparent frame round some things) — the room's own window shader (WIN_V / WIN_F):
+     3 window sizes × 4 blur radii (0 = in focus) on a transparent sheet; along the centre row from the window's edge outwards the light (r+g+b) never
+     rises (no rim; ≤ 2 of 765 for 8-bit steps) and its steepest drop × R in px stays ≤ 2.5 × its peak (the old 0.3 R edge: ≈ 5; my guess between); in
+     focus (R 0) every pixel equals the old shader's (exact). CONTROL: the old disc (uBokehOld 1) must break the rim or the edge somewhere */
+  try{ const wi=[]; for(const [hw, hh] of [[0.008, 0.014], [0.018, 0.03], [0.035, 0.05]]) for(const R of [0, 0.008, 0.02, 0.045]) wi.push([hw, hh, R]);
+    const NW=wi.length, g3=new T.InstancedBufferGeometry(); g3.setAttribute('position', new T.Float32BufferAttribute([-1,-1,0, 1,-1,0, 1,1,0, -1,1,0], 3)); g3.setIndex([0,1,2, 0,2,3]);
+    const AR=new Float32Array(NW*4), Q0=new Float32Array(NW*4), Q1=new Float32Array(NW*4), EV=new Float32Array(NW*4), LI=new Float32Array(NW).fill(1), WA=new Float32Array(NW).fill(0.5), DE=new Float32Array(NW), VI=new Float32Array(NW).fill(1), cells=[];
+    wi.forEach(([hw, hh, R], i)=>{ const cx=-0.875+(i%8)*0.25, cy=0.25-Math.floor(i/8)*0.5; AR.set([cx, cy, hw, hh], i*4); Q0.set([cx-hw, cy-hh, cx+hw, cy-hh], i*4); Q1.set([cx+hw, cy+hh, cx-hw, cy+hh], i*4); DE[i]=R; cells.push([cx, cy]); });
+    for(const [n3, a, k] of [['aRect', AR, 4], ['aQ0', Q0, 4], ['aQ1', Q1, 4], ['aEv', EV, 4], ['aLit', LI, 1], ['aWarm', WA, 1], ['aDepth', DE, 1], ['aVis', VI, 1]]) g3.setAttribute(n3, new T.InstancedBufferAttribute(a, k)); g3.instanceCount=NW;
+    const V3=v=>new T.Vector3(v[0], v[1], v[2]), m3=new T.ShaderMaterial({ uniforms:{ uTan:{ value:new T.Vector2(1, 0.5) }, uFoc:{ value:new T.Vector4(0, 1, 1, 0) }, uPad:{ value:0.02 }, uHoney:{ value:V3([1, 0.72, 0.4]) }, uAmber:{ value:V3([1, 0.55, 0.25]) }, uTime:{ value:0 },
+        uGarA:{ value:V3([1, 0, 0]) }, uGarB:{ value:V3([0, 1, 0]) }, uGarC:{ value:V3([0, 0, 1]) }, uGarD:{ value:V3([1, 1, 0]) }, uLit:{ value:null }, uExt:{ value:new T.Vector2(1, 1) }, uBaked:{ value:0 }, uVisOff:{ value:0 }, uBokehOld:{ value:0 } },
+      vertexShader:G.WIN_V, fragmentShader:G.WIN_F, transparent:true, depthTest:false, depthWrite:false, blending:T.CustomBlending, blendSrc:T.OneFactor, blendDst:T.OneMinusSrcAlphaFactor, blendSrcAlpha:T.OneFactor, blendDstAlpha:T.OneMinusSrcAlphaFactor });
+    const mesh3=new T.Mesh(g3, m3); mesh3.frustumCulled=false; const sc3=new T.Scene(), cam3=new T.OrthographicCamera(-1, 1, 1, -1, 0, 1); sc3.add(mesh3);
+    const PX=W/2, sheet=old=>{ m3.uniforms.uBokehOld.value=old ? 1 : 0; r.setRenderTarget(null); r.setClearColor(0x000000, 0); r.clear(); r.render(sc3, cam3); const gl=r.getContext(), px=new Uint8Array(W*Hh*4); gl.readPixels(0, 0, W, Hh, gl.RGBA, gl.UNSIGNED_BYTE, px); return px; };
+    const judgeW=px=>{ let rim=0, rimAt=-1, st=0, stAt=-1; wi.forEach(([hw, hh, R], i)=>{ if(!R) return; const [cx, cy]=cells[i], y=Math.round((cy+0.5)*Hh), x0=Math.round((cx+1)*PX), xe=Math.round((cx+hw+1)*PX), x1=Math.round((cx+0.125+1)*PX)-1;
+        const v=x=>px[(y*W+x)*4]+px[(y*W+x)*4+1]+px[(y*W+x)*4+2]; let pk=0; for(let x=x0;x<=x1;x++) pk=Math.max(pk, v(x)); if(pk<20) return;
+        for(let x=xe;x<x1;x++){ const up=v(x+1)-v(x), dn=(v(x)-v(x+1))*R*PX/pk; if(up>rim){ rim=up; rimAt=i; } if(dn>st){ st=dn; stAt=i; } } }); return { rim, rimAt, st, stAt }; };
+    const pNew=sheet(false), pOld=sheet(true), jn=judgeW(pNew), jo=judgeW(pOld); n+=3;
+    const it=i=>i<0 ? '-' : `window ${(wi[i][0]*2*PX).toFixed(0)}×${(wi[i][1]*2*PX).toFixed(0)} px, R ${(wi[i][2]*PX).toFixed(1)} px`;
+    if(jn.rim>2 || jn.st>2.5) miss(`a blurred window still has a frame: rise ${jn.rim} of 765 (${it(jn.rimAt)}), edge ${jn.st.toFixed(2)} × peak / R (${it(jn.stAt)})`);
+    else notes.push(`blurred windows (${NW-3}): no rim (rise ≤ ${jn.rim} of 765), the edge ${jn.st.toFixed(2)} × peak / R at its steepest`);
+    if(!(jo.rim>2 || jo.st>2.5)) miss(`CONTROL: the old window disc passed (rise ${jo.rim}, edge ${jo.st.toFixed(2)}) — the check cannot fail`); else notes.push(`CONTROL: the old disc is caught (rise ${jo.rim} of 765 at ${it(jo.rimAt)}, edge ${jo.st.toFixed(2)} at ${it(jo.stAt)})`);
+    let diff0=0, diffR=0; wi.forEach(([hw, hh, R], i)=>{ const [cx, cy]=cells[i], xa=Math.round((cx-0.125+1)*PX), xb=Math.round((cx+0.125+1)*PX)-1, ya=Math.round((cy-0.25+0.5)*Hh), yb=Math.round((cy+0.25+0.5)*Hh)-1;
+      for(let y=Math.max(0, ya);y<=Math.min(Hh-1, yb);y++) for(let x=xa;x<=xb;x++) for(let c=0;c<4;c++){ const k=(y*W+x)*4+c; if(pNew[k]!==pOld[k]){ if(R) diffR++; else diff0++; } } });
+    if(diff0) miss(`a window in focus changed: ${diff0} byte(s) differ from the old shader`); else if(!diffR) miss('CONTROL: the blurred windows equal the old ones too — the comparison sees nothing');
+    else notes.push(`in focus every byte equals the old shader's (3 windows); blurred: ${diffR} bytes differ (the change itself)`);
+    g3.dispose(); m3.dispose(); }
+  catch(e){ miss('the lit windows check: '+(e && e.message || e)); }
   /* UI-1: THE FAR CITY'S BAKED WINDOWS (the founder's screenshot: little rectangles on the hills) — the room's own baked-city shader (rain-city.js BAKED_F) on a
      made-up bake: one 2 × 1 px window at far depth; it must come out round (directions within 15 % of its peak, my guess — a 2-px source keeps about 9 % of its shape on the room's 113-tap Gaussian);
      CONTROL the same window at near depth (the house opposite: drawn exactly as baked) is not round */

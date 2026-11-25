@@ -31,6 +31,8 @@ Every older open step (120–192) is kept word for word in `archive/HANDOFF-hist
 Moved to `archive/HANDOFF-history.md` (RELEASE-1, still open there).
 
 ## Records (English, at most about 15 lines each; older ones go to `archive/HANDOFF-history.md`)
+### RAIN-11 (2026-11-25): the lit windows out of focus lost their square frame — the old blurred window was a plateau with a brighter rim and a 0.3 R edge (and a translucent box round a half-blurred one); now the same light (sum within 4 %, peak equal) with a soft 1.1 R edge, no rim, the pane's edge softening with the blur. In focus every byte as before (Detailed included: the founder asked for the fix). Row «RAIN no quad edges» + the windows (CONTROL the old disc, `winBokehDbg`). Captures `tools/.ui-snap/rain11/`. Log: `docs/night/WORK-LOG.md`
+
 ### SPEED-1 step 10 (2026-11-25): the rain's garbage −20…27 % (8.5 → 6.2 MB/s at Standard), the same picture byte for byte (450 frames × 3 qualities, CONTROL caught). The speed check's rain audio count exact (the lo-fi engine waited for), baseline renewed by declaration. Left: the projection's objects, the life sprites. Log: `docs/night/WORK-LOG.md`
 
 ### SPEED-1 step 9 (2026-11-25): stage 3 measured — the rain's garbage (~8 MB/s: the street's life upload, the city's projection, the drops' grid) and the long frames (mostly the hand model). `tools/speed.mjs --why`. Log: `docs/night/WORK-LOG.md`. Found: the speed check's rain audio count is a race (31 / 41) — to be made exact.

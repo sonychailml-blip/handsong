@@ -133,7 +133,7 @@ export function buildRain(T, opt){
   wg.setAttribute('aVis', new T.InstancedBufferAttribute(new Float32Array(VIS), 1));
   const evArr=new Float32Array(WIN.length*4), evAttr=dyn(evArr, 4); for(let i=0;i<WIN.length;i++) evArr[i*4]=winGarland(i) ? 1 : 0; wg.setAttribute('aEv', evAttr);   // RAIN-5c: garland, event kind, its phase
   let winEv=null, winEvPrev=-1;
-  const winM=mat({ uniforms:{ uTan:{ value:UT }, uFoc:{ value:FOC }, uPad:{ value:BOKEH.pad }, uHoney:{ value:HONEY }, uAmber:{ value:AMBER }, uTime:UTIME, uGarA:{ value:col('garland-a') }, uGarB:{ value:col('garland-b') }, uGarC:{ value:col('garland-c') }, uGarD:{ value:col('garland-d') }, uLit:{ value:litTex }, uExt:{ value:EXT }, uBaked:{ value:BK ? 1 : 0 }, uVisOff:{ value:0 } }, vertexShader:WIN_V, fragmentShader:WIN_F,
+  const winM=mat({ uniforms:{ uTan:{ value:UT }, uFoc:{ value:FOC }, uPad:{ value:BOKEH.pad }, uHoney:{ value:HONEY }, uAmber:{ value:AMBER }, uTime:UTIME, uGarA:{ value:col('garland-a') }, uGarB:{ value:col('garland-b') }, uGarC:{ value:col('garland-c') }, uGarD:{ value:col('garland-d') }, uLit:{ value:litTex }, uExt:{ value:EXT }, uBaked:{ value:BK ? 1 : 0 }, uVisOff:{ value:0 }, uBokehOld:{ value:0 } }, vertexShader:WIN_V, fragmentShader:WIN_F,
     transparent:true, blending:T.CustomBlending, blendSrc:T.OneFactor, blendDst:T.OneMinusSrcAlphaFactor, blendSrcAlpha:T.OneFactor, blendDstAlpha:T.OneMinusSrcAlphaFactor });
   const wins=add(new T.Mesh(wg, winM), 0.3);   // RELEASE-1 (C): drawn before the vehicles (0.4) and the life (0.5): what stands before the facade covers its windows (it was 1: over them)
 
@@ -491,6 +491,7 @@ export function buildRain(T, opt){
       return { cones, crownShare:cs, sway:viewM.uniforms.uSway.value, focus, buskAt, t:now, busker:false }; },   // RAIN-7; RAIN-9: the musician's figure removed (no place near enough to be seen)
     litSumDbg:()=>{ let x=0; for(let i=0;i<lit.length;i++) x+=lit[i]; return x; },   // RAIN-6b (8): how lit the windows are, all together
     winsShowDbg:on=>{ if(on!=null) wins.material.visible=!!on; return wins.material.visible; },
+    winBokehDbg:old=>{ if(old!=null) winM.uniforms.uBokehOld.value=old ? 1 : 0; return winM.uniforms.uBokehOld.value; },   // RAIN-11: the out-of-focus window's old disc (a rim, a 0.3 R edge) - the probes' CONTROL
     winVisDbg:o=>{ if(o && o.off!=null) winM.uniforms.uVisOff.value=o.off ? 1 : 0; if(o && o.lit!=null){ litForce=o.lit; } return { vis:VIS.slice(), off:winM.uniforms.uVisOff.value }; },   // RELEASE-1: the windows' seen share; o.lit — every window forced to that light (the probes)   // RELEASE-1: the lit-window layer on / off (captures)
     catDbg:()=>({ streams:VREC.filter(q=>q.ty===8).length, rain:rainEff, inst:(()=>{ for(let i=0;i<lifeN;i++) if(Math.round(fK[i*4])===LK.sillcat) return { rect:Array.from(fRect.slice(i*4, i*4+4)), k:Array.from(fK.slice(i*4, i*4+4)), d:fD[i] }; return null; })(), lifeN, win:CATW, now:catNow, lit:CATW>=0 ? lit[CATW] : null, at:CATW>=0 ? { x:WIN[CATW].x, y:WIN[CATW].y, hw:WIN[CATW].hw, hh:WIN[CATW].hh } : null }),   // RELEASE-1 (C)
     carAtDbg:(t0, t1, z0=12, z1=40)=>{ for(let t=t0;t<=t1;t+=0.5){ const c=trafficAt(t, book||dens).find(c=>c.kind==='car' && c.z>z0 && c.z<z1); if(c) return { t, x:c.x, z:c.z, dir:c.dir, ty:vehType(c.lane, c.slot) }; } return null; },   // RELEASE-1 (B)

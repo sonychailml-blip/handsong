@@ -4,6 +4,14 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`, `archive/NIGHT-RUN-LOG-2026-10.md`. New runs start at `NIGHT-1`.
 
+# RAIN-11 (NIGHT track, 2026-11-25, iteration mode): no square frame round the lit windows out of focus
+Tree hashes before: core 17a6ce078eefa5f4 · apps/full 0148bb454440c3e3 · apps/night 5a7ab9432b6ad0ee (SPEED-1 step 10's after). After: core and apps/full unchanged · apps/night 49df7ffd11accd1c.
+- The founder: some things in the rain still have a square semi-transparent frame. Found by rendering the room with each sprite layer on and off (the difference ×8; life, lights, windows, cars): the life and the lights are round; the LIT WINDOWS (`rain-glass.js WIN_F`) out of focus were a plateau to 0.7 R, a rim brightening 0.86 → 1 and a 0.3 R edge — a rounded square with a frame; a half-blurred window was its sharp picture plus that box at k (a translucent frame round it).
+- `WIN_F`: the disc `smoothstep(1.35 R, 0.25 R, d)` (half light at 0.8 R; no rim; the edge 1.1 R wide), the pane's edge `max(e, 0.7 R)`; `WIN_V` grows the quad by 1.4 R (room for the edge). `uBokehOld 1` = the old disc (CONTROL; `rain.js winBokehDbg(old)`). In focus R = 0: every value as before.
+- Light measured on the room's evening frame (window layer on − off, 1280 × 800): sum +3…4 %, the 99th percentile within 3 %, at focus 0.6 identical (Detailed and Light).
+- Row P.night «RAIN no quad edges» (`tools/probes/night/rain5.js`) + the windows: 3 sizes × 4 radii on a sheet; no rise outward (0 of 765), the steepest edge 1.37 × peak / R (limit 2.5, my guess; the old 5.00 — CONTROL caught, its rim 12 of 765); in focus every byte equals the old shader's. 13/0. «RELEASE-1 windows seen sharp and soft» PASS. Fix rounds: 2 (the first soft edge left the windows' light too small — widened to the old size, measured).
+- Verdicts: static PASSED; [probe-data] PASS — 107 checks, 0 differences. Not run (iteration mode): the Night suite.
+
 # SPEED-1 step 10 (NIGHT track, 2026-11-25, iteration mode): the rain's garbage cut, the same picture byte for byte; the speed check's rain audio count exact
 Tree hashes before: core 17a6ce078eefa5f4 · apps/full 0148bb454440c3e3 · apps/night 79ec4fb4f4e589e8. After: core and apps/full unchanged · apps/night 5a7ab9432b6ad0ee.
 - The founder: yes, if nothing changes (Detailed included — the code is shared, the output identical).

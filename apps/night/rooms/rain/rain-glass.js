@@ -87,21 +87,22 @@ const QUAD_SD=`float sdQ(vec2 p, vec2 a, vec2 b, vec2 c, vec2 d){ float s=1., m=
 /* A LIT WINDOW (one instance each: aRect its centre and half size, aLit its light, aWarm honey … amber, aDepth its depth). In focus: the pane
    behind a curtain, its bars, a little light spilling on the wall. Out of focus (its own radius by its depth): the same light spread over the
    window grown by that radius into a soft rounded rectangle, dimmer by the area. Premultiplied: the pane covers the dark window, the disc adds. */
-export const WIN_V=`attribute vec4 aRect, aQ0, aQ1, aEv; attribute float aLit, aWarm, aDepth, aVis; uniform vec2 uTan; uniform vec4 uFoc; uniform float uPad;
+export const WIN_V=`attribute vec4 aRect, aQ0, aQ1, aEv; attribute float aLit, aWarm, aDepth, aVis; uniform vec2 uTan; uniform vec4 uFoc; uniform float uPad, uBokehOld;
 varying vec2 vP, vH, vV; varying vec4 vQ0, vQ1, vEv; varying float vLit, vWarm, vR, vA0, vPer, vVis; ${RAD}
-void main(){ vR=radAt(aDepth); vec2 mn=min(min(aQ0.xy, aQ0.zw), min(aQ1.xy, aQ1.zw)), mx=max(max(aQ0.xy, aQ0.zw), max(aQ1.xy, aQ1.zw)), c=(mn+mx)*0.5, hs=(mx-mn)*0.5+vR+uPad*min(1., aRect.w*8.);
+void main(){ vR=radAt(aDepth); vec2 mn=min(min(aQ0.xy, aQ0.zw), min(aQ1.xy, aQ1.zw)), mx=max(max(aQ0.xy, aQ0.zw), max(aQ1.xy, aQ1.zw)), c=(mn+mx)*0.5, hs=(mx-mn)*0.5+vR*(uBokehOld>0.5 ? 1. : 1.4)+uPad*min(1., aRect.w*8.);   /* RAIN-11: room for the soft edge (to 1.4 R) */
   vV=c+position.xy*hs; vP=vV-aRect.xy; vH=aRect.zw; vLit=aLit; vWarm=aWarm; vQ0=aQ0; vQ1=aQ1; vEv=aEv; vVis=aVis;   /* RAIN-2: the quad's bounds grown by the radius */
   vA0=0.5*abs((aQ0.x*aQ0.w-aQ0.z*aQ0.y)+(aQ0.z*aQ1.y-aQ1.x*aQ0.w)+(aQ1.x*aQ1.w-aQ1.z*aQ1.y)+(aQ1.z*aQ0.y-aQ0.x*aQ1.w)); vPer=distance(aQ0.xy, aQ0.zw)+distance(aQ0.zw, aQ1.xy)+distance(aQ1.xy, aQ1.zw)+distance(aQ1.zw, aQ0.xy);
   gl_Position= aLit>0.004 ? vec4(vV/uTan, 0., 1.) : vec4(2., 2., 2., 1.); }`;
-export const WIN_F=`precision highp float; uniform float uPad, uBaked, uTime, uVisOff; uniform vec3 uHoney, uAmber, uGarA, uGarB, uGarC, uGarD; uniform sampler2D uLit; uniform vec2 uExt; varying vec2 vP, vH, vV; varying vec4 vQ0, vQ1, vEv; varying float vLit, vWarm, vR, vA0, vPer, vVis; ${QUAD_SD}
+export const WIN_F=`precision highp float; uniform float uPad, uBaked, uTime, uVisOff, uBokehOld; uniform vec3 uHoney, uAmber, uGarA, uGarB, uGarC, uGarD; uniform sampler2D uLit; uniform vec2 uExt; varying vec2 vP, vH, vV; varying vec4 vQ0, vQ1, vEv; varying float vLit, vWarm, vR, vA0, vPer, vVis; ${QUAD_SD}
 float wel(vec2 p, vec2 c, vec2 r){ return length((p-c)/r)-1.; }
 void main(){ float d=sdQ(vV, vQ0.xy, vQ0.zw, vQ1.xy, vQ1.zw), R=max(vR, 1e-4), k=clamp(vR/(vH.y*0.9+0.002), 0., 1.);   /* RAIN-2: the distance to the window's own quad */
   vec3 warm=mix(uHoney, uAmber, vWarm); vec2 u=vP/vH, lp=u-vec2(0.3*sin(vWarm*40.), -0.4);
   float folds=0.84+0.16*sin(u.x*9.+vWarm*20.), lamp=0.6+0.4*exp(-dot(lp, lp)*1.5);
   float bars=1.-0.7*max(smoothstep(0.08, 0.03, abs(u.x)), smoothstep(0.06, 0.02, abs(u.y-0.4)));
-  float e=vH.x*0.08, inA=smoothstep(e, -e, d);
+  float e=vH.x*0.08, eA= uBokehOld>0.5 ? e : max(e, R*0.7), inA=smoothstep(eA, -eA, d);   /* RAIN-11: the pane's own edge softens with the blur (in focus R is 0: as before) */
   float A0=max(vA0, 1e-6), A1=A0+vPer*R+3.1416*R*R, gain=pow(A0/A1, 0.5);   /* the quad's own area grown by the radius */
-  float disc=smoothstep(R, R*0.7, d)*(0.86+0.14*smoothstep(R*0.2, R*0.9, d));
+  float disc=smoothstep(R, R*0.7, d)*(0.86+0.14*smoothstep(R*0.2, R*0.9, d));   /* the old disc: a plateau, a brighter rim, a 0.3 R edge — read as a frame (uBokehOld 1: the probes' CONTROL) */
+  if(uBokehOld<0.5) disc=smoothstep(R*1.35, R*0.25, d);   /* RAIN-11: the same plateau and light (half at 0.8 R: the old sum within 4 %), no rim, the edge soft over 1.1 R (the old 0.3 R read as a frame) */
   float sp=uPad*min(1., vH.y*8.), spill=exp(-max(d, 0.)/(sp*0.3+1e-5))*0.16*(1.-k)*step(0., d);
   vec3 inner= uBaked>0.5 ? texture2D(uLit, clamp(vV/uExt*0.5+0.5, 0., 1.)).rgb*1.1 : warm*folds*lamp*bars;   /* RAIN-1: in focus, the baked room and its life */
   /* RAIN-5c: the window's life (pure/windows.js): someone at the window (a silhouette coming from the side and going), a curtain drawn and back */
