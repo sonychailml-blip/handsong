@@ -37,7 +37,7 @@ import { buildGust } from './forest-gust.js';   // NIGHT-6 slice 6: the effects 
 import { buildCanopy, patchDapple } from './forest-canopy.js';   // NIGHT-6 slice 7: the canopy, the stars, the dappled moonlight
 import { buildPaint } from './forest-paint.js';   // NIGHT-6 slice 8: the painted distance and the film
 import { buildLightParts } from './forest-light.js';   // SPEED-1 step 5: the Light quality's forest
-import { placeMemo } from './forest-memo.js';   // SPEED-1 step 6: the places remembered for the session
+import { placeMemo, memoSeed } from './forest-memo.js';   // SPEED-1 step 6: the places remembered for the session; step 7: and read from the level's places file
 import { buildHidden, foxUniforms } from './forest-hidden.js';   // NIGHT-6 slice 9: hidden things the light finds
 import { breathAt } from './pure/paint.js';   // NIGHT-6 slice 5: moss, roots, fallen wood, contact shadows
 import { handLightK, HANDLIGHT_GLOW_OLD } from '../../pure/handlight.js';   // NIGHT-13: the hand's light brighter as its finger closes
@@ -102,13 +102,16 @@ let CULL_EXTRA=null; export const forestCullListDbg=v=>{ CULL_EXTRA=v||null; ret
 let APART=true; export const forestApartDbg=v=>{ if(v!=null) APART=!!v; return APART; };   // FOREST-2e: plants apart (the default); false — the probes' CONTROL only (the forest as at FOREST-2d)
 const WOOD_MEMO=new Map(), LITTER_MEMO=new Map();   // NIGHT-8: + the litter's places per counts   // NIGHT-6 slice 5: the wood's places per counts (pure, seeded): worked out once per session
 const IMG={}, LOADING={}, assetErr=[];
+/* SPEED-1 step 7: each level's places file (tools/forest-places.mjs; forest-memo.js) — fetched with the level's pictures, so the first opening replays too */
+const PLACES=Object.freeze({ full:new URL('./places/full.json', import.meta.url), reduced:new URL('./places/reduced.json', import.meta.url) });
 async function fileImage(url){ const r=await fetch(url); if(!r.ok) throw new Error(r.status+' '+url.pathname);
   const u=URL.createObjectURL(await r.blob()), img=new Image(); try{ img.src=u; await img.decode(); } finally { URL.revokeObjectURL(u); } return img; }
 const levelFiles=level=>{ const all=FOREST_TEX[level]||FOREST_TEX.full, skip=scanOf(level) ? BAKED_KEYS : SCAN_KEYS; return Object.entries(all).filter(([k])=>!skip.includes(k)).map(([, n])=>n); };
 /* the files of `level` ('full' | 'reduced'), once per session → a promise of the loaded images by name. NIGHT-14c: a failed file is forgotten, so a
    later call fetches it again (it may be in the precache by then) */
 export function forestAssets(level='full'){
-  const all=Promise.all(levelFiles(level).map(n=>LOADING[n] || (LOADING[n]=fileImage(TEX[n]).then(img=>{ IMG[n]=img; }, e=>{ delete LOADING[n]; assetErr.push(n+': '+String(e&&e.message||e)); })))).then(()=>IMG);
+  const pk='places-'+level, places= PLACES[level] ? LOADING[pk] || (LOADING[pk]=fetch(PLACES[level]).then(r=>{ if(!r.ok) throw new Error(r.status+' '+PLACES[level].pathname); return r.json(); }).then(J=>{ if(!memoSeed(J)) assetErr.push(pk+': not a places file'); }, e=>{ delete LOADING[pk]; assetErr.push(pk+': '+String(e&&e.message||e)); })) : null;   // SPEED-1 step 7: a missing file only means searching
+  const all=Promise.all([...levelFiles(level).map(n=>LOADING[n] || (LOADING[n]=fileImage(TEX[n]).then(img=>{ IMG[n]=img; }, e=>{ delete LOADING[n]; assetErr.push(n+': '+String(e&&e.message||e)); }))), places]).then(()=>IMG);
   return PARTS.has('rocks') || PARTS.has('bark') || PARTS.has('spruce') ? all.then(()=>naturalAssets(level, PARTS)).then(()=>IMG) : all; }   // FOREST-2: the new files only with the switch
 /* NIGHT-14c: are `level`'s files here without asking the network? Under a precache (a worker in control) each must be in its cache; with no worker
    (the repository, Live Server) the network serves them as before → true. FOREST-2 (the founder's Detailed shown as Standard on Live Server): the
@@ -225,12 +228,13 @@ export function buildForest(T, opt){
   for(const f of ferns){ const [x,z]=outOfWater(f[0], f[1], STREAM.half+0.3+f[2]*0.25); f[0]=x; f[1]=z; }   // NIGHT-6 slice 4: out of the water
   const fernsToday=nat ? ferns.map(f=>f.slice()) : null;   // FOREST-2: today's ferns (the herb layer is placed round them, then moved)
   /* FOREST-2: the solids every plant keeps clear of (pure/natural.js; no random draw: everything after stays as seeded) */
-  const wkey0=JSON.stringify(['roots','logs','stumps','snags','twigs','moss','ivy','woodShrooms'].map(k=>Lv[k]||0)), wkeyN=wkey0+(has('roots') ? '.organic' : ''); let SOL=null, clr=null; const movedN={ ferns:0, plants:0, shrooms:[] };
+  const wkey0=JSON.stringify(['roots','logs','stumps','snags','twigs','moss','ivy','woodShrooms'].map(k=>Lv[k]||0)), wkeyN=wkey0+(has('roots') ? '.organic' : ''); let SOL=null, clr=null, clrF=null; const movedN={ ferns:0, plants:0, shrooms:[] };
   if(nat && !WOOD_MEMO.has(wkeyN)) WOOD_MEMO.set(wkeyN, has('roots') ? woodPlaces(Lv, spots, undefined, { roots:(t, p, Rr, nt, tr)=>rootsOrganic(t, p, Rr, nt, tr, lifePlaces(Lv.shrooms, Lv.blooms).filter(q=>q.kind==='shroom').map(q=>[q.x, q.z]).concat((WOOD_MEMO.get(wkey0)||woodPlaces(Lv, spots)).shrooms.map(q=>[q.x, q.z]))), rootTop:rootTopAt }) : woodPlaces(Lv, spots));   // without «roots» the very places of today
   if(has('clear')){
     SOL=solidsOf({ trunks:spots, wood:WOOD_MEMO.get(wkeyN), rocks:streamRocks(Math.max(0, Lv.rocks|0)), aisle:ROCKS_TODAY });
     const blocks=sightBlock(lifePlaces(Lv.shrooms, Lv.blooms).filter(q=>q.kind==='shroom').concat(WOOD_MEMO.get(wkeyN).shrooms));   // the mushrooms' lines of sight: kept free
-    clr=(x, z, reach, o={})=>{ const r=clearSpotM(x, z, reach, SOL, { ...o, avoid:blocks, inView:true }); if(!r[2]) return [x, z, 1]; movedN.plants++; return [r[0], r[1], keepSizeM(x, z, r[0], r[1], reach, SOL, o.low==null ? reach : o.low)]; };   // → [x, z, size factor]
+    const clrBy=(cs, ks)=>(x, z, reach, o={})=>{ const r=cs(x, z, reach, SOL, { ...o, avoid:blocks, inView:true }); if(!r[2]) return [x, z, 1]; movedN.plants++; return [r[0], r[1], ks(x, z, r[0], r[1], reach, SOL, o.low==null ? reach : o.low)]; };
+    clr=clrBy(clearSpot, keepSize); clrF=clrBy(clearSpotM, keepSizeM);   // SPEED-1 step 6/7: the floor's through the memo; the canopy keeps its own memo (its searches only on its first build — a shared record would shift)   // → [x, z, size factor]
   }
   const frondM=new T.MeshStandardMaterial({ map:fernT, alphaTest:0.45, side:T.DoubleSide, roughness:0.85 }), frondD=new T.MeshDistanceMaterial({ map:fernT, alphaTest:0.45, side:T.DoubleSide });
   const fronds=new T.InstancedMesh(frondG, frondM, ferns.length*7); fronds.customDistanceMaterial=frondD; own.push(frondM, frondD);
@@ -311,7 +315,7 @@ export function buildForest(T, opt){
   /* NIGHT-6 slice 3: the forest floor — the herb layer and the fine fern, placed around today's trunks and ferns */
   let floorTex=null; if(files.floor && Object.keys(Lv).some(k=>['sorrel','forb','bilberry','anemone','nettle','sedge','fern2'].includes(k) && Lv[k]>0)){
     floorTex=new T.Texture(files.floor); floorTex.encoding=T.sRGBEncoding; floorTex.anisotropy=4; floorTex.needsUpdate=true; own.push(floorTex); }
-  const floor= has('clear') || has('moss') ? buildFloor({ T, s, own, lv:Lv, trunks:spots, ferns, tex:floorTex, U:life.U, soft, clear:clr||undefined, avoid:clrAvoid||undefined, fernsToday:fernsToday||undefined, extra:has('moss') ? GR.sprouts : undefined, S3:S3||undefined, spot:PM.wrap('floor', cardSpot) }) : buildFloor({ T, s, own, lv:Lv, trunks:spots, ferns, tex:floorTex, U:life.U, soft });
+  const floor= has('clear') || has('moss') ? buildFloor({ T, s, own, lv:Lv, trunks:spots, ferns, tex:floorTex, U:life.U, soft, clear:clrF||undefined, avoid:clrAvoid||undefined, fernsToday:fernsToday||undefined, extra:has('moss') ? GR.sprouts : undefined, S3:S3||undefined, spot:PM.wrap('floor', cardSpot) }) : buildFloor({ T, s, own, lv:Lv, trunks:spots, ferns, tex:floorTex, U:life.U, soft });
   const stream= has('rocks') || has('moss') ? buildStream({ T, s, C, pal, own, lv:Lv, floorMat:floorTex ? floor.parts.material : null, aisle, litter, rockC:has('rocks') ? NT.rockC||null : null, rockN:has('rocks') ? NT.rockN||null : null, rockL:NT ? NT.rockL : 0.044, mossDetail:has('moss') }) : buildStream({ T, s, C, pal, own, lv:Lv, floorMat:floorTex ? floor.parts.material : null, aisle, litter });   // FOREST-2: the rocks' CC0 detail   // NIGHT-6 slice 4; NIGHT-8 today's aisle rocks join its stones, the litter's leaves and pebbles its draws
   life.waterRocks(stream.inWater);   // NIGHT-8: white water round the rocks in the stream
   const seenT= has('roots') && Lv.flare ? seenTrunks(spots, new Set(WP.roots.map(r=>r.tree))) : [];   // FOREST-2c: the trunks whose feet a player sees
@@ -325,7 +329,7 @@ export function buildForest(T, opt){
   /* NIGHT-6 slice 7: the canopy (crowns, the understorey, the stars) and the dappled moonlight on the ground */
   let crownTex=null; if(files.crown && Lv.crowns){ crownTex=new T.Texture(files.crown); crownTex.encoding=T.sRGBEncoding; crownTex.anisotropy=4; crownTex.needsUpdate=true; own.push(crownTex); }
   const spruce= has('spruce') && NT && NT.foliage ? { n:SPRUCES[opt.level]||SPRUCES.full, tex:NT.foliage, shrooms:lifePlaces(Lv.shrooms, Lv.blooms).filter(q=>q.kind==='shroom').concat(WP.shrooms, nearMore), apart:APART } : null;   // FOREST-2b; FOREST-2e apart (FOREST-2f: spruces no longer step aside for ferns — the ferns move)
-  const canopy= has('clear') ? buildCanopy({ T, s, C, own, lv:Lv, trunks:spots, U:life.U, crownTex, woodMat:wood.parts.material, soft, clear:clr, reach:NATURAL.reach, tall:NATURAL.tall, sprays:q=>spraysClear(q, spots.map(([x, z, r])=>({ x, z, r, y0:gy(x, z)+WOOD.trunk.foot })).concat(WP.snags.map(S=>({ x:S.x, z:S.z, r:S.s, y0:S.y+WOOD.trunk.foot })))), clearKey:opt.level+(Lv.rocks|0), spruce }) : spruce ? buildCanopy({ T, s, C, own, lv:Lv, trunks:spots, U:life.U, crownTex, woodMat:wood.parts.material, soft, spruce }) : buildCanopy({ T, s, C, own, lv:Lv, trunks:spots, U:life.U, crownTex, woodMat:wood.parts.material, soft });
+  const canopy= has('clear') ? buildCanopy({ T, s, C, own, lv:Lv, trunks:spots, U:life.U, crownTex, woodMat:wood.parts.material, soft, wrap:PM.wrap, clear:clr, reach:NATURAL.reach, tall:NATURAL.tall, sprays:q=>spraysClear(q, spots.map(([x, z, r])=>({ x, z, r, y0:gy(x, z)+WOOD.trunk.foot })).concat(WP.snags.map(S=>({ x:S.x, z:S.z, r:S.s, y0:S.y+WOOD.trunk.foot })))), clearKey:opt.level+(Lv.rocks|0), spruce }) : spruce ? buildCanopy({ T, s, C, own, lv:Lv, trunks:spots, U:life.U, crownTex, woodMat:wood.parts.material, soft, wrap:PM.wrap, spruce }) : buildCanopy({ T, s, C, own, lv:Lv, trunks:spots, U:life.U, crownTex, woodMat:wood.parts.material, soft });
   /* FOREST-2e: PLANTS APART — a fern whose fronds enter a young spruce's cone moves to the nearest clear place from its place of today (the same
      search and limits as its clearing: solids, water, the eye, the mushrooms' sight, 1.76 m at most), a little smaller (×0.85, 0.7, 0.55) only where no
      place fits it whole; its seven fronds re-placed, no random draw (pure/spacing.js) */

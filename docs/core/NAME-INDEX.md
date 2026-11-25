@@ -303,8 +303,8 @@ SPEED-1 step 5 — THE LIGHT QUALITY'S FOREST (the founder chose all three after
 
 ## apps/night/rooms/forest/forest-memo.js
 SPEED-1 step 6 — THE FOREST'S PLACES REMEMBERED FOR THE SESSION.
-- const (2): `WORLDS_KEPT`, `forestMemoDbg`
-- fn (1): `placeMemo`
+- const (5): `PLACES_FORMAT`, `PLACES_ONCE`, `PLACES_SKIP`, `WORLDS_KEPT`, `forestMemoDbg`
+- fn (4): `placesKey`, `memoSeed`, `memoExport`, `placeMemo`
 
 ## apps/night/rooms/forest/forest-mirror.js
 NIGHT-9 — THE WATER'S MIRROR (a part of the night forest room; forest.js builds it after the paint pass).
@@ -602,7 +602,7 @@ CORE-20: Night fetches only the modes it plays — every room's moods and the pa
 ## apps/night/scene/host.js
 THE SCENE HOST and Night's BACKGROUNDS (VIS1b, RUN 6; Night's own since CORE-8 — the shared UI reaches it through hooks.scene).
 - const (35): `BACKGROUNDS`, `sceneRoomAdd`, `sceneRoomRemove`, `sceneRooms`, `sceneRoom`, `sceneRoomSet`, `SCENE_LEVEL_DEFAULT`, `SCENE_FADE`, `scenePausing`, `COMPILE_LOG`, `sceneFlyPick`, `sceneFlyAt`, `sceneFlyLand`, `sceneRestDbg`, `sceneLitDbg`, `sceneHeardDbg`, `backgroundOf`, `sceneLightInPlace`, `setSceneLight`, `sceneLevel`, `sceneShadowDbg`, `sceneOptDbg`, `sceneInfo`, `sceneRoomDbg`, `sceneLostDbg`, `sceneStartNote`, `sceneStartLevelDbg`, `sceneHoldDbg`, `sceneGuardDbg`, `sceneLevelDbg`, `sceneHeldDbg`, `sceneProgramsDbg`, `sceneClockDbg`, `sceneBedDbg`, `sceneOpenDbg`
-- fn (10): `loadThree`, `sceneOpen`, `sceneSwitch`, `sceneClose`, `sceneRest`, `setBackground`, `setSceneLevel`, `sceneSnapDbg`, `sceneShotDbg`, `sceneLoseDbg`
+- fn (11): `loadThree`, `sceneOpen`, `sceneFadeOut`, `sceneSwitch`, `sceneClose`, `sceneRest`, `setBackground`, `setSceneLevel`, `sceneSnapDbg`, `sceneShotDbg`, `sceneLoseDbg`
 
 ## apps/night/scene/lightskip.js
 SPEED-1 step 2 — DARK POINT LIGHTS SKIPPED (the host applies it to every room at its opening; `?speedoff` leaves it out).
@@ -1721,7 +1721,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 UI-1 — «NIGHT labels follow the room»: the founder entered the rain and the Sound button still read «Firefly» while another timbre played.
 - fn (1): `checkNightLabels`
 
-_342 modules, 3283 exported names._
+_342 modules, 3290 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

@@ -22,7 +22,7 @@ import { profileOf } from '../../core/profile.js';
 import { fsBegin, fsStarted, fsToggle, fsOn, fsOnChange, fsCanToggle } from './fullscreen.js';   // NIGHT-7c: full screen (NIGHT-8b: never while the camera is undecided)
 import { devItems } from './edition.js';   // NIGHT-7b: the release edition (a players' build, or ?release) hides the development items
 import { calWire, calOfferIfNew, calActive, calSideApply, calSideSet, calSettingsRender, calAbort, calDueNow, calOffered, calStep } from './calib.js';   // NIGHT-2: the hand's calibration (its picture is drawn by the loop: main.js afterDraw)
-import { setSceneLevel, setSceneLight, sceneLightInPlace, sceneLevel, setBackground, backgroundOf, sceneInfo, sceneRoom, sceneRooms, sceneOptDbg, sceneStartNote } from './scene/host.js';   // RUN 8 (slice 4): the scene's quality (development switch); C8 the measurement
+import { setSceneLevel, setSceneLight, sceneLightInPlace, sceneFadeOut, sceneLevel, setBackground, backgroundOf, sceneInfo, sceneRoom, sceneRooms, sceneOptDbg, sceneStartNote } from './scene/host.js';   // RUN 8 (slice 4): the scene's quality (development switch); C8 the measurement
 import { roomSwitch, roomNext, natureLight } from './roomswitch.js';
 import { setTabsWire } from './settabs.js';   // DESIGN-1 part C: the settings in three tabs (revert: docs/night/design/DESIGN-1-settings-before.html)   // NIGHT-3 stage 5 part 2: the Room button
 import { persistInfo } from './persist.js';   // NIGHT-15: whether the browser keeps Night's files
@@ -285,15 +285,15 @@ function bars(now, hv, fxv){
    (user answer E1). On: the room from the delay network instead of the convolution (Forest depth's `light` — the convolution was Night's
    largest fixed cost), struck sounds ring at most 60 % of their caps (audio.setLowPower), the forest picture at medium (the level chosen
    before is remembered and comes back when it is off), no glass blur. `boot` = applied with the face (the scene level only if it differs). */
-function lightApply(v){
+function lightApply(v, level=true){   // level false: the caller sets the scene level itself (qualitySet)
   setLowPower(v); bedSetLight(v || WEAK); natureLight(v || WEAK); const I=fxInstance(chainKeyOf('ld'),'fdepth'); if(I && I.params[4]) I.params[4].setNorm(v ? 1 : 0);   // NIGHT-4: the music bed's lighter variant too (also on a weak device); NIGHT-8 the stream's
   setSceneLight(v);   // RAIN-R1: a room may draw less under Light (read at its next build)
-  if(v && sceneLevel()==='full') setSceneLevel('reduced');   // NIGHT-16: Light draws Standard's picture
+  if(level && v && sceneLevel()==='full') setSceneLevel('reduced');   // NIGHT-16: Light draws Standard's picture
 }
 /* NIGHT-16: the player's quality choice → the Light flag, the sound, the picture level (a promise: the level may load its pictures) */
 export function qualitySet(q){ if(!QUALITIES.includes(q)) return Promise.resolve(false);
-  const S=qualityState(q), inPlace=sceneLightInPlace(S.level); save(KEY.light, S.light); lightApply(S.light==='1');
-  return inPlace ? Promise.resolve(true) : Promise.resolve(setSceneLevel(S.level)).then(()=>true); }   // SPEED-1 step 6: Standard ↔ Light in the forest without a rebuild (the room turns it in place)
+  const S=qualityState(q), inPlace=sceneLightInPlace(S.level); save(KEY.light, S.light); lightApply(S.light==='1', false);
+  return inPlace ? Promise.resolve(true) : sceneFadeOut().then(()=>setSceneLevel(S.level)).then(()=>true); }   /* step 7: the picture fades out first (a rebuild takes seconds) */   // SPEED-1 step 6: Standard ↔ Light in the forest without a rebuild (the room turns it in place)
 export const qualityOf=()=>quality();
 /* UI-1, probes only: the labels of Sound, Music and Mood against what plays; stale (the CONTROL): the room-music word ignored (the old way) */
 let labelsStale=false;

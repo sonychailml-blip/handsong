@@ -1842,9 +1842,11 @@ async function nightPrecacheList(){
   const NT=(await import(new URL('../apps/night/rooms/forest/forest-natural.js', import.meta.url).href)).NATURAL_TEX, newDir=fs.readdirSync(new URL('../apps/night/rooms/forest/new/', import.meta.url));
   const natFile=nm=>{ const f=newDir.find(x=>x.replace(/\.[a-z]+$/, '')===nm); return f ? FB+'new/'+f : null; }, natAll=[...new Set(Object.values(NT).flatMap(L=>Object.values(L)).map(natFile).filter(Boolean))];
   for(const nm of Object.values(NT.reduced)){ const f=natFile(nm); if(f) std.add(f); }
+  const placesOf=Object.fromEntries([...F.matchAll(/(\w+):new URL\('\.\/(places\/[^']+)'/g)].map(m=>[m[1], FB+m[2]])); if(placesOf.reduced) std.add(placesOf.reduced);   // SPEED-1 step 7: each level's places file (Standard's a start file)
   const judgeLater=later=>[...std].filter(p=>later.some(r=>r.test(p)));
+  n++; if(!placesOf.reduced || !placesOf.full) miss('the places files of the forest could not be read (PLACES)');
   n++; if(std.size<8 || !SF(R,'full')) miss(`the Standard level's files could not be read (${std.size})`); else { const b=judgeLater(PC.NIGHT_LATER); if(b.length) miss('the Standard level would wait for the top-up: '+b.join(', ')); else notes.push(`none of the Standard level's ${std.size} files waits for the top-up`); }
-  n++; { const real=[...Object.values(texOf), FB+SF(R,'full'), FB+SF(R,'reduced'), ...natAll], stale=PC.NIGHT_LATER.filter(r=>!r.source.startsWith('^icons') && !real.some(p=>r.test(p))); if(stale.length) miss('a later pattern matches no forest file (stale?): '+stale.map(String).join(', ')); }
+  n++; { const real=[...Object.values(texOf), FB+SF(R,'full'), FB+SF(R,'reduced'), ...natAll, ...Object.values(placesOf)], stale=PC.NIGHT_LATER.filter(r=>!r.source.startsWith('^icons') && !real.some(p=>r.test(p))); if(stale.length) miss('a later pattern matches no forest file (stale?): '+stale.map(String).join(', ')); }
   n++; if(!judgeLater([...PC.NIGHT_LATER, /litter-col-1024\.jpg$/]).length) miss('CONTROL: a later pattern catching a Standard file passed'); else notes.push('CONTROL: a later pattern catching a Standard file is caught');
   /* NIGHT-14c: every level's still is a start file (the start screen shows the chosen level's still first — a Detailed player offline included) */
   const stills=['full','reduced'].map(lv=>SF(R, lv)).filter(Boolean).map(s=>FB+s), stillLater=later=>stills.filter(p=>later.some(r=>r.test(p)));

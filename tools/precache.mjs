@@ -22,7 +22,7 @@ export const NIGHT_SKIP=Object.freeze([/^apps\/night\/rooms\/forest\/tex\/ground
    still before anything else: 66 KB). Data row «NIGHT precache list (app)» proves no file the Standard level fetches and no still is here. */
 export const NIGHT_LATER=Object.freeze([/^icons\//, /^apps\/night\/rooms\/forest\/tex\/(web|crown|dapple|groundm)-1024\.png$/, /^apps\/night\/rooms\/forest\/tex\/(floor|shade)-2048\.png$/,
   /^apps\/night\/rooms\/forest\/tex\/moon-512\.png$/, /^apps\/night\/rooms\/forest\/scan\/litter-arm-1024\.jpg$/,
-  /^apps\/night\/rooms\/forest\/new\/foliage-1024\.png$/]);   // small fixes (2026-11-17): the spruces' Detailed sheet (932 KB) — Standard draws foliage-512
+  /^apps\/night\/rooms\/forest\/new\/foliage-1024\.png$/, /^apps\/night\/rooms\/forest\/places\/full\.json$/]);   // SPEED-1 step 7: Detailed's places file   // small fixes (2026-11-17): the spruces' Detailed sheet (932 KB) — Standard draws foliage-512
 /* RAIN-R1: files fetched ON DEMAND (stage 2) — the rain room's media (its baked city, its recordings, its session timbres): listed and hashed like every
    file, never installed nor topped up; the worker caches each the first time the page fetches it (hash checked), so a room met once opens offline
    afterwards. The rain's code and its stills stay start files (the start screen may show the rain; its code is small). */

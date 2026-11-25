@@ -204,6 +204,10 @@ export async function sceneOpen(id=roomId, opt={}){
 /* NIGHT-3 stage 5 part 2: SWITCH to room `id` → a promise of sceneInfo() once its picture is in. The room picture shown: it fades to black
    (SCENE_FADE.out), the new room opens in the dark moment (the context kept), then fades in (SCENE_FADE.in). Dark or Camera: only the current
    room changes. o.fast (probes): no waiting for the fades */
+/* SPEED-1 step 7: the shown picture fades out (SCENE_FADE.out) before a quality rebuild — the shell's quality choice, as a room switch fades; the new
+   room's canvas is born veiled and fades in once drawn. Resolves false at once when no room picture shows */
+export function sceneFadeOut(){ if(!glCanvas || !room || bg!=='forest' || opening || glCanvas.classList.contains('veil')) return Promise.resolve(false);
+  glCanvas.classList.add('veil'); return new Promise(r=>setTimeout(()=>r(true), SCENE_FADE.out)); }
 export async function sceneSwitch(id, o={}){
   if(!ROOMS.has(id)) throw new Error(`no room «${id}»`);
   if(id===roomId && room && room.id===id && !opening) return sceneInfo();   // already shown

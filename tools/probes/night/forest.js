@@ -28,7 +28,7 @@ import { speedOffDbg } from '../../../apps/night/speed.js';
 import { lightSkipInfo } from '../../../apps/night/scene/lightskip.js';   // SPEED-1: the paint row's exact identity is the undo build's
 import { SPEED_BEFORE } from '../../../apps/night/rooms/forest/forest.js';   // SPEED-1 step 5
 import { THIN_MIN } from '../../../apps/night/rooms/forest/forest-light.js';
-import { forestMemoDbg } from '../../../apps/night/rooms/forest/forest-memo.js';   // SPEED-1 step 6
+import { forestMemoDbg, PLACES_SKIP, PLACES_ONCE } from '../../../apps/night/rooms/forest/forest-memo.js';   // SPEED-1 step 6; step 7 the places files
 import { streamNear } from '../../../apps/night/rooms/forest/pure/forestlife.js';   // RUN 9 (slice 2)
 import { lifePlaces } from '../../../apps/night/rooms/forest/pure/forestlife.js';   // NIGHT-6 slice 5
 import { woodPlaces, barkMoss, barkUv, woodPieces } from '../../../apps/night/rooms/forest/pure/wood.js';   // NIGHT-8b: barkMoss; NIGHT-8c: barkUv, woodPieces
@@ -844,24 +844,33 @@ export async function checkForestPaint(){
 row({ night:true, at:1008.6399, name:'FOREST paint', drawn:true, run:()=>checkForestPaint(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });
 /* SPEED-1 step 6: row «FOREST places remembered» — rooms built without a renderer, at Standard and Detailed: the world's first build records its place
    searches, the second replays them; every mesh's and point set's instance matrices, colours and positions equal byte for byte, the replay hit every
-   recorded call (no miss, nothing searched afresh). CONTROL: one recorded answer moved by hand shows in the next replayed room (the comparison can fail) */
+   recorded call (no miss, nothing searched afresh). CONTROL: one recorded answer moved by hand shows in the next replayed room (the comparison can fail).
+   SPEED-1 step 7: the level's places file is this world's (else stale: tools/forest-places.mjs), a room started from it replays every search but the
+   roots (searched and recorded) and is the same room; CONTROL a world with another level table never takes the file */
 export async function checkForestMemo(){
   const d=[], notes=[]; let n=0; const miss=s=>d.push(s), was=forestMemoDbg();
   try{
-    const T=await loadThree(); await forestAssets('full'); await forestAssets('reduced'); const w=844, h=390, rooms=[], mk=lv=>{ const r=buildForest(T,{ C:cv, level:lv, w, h, gl2:true }); rooms.push(r); return r; };
+    const T=await loadThree(); await forestAssets('full'); await forestAssets('reduced'); const w=844, h=390, rooms=[], mk=(lv, o={})=>{ const r=buildForest(T,{ C:cv, level:lv, w, h, gl2:true, ...o }); rooms.push(r); return r; };
     const print=r=>{ const out=[]; r.scene.traverse(o=>{ if(!o.isMesh && !o.isPoints) return; const a=[o.type, o.count|0, o.isInstancedMesh ? o.instanceMatrix.array : null, o.isInstancedMesh && o.instanceColor ? o.instanceColor.array : null, o.geometry && o.geometry.attributes.position ? o.geometry.attributes.position.array : null]; out.push(a); }); return out; };
     const diff=(A, B)=>{ if(A.length!==B.length) return `${A.length} vs ${B.length} objects`; let bad=0; A.forEach((a, i)=>{ const b=B[i]; if(a[0]!==b[0] || a[1]!==b[1]){ bad++; return; } for(let k=2;k<5;k++){ const x=a[k], y=b[k]; if(!x && !y) continue; if(!x || !y || x.length!==y.length || x.some((v, j)=>!Object.is(v, y[j]))){ bad++; return; } } }); return bad ? bad+' objects differ' : ''; };
     try{
-      forestMemoDbg({ off:false, clear:true });
-      for(const lv of ['reduced', 'full']){ const B=mk(lv), C=mk(lv), sb=B.memoDbg(), sc=C.memoDbg(), all=Object.values(sb.calls).reduce((a, b)=>a+b, 0); n+=3;
+      forestMemoDbg({ off:false, files:false, clear:true });
+      for(const lv of ['reduced', 'full']){ forestMemoDbg({ files:false, clear:true }); const B=mk(lv), C=mk(lv), sb=B.memoDbg(), sc=C.memoDbg(), all=Object.values(sb.calls).reduce((a, b)=>a+b, 0); n+=3;
         if(sb.replay || !(all>100)) miss(`${lv}: the first build did not record: ${JSON.stringify(sb)}`);
-        if(!sc.replay || sc.misses || sc.hits!==all) miss(`${lv}: the replay ${JSON.stringify(sc)} of ${all} recorded calls`);
+        const leftOk=st=>Object.keys(st.left).every(k=>PLACES_ONCE.includes(k)), leftN=st=>Object.values(st.left).reduce((a, b)=>a+b, 0);   // step 7: only a once-a-session search may stay unasked
+        if(!sc.replay || sc.misses || sc.broken.length || !leftOk(sc) || sc.hits+leftN(sc)!==all) miss(`${lv}: the replay ${JSON.stringify(sc)} of ${all} recorded calls`);
         const pb=print(B), e=diff(pb, print(C)); if(e) miss(`${lv}: the replayed room differs from the searched one: ${e}`);
         notes.push(`${lv}: ${all} searches recorded (${Object.entries(sb.calls).map(([k, v])=>k+' '+v).join(', ')}), all replayed; ${pb.length} objects equal`);
+        /* SPEED-1 step 7: the level's places file — this very world (else stale), replayed with no miss but the roots (searched, recorded), the same room */
+        { forestMemoDbg({ files:true, clear:true }); const F=mk(lv), sf=F.memoDbg(), rec=PLACES_SKIP.reduce((a, k)=>a+(sb.calls[k]||0), 0); n+=2;
+          if(sf.from!=='file') miss(`${lv}: the places file is stale or missing (this world ${sb.key}) — run node tools/forest-places.mjs`);
+          else { const fileN=sf.hits+leftN(sf); if(sf.misses || sf.broken.length || !leftOk(sf) || fileN!==Object.entries(sf.calls).filter(([k])=>!sf.recorded.includes(k)).reduce((a, [, v])=>a+v, 0) || sf.recorded.join()!==PLACES_SKIP.filter(k=>sb.calls[k]).join()) miss(`${lv}: the file's replay ${JSON.stringify({ hits:sf.hits, misses:sf.misses, broken:sf.broken, recorded:sf.recorded })} of ${all-rec}`);
+            const e3=diff(pb, print(F)); if(e3) miss(`${lv}: the room from the places file differs from the searched one: ${e3}`); else notes.push(`${lv}: from the places file (world ${sf.key}): ${sf.hits} replayed, ${sf.recorded.join()} searched; the same room`); }
+          if(lv==='reduced'){ const G=mk(lv, { lv:{ paintScale:0.7 } }); n++; if(G.memoDbg().from) miss('CONTROL: a world with another level table replays '+G.memoDbg().from+' (the world check cannot fail)'); } }
         if(lv==='reduced'){ forestMemoDbg({ poke:'grass' }); const D=mk(lv), e2=diff(pb, print(D)); n++; if(!e2) miss('CONTROL: a recorded answer moved by hand does not show in the replayed room'); else notes.push('CONTROL: one grass answer moved → '+e2); } }
     } finally { for(const r of rooms) r.dispose(); }
   } catch(e){ miss('error: '+(e&&e.stack||e)); }
-  finally{ forestMemoDbg({ off:was.off, clear:true }); }
+  finally{ forestMemoDbg({ off:was.off, files:was.files, clear:true }); }
   return { cases:n, total:d.length, differences:d, notes };
 }
 row({ night:true, at:1008.6401, name:'FOREST places remembered', run:()=>checkForestMemo(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });

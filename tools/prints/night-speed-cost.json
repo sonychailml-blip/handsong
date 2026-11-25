@@ -1,12 +1,12 @@
 {
- "made": "2026-11-24",
+ "made": "2026-11-25",
  "machine": {
   "gpu": "ANGLE (Intel, Intel(R) HD Graphics 4000 (0x00000166) Direct3D11 vs_5_0 ps_5_0, D3D11)",
   "cores": 4
  },
  "startSet": {
-  "files": 262,
-  "kb": 27019
+  "files": 263,
+  "kb": 27410
  },
  "audioBuilt": {
   "Worklet:frz-store": 1,
@@ -178,6 +178,7 @@
   "/apps/night/rooms/forest/new/foliage-512.png",
   "/apps/night/rooms/forest/new/rock-col-512.jpg",
   "/apps/night/rooms/forest/new/rock-nor-512.jpg",
+  "/apps/night/rooms/forest/places/reduced.json",
   "/apps/night/rooms/forest/pure/answers.js",
   "/apps/night/rooms/forest/pure/canopy.js",
   "/apps/night/rooms/forest/pure/cull.js",
