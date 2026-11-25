@@ -6,6 +6,8 @@ Quality is kept. Runs are named `SPEED-n` (NIGHT track; a core part is its own s
 ## Rules
 - Measure → change → the same measurement. An invisible change is proved byte-exact (picture) or sample-exact (sound); a visible one ships
   behind an old/new switch and the founder decides. Detailed is never simplified without the founder's «yes».
+- ⛳ **Detailed stays exactly as it is** (the founder, 2026-11-25): a picture change is made only at Standard and Light.
+- ⛳ **No automatic quality change** (the founder, 2026-11-25): SPEED-1 step 8 built one and it was removed the same day; only the PERF-4 name list (a known weak GPU starts at Light on its first visit) stays. The person chooses.
 - ⛔ No pre-recorded instrument notes in place of synthesis (the founder, 2026-11-23). Everything else that beats the stutter may be tried.
 - Never widen a tolerance or weaken a control. Full untouched; core changes opt-in (core rules 4–6).
 - **Checks are automatic and short** (the founder): each step runs only the rows it touched (seconds, at most 1–2 min); the fast speed set
@@ -32,7 +34,7 @@ Quality is kept. Runs are named `SPEED-n` (NIGHT track; a core part is its own s
 ## Stage 1 — faster hands (the biggest lever)
 1. Detection off the contested main thread / GPU: main vs worker × GPU vs CPU (XNNPACK) in both rooms at each quality; the best per device
    class (the worker's picture matched the main thread's exactly at LAT2b).
-2. Camera 60 fps where offered (frame wait ≈ 17 → 8 ms); 30 elsewhere.
+2. ~~Camera 60 fps where offered~~ — struck (the founder, 2026-11-25: the camera adapts by itself).
 3. A smaller detection input (e.g. 480×360) — kept only if a far hand is still found.
 4. A rarer second-hand search while one hand is tracked (steadier rhythm; the second hand found a little later).
 5. Hands before picture: when detection slows under the room's load, the picture eases its resolution for a moment and comes back smoothly.
@@ -42,8 +44,8 @@ Quality is kept. Runs are named `SPEED-n` (NIGHT track; a core part is its own s
 ## Stage 2 — faster sound
 1. A smaller audio buffer where the device holds it with zero underruns.
 2. A lighter engine: voices built when needed, cached and gated after (rule #3), not 24 up front — the same sound (sample-exact proof).
-3. A faster audible onset for slow-attack timbres (a faint transient, the body unchanged) — the founder decides by ear.
-4. Adaptive smoothing of volume and depth: steady at rest, no lag in motion.
+3. ~~A faster audible onset for slow-attack timbres~~ — struck (the founder, 2026-11-25).
+4. ~~Adaptive smoothing of volume and depth~~ — struck (the founder, 2026-11-25).
 5. Experiment, behind a switch: the pinch predicted one frame early from fingertip speed — kept only with no extra notes.
 
 ## Stage 3 — smoothness of the whole app
@@ -58,8 +60,11 @@ Ready-made forest geometry instead of building it at start; baked light and shad
 GPU-compressed textures; precomputed tables for sound and picture; a small start set, the rest downloaded in the background, and after the
 first visit the whole app kept on the device. (A bigger hand model is SLOWER — there the gain is the smaller one.)
 
-## Stage 5 — start and automatic quality
-Shader setup in parallel with the hand model's load; the quality picked by the device's strength at the first start; the long pre-publish check shortened.
+## Stage 5 — start
+Shader setup in parallel with the hand model's load (the founder: may be tried); the long pre-publish check shortened. ~~The quality picked by the device's strength~~ — struck (no automatic quality change).
+
+## The founder's order after step 8 (2026-11-25)
+Stage 2 items 1–2 (a smaller audio buffer, a lighter engine — the same sound); stage 3 (the stutter recorder; less garbage — the rain's 7–10 MB/s): go; stage 4 (baking): try, kept only if faster AND the picture loses nothing; stage 5's parallel shader setup: try. Every picture change at Standard and Light only.
 
 ## Expected (to be proved by measurement)
 Gesture → sound on the laptop by day ≈ 120–125 → 70–90 ms (more inside a room); the Detailed and Standard forest clearly smoother; a repeat
@@ -88,3 +93,4 @@ Details and numbers per step: `docs/night/WORK-LOG.md`. Machine: Intel HD 4000, 
 - Storing whole meshes in the places file: 7 MB for 1 s — keep files to places, not geometry.
 - Single timing runs mislead (Light's gain read 3.6 ms once, 1.6 ms over three runs): repeat a timing at least three times; calls / triangles a frame vary (the mirror every 1.5 s).
 - A frame (`room.update`) inside an exact check moves the room: do exact comparisons before any update.
+- The automatic quality (step 8: the forest timed on the GPU at the first visit, Light when slow, Detailed when strong): the founder did not want the app to change quality by itself — removed. A browser without a GPU timer (phones, Safari, Firefox) caps Standard at 30 fps, so its frame rate cannot show room for Detailed; only trying Detailed itself could.
