@@ -6,7 +6,7 @@
  },
  "startSet": {
   "files": 263,
-  "kb": 27410
+  "kb": 27411
  },
  "audioBuilt": {
   "Worklet:frz-store": 1,
@@ -72,7 +72,7 @@
    "textures": 20,
    "buffer": "1152x648",
    "audioRunning": {
-    "OscillatorNode": 31
+    "OscillatorNode": 41
    }
   },
   "rain reduced": {
@@ -84,7 +84,7 @@
    "textures": 20,
    "buffer": "1152x648",
    "audioRunning": {
-    "OscillatorNode": 31
+    "OscillatorNode": 41
    }
   },
   "rain full": {
@@ -96,7 +96,7 @@
    "textures": 20,
    "buffer": "1632x918",
    "audioRunning": {
-    "OscillatorNode": 31
+    "OscillatorNode": 41
    }
   }
  },

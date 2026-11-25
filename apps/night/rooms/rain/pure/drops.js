@@ -50,15 +50,16 @@ function absorb(S, a, b){
    capsule can reach (the largest radius bounds the reach) */
 const GRID=0.03, GW=Math.ceil(2*PANE_EXT[0]/GRID)+2, GH=Math.ceil(2*PANE_EXT[1]/GRID)+8;   // the pane's cells (a margin below for runners leaving)
 const gi=x=>Math.max(0, Math.min(GW-1, Math.floor((x+PANE_EXT[0])/GRID)+1)), gj=y=>Math.max(0, Math.min(GH-1, Math.floor((y+PANE_EXT[1])/GRID)+6));
-function gridPut(S, d){ const k=gj(d.y)*GW+gi(d.x), a=S.grid[k]; if(!a.length) S.used.push(k); a.push(d); if(d.r>S.rMax) S.rMax=d.r; }
-function gridBuild(S){ if(!S.grid){ S.grid=Array.from({ length:GW*GH }, ()=>[]); S.used=[]; } for(const k of S.used) S.grid[k].length=0; S.used.length=0; S.rMax=0; for(const d of S.list) if(!d.dead) gridPut(S, d); }
+/* SPEED-1 step 10: each cell keeps its array and a count (S.gn) — emptying an array to length 0 let it give its storage back and every push take it again */
+function gridPut(S, d){ const k=gj(d.y)*GW+gi(d.x), n=S.gn[k]; if(!n) S.used.push(k); S.grid[k][n]=d; S.gn[k]=n+1; if(d.r>S.rMax) S.rMax=d.r; }
+function gridBuild(S){ if(!S.grid){ S.grid=Array.from({ length:GW*GH }, ()=>[]); S.gn=new Int32Array(GW*GH); S.used=[]; } for(const k of S.used) S.gn[k]=0; S.used.length=0; S.rMax=0; for(const d of S.list) if(!d.dead) gridPut(S, d); }
 /* the drops whose disc the capsule from (x0, y0) to (x1, y1) of d's radius touches (each once) */
 function touching(S, d, x0, y0, x1, y1){
   if(!S.grid) gridBuild(S);
   const out=[], k=DROPS.touch, reach=(d.r+S.rMax)*k, vx=x1-x0, vy=y1-y0, L=vx*vx+vy*vy, mark=++S.mark;
   const i0=gi(Math.min(x0, x1)-reach), i1=gi(Math.max(x0, x1)+reach), j0=gj(Math.min(y0, y1)-reach), j1=gj(Math.max(y0, y1)+reach);
-  for(let j=j0;j<=j1;j++) for(let i=i0;i<=i1;i++){ const a=S.grid[j*GW+i];
-    for(const o of a){ if(o===d || o.dead || o.seen===mark) continue; o.seen=mark;
+  for(let j=j0;j<=j1;j++) for(let i=i0;i<=i1;i++){ const a=S.grid[j*GW+i], an=S.gn[j*GW+i];
+    for(let m=0;m<an;m++){ const o=a[m]; if(o===d || o.dead || o.seen===mark) continue; o.seen=mark;
       const t= L>0 ? Math.max(0, Math.min(1, ((o.x-x0)*vx+(o.y-y0)*vy)/L)) : 0, ex=o.x-(x0+t*vx), ey=o.y-(y0+t*vy), rr=(d.r+o.r)*k;
       if(ex*ex+ey*ey<rr*rr) out.push(o); } }
   return out;
@@ -86,7 +87,7 @@ function laneClear(S, x0, y0, x1, y1, w){
 }
 /* one fixed step: rain 0…1 */
 function tick(S, rain){
-  const C=DROPS, h=C.step, R=S.R, [x0, y0, x1, y1]=S.region; gridBuild(S);
+  const C=DROPS, h=C.step, R=S.R, G=S.region, x0=G[0], y0=G[1], x1=G[2], y1=G[3]; gridBuild(S);   // SPEED-1 step 10: indexed
   /* new drops, at the rain's rate over the region's area */
   S.spawnAcc+=h*(C.rate+C.rateRain*rain)*(x1-x0)*(y1-y0);
   while(S.spawnAcc>=1){ S.spawnAcc-=1; dropAdd(S, x0+(x1-x0)*R(), y0+(y1-y0)*R(), C.r0+Math.pow(R(), C.rPow)*(C.rSpan+C.rSpanRain*rain)); }

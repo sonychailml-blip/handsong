@@ -41,8 +41,10 @@ export const camBasis=(c=CAM)=>{ const y=c.yaw*D2R, p=c.pitch*D2R, f=[Math.sin(y
   const u=[f[1]*r[2]-f[2]*r[1], f[2]*r[0]-f[0]*r[2], f[0]*r[1]-f[1]*r[0]]; return { r, u, f }; };
 const B0=camBasis();
 /* a world point → { x, y (view-angle units), z (distance along the view axis, m), dist (m) } ; z ≤ 0: behind the eye */
-export function project(P, c=CAM, B=B0){
-  const vx=P[0]+bendX(P[2])-c.x, vy=P[1]-c.y, vz=P[2]-c.z, z=vx*B.f[0]+vy*B.f[1]+vz*B.f[2];   // RAIN-5: the bend (0 nearer than BEND.z0)
+export const project=(P, c=CAM, B=B0)=>projectXYZ(P[0], P[1], P[2], c, B);
+/* SPEED-1 step 10: the same law from three numbers (no array made per call; the same arithmetic, so the same answers to the bit) */
+export function projectXYZ(px, py, pz, c=CAM, B=B0){
+  const vx=px+bendX(pz)-c.x, vy=py-c.y, vz=pz-c.z, z=vx*B.f[0]+vy*B.f[1]+vz*B.f[2];   // RAIN-5: the bend (0 nearer than BEND.z0)
   return { x:(vx*B.r[0]+vy*B.r[1]+vz*B.r[2])/z, y:(vx*B.u[0]+vy*B.u[1]+vz*B.u[2])/z, z, dist:Math.hypot(vx, vy, vz) };
 }
 /* a view direction (view-angle units) → the world ray's unit direction */
@@ -54,8 +56,8 @@ export const vanishing=(B=B0)=>({ x:B.f[2] ? B.r[2]/B.f[2] : 0, y:B.u[2]/B.f[2],
 export const DEPTH=F({ glass:0, frame:0.03, sky:1, anchors:F([F([20, 0.35]), F([60, 0.65]), F([110, 0.72]), F([450, 0.82]), F([3200, 0.95])]) });
 export function depthOf(dist){
   const A=DEPTH.anchors; if(!(dist>0)) return DEPTH.glass; if(dist<=A[0][0]) return A[0][1]*Math.max(0, dist)/A[0][0];
-  for(let i=1;i<A.length;i++) if(dist<=A[i][0]){ const [d0, v0]=A[i-1], [d1, v1]=A[i], t=Math.log(dist/d0)/Math.log(d1/d0); return v0+(v1-v0)*t; }
-  const [d0, v0]=A[A.length-1]; return Math.min(0.99, v0+0.03*Math.log(dist/d0));
+  for(let i=1;i<A.length;i++) if(dist<=A[i][0]){ const a=A[i-1], b=A[i], t=Math.log(dist/a[0])/Math.log(b[0]/a[0]); return a[1]+(b[1]-a[1])*t; }   // SPEED-1 step 10: indexed (a destructuring made garbage every call)
+  const a=A[A.length-1]; return Math.min(0.99, a[1]+0.03*Math.log(dist/a[0]));
 }
 /* the far hills' height (m) at a view direction x (their silhouette) */
 export const hillsAt=x=>{ const [lo, hi]=FAR.hillsY; return lo+(hi-lo)*(0.55+0.25*Math.sin(x*2.3+0.9)+0.13*Math.sin(x*6.1+2.4)+0.07*Math.sin(x*13.7+0.3)-0.2*Math.exp(-((x+0.55)**2)/0.02)); };

@@ -93,4 +93,6 @@ Details and numbers per step: `docs/night/WORK-LOG.md`. Machine: Intel HD 4000, 
 - Storing whole meshes in the places file: 7 MB for 1 s — keep files to places, not geometry.
 - Single timing runs mislead (Light's gain read 3.6 ms once, 1.6 ms over three runs): repeat a timing at least three times; calls / triangles a frame vary (the mirror every 1.5 s).
 - A frame (`room.update`) inside an exact check moves the room: do exact comparisons before any update.
+- Garbage (step 10): the profiler's allocation sites (`speed.mjs --why`) named the lines; small array literals (`project([x, y, z])`, `.set([a, b, c, d])`), destructuring in a hot function and arrays emptied to length 0 were the garbage. Proof: record the room's whole CPU output per frame BEFORE editing (deterministic: twice), compare after.
+- A judged count that depends on a lazy load is a race (the rain's lo-fi engine: 31 / 41): wait for the load, then count.
 - The automatic quality (step 8: the forest timed on the GPU at the first visit, Light when slow, Detailed when strong): the founder did not want the app to change quality by itself — removed. A browser without a GPU timer (phones, Safari, Firefox) caps Standard at 30 fps, so its frame rate cannot show room for Detailed; only trying Detailed itself could.

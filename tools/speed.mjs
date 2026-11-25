@@ -80,6 +80,11 @@ try{
   for(const [room, q] of PLAN){
     await p.evaluate(()=>window.__Sh.nightMusicHoldDbg(true));
     if(room!==cur){ await p.evaluate(id=>window.__RS.roomSwitch(id), idOf(room)); cur=room; }
+    /* SPEED-1 step 10: the rain's lo-fi engine (10 pool oscillators, cached once built — rule #3) loads after a dynamic import when its music first plays:
+       whether a case counted it was a race (31 / 41). Exact now: on entering the rain the music plays until the engine is in (≤ 30 s, else a failure), then held */
+    if(room==='rain'){ const ok=await p.evaluate(async ()=>{ const B=await import('/apps/night/bed2.js'); window.__Sh.nightMusicHoldDbg(false); const t0=performance.now();
+        while(!B.bed2LofiDbg().loaded && !B.bed2LofiDbg().fail && performance.now()-t0<30000) await new Promise(r=>setTimeout(r, 200)); window.__Sh.nightMusicHoldDbg(true); return B.bed2LofiDbg().loaded; });
+      if(!ok) fails.push('the rain lo-fi engine was not built within 30 s'); }
     await p.evaluate(q=>window.__Sh.qualitySet(q), q);
     await p.waitForFunction(r=>{ const I=window.__H.sceneInfo(); return !!I.id && I.id.endsWith(r) && !I.opening && I.webgl && I.rendered>3; }, room, { timeout:90e3 });
     await p.waitForTimeout(3000);

@@ -31,6 +31,8 @@ Every older open step (120–192) is kept word for word in `archive/HANDOFF-hist
 Moved to `archive/HANDOFF-history.md` (RELEASE-1, still open there).
 
 ## Records (English, at most about 15 lines each; older ones go to `archive/HANDOFF-history.md`)
+### SPEED-1 step 10 (2026-11-25): the rain's garbage −20…27 % (8.5 → 6.2 MB/s at Standard), the same picture byte for byte (450 frames × 3 qualities, CONTROL caught). The speed check's rain audio count exact (the lo-fi engine waited for), baseline renewed by declaration. Left: the projection's objects, the life sprites. Log: `docs/night/WORK-LOG.md`
+
 ### SPEED-1 step 9 (2026-11-25): stage 3 measured — the rain's garbage (~8 MB/s: the street's life upload, the city's projection, the drops' grid) and the long frames (mostly the hand model). `tools/speed.mjs --why`. Log: `docs/night/WORK-LOG.md`. Found: the speed check's rain audio count is a race (31 / 41) — to be made exact.
 
 ### SPEED-1 step 8 (2026-11-25): the automatic quality — built, then removed by the founder. Log: `docs/night/WORK-LOG.md`
