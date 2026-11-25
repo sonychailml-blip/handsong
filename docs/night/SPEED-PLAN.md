@@ -64,3 +64,27 @@ Shader setup in parallel with the hand model's load; the quality picked by the d
 ## Expected (to be proved by measurement)
 Gesture → sound on the laptop by day ≈ 120–125 → 70–90 ms (more inside a room); the Detailed and Standard forest clearly smoother; a repeat
 start almost instant. The evening dark is a camera limit: only light on the hands helps there.
+
+## Lessons — what worked, what did not (SPEED-0 … SPEED-1 step 7; the founder, 2026-11-25: keep them so a later speed run does not repeat a mistake)
+Details and numbers per step: `docs/night/WORK-LOG.md`. Machine: Intel HD 4000, 1920×1080, Chrome (never switched to the NVIDIA).
+**Worked**
+- Measure before choosing: a CPU profile (`Profiler` via CDP) or a leave-one-out GPU split (`perf1 --meshes`, `--passes`, `--exp`) found the real cost every time; guesses were wrong (below).
+- The paint's first picture at 0.75 (step 1): the largest single GPU gain (Standard 54 → 36 ms), the strokes keep their screen size.
+- Dark point lights skipped per fragment (step 2): exact pixels, −5 ms at Detailed. Lights at intensity 0 then cost almost nothing — so hold a light dark rather than hiding it (step 6).
+- Far trunks in a plain material (step 4): −6.4 / −3.6 ms; the founder judged the look.
+- Light's own picture changed IN PLACE, no rebuild (steps 5–6): every other leaf card, per-vertex plants, the wild lights dark — the switch 12–19 s → 0.1 s.
+- Session memo + files for the forest's pure place searches (steps 6–7): ~11 s of JS per opening was the same answer each time; replayed with each call's arguments checked; the first opening 27–33 → 16 s, repeat Detailed 32 → 5 s.
+- The second hand searched every 5th frame while one plays (step 3, CORE-29).
+- Show what is chosen live before deciding (a temporary `?try=` switch, then built in properly).
+**Did not work / traps**
+- Hiding lights (`visible=false`) changes the light count → EVERY lit program recompiles (a 5-s freeze at the first switch). Keep the count; use intensity 0.
+- «Mist, beams, halos at half size» — planned, measured at ~1.5 ms: dropped. The undergrowth's soft edges cost ~0.
+- Detection off the main thread (worker), on the CPU, or the room drawn after detection: all measured slower or starving the picture on 2 cores / 4 threads (step 3). A smaller detection input and a «hand matters more» switch: refused by the founder.
+- The 2D overlay canvas hidden: no gain (its cost is compositing).
+- Background loading of files does not shorten pauses — they were already cached; the pauses were JS building and shader compiling.
+- Preparing a room's GPU programs in the background: not needed — Chrome keeps compiled programs on disk between visits (the first rain 35 s happens once per browser); doing it while playing would stutter.
+- Instant Detailed ↔ Standard: Detailed's context is antialiased (a context attribute → a new context); holding both forests doubles GPU memory. Kept as a 4–5 s rebuild behind a fade.
+- A session memo shared by a module that has its OWN memo shifts the record (the canopy, step 7): wrap only searches that run on every build, or record the once-a-session ones apart (`PLACES_ONCE`).
+- Storing whole meshes in the places file: 7 MB for 1 s — keep files to places, not geometry.
+- Single timing runs mislead (Light's gain read 3.6 ms once, 1.6 ms over three runs): repeat a timing at least three times; calls / triangles a frame vary (the mirror every 1.5 s).
+- A frame (`room.update`) inside an exact check moves the room: do exact comparisons before any update.
