@@ -3578,6 +3578,32 @@ async function nightCameraNames(){
   return { cases:n, total:d.length, differences:d, notes };
 }
 
+/* SPEED-1 step 13 — «ROOM shader copies (app)»: the GPU compiler (ANGLE → D3D on the founder's laptop) copies a GLSL function at every call, through
+   its callers; the rain's life shader called figure() 14 times and dome() 6: 25 of its 33-s first compile (docs/night/ROOM-RULES.md §3). Every shader
+   in a room's modules (a template literal with «void main»): a function over SHADER_BIG characters (comments out) is copied at most SHADER_COPIES times.
+   CONTROLS: a big function called three times from main, and through a small wrapper called three times, are both caught. */
+const SHADER_BIG=1000, SHADER_COPIES=2;
+function shaderCopies(src){
+  const code=src.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' '), F=new Map(), re=/(?:^|[\s;}])(?:float|vec[234]|void|bool|mat[234]|int|ivec[234])\s+([A-Za-z_]\w*)\s*\(([^()]*)\)\s*\{/g; let m;
+  while((m=re.exec(code))){ const i=code.indexOf('{', m.index+m[0].length-1); let d=0, j=i; for(;j<code.length;j++){ if(code[j]==='{') d++; else if(code[j]==='}'){ d--; if(!d) break; } } F.set(m[1], { a:i, b:j, size:j-i+1 }); }
+  const callsIn=(G, n)=>{ let c=0, k=G.a; while((k=code.indexOf(n+'(', k))>=0 && k<G.b){ if(!/[\w.]/.test(code[k-1]||' ')) c++; k++; } return c; };
+  const memo=new Map(), copies=n=>{ if(memo.has(n)) return memo.get(n); memo.set(n, 0); let c=0; for(const [g, G] of F) if(g!==n){ const x=callsIn(G, n); if(x) c+=x*(g==='main' ? 1 : copies(g)); } memo.set(n, c); return c; };
+  return [...F.keys()].filter(n=>n!=='main').map(n=>({ name:n, size:F.get(n).size, copies:copies(n) })); }
+async function roomShaderCopies(){
+  const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); return !!c; }, { readdir }=await import('node:fs/promises');
+  const over=src=>shaderCopies(src).filter(f=>f.size>SHADER_BIG && f.copies>SHADER_COPIES), root=new URL('../apps/night/rooms/', import.meta.url);
+  let shaders=0, worst=null;
+  for(const r of await readdir(root, { withFileTypes:true })) if(r.isDirectory()) for(const f of await readdir(new URL(r.name+'/', root))) if(f.endsWith('.js')){
+    const txt=await readFile(new URL(r.name+'/'+f, root), 'utf8'), re=/`([^`]*)`/g; let m;
+    while((m=re.exec(txt))) if(m[1].includes('void main')){ shaders++; for(const x of over(m[1])) ok(`${r.name}/${f}: ${x.name}() (${x.size} chars) is copied ${x.copies} times (at most ${SHADER_COPIES}: call it once with chosen arguments)`, false);
+      for(const x of shaderCopies(m[1])) if(x.copies>1 && (!worst || x.size*x.copies>worst.size*worst.copies)) worst={ ...x, file:r.name+'/'+f }; } }
+  ok(`too few shaders found (${shaders})`, shaders>=20);
+  const big='float big(vec2 p){ float d=0.;'+' d+=sin(p.x*1.3)+cos(p.y*0.7);'.repeat(40)+' return d; }';
+  ok('CONTROL: a big function called three times passed', over(`${big} void main(){ gl_FragColor=vec4(big(vec2(0.))+big(vec2(1.))+big(vec2(2.))); }`).length===1);
+  ok('CONTROL: a big function through a wrapper called three times passed', over(`${big} float w(vec2 p){ return big(p); } void main(){ gl_FragColor=vec4(w(vec2(0.))+w(vec2(1.))+w(vec2(2.))); }`).length===1);
+  ok('CONTROL: a big function called once failed', over(`${big} void main(){ gl_FragColor=vec4(big(vec2(0.))); }`).length===0);
+  notes.push(`${shaders} shaders in the rooms; the most copied: ${worst ? `${worst.file} ${worst.name}() ${worst.size} chars × ${worst.copies}` : 'none'}; CONTROLS: three calls and a wrapper caught, one call passed`);
+  return { cases:n, total:d.length, differences:d, notes }; }
 const ROWS=[
   ...REG.rows({ node:true }).map(r=>[r.name, r.run, r.read]),
   ['LIC1 licence register',     ()=>LIC.run(),          r=>({ cases:r.cases, diff:r.total, list:r.differences })],
@@ -3665,6 +3691,7 @@ const ROWS=[
   ['RAIN effects hand (app)', ()=>rainFxLaw(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-6
   ['RAIN-7 law (app)', ()=>rain7Law(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-7
   ['RAIN-10 gait, clothes and the lamp (app)', ()=>rain10Gait(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-10
+  ['ROOM shader copies (app)', ()=>roomShaderCopies(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // SPEED-1 step 13
   ['RELEASE-1 people clothes (app)', ()=>release1Clothes(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RELEASE-1 (A)
   ['RELEASE-1 people come and go (app)', ()=>release1Stay(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RELEASE-1 (A)
   ['RELEASE-1 vehicle bodies (app)', ()=>release1Bodies(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RELEASE-1 (B)

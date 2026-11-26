@@ -276,7 +276,6 @@ float figure(vec2 p, float ox, float ph, float sw, float st, float bend, float u
   float d=min(min(min(dC, dL), min(dS, dK)), min(dH, dT))*sc;
   if(d<gD){ gD=d; gC=dC*sc; gL=dL*sc; gT=dT*sc; gS=dS*sc; gK=dK*sc; gH=dH*sc; gWho=who; gFig=1.; }
   return d; }
-float person(vec2 p, float ox, float ph, float sw, float st, float bend, float umb){ return figure(p, ox, ph, sw, st, bend, umb, 0., 1.); }
 /* RAIN-6b (RAIN-6c's rest): an umbrella leans into Wave's wind about its handle's top, gusting (each its own phase) */
 uniform float uWind, uTime;
 vec2 tilt(vec2 p, float y, float k){ if(uWind<=0.) return p; float a=-uWind*(0.32+0.14*sin(uTime*2.3+k*1.7)), c=cos(a), s=sin(a); vec2 q=p-vec2(0., y*0.6); return vec2(c*q.x-s*q.y, s*q.x+c*q.y)+vec2(0., y*0.6); }
@@ -328,16 +327,33 @@ void main0(){ float k=floor(vK.x+0.5), ph=fract(vK.y), sub=floor(vK.y), face=mod
   vec2 p=vQ; if(k<2.5 || (k>13.5 && k<18.5)) p.y*=1.15;   /* RAIN-5c: a person's quad reaches 15 % over the head (rain.js): the umbrella fits */
   float d=1., du=1., da=1., light=0., clear=0., uy=0.9, uw=1., ux=0.012*sin(ph*6.2832), lamp=0.; vec3 lampC=vec3(0.), glowC=vec3(0.);
   float hasU= uk<3.5 ? 1. : 0., wc=floor(vW.x+0.5); gV=vV; gRt=max(vRt, 0.02); gRtL=gRt; gFace=face; gStyle=mod(floor(wc/32768.), 4.); gHs=mod(floor(wc/131072.), 4.);   /* RELEASE-1 (A): the wear's style and hair style */
+  /* SPEED-1 step 13: ONE call site for figure() and one for dome(): the compiler copied each at every call (15 figures, 6 domes: 25 s of the
+     rain's 33-s first compile). Each kind's figures are set here in their old order (fN), drawn by the loop, read by its branch as fR0…fR2 */
+  if(k>17.5 && k<18.5){ gRt=vRt*0.5; gRtL=gRt; gV.x*=2.; }   /* RELEASE-1 (A): the group's frame is twice as wide */
+  float fN=0., dN=0., dOx=ux, dW=1.; vec2 fP0=p, fP1=p, fP2=p; vec4 fA0=vec4(0., ph, 0., 0.), fA1=fA0, fA2=fA0, fB0=vec4(0., 0., 0., 1.), fB1=fB0, fB2=fB0;   /* (ox, ph, sw, st), (bend, umb, who, sc) */
+  if(k<0.5 || (k>14.5 && k<15.5) || (k>15.5 && k<16.5)){ float st= k>15.5 ? 1. : 0.; fN=1.; fA0=vec4(0., ph, k>14.5 && k<15.5 ? 0.06 : 0.1, st); fB0=vec4(k>14.5 && k<15.5 ? 0.25 : 0., hasU*(1.-st), 0., 1.); }
+  else if(k<1.5){ fN=2.; fA0=vec4(-0.3, ph, 0.07, 0.); fA1=vec4(0.3, ph+0.5, 0.07, 0.); fB1=vec4(0., 1., 1., 1.); }
+  else if(k<2.5){ fN=1.; fA0=vec4(-0.38, ph, 0.09, 0.); fB0=vec4(0., hasU, 0., 1.); }
+  else if(k>3.5 && k<4.5){ fN=1.; fA0=vec4(0., ph, 0.22, 0.); fB0=vec4(0.1, 0., 0., 1.); }
+  else if(k>5.5 && k<6.5){ fN=1.; fA0=vec4(0., ph, 0.08, 0.); }
+  else if(k>13.5 && k<14.5){ fN=2.; fA0=vec4(-0.3, ph, 0.08, 0.); fB0=vec4(0., hasU, 0., 1.); fP1=vec2((p.x-0.35)/0.62, p.y/0.62); fA1=vec4(0., fract(ph*1.4), 0.12, 0.); fB1=vec4(0., 0., 1., 0.62); }   /* a child holding a hand */
+  else if(k>16.5 && k<17.5){ fN=1.; fA0=vec4(0., ph, 0.05, 1.); }
+  else if(k>17.5 && k<18.5){ fN=3.; fP0=vec2((p.x+0.64)*2., p.y*1.04); fA0=vec4(0., ph, 0.09, 0.); fB0=vec4(0., 0., 1., 0.5); fP1=vec2(p.x*2., p.y); fA1=vec4(0., ph+0.31, 0.09, 0.); fB1=vec4(0., 1., 0., 0.5);
+    fP2=vec2((p.x-0.64)*2., p.y*1.08); fA2=vec4(0., ph+0.63, 0.09, 0.); fB2=vec4(0., 0., 2., 0.5); }
+  else if(k>21.5 && k<22.5){ fN=1.; fP0=vec2(p.x*2.2, (p.y-0.12)*1.35); fA0= ph<0.5 ? vec4(0., 0., 0.1, 1.) : vec4(0., 0.2, 0.14, 0.); }   /* the pedestrian signal: red standing, green walking */
+  float fR0=1e3, fR1=1e3, fR2=1e3;
+  for(int i=0;i<3;i++){ if(float(i)>fN-0.5) break; vec2 P= i==0 ? fP0 : i==1 ? fP1 : fP2; vec4 A= i==0 ? fA0 : i==1 ? fA1 : fA2, B= i==0 ? fB0 : i==1 ? fB1 : fB2;
+    float r=figure(P, A.x, A.y, A.z, A.w, B.x, B.y, B.z, B.w); if(i==0) fR0=r; else if(i==1) fR1=r; else fR2=r; }
   if(k<0.5 || (k>14.5 && k<15.5) || (k>15.5 && k<16.5)){ float st= k>15.5 ? 1. : 0., bend= k>14.5 && k<15.5 ? 0.25 : 0.;
-    d=person(p, 0., ph, k>14.5 && k<15.5 ? 0.06 : 0.1, st, bend, hasU*(1.-st));
+    d=fR0;
     if(k>15.5 && ph<0.3){ gB=min(gB, el(p, vec2(0.22, 0.74), vec2(0.1, 0.05))); d=min(d, gB); lamp=exp(-dot((p-vec2(0.22, 0.74))/vec2(0.1, 0.05), (p-vec2(0.22, 0.74))/vec2(0.1, 0.05))*1.5)*0.35; lampC=vec3(0.55, 0.66, 0.9); }   /* the phone held up, its screen lit */
     cHand= st>0.5 ? 1e3 : 0.04; cFlip= flipU>0. ? smoothstep(0., 0.12, flipU)*(1.-smoothstep(0.72, 0.95, flipU)) : 0.;   /* RELEASE-1 (C): over, shaken, put right */
-    if(uk<1.5 || uk>2.5 && uk<3.5){ uw= uk>2.5 ? 1.4 : 1.; du=dome(tilt(p, uy, ci+uk*3.), ux, uw, uy); } else if(uk>1.5 && uk<2.5){ du=dome(tilt(p, uy, ci+uk*3.), ux, 1., uy); clear=1.; }
+    if(uk<1.5 || uk>2.5 && uk<3.5){ uw= uk>2.5 ? 1.4 : 1.; dN=1.; dW=uw; } else if(uk>1.5 && uk<2.5){ dN=1.; clear=1.; }
     else if(uk>3.5 && uk<4.5){ float hd=el(p, vec2(0., 0.88), vec2(0.32, 0.09)); if(face>0.5) hd=max(hd, -el(p, vec2(0., 0.862), vec2(0.17, 0.052))); gA=min(gA, hd); d=min(d, hd); }   /* a hood (its opening shows the face) */
     else if(uk>4.5 && uk<5.5){ gN=min(gN, seg(p, vec2(-0.52, 0.97), vec2(0.52, 0.97), 0.03)); d=min(d, gN); }   /* a newspaper over the head */
     gear(p, acc, face, ph, d); }
-  else if(k<1.5){ d=min(figure(p, -0.3, ph, 0.07, 0., 0., 0., 0., 1.), figure(p, 0.3, ph+0.5, 0.07, 0., 0., 1., 1., 1.)); du=dome(tilt(p, uy, ci+uk*3.), ux, 1.25, uy); }
-  else if(k<2.5){ d=person(p, -0.38, ph, 0.09, 0., 0., hasU);
+  else if(k<1.5){ d=min(fR0, fR1); dN=1.; dW=1.25; }
+  else if(k<2.5){ d=fR0;
     /* RELEASE-1 (A): THE DOG walks AHEAD of its walker along the walking direction as it shows on screen (gV.xy per metre; RAIN-5 drew it side-on,
        running sideways): its body from tail to head along that direction, four legs trotting, the tail up, the lead from the free hand to its collar */
     vec2 Wm=length(gV.xy)>1e-4 ? gV.xy : vec2(0.9, 0.), G=vec2(0.3, 0.)+Wm*1.15, Rr=G-Wm*0.3, Ff=G+Wm*0.3, by=vec2(0., 0.17); float tr=sin(ph*12.566);
@@ -346,13 +362,13 @@ void main0(){ float k=floor(vK.x+0.5), ph=fract(vK.y), sub=floor(vK.y), face=mod
       vec2 top=G+Wm*al+vec2(sd, 0.15), ft=G+Wm*(al+0.07*tr*sg)+vec2(sd, 0.004); gDog=min(gDog, limb(p, top, ft, 0.014)); }   /* legs, trotting in diagonal pairs */
     gDog=min(gDog, limb(p, Rr+by+vec2(0., 0.01), Rr+by+vec2(0., 0.09)-Wm*0.1, 0.012));   /* the tail */
     float lead=limb(p, vec2(-0.01, 0.37), Ff+by+vec2(0., 0.03), 0.004); d=min(min(d, gDog), lead); gN=min(gN, 1e3);
-    cHand= hasU>0.5 ? -0.34 : 1e3; du=dome(tilt(p, uy, ci+uk*3.), -0.38+ux, 0.8, uy); }
+    cHand= hasU>0.5 ? -0.34 : 1e3; dN=1.; dOx=-0.38+ux; dW=0.8; }
   else if(k<3.5){ float pa=ph*6.2832;   /* RAIN-5c: a cyclist from behind (riding away) or the front: one wheel end-on, the rider over it, legs pedalling */
     d=abs(seg(p, vec2(0., 0.13), vec2(0., 0.33), 0.08))-0.03;   /* RAIN-10: the wheel end-on, a capsule's rim clear of the quad's foot */ d=min(d, el(p, vec2(0., 0.66), vec2(0.36, 0.16))); d=min(d, el(p, vec2(0., 0.88), vec2(0.21, 0.06)));
     d=min(d, min(el(p, vec2(-0.14, 0.42+0.07*sin(pa)), vec2(0.1, 0.13)), el(p, vec2(0.14, 0.42-0.07*sin(pa)), vec2(0.1, 0.13))));
     d=min(d, seg(p, vec2(-0.47, 0.6), vec2(0.47, 0.6), 0.025));
     if(face>0.5){ lamp=exp(-dot(p-vec2(0., 0.56), p-vec2(0., 0.56))/0.006); lampC=uHead; } else { lamp=exp(-dot(p-vec2(0., 0.44), p-vec2(0., 0.44))/0.005)*xtra; lampC=uNavR; } }
-  else if(k<4.5){ d=person(p, 0., ph, 0.22, 0., 0.1, 0.); }
+  else if(k<4.5){ d=fR0; }
   else if(k>28.5 && k<29.5){   /* RELEASE-1 (C): THE CAT ON THE SILL of a lit window — a dark silhouette rimmed by the room's light behind it; c: state (0 sit, 1 wash, 2 walk,
        3 lie) + 4 facing left; ph: its progress, + 4 × (look + 1) (where it looks). The sprite: drawn 1.4 × a real cat (0.6 × 0.44 m of shapes over a sprite
        the room sizes 0.84 × 0.62 m) so it reads at a window's few pixels; the sill 0.1 m (shapes) above its foot */
@@ -419,7 +435,7 @@ void main0(){ float k=floor(vK.x+0.5), ph=fract(vK.y), sub=floor(vK.y), face=mod
     d=min(d, el(p, vec2(0., 0.32), vec2(0.18, 0.1))); d=min(d, seg(p, vec2(-0.47, 0.6), vec2(0.47, 0.6), 0.025)); da=el(p, vec2(0., 0.7), vec2(0.42, 0.16));
     lamp=exp(-dot(p-vec2(0., 0.4), p-vec2(0., 0.4))/0.005); lampC=uHead; }
   else if(k<5.5){ d=min(el(p, vec2(0., 0.45), vec2(0.45, 0.26)), el(p, vec2(0.02*sin(ph*6.2832), 0.8), vec2(0.28, 0.08))); }
-  else if(k<6.5){ d=min(person(p, 0., ph, 0.08, 0., 0., 0.), seg(p, vec2(0.2, 0.63), vec2(0.88, 0.63), 0.02)); }   /* RAIN-10: the tray a capsule — as the handlebars, the hat's brim and the newspaper (a thin ellipse's soft edge ran far along it, past its quad) */
+  else if(k<6.5){ d=min(fR0, seg(p, vec2(0.2, 0.63), vec2(0.88, 0.63), 0.02)); }   /* RAIN-10: the tray a capsule — as the handlebars, the hat's brim and the newspaper (a thin ellipse's soft edge ran far along it, past its quad) */
   else if(k<7.5){ d=el(p, vec2(0., 0.45), vec2(0.8, 0.4)); if(vK.y>=0.) d=min(d, el(p, vec2(0., 0.55+0.3*sin(ph*6.2832)), vec2(0.88, 0.12))); }   /* RAIN-10: the wing tips inside the quad with their soft edge */
   else if(k<8.5){ d=min(el(p, vec2(0., 0.4), vec2(0.7, 0.28)), min(el(p, vec2(0.7, 0.68), vec2(0.25, 0.18)), el(p, vec2(-0.8, 0.65), vec2(0.12, 0.35)))); }
   else if(k<9.5){ float a=ph*6.2832; vec2 q=mat2(cos(a), -sin(a), sin(a), cos(a))*(p-vec2(0., 0.5)); d=(abs(q.x)+abs(q.y*2.)-0.48)*0.4; }   /* RAIN-10: the leaf inside its quad as it turns */
@@ -427,13 +443,12 @@ void main0(){ float k=floor(vK.x+0.5), ph=fract(vK.y), sub=floor(vK.y), face=mod
   else if(k<11.5){ light=1.; d=abs(el(p, vec2(0., 0.5), vec2(1., 0.5)))-0.05; }
   else if(k<12.5){ light=1.; d=p.y<0.5 ? 1. : abs(el(p, vec2(0., 0.5), vec2(1., 0.5)))-0.08; }
   else if(k<13.5) discard;   /* RAIN-10: 13 (heads over the tram) retired — the tram draws its passengers inside its windows */
-  else if(k<14.5){ vec2 q=p; d=person(vec2(q.x, q.y), -0.3, ph, 0.08, 0., 0., hasU); vec2 c=vec2((q.x-0.35)/0.62, q.y/0.62); d=min(d, figure(c, 0., fract(ph*1.4), 0.12, 0., 0., 0., 1., 0.62)); cHand= hasU>0.5 ? -0.26 : 1e3;   /* a child holding a hand */
-    if(p.x>-0.1 && p.x<0.25) d=min(d, abs(p.y-0.42)-0.014); du=dome(tilt(p, uy, ci+uk*3.), -0.3+ux, 0.9, uy); }
-  else if(k<17.5){ d=person(p, 0., ph, 0.05, 1., 0., 0.); float hg=el(p, vec2(xtra>0.5 ? -0.32 : 0.32, 0.58+0.05*sin(ph*6.2832)), vec2(0.09, 0.08)); gK=min(gK, hg); d=min(d, hg); }   /* talking: a gesturing hand */
+  else if(k<14.5){ d=min(fR0, fR1); cHand= hasU>0.5 ? -0.26 : 1e3;   /* a child holding a hand */
+    if(p.x>-0.1 && p.x<0.25) d=min(d, abs(p.y-0.42)-0.014); dN=1.; dOx=-0.3+ux; dW=0.9; }
+  else if(k<17.5){ d=fR0; float hg=el(p, vec2(xtra>0.5 ? -0.32 : 0.32, 0.58+0.05*sin(ph*6.2832)), vec2(0.09, 0.08)); gK=min(gK, hg); d=min(d, hg); }   /* talking: a gesturing hand */
   else if(k<18.5){   /* RAIN-5c: a small group of three walking together (1.5 m), a golf umbrella over the middle one */
-    gRt=vRt*0.5; gRtL=gRt; gV.x*=2.;   /* RELEASE-1 (A): the group's frame is twice as wide */
-    d=min(figure(vec2((p.x+0.64)*2., p.y*1.04), 0., ph, 0.09, 0., 0., 0., 1., 0.5), min(figure(vec2(p.x*2., p.y), 0., ph+0.31, 0.09, 0., 0., 1., 0., 0.5), figure(vec2((p.x-0.64)*2., p.y*1.08), 0., ph+0.63, 0.09, 0., 0., 0., 2., 0.5)));
-    cHand=0.04; du=dome(vec2(p.x*2., p.y), ux, 1.35, uy)*0.5; }
+    d=min(fR0, min(fR1, fR2));   /* the three figures (the group's frame set above) */
+    cHand=0.04; dN=2.; dW=1.35; }
   else if(k<19.5){ float sw=(ph-0.5)*0.6; vec2 q=p-vec2(sw*(1.-p.y), 0.); d=max(abs(q.x)-0.9*p.y, max(-p.y+0.02, p.y-0.98))*0.5; glowC= ci<0.5 ? uGarA : ci<1.5 ? uGarB : ci<2.5 ? uGarC : uGarD; }   /* a little flag of the bunting */
   else if(k<20.5){ float g=glyph(p, ci), board=el(vec2(p.x*0.5, p.y), vec2(0., 0.5), vec2(0.45, 0.45)); vec3 gc= ci>0.5 && ci<1.5 ? uCross : ci>3.5 || ci<0.5 ? uSignWarm : uSign;   /* a lit pictogram on its dark board */
     float sw=clamp(vSoft, 0.02, 0.6), win=winOf()*mix(1., vFade, uWin), core=smoothstep(sw, -sw, g), halo=smoothstep(0.35+sw, -sw, g)*0.35, bd=smoothstep(sw, -sw, board);
@@ -445,8 +460,9 @@ void main0(){ float k=floor(vK.x+0.5), ph=fract(vK.y), sub=floor(vK.y), face=mod
     float lr=smoothstep(0.12+sw, 0.09-sw, length(r1)), lg=smoothstep(0.12+sw, 0.09-sw, length(g1));
     vec3 c=vec3(0.015)*smoothstep(sw, -sw, box)+uWalkR*lr*(0.15+1.4*on)+uWalkG*lg*(0.15+1.4*(1.-on)); float al=smoothstep(sw, -sw, box)*win*vK.w; gl_FragColor=vec4(c*win*vK.w, al); return; }
   else { float sw=clamp(vSoft, 0.02, 0.6), win=winOf()*mix(1., vFade, uWin), go=ph<0.5 ? 0. : 1.;   /* the pedestrian signal: a standing red figure, or a walking green one */
-    vec2 bq=abs(vec2(p.x*0.42, p.y-0.5))-vec2(0.36, 0.46); float box=length(max(bq, 0.))+min(max(bq.x, bq.y), 0.)-0.04, f= go>0.5 ? person(vec2(p.x*2.2, (p.y-0.12)*1.35), 0., 0.2, 0.14, 0., 0., 0.)*0.45 : person(vec2(p.x*2.2, (p.y-0.12)*1.35), 0., 0., 0.1, 1., 0., 0.)*0.45;
+    vec2 bq=abs(vec2(p.x*0.42, p.y-0.5))-vec2(0.36, 0.46); float box=length(max(bq, 0.))+min(max(bq.x, bq.y), 0.)-0.04, f=fR0*0.45;
     float fig=smoothstep(sw, -sw, f); vec3 fc= go>0.5 ? uWalkG : uWalkR; vec3 c=vec3(0.015)*smoothstep(sw, -sw, box)*(1.-fig)+fc*fig*1.5; float al=smoothstep(sw, -sw, box)*win*vK.w; gl_FragColor=vec4(c*win*vK.w, al); return; }
+  if(dN>0.5){ du=dome(dN>1.5 ? vec2(p.x*2., p.y) : tilt(p, uy, ci+uk*3.), dOx, dW, uy); if(dN>1.5) du*=0.5; }   /* SPEED-1 step 13: the one umbrella (the group's golf one flat, at half) */
   float win=winOf(), fade=mix(1., vFade, uWin), sw=clamp(vSoft, 0.02, 0.6), kb=smoothstep(0.35, 0.9, vSoft), disc=1.-smoothstep(0.1, 1., length(vE*vAsp)/min(vAsp.x, vAsp.y));   /* the circle inside the quad's short side */   // RAIN-5b: never a visible quad edge;
   float m=mix(smoothstep(sw, -sw, d), disc*0.85, kb)*win*fade, mu=smoothstep(sw, -sw, du)*(1.-kb)*win*fade, ma=smoothstep(sw, -sw, da)*(1.-kb)*win*fade;   // RAIN-10: a blur wider than the thing makes it a round soft spot, never a square
   if(light>0.5){ gl_FragColor=vec4(vec3(0.6, 0.6, 0.62)*m*vK.w, m*vK.w*0.35); return; }

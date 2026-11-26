@@ -4,6 +4,17 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`, `archive/NIGHT-RUN-LOG-2026-10.md`. New runs start at `NIGHT-1`.
 
+# SPEED-1 step 13 (NIGHT track, 2026-11-26, timing indicative): the rain's life shader compiled 2.4× faster; the room rules
+Tree hashes before: core 17a6ce078eefa5f4 · apps/full 0148bb454440c3e3 · apps/night 71d2ffcf691ba0cd. After: core and apps/full unchanged · apps/night 526d7090edd7b5df.
+- The founder: «take next what you think is needed»; and «write down the rules for making rooms so we don't fix everything later».
+- `docs/night/ROOM-RULES.md` (new): shape, seeded laws, shader size, sprite edges, per-frame garbage, opening budgets, three qualities, checks, order of work, each rule with its origin. CLAUDE.md «Conventions» line «A Night room»; `docs/night/HANDOFF.md` header points to it.
+- Measured, each rain program's first compile alone (cold; `tools/.out/speed1-step13/rain-each.js`): the life program 32.7 s, the other ten 5 s together. Stubs (`life-variants.js`): figure() stubbed 12.1 s, figure + dome 7.2 s, so the copies cost 25 s.
+- `rain-glass.js LIFE_F`: `figure()` and `dome()` each from ONE call site. The slots `fN`, `fP0…2`, `fA0…2 (ox, ph, sw, st)`, `fB0…2 (bend, umb, who, sc)` are set per kind in the old call order (the group's frame `gRt/gRtL/gV.x` set before them), a loop draws them, and the branches read `fR0…2`. The umbrella is set as `dN / dOx / dW` and drawn once after the kinds (the group's golf umbrella flat and at half); `person()` was removed.
+- A/B (`life-ab.js`, the old source kept in `tools/.out/speed1-step13/life-old.glsl`): 12 sheets × 336 items (every kind, seeded phases, codes, wear, views; wind, time, focus, lamp): 30 of 18 874 368 pixels differ by 1 (max 1/255), in kinds 14, 16–18 and 22 (constant arguments were folded by the compiler before). CONTROL (one figure 0.1 mm off): 3022 px, max 34. Through three, the compile 25.5 → 10.6 s.
+- The rain opened cold: 16.6 / 16.8 s, longest slice 11.2 / 11.7 s (before ≈ 30 s and 25.9 s). With the parallel compile allowed: 23.7 s, no slice over 0.2 s, so `parCompile:false` stays (comment renewed).
+- Data row «ROOM shader copies (app)» (`tools/probe-data.mjs roomShaderCopies`): 38 shaders in the rooms' modules; a function over 1000 chars (comments out) is copied at most twice, counted through its callers. CONTROLS: three calls, a wrapper called three times, one call passes. The old rain-glass.js fails (figure 2687 × 14, dome 1569 × 6).
+- Rows: data PASS 108/0; P.night «RAIN no quad edges» 13/0, «RAIN-10 people, cars and the tram» 105/0, «SPEED parallel compile» 8/0 (via `rows.js`). Fix rounds: 1 (the compile timing first read a cached program, so it was moved before the sheets).
+
 # SPEED-1 step 12 (NIGHT track, 2026-11-26, timing indicative): the forest's programs compiled all at once
 Tree hashes before: core 17a6ce078eefa5f4 · apps/full 0148bb454440c3e3 · apps/night 49df7ffd11accd1c. After: core and apps/full unchanged · apps/night 71d2ffcf691ba0cd.
 - The founder: yes; the music stays as it is (playing from Begin).

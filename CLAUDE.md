@@ -163,6 +163,7 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   engine, `leadIsKs` — the «KS block is the tail» rule is retired). A kit's six rows name row synths of `drumkits.js` (`KIT_SYNTHS`) with
   their parameters; a new row SYNTH is code (+ its parameter list in `core/pure/timbre.js KIT_SYNTHS`, bounded).
   Events store the timbre ID (TIM2). The editor lists timbres only via `audio.timbresOf(role)`.
+- ⛳ **A Night room** (the founder, 2026-11-26) = a folder `apps/night/rooms/<name>/` built by the rules in `docs/night/ROOM-RULES.md` from its first slice (shape, seeded laws, shader size, sprite edges, no per-frame garbage, opening budget, three qualities, its checks); a rule learned in a later fix is added there.
 - **A profile** (C0) = `apps/<app>/data/<name>.json` (`handsong/profile` v1), declared by the page (`<link rel="handsong-profile">`), + its id in `core/pure/profile.js PROFILE_IDS` (pinned, rule #37); every narrowing field null in Full (Full changes nothing).
 - **Night's per-timbre settings** (RUN 8; the user: Full exactly as at RUN 7) live in the PROFILE, never in a timbre record: `levels` {id: dB}
   (`audio.setTimbreTrim`), `voices` {id: strikes} (`audio.setNightStrikes` — the struck banks take Night's cheaper strike + the cap only while
