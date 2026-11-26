@@ -39,6 +39,9 @@ _Every item was checked against today's code. Closed and outdated items, word fo
 - ⬜ Before the first release: detection in a worker if phone numbers ask for it; the audit marks of the remaining icons and images (§7.19).
 - ⬜ After the first release: installation (kiosk) mode §7.18 = stage 4b · «Listen» §7.17 · more rooms, the forest band, rhythmic backings, more timbres and effects, the expression hand, saved moments, packs, «Plus». Selling: Vercel Hobby forbids it; a paid plan or other hosting first (§7.12 item 6, `docs/core/BACKLOG.md`).
 
+## Deferred ideas (the founder parks them; not dropped)
+- ⏸ **A steady 30 fps picture to free the hands** (SPEED-1 step 15 proposal; the founder, 2026-11-26: deferred — «не будем терять плавность»). Why it came up: in a room the hand detection takes 340–490 ms/s of long frames on the laptop and shares the main thread and GPU with a picture drawn at ~43 fps. To try later behind a measuring switch first (detection ms, hand → sound, long frames, forest and rain); the person would choose it, never automatic.
+
 ## 7. Product direction (the parts that belong to Night)
 _The heading and intro of §7 are in `docs/core/BACKLOG.md`._
 

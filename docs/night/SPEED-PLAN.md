@@ -38,7 +38,7 @@ Quality is kept. Runs are named `SPEED-n` (NIGHT track; a core part is its own s
 3. A smaller detection input (e.g. 480×360) — kept only if a far hand is still found.
 4. A rarer second-hand search while one hand is tracked (steadier rhythm; the second hand found a little later).
 5. Hands before picture: when detection slows under the room's load, the picture eases its resolution for a moment and comes back smoothly.
-6. A steady 30 fps picture on weak devices (frees the GPU for the hands).
+6. ~~A steady 30 fps picture on weak devices (frees the GPU for the hands)~~ — ⏸ deferred (the founder, 2026-11-26: «не будем терять плавность»; kept in the deferred ideas). Step 15 measured why it was proposed: in a room the hand detection takes 340–490 ms/s of long frames on the laptop.
 7. A one-time hint to switch the browser to the high-performance GPU when an integrated one is in use.
 
 ## Stage 2 — faster sound — ⏸ POSTPONED, every item (the founder, 2026-11-25: no sound work for now; to come back to later)
