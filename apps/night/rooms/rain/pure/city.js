@@ -43,9 +43,11 @@ const B0=camBasis();
 /* a world point → { x, y (view-angle units), z (distance along the view axis, m), dist (m) } ; z ≤ 0: behind the eye */
 export const project=(P, c=CAM, B=B0)=>projectXYZ(P[0], P[1], P[2], c, B);
 /* SPEED-1 step 10: the same law from three numbers (no array made per call; the same arithmetic, so the same answers to the bit) */
-export function projectXYZ(px, py, pz, c=CAM, B=B0){
+export function projectXYZ(px, py, pz, c=CAM, B=B0){ return projectTo({ x:0, y:0, z:0, dist:0 }, px, py, pz, c, B); }
+/* SPEED-1 step 15: the same law written into o (a frame's scratch: no object made per call) */
+export function projectTo(o, px, py, pz, c=CAM, B=B0){
   const vx=px+bendX(pz)-c.x, vy=py-c.y, vz=pz-c.z, z=vx*B.f[0]+vy*B.f[1]+vz*B.f[2];   // RAIN-5: the bend (0 nearer than BEND.z0)
-  return { x:(vx*B.r[0]+vy*B.r[1]+vz*B.r[2])/z, y:(vx*B.u[0]+vy*B.u[1]+vz*B.u[2])/z, z, dist:Math.hypot(vx, vy, vz) };
+  o.x=(vx*B.r[0]+vy*B.r[1]+vz*B.r[2])/z; o.y=(vx*B.u[0]+vy*B.u[1]+vz*B.u[2])/z; o.z=z; o.dist=Math.hypot(vx, vy, vz); return o;
 }
 /* a view direction (view-angle units) → the world ray's unit direction */
 export function rayOf(x, y, B=B0){ const d=[B.f[0]+x*B.r[0]+y*B.u[0], B.f[1]+x*B.r[1]+y*B.u[1], B.f[2]+x*B.r[2]+y*B.u[2]], n=Math.hypot(...d); return [d[0]/n, d[1]/n, d[2]/n]; }

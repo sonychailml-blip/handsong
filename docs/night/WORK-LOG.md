@@ -4,6 +4,15 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`, `archive/NIGHT-RUN-LOG-2026-10.md`. New runs start at `NIGHT-1`.
 
+# SPEED-1 step 15 (NIGHT track, 2026-11-26): the rain's per-frame garbage, the same output byte for byte
+Tree hashes before: core 17a6ce078eefa5f4 · apps/full 0148bb454440c3e3 · apps/night 17c7fb7bcbe9f0fb. After: core and apps/full unchanged · apps/night a3091307a74bf245.
+- Measured first (`node tools/speed.mjs --why --only rain`): allocated Light 6.42, Standard 5.52, Detailed 4.85 MB/s; sites lifeUpload 20 %, projectXYZ 19 %, lifeAt 7–10 %, the vehicles' put 5 %, drops, sceneAt, lightAt.
+- Changed (`rooms/rain/rain.js`, `pure/city.js`): `projectTo(o, x, y, z)` — projectXYZ's arithmetic into a given object (projectXYZ now calls it); every per-frame projection in the room writes its own scratch (`PJ`); `lightAt(i, x, y, z, …)` (13 array literals a frame gone); the life rows from a pool (16 numbers, the view written in by `viewOf(q, b, hw, hh, R)`), the row list kept; a stable bottom-up merge sort through a kept buffer (`sortFar`) in place of `S.sort` + `splice`; the vehicle records pooled with their arrays and focus levels written in place; the shutter and the awnings' fringes made once; in 'mesh' no vehicle items made (all were filtered out).
+- Proof: the room's whole per-frame output (`tools/.out/speed1-step15/rain-pin.js`: every attribute, uniform, DataTexture, instance count, 300 frames at 10 s / 400 s / 1300 s, pixels at 5 frames) recorded before = after at Standard, Detailed and Light; deterministic twice; CONTROL one bit caught. `sortFar` = the built-in sort in 3000 of 3000 random cases with ties (`sort-check.mjs`; CONTROL an unstable merge differs in 1452).
+- After: allocated Light 4.48, Standard 4.46, Detailed 3.53 MB/s. Left: the life law's own items (`pure/life.js lifeAt`, shared with the sound), drops, traffic. The long frames are the hand detection (`core/vision.js onVF` 340–490 ms/s).
+- `tools/prints/night-speed-cost.json` renewed (declared `--cost --renew`): the only difference startSet.kb 27411 → 27416 (code of RAIN-12 and steps 14–15). `docs/core/NAME-INDEX.md` regenerated (projectTo).
+- Checks: static PASSED; `[probe-data] PASS — 108 checks, 0 differences` (after the name index; fix round 1); `speed.mjs --cost` PASS; P.night «RAIN room» 47/0, «RAIN-10 people, cars and the tram» 105/0, «RELEASE-1 vehicles in 3D» 54/0.
+
 # SPEED-1 step 14 (NIGHT track, 2026-11-26, timing indicative — the laptop measured slower than at step 13): the vehicle sprites out of the shipped life program
 Tree hashes before: core 17a6ce078eefa5f4 · apps/full 0148bb454440c3e3 · apps/night 0a30b3f873a52ca1. After: core and apps/full unchanged · apps/night 17c7fb7bcbe9f0fb.
 - Where the life program's remaining time goes (`tools/.out/speed1-step14/life-branches.js`, each variant cold, alone): whole 15.4–16.9 s today; each big branch emptied saves 0.5–2.3 s; all six (cat, facade things, vehicle sprites, scooter, signs, signal) 8.3 s — the compile grows faster than the code.

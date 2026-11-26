@@ -478,7 +478,7 @@ RAIN-7: THE STREET MUSICIAN under the café's awning, playing along with our mus
 ## apps/night/rooms/rain/pure/city.js
 RAIN-0b: THE VIEW LAW — the eye on the 8th floor, looking slightly down and diagonally along the boulevard (concept §3), as ONE pure projection used by the painting, the depth map, the lights, the …
 - const (22): `CAM`, `STREET`, `BEND`, `bendX`, `BAKE_EXT`, `BLOCKS`, `FLOOR`, `FAR`, `camBasis`, `project`, `vanishing`, `DEPTH`, `hillsAt`, `RAIN_CITY_SEED`, `LAMP_ROWS`, `NEAR_TREES`, `TRAFFIC`, `DENS_MARGIN`, `RAIN_TRAFFIC`, `EAR`, `trafficAt`, `trafficDensity`
-- fn (8): `projectXYZ`, `rayOf`, `depthOf`, `sceneAt`, `cityWindows`, `cityLamps`, `lampLitAt`, `cityTrees`
+- fn (9): `projectXYZ`, `projectTo`, `rayOf`, `depthOf`, `sceneAt`, `cityWindows`, `cityLamps`, `lampLitAt`, `cityTrees`
 
 ## apps/night/rooms/rain/pure/drops.js
 RAIN-0b: THE DROPS ON THE PANE — a stateful simulation, so drops see each other (pure, rule #36; data row «RAIN glass law (app)»).
@@ -1726,7 +1726,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 UI-1 — «NIGHT labels follow the room»: the founder entered the rain and the Sound button still read «Firefly» while another timbre played.
 - fn (1): `checkNightLabels`
 
-_343 modules, 3294 exported names._
+_343 modules, 3295 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

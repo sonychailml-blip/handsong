@@ -9058,3 +9058,18 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 - Measured and dropped: mist / beams / halos at half size (~1.5 ms); the undergrowth's soft edges cost ~0. The room's frame rate barely moves detection (room not drawn: 144 → 105 ms, fake camera).
 - `tools/speed.mjs`: the resource-timing buffer was full → the start set is really 260 files / 27 MB (read 208 / 4.4 MB); baseline renewed (declared, only the start set differs). `tools/perf1.mjs --query`.
 
+
+## Moved from docs/night/HANDOFF.md at SPEED-1 step 15 (2026-11-26)
+### SPEED-1 step 7 (2026-11-25): the pauses, second half. Log: `docs/night/WORK-LOG.md`
+- Places files `rooms/forest/places/{reduced,full}.json` (386 / 944 KB; `node tools/forest-places.mjs`, `--check`): the first opening of each level replays its searches (the roots excepted); the spruces' searches joined the memo. A level-table change makes them stale — the row says so.
+- A quality rebuild fades out first (`sceneFadeOut`, 500 ms), then fades in like a room switch.
+- Chrome keeps compiled GPU programs between visits: the first rain (35 s) happens once per browser — not prepared in the background.
+- A browser's first visit → next visits: the first opening 16 → 8 s (was 27–33 → 7–10), the first Detailed 18 → 7 s (was 42); Detailed ↔ Standard in a session 4–5 s; Standard ↔ Light 0.1 s.
+- Detailed ↔ Standard stays a rebuild (the founder agreed): Detailed is another forest with an antialiased context.
+
+### SPEED-1 step 6 (2026-11-24): the pauses between qualities and rooms, first half. Log: `docs/night/WORK-LOG.md`
+- Measured: the files were never the cause (cached after the first time); each forest opening searched its places again (~11 s of JS on HD 4000: grass 4.7, herbs and ferns ~4, roots 1), and Standard ↔ Light rebuilt the whole forest.
+- `rooms/forest/forest-memo.js`: each place search (clear, size, fern, apart, floor, grass, roots) recorded per world (level, parts, level table) and replayed with every call's plain arguments checked; `?speedoff` always searches. Row «FOREST places remembered» (byte-equal rooms; CONTROL a moved answer shows).
+- Standard ↔ Light: the shell skips the rebuild when the forest turns its Light picture in place (`sceneLightInPlace`); the wild lights are held dark instead of hidden (hiding recompiled every lit program: a 5-s first switch); the opening compiles the other Light picture's program too (+1 program, < 1 s).
+- Now: Standard ↔ Light 0.1 s (was 12–19 s); Detailed ↔ Standard again 3–5 s (was 14–43); rain → forest 4.5 s (was 17.6). Still slow: the first Detailed (41 s) and the first rain (32 s, 29 s of it compiling).
+
