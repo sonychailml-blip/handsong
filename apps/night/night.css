@@ -29,8 +29,8 @@
   /* RUN 8 (slice 3): the slim bars that show the forest's depth and the three effects while the hands play (Moonglass) */
   --night-bar-w:6px; --night-bar-h:min(30vh, 200px); --night-bar-gap:16px; --night-bar-ico:20px; --night-warm:#ffb45a; --night-cold:#e6fff2;
   /* SHARE-3: the clip button's ring, the countdown's figure over the room, the veil behind the clip's card */
-  --night-rec-ring:2px; --night-count:170px; --night-fs-count:104px; --night-fs-rec:18px; --night-lh-none:1; --night-fs-rec-end:20px; --night-clip-r:14px; --night-clip-h:min(52vh, 440px);
-  --night-text-glow:0 2px 18px rgba(0,0,0,.6); --night-text-lift:0 1px 6px rgba(0,0,0,.8); --night-veil-dim:rgba(6,10,18,.55);
+  --night-rec-ring:2px; --night-rec-breathe:2.8s; --night-rec-glow:0 0 10px color-mix(in srgb, var(--night-tint) 45%, transparent); --night-count:170px; --night-fs-count:104px; --night-fs-rec:18px; --night-lh-none:1; --night-fs-rec-end:20px; --night-clip-r:14px; --night-clip-h:min(52vh, 440px);
+  --night-text-glow:0 2px 18px rgba(0,0,0,.6); --night-veil-dim:rgba(6,10,18,.55);
   /* VIS1c (RUN 6): the NIGHT FOREST room (apps/night/rooms/forest/; moved from core/tokens.css at NIGHT-3) — the «Rooms of light» prototype's colours, read by the 3D room as its base
      colours (textures add small numeric jitter around them). The firefly greens are the hand's light; the halo / mask entries are alpha
      ramps of white used as light masks (sprites, mist), not visible colours on their own. */
@@ -117,7 +117,12 @@ body.night-plain .night-glass{ background:var(--night-surface-plain); -webkit-ba
 .night-rec-arc{ stroke:var(--night-tint); stroke-linecap:round; stroke-dasharray:0 158; }
 .night-recbtn.rec .night-rec-track{ opacity:1; }
 .night-recbtn.end .night-rec-track{ stroke:color-mix(in srgb, var(--night-tint) 35%, transparent); }
-.night-rec-ico{ display:flex; width:52%; height:52%; } .night-rec-ico[hidden], .night-rec-sec[hidden]{ display:none; }
+.night-rec-ico{ display:flex; width:52%; height:52%; } .night-rec-ico .svgi{ width:100%; height:100%; }   /* the span is the 52 % box, as Settings' svg is (.night-ibtn .svgi would shrink it twice) */
+/* the resting button breathes a light rim (opacity only: drawn once, the compositor fades it); none while counting or recording */
+.night-recbtn::after{ content:""; position:absolute; inset:-1px; border-radius:inherit; border:1px solid var(--night-tint); box-shadow:var(--night-rec-glow); opacity:0; pointer-events:none; will-change:opacity; }
+#nightShell.show .night-recbtn:not(.rec):not(.live)::after, #nightShell .night-recbtn.hint::after{ animation:night-rec-breathe var(--night-rec-breathe) ease-in-out infinite alternate; }
+@keyframes night-rec-breathe{ from{ opacity:.12; } to{ opacity:.8; } }
+@media (prefers-reduced-motion:reduce){ #nightShell.show .night-recbtn:not(.rec):not(.live)::after, #nightShell .night-recbtn.hint::after{ animation:none; opacity:.5; } } .night-rec-ico[hidden], .night-rec-sec[hidden]{ display:none; }
 .night-rec-sec{ font-family:var(--night-font-display); font-weight:var(--night-fw-light); font-size:var(--night-fs-rec); line-height:var(--night-lh-none); font-variant-numeric:tabular-nums; }
 .night-recbtn.end .night-rec-sec{ color:var(--night-tint); font-size:var(--night-fs-rec-end); }
 #nightShell .night-rectip{ position:absolute; top:calc(max(var(--night-edge), env(safe-area-inset-top)) + var(--night-ibtn) + var(--night-gap)); right:max(var(--night-edge), env(safe-area-inset-right));
@@ -130,7 +135,6 @@ body.night-plain .night-glass{ background:var(--night-surface-plain); -webkit-ba
 .night-count svg{ position:absolute; inset:0; width:100%; height:100%; overflow:visible; transform:rotate(-90deg); }
 .night-count circle{ fill:none; stroke:var(--night-tint); stroke-opacity:.75; stroke-width:var(--night-rec-ring); stroke-linecap:round; }
 #nightCountN{ font-family:var(--night-font-display); font-weight:var(--night-fw-light); font-size:var(--night-fs-count); line-height:var(--night-lh-none); color:var(--night-ink); text-shadow:var(--night-text-glow); }
-.night-count-lab{ position:absolute; top:calc(100% + var(--night-pad)); white-space:nowrap; font-size:var(--night-fs-body); color:var(--night-ink); text-shadow:var(--night-text-lift); }
 /* SHARE-3: the clip's card over a dimmed room */
 #nightShell .night-clipveil{ position:absolute; inset:0; background:var(--night-veil-dim); pointer-events:auto; }
 #nightShell .night-clipveil[hidden]{ display:none; }

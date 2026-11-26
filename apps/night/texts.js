@@ -86,7 +86,6 @@ export const NIGHT_TEXTS=Object.freeze({
     /* SHARE-3: the clip button, its countdown, tips and result card */
     'night.clip.rec':'Record a clip',
     'night.clip.stop':'Stop recording',
-    'night.clip.raise':'Raise your hands',
     'night.clip.title':'Your clip',
     'night.clip.share':'Share',
     'night.clip.done':'Done',
@@ -174,7 +173,6 @@ export const NIGHT_TEXTS=Object.freeze({
     /* SHARE-3: the clip button, its countdown, tips and result card */
     'night.clip.rec':'Записать ролик',
     'night.clip.stop':'Остановить запись',
-    'night.clip.raise':'Поднимите руки',
     'night.clip.title':'Ваш ролик',
     'night.clip.share':'Поделиться',
     'night.clip.done':'Готово',

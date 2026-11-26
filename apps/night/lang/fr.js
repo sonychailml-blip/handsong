@@ -149,7 +149,6 @@ export default Object.freeze({
   /* SHARE-3: the clip button, its countdown, tips and result card */
   'night.clip.rec':'Enregistrer une vidéo',
   'night.clip.stop':'Arrêter l’enregistrement',
-  'night.clip.raise':'Levez les mains',
   'night.clip.title':'Votre vidéo',
   'night.clip.share':'Partager',
   'night.clip.done':'Terminé',

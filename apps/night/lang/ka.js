@@ -150,7 +150,6 @@ export default Object.freeze({
   /* SHARE-3: the clip button, its countdown, tips and result card */
   'night.clip.rec':'ვიდეოს ჩაწერა',
   'night.clip.stop':'ჩაწერის შეჩერება',
-  'night.clip.raise':'ასწიეთ ხელები',
   'night.clip.title':'თქვენი ვიდეო',
   'night.clip.share':'გაზიარება',
   'night.clip.done':'მზადაა',
