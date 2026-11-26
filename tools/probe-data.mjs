@@ -3604,6 +3604,39 @@ async function roomShaderCopies(){
   ok('CONTROL: a big function called once failed', over(`${big} void main(){ gl_FragColor=vec4(big(vec2(0.))); }`).length===0);
   notes.push(`${shaders} shaders in the rooms; the most copied: ${worst ? `${worst.file} ${worst.name}() ${worst.size} chars × ${worst.copies}` : 'none'}; CONTROLS: three calls and a wrapper caught, one call passed`);
   return { cases:n, total:d.length, differences:d, notes }; }
+/* SHARE-1: «SHARE mp4 writer (app)» — apps/night/pure/mp4.js written and read back by its own reader: the box tree closes on the file's size, the
+   moov comes before the mdat, every sample's bytes sit where its table says, the video's durations follow each frame's own timestamp (a variable
+   frame rate kept), the key frames, the sound's edit list (its lead and skip), the refusals. CONTROLS: one offset moved, a cut file, a box too long. */
+async function shareMp4(){
+  const d=[], notes=[]; let n=0; const ok=(what, c)=>{ n++; if(!c) d.push(what); return !!c; };
+  const M=await import(new URL('../apps/night/pure/mp4.js', import.meta.url).href);
+  const avcC=new Uint8Array([1, 0x42, 0xe0, 0x1f, 0xff, 0xe1, 0, 4, 0x67, 0x42, 0xe0, 0x1f, 1, 0, 4, 0x68, 0xce, 0x3c, 0x80]), asc=new Uint8Array([0x11, 0x90]);
+  const pat=(k, i, len)=>{ const a=new Uint8Array(len); for(let j=0;j<len;j++) a[j]=(k*131+i*7+j*13)&255; return a; };
+  const gaps=[33333, 23256, 41000, 16667, 33333, 50000]; const V=[]; let t=0; for(let i=0;i<120;i++){ V.push({ data:pat(1, i, 40+(i*17)%300), ts:t, key:i%30===0 }); t+=gaps[i%gaps.length]; }
+  const A={ rate:48000, channels:2, asc, bitrate:160000, frame:1024, skip:300, lead:40000, samples:Array.from({ length:190 }, (_, i)=>({ data:pat(2, i, 20+(i*29)%200) })) };
+  const f=M.mp4Write({ width:640, height:360, avcC, samples:V }, A); let r=null; try{ r=M.mp4Read(f); }catch(e){ ok('the reader refused our own file: '+e.message, false); return { cases:n, total:d.length, differences:d, notes }; }
+  const top=r.boxes.filter(b=>b[0]===0); ok(`the top boxes close on the file (${top.reduce((a, b)=>a+b[2], 0)} of ${f.length})`, top.reduce((a, b)=>a+b[2], 0)===f.length);
+  ok(`the order ftyp, moov, mdat (${top.map(b=>b[1]).join(', ')})`, top.map(b=>b[1]).join()==='ftyp,moov,mdat');
+  const [vt, at]=r.tracks; ok('two tracks, video then sound', r.tracks.length===2 && vt.kind==='vide' && at.kind==='soun' && vt.entry==='avc1' && at.entry==='mp4a');
+  ok(`the picture's size (${vt.width}×${vt.height})`, vt.width===640 && vt.height===360); ok(`the sound's rate and channels (${at.rate}, ${at.channels})`, at.rate===48000 && at.channels===2);
+  let bad=0; vt.offsets.forEach((o, i)=>{ const s=pat(1, i, 40+(i*17)%300); if(vt.sizes[i]!==s.length || s.some((x, j)=>f[o+j]!==x)) bad++; }); at.offsets.forEach((o, i)=>{ const s=pat(2, i, 20+(i*29)%200); if(at.sizes[i]!==s.length || s.some((x, j)=>f[o+j]!==x)) bad++; });
+  ok(`every sample where its table says (${bad} wrong of ${V.length+A.samples.length})`, bad===0);
+  let worst=0; for(let i=0;i<V.length-1;i++) worst=Math.max(worst, Math.abs(vt.durations[i]-gaps[i%gaps.length]*90000/1e6)); ok(`each frame lasts until the next (worst ${worst.toFixed(2)} ticks of 90000)`, worst<=1);
+  const vSum=vt.durations.reduce((a, b)=>a+b, 0), want=Math.round((V[V.length-1].ts-V[0].ts+Math.round((V[V.length-1].ts-V[0].ts)/(V.length-1)))*0.09); ok(`the video's length (${vSum} ticks, ${want} wanted)`, Math.abs(vSum-want)<=1);
+  ok(`the key frames (${vt.keys.join(',')})`, vt.keys.join()==='1,31,61,91'); ok(`the sound's packets 1024 samples each`, at.durations.every(x=>x===1024) && at.durations.length===190);
+  ok(`the sound's edit list: 40 ms lead, 300 samples skipped (${JSON.stringify(at.edits)})`, !!at.edits && at.edits.length===2 && at.edits[0][1]===-1 && at.edits[0][0]===40 && at.edits[1][1]===300);
+  ok('a first frame that is not a key frame refused', (()=>{ try{ M.mp4Write({ width:64, height:64, avcC, samples:[{ data:pat(3, 0, 10), ts:0, key:false }] }); return false; }catch(e){ return true; } })());
+  ok('no video samples refused', (()=>{ try{ M.mp4Write({ width:64, height:64, avcC, samples:[] }); return false; }catch(e){ return true; } })());
+  { const g=M.mp4Write({ width:64, height:64, avcC, samples:[{ data:pat(4, 0, 10), ts:0, key:true }] }), q=M.mp4Read(g); ok('a silent clip: one track, no sound', q.tracks.length===1 && q.tracks[0].durations[0]===3000); }
+  /* CONTROLS */
+  { const g=f.slice(), p=vt.offsets[5]; const stco=(()=>{ for(let i=0;i<g.length-8;i++) if(g[i+4]===0x73 && g[i+5]===0x74 && g[i+6]===0x63 && g[i+7]===0x6f) return i; return -1; })();
+    const dv=new DataView(g.buffer); dv.setUint32(stco+16+5*4, p+3); const q=M.mp4Read(g); let b2=0; q.tracks[0].offsets.forEach((o, i)=>{ const s=pat(1, i, 40+(i*17)%300); if(s.some((x, j)=>g[o+j]!==x)) b2++; });
+    ok(`CONTROL one offset moved passed (${b2} wrong)`, b2===1); }
+  ok('CONTROL a cut file was read', (()=>{ try{ M.mp4Read(f.slice(0, f.length-100)); return false; }catch(e){ return true; } })());
+  ok('CONTROL a box too long was read', (()=>{ const g=f.slice(); new DataView(g.buffer).setUint32(0, 0xffff); try{ M.mp4Read(g); return false; }catch(e){ return true; } })());
+  notes.push(`${f.length} bytes: ${V.length} frames at six frame gaps, ${A.samples.length} AAC packets with a 40-ms lead and 300 samples skipped; CONTROLS caught: a moved offset, a cut file, a box too long`);
+  return { cases:n, total:d.length, differences:d, notes }; }
+
 const ROWS=[
   ...REG.rows({ node:true }).map(r=>[r.name, r.run, r.read]),
   ['LIC1 licence register',     ()=>LIC.run(),          r=>({ cases:r.cases, diff:r.total, list:r.differences })],
@@ -3692,6 +3725,7 @@ const ROWS=[
   ['RAIN-7 law (app)', ()=>rain7Law(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-7
   ['RAIN-10 gait, clothes and the lamp (app)', ()=>rain10Gait(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RAIN-10
   ['ROOM shader copies (app)', ()=>roomShaderCopies(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // SPEED-1 step 13
+  ['SHARE mp4 writer (app)', ()=>shareMp4(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // SHARE-1
   ['RELEASE-1 people clothes (app)', ()=>release1Clothes(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RELEASE-1 (A)
   ['RELEASE-1 people come and go (app)', ()=>release1Stay(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RELEASE-1 (A)
   ['RELEASE-1 vehicle bodies (app)', ()=>release1Bodies(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // RELEASE-1 (B)

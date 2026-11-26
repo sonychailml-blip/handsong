@@ -7,6 +7,7 @@ ROADMAP «After release» item 2 / Stage 2 item 1: the main growth lever.
 - ⛳ **The mark is on the whole clip**: a small quiet «Handsong Night · handsong.app» in a corner.
 - ⛳ **Way B (re-draw after stop)** — if the clip looks and sounds EXACTLY as played (stage 0 below: it can).
 - ⛳ **The clip has the screen's shape; 60 s at most.**
+- ⛳ **Way A — film while playing** (the founder, after stage 0: B mid-play needs each room's state saved). SHARE-1 built it for testing: `apps/night/film.js`, `apps/night/pure/mp4.js`, the development clip test (Settings → «Video clip test (development)»).
 
 ## What it gives
 - **Growth.** Every shared clip is a small advert with the address on it. A room played with the hands is unusual enough to be watched.

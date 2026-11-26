@@ -70,6 +70,16 @@ CORE-20 (audit P1) — MEDIAPIPE'S BINARY EARLY, NEVER AGAINST THE PAGE'S OWN FI
 NIGHT-7b — NIGHT'S EDITION: the build's (core/edition.js: 'release' in a players' build) or, on any page, «?release» in the address — so the players' settings can be checked on Live Server without …
 - const (2): `NIGHT_EDITION`, `devItems`
 
+## apps/night/film.js
+SHARE-1 — FILMING A CLIP WHILE PLAYING (way A, the founder 2026-11-26: start and stop by the person, the screen's shape, 60 s at most, the mark on the whole clip; docs/night/SHARE-PLAN.md).
+- const (2): `FILM`, `filmState`
+- fn (5): `filmSupport`, `filmStart`, `filmStop`, `filmShare`, `filmSave`
+
+## apps/night/filmlab.js
+SHARE-1 — THE CLIP TEST (development edition only; the founder checks way A before the players' record button is built).
+- const (1): `filmLabDbg`
+- fn (2): `filmLabOpen`, `filmLabWire`
+
 ## apps/night/forestlabel.js
 FOREST-2 (the founder: «so I can see what is drawn»): a small label in the corner, ONLY when the address carries a forest switch (?forest=…) — «level: Detailed · forest: roots», the level the room …
 - fn (1): `forestLabelWire`
@@ -216,6 +226,10 @@ RAIN-3: A ROOM's LAYERED RECORDINGS — near and far, crossfaded by the focus �
 RAIN-4c / RAIN-4d: THE ROOM'S MUSIC AS LO-FI (pure, rule #36; data row «RAIN lo-fi bed (app)»).
 - const (8): `LOFI_FORMAT`, `LOFI_DRUMS`, `LOFI_LAYERS`, `LOFI_LEVELS`, `LOFI_REG`, `LOFI_GEN`, `lofiBarSec`, `lofiChords`
 - fn (12): `lofiCheck`, `lofiVoice`, `lofiComp`, `passStep`, `lofiSafe`, `lofiInit`, `lofiBarAt`, `lofiGain`, `lofiLevel`, `lofiStop`, `lofiFadeIn`, `lofiStep`
+
+## apps/night/pure/mp4.js
+SHARE-1 — THE MP4 WRITER (ISO/IEC 14496-12 base media file format + 14496-15 for H.264 and 14496-3/-14 for AAC; written from the standards, our own code — rule #32).
+- fn (2): `mp4Write`, `mp4Read`
 
 ## apps/night/pure/passes.js
 RAIN-1: PASSING VEHICLES — one law for the picture and the sound (pure, rule #36; data row «RAIN car passes (app)»).
@@ -601,7 +615,7 @@ CORE-20: Night fetches only the modes it plays — every room's moods and the pa
 
 ## apps/night/scene/host.js
 THE SCENE HOST and Night's BACKGROUNDS (VIS1b, RUN 6; Night's own since CORE-8 — the shared UI reaches it through hooks.scene).
-- const (36): `BACKGROUNDS`, `sceneRoomAdd`, `sceneRoomRemove`, `sceneRooms`, `sceneRoom`, `sceneRoomSet`, `SCENE_LEVEL_DEFAULT`, `SCENE_FADE`, `scenePausing`, `sceneParDbg`, `COMPILE_LOG`, `sceneFlyPick`, `sceneFlyAt`, `sceneFlyLand`, `sceneRestDbg`, `sceneLitDbg`, `sceneHeardDbg`, `backgroundOf`, `sceneLightInPlace`, `setSceneLight`, `sceneLevel`, `sceneShadowDbg`, `sceneOptDbg`, `sceneInfo`, `sceneRoomDbg`, `sceneLostDbg`, `sceneStartNote`, `sceneStartLevelDbg`, `sceneHoldDbg`, `sceneGuardDbg`, `sceneLevelDbg`, `sceneHeldDbg`, `sceneProgramsDbg`, `sceneClockDbg`, `sceneBedDbg`, `sceneOpenDbg`
+- const (37): `BACKGROUNDS`, `sceneRoomAdd`, `sceneRoomRemove`, `sceneRooms`, `sceneRoom`, `sceneRoomSet`, `SCENE_LEVEL_DEFAULT`, `SCENE_FADE`, `scenePausing`, `sceneParDbg`, `COMPILE_LOG`, `sceneFrameTap`, `sceneFlyPick`, `sceneFlyAt`, `sceneFlyLand`, `sceneRestDbg`, `sceneLitDbg`, `sceneHeardDbg`, `backgroundOf`, `sceneLightInPlace`, `setSceneLight`, `sceneLevel`, `sceneShadowDbg`, `sceneOptDbg`, `sceneInfo`, `sceneRoomDbg`, `sceneLostDbg`, `sceneStartNote`, `sceneStartLevelDbg`, `sceneHoldDbg`, `sceneGuardDbg`, `sceneLevelDbg`, `sceneHeldDbg`, `sceneProgramsDbg`, `sceneClockDbg`, `sceneBedDbg`, `sceneOpenDbg`
 - fn (11): `loadThree`, `sceneOpen`, `sceneFadeOut`, `sceneSwitch`, `sceneClose`, `sceneRest`, `setBackground`, `setSceneLevel`, `sceneSnapDbg`, `sceneShotDbg`, `sceneLoseDbg`
 
 ## apps/night/scene/lightskip.js
@@ -1726,7 +1740,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 UI-1 — «NIGHT labels follow the room»: the founder entered the rain and the Sound button still read «Firefly» while another timbre played.
 - fn (1): `checkNightLabels`
 
-_343 modules, 3295 exported names._
+_346 modules, 3308 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

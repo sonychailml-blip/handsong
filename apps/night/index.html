@@ -694,6 +694,8 @@
       <button id="nightMeasure" class="night-lnk night-dev" data-i18n="night.measure" hidden>Measure this device (about 2 minutes, development)</button>
       <!-- AUDIO-3: the development audio lab (apps/night/audiolab.js) -->
       <button id="nightLabBtn" class="night-lnk night-dev" hidden>Audio lab (development)</button>
+      <!-- SHARE-1: the development clip test (apps/night/filmlab.js) -->
+      <button id="nightFilmBtn" class="night-lnk night-dev" hidden>Video clip test (development)</button>
       <pre id="nightMeasureOut" class="night-measure" hidden></pre>
       <button id="nightToSound" class="night-lnk night-dev" data-i18n="night.toSound" hidden>Sound panel and diagnostics (development)</button>
     </div>
@@ -708,6 +710,13 @@
     <label class="night-lab-row night-dev">Palm search with no hand: every <select id="nightLabIdle"></select></label>
     <p class="night-lab-sub night-dev">On = playing. Untick to take a part out of the sound (one at a time):</p>
     <div id="nightLabGrid" class="night-lab-grid"></div>
+  </div>
+  <!-- SHARE-1: THE CLIP TEST (development edition only; apps/night/filmlab.js): start / stop filming the room, the file's facts, share / save -->
+  <div id="nightFilm" class="night-audiolab night-glass" hidden>
+    <div class="night-lab-head"><b class="night-dev">Video clip test</b> <button id="nightFilmClose" class="night-lnk night-dev">close</button></div>
+    <p id="nightFilmCount" class="night-lab-count night-dev"></p>
+    <div class="night-lab-btns"><button id="nightFilmRec" class="night-btn night-dev">Start recording</button><button id="nightFilmShare" class="night-btn night-dev" hidden>Share</button><button id="nightFilmSave" class="night-btn night-dev" hidden>Save</button></div>
+    <p id="nightFilmMsg" class="night-lab-msg night-dev"></p>
   </div>
   <!-- NIGHT-7: THE FIRST CARDS (apps/night/cards.js): four short cards with drawn pictures after the calibration offer on a first start, and from
        Settings → How to play; the picture, the title and the text are written by the module (NIGHT-7b: filled at load too, so no label is ever blank) -->

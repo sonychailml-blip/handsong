@@ -256,6 +256,9 @@ export async function sceneSwitch(id, o={}){
   return sceneInfo();
 }
 export function sceneClose(){ if(runOn) runFlag(false); want=null; if(opening) openEnd(opening); stackSet('scene', false); if(room){ room.dispose(); room=null; } dropRenderer(true); info.fps=0; }
+/* SHARE-1: THE FRAME TAP — one listener (a clip being filmed) called with the room's canvas right after each drawn frame; null: none (the default) */
+let frameTap=null;
+export const sceneFrameTap=fn=>{ frameTap= typeof fn==='function' ? fn : null; return !!frameTap; };
 /* the scene module (layer «scene»): the room at its own rate; a new solo note-on makes the playing light glint */
 function sceneFrame(t, bus){
   if(!renderer || !room || compiling>0) return;
@@ -272,6 +275,7 @@ function sceneFrame(t, bus){
     if(room.heard && ck) room.heard(ck); }   // RAIN-3: an opt-in room takes the audio clock (its sound's events shown when heard)
   room.update(dt, t/1000+clockOff, litHands(bus.get('handsView')||[]), bus.get('nightFx'), bus.get('nightSky'));   // RUN 7 (C5): the Night effects' values; RUN 9: the mood and the sleep
   renderer.info.reset(); draw();
+  if(frameTap) try{ frameTap(glCanvas, t); }catch(e){ errors.push('frame tap: '+(e&&e.message||e)); }   // SHARE-1: a clip being filmed takes the frame just drawn (its drawing buffer is valid until this task ends)
   info.calls=renderer.info.render.calls; info.tris=renderer.info.render.triangles;   // NIGHT-6 slice 0: this frame's draw calls and triangles (slice 8: every pass of it)
   if(opening && opening.id===room.id && ++opening.frames>=2) openEnd(opening);   // NIGHT-3 stage 5 part 2: two frames drawn — detection resumes, the picture fades in
   if(snapWant){ const f=snapWant; snapWant=null; f(); }   // RUN 8 probe: copy the frame JUST rendered (the drawing buffer is cleared once presented)

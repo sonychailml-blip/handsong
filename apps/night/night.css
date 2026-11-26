@@ -60,6 +60,7 @@
   --cv-rain-sky:#1b1a2b; --cv-rain-glow:#8a5a44; --cv-rain-cloud:#5a3a4a; --cv-rain-haze:#2b2536; --cv-rain-stone:#2a2220; --cv-rain-plaster:#6b5440; --cv-rain-asphalt:#121621; --cv-rain-mist:#b9a48e;
   --cv-rain-eve-sky:#23203a; --cv-rain-eve-glow:#a06a48; --cv-rain-eve-cloud:#6a4456; --cv-rain-eve-haze:#352c40; --cv-rain-eve-stone:#2e2523; --cv-rain-eve-plaster:#76593f; --cv-rain-eve-asphalt:#141826; --cv-rain-eve-mist:#c2aa90;
   --cv-rain-after-sky:#171a2c; --cv-rain-after-glow:#6f5560; --cv-rain-after-cloud:#453848; --cv-rain-after-haze:#272838; --cv-rain-after-stone:#262224; --cv-rain-after-plaster:#5e4c42; --cv-rain-after-asphalt:#0f1420; --cv-rain-after-mist:#a8a8b4;
+  --cv-share-mark:rgba(236,230,220,.62); --cv-share-shadow:rgba(0,0,0,.5);   /* SHARE-1: the clip's quiet corner mark */
   --z-night:18;
 }
 /* DESIGN-1: the tint is a registered colour, so a room switch EASES it (the root's transition) instead of snapping */
@@ -412,7 +413,7 @@ a.night-lnk{ text-decoration:none; }
 /* FOREST-2: the development label «level · forest» (apps/night/forestlabel.js), only with ?forest=… in the address */
 .forest-label{position:fixed;left:var(--night-gap);bottom:var(--night-gap);z-index:var(--z-diag);padding:var(--night-gap-sm) var(--night-gap);border-radius:var(--night-r-pill);background:var(--night-raised);color:var(--night-ink-dim);font-size:var(--night-fs-small);line-height:var(--night-lh);pointer-events:none;white-space:nowrap}
 /* AUDIO-3: the development audio lab — pinned to the top, small, scrollable, stays while playing */
-#nightLab{ position:fixed; top:var(--night-gap-sm); left:50%; transform:translateX(-50%); width:min(560px, calc(100vw - 2 * var(--night-gap-sm))); max-height:46vh; overflow:auto;
+#nightLab, #nightFilm{ position:fixed; top:var(--night-gap-sm); left:50%; transform:translateX(-50%); width:min(560px, calc(100vw - 2 * var(--night-gap-sm))); max-height:46vh; overflow:auto;
   z-index:calc(var(--z-night) + 5); pointer-events:auto; padding:var(--night-gap-sm) var(--night-gap); border-radius:var(--night-r-card); color:var(--night-ink); font-family:var(--night-font-body); font-size:var(--night-fs-small); }
 .night-lab-head{ display:flex; justify-content:space-between; align-items:center; }
 .night-lab-head .night-lnk{ margin:0 !important; }
