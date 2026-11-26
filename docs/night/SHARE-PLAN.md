@@ -57,6 +57,17 @@ ROADMAP «After release» item 2 / Stage 2 item 1: the main growth lever.
   (768×480 vs 1152×648 the same: the update, the render and the encoder's queue dominate). A 60-s clip at the live frame rate ≈ 1.5–3× its
   length to wait on this laptop with software encoding; the founder's real Chrome may offer the hardware encoder (to measure there).
 - **Support in Chrome:** VideoEncoder H.264 (Baseline, Main, High — software in the runner), AudioEncoder AAC and Opus — MP4 with AAC works.
+- ⛔ **But a recording starts in the middle of play — and there B is NOT exact by itself.** Replayed from a fresh instance at the start
+  (`mid.js`): rain 334k → 54k px off a frame over 4 s, forest 130k → 11k; with a 20-s warm-up (`warm.js`) still rain ~43k (the drops on the
+  glass), forest ~4k (the stream's mirror). Every update from birth but no drawing before the start (`mid-norender.js`): rain exact (all its
+  state is in its updates), forest ~4–5k px (the mirror, re-drawn every 1.5 s, holds a picture: a forced refresh at the start fixes it).
+  So exact B mid-play needs each room to SAVE ITS STATE at the start (its own save / load, proved by this replay; every new room too) — or
+  a replay from the room's birth (minutes after a long session). Estimated 2–4 slices for the two rooms.
+- **Way A measured** (`film.js`: every drawn frame of the room canvas into VideoEncoder while the room runs; software H.264 in the runner, no
+  hand detection there): the room's frame rate unchanged (rain Standard 21.1 → 21.4, forest 21.1 → 21.8, rain Detailed 24.6 → 24.1 — the
+  runner's page runs ~21–25 fps), its frame time +0…1.4 ms (Detailed), long frames not more; at Detailed the software encoder's queue
+  filled (8). Indicative only: to confirm with the hands running (`speed.mjs`) and on the Poco. A is exact by nature (it films what is shown)
+  and the clip is ready at once.
 - Still to measure: the founder's real Chrome (hardware encoder?), the Poco, an iPhone; a real MP4 in WhatsApp / Telegram / Instagram / TikTok
   (needs the MP4 writer — first piece of stage 1).
 
