@@ -479,7 +479,8 @@ export function buildRain(T, opt){
   resize(W, H);
   /* the pane starts wet: drops scattered at once (they merge as they land), the simulation goes on from there */
   { const R=seeded(RAIN_SEED^0x57455421), [x0, y0, x1, y1]=SIM.region, n=Math.round(Lv.drops*(0.35+0.4*rainK)); for(let i=0;i<n;i++) dropAdd(SIM, x0+(x1-x0)*R(), y0+(y1-y0)*R(), DROPS.r0+Math.pow(R(), DROPS.rPow)*(DROPS.rSpan+DROPS.rSpanRain*rainK)); }
-  return { id:RAIN_ROOM.id, scene, camera, update, resize, render, glint, state, dispose, texBytes, held:sec=>{ heldNow= sec>0 ? sec : 0; }, project:()=>null,
+  return { id:RAIN_ROOM.id, parCompile:false,   // SPEED-1 step 12: the host compiles this room one program at a time (its largest program alone: ≈ 25 s; together with the rest ≈ 35 s, measured)
+    scene, camera, update, resize, render, glint, state, dispose, texBytes, held:sec=>{ heldNow= sec>0 ? sec : 0; }, project:()=>null,
     heard:ck=>{ clock=ck; }, dripsDbg:()=>dripsShown, winEvDbg:()=>winEv, skyDbg:v=>{ if(v!==undefined) skyT=v; return skyNow; }, bed:(it, when)=>bedIn(it, when), lifeDbg:()=>({ n:lifeN, shown:shownLog.slice(), queued:bedQ.length }),
     rest:on=>{ restOn=!!on; return restOn; }, restDbg:()=>({ rest:restOn, off:[off.x, off.y], fov:Math.atan(th)*360/Math.PI }),
     viewDbg:o=>{ viewOver=o||null; resize(W, H); return viewOver; },

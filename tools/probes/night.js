@@ -49,6 +49,7 @@ export { checkRain10 } from './night/rain10.js';   // RAIN-10: people walk, dres
 export { checkRelease1B } from './night/release1b.js';   // RELEASE-1 (B): the vehicles in 3D, the camera's own law
 export { checkRelease1W } from './night/release1w.js';   // RELEASE-1: a window's light seen alike in focus and soft
 export { checkPerfInvisible } from './night/perf2.js';   // PERF-2: the invisible optimisations, each by an exact A/B
+export { checkSpeedPar } from './night/speed12.js';   // SPEED-1 step 12: the programs compiled all at once, three's the same
 export { checkForestApart } from './night/forest2e.js';   // FOREST-2e: plants apart
 export { checkForestCull } from './night/forestcull.js';   // FOREST-2e: the cull (?forest=cull) keeps the frames
 export { checkRainQuads } from './night/rain5.js';   // RAIN-5b: no sprite's quad edge shows   // RAIN-4: the forest's bed bit-exact after the jazz bed   // FOREST-2: the switch ?forest=new

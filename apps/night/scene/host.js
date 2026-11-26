@@ -159,6 +159,37 @@ function openFail(op, e){ errors.push('opening '+op.id+': '+String(e&&e.message|
 export const scenePausing=()=> !!opening && !opening.late && !pauseOff;
 /* a promise that settles when the opening of `id` (if any) has ended */
 const openedP=id=> opening && opening.id===id ? new Promise(r=>opening.waits.push(r)) : Promise.resolve();
+/* SPEED-1 step 12: THE ROOM'S PROGRAMS COMPILED ALL AT ONCE before three asks for them one by one — with KHR_parallel_shader_compile the browser
+   compiles them side by side and the page stays free (a first opening's compile on the HD 4000: 7–9 s one by one, ≈ 5.5 s together). Their sources
+   come from a throwaway context where compile and link do nothing (three's own source, every define and binding); three's compile then finds each
+   program in the browser's program cache. Nothing drawn changes (three still builds every program itself). No extension, ?speedoff or parOff:
+   the old path alone; a room may say parCompile:false (the rain: one program dominates, and alone it compiles faster — measured). PAR_LOG: the last opening's numbers (probes) */
+let parOff=false, parMis=false; const PAR_LOG={};
+export const sceneParDbg=(v, mis)=>{ if(v!=null) parOff=!!v; if(mis!=null) parMis=!!mis; return { off:parOff, mis:parMis, ...PAR_LOG }; };   // probes: v true = the old one-by-one compile only; mis true = each program compiled ahead one line off (CONTROL: none matches three's)
+function parSources(rr, scene, camera){
+  const c=document.createElement('canvas'); c.width=c.height=1; let r2=null; const out=[];
+  try{ r2=new THREE.WebGLRenderer({ canvas:c, antialias:false, powerPreference:'high-performance' });
+    for(const k of ['outputEncoding', 'toneMapping', 'toneMappingExposure', 'physicallyCorrectLights', 'gammaFactor']) r2[k]=rr[k];
+    r2.shadowMap.enabled=rr.shadowMap.enabled; r2.shadowMap.type=rr.shadowMap.type;
+    const g=r2.getContext(), src=new Map(), att=new Map(), bind=new Map(), ty=new Map(), cs=g.createShader.bind(g), ss=g.shaderSource.bind(g);
+    g.createShader=t=>{ const sh=cs(t); ty.set(sh, t); return sh; }; g.shaderSource=(sh, t)=>{ src.set(sh, t); ss(sh, t); };
+    g.attachShader=(pr, sh)=>{ if(!att.has(pr)) att.set(pr, []); att.get(pr).push(sh); }; g.bindAttribLocation=(pr, i, n)=>{ if(!bind.has(pr)) bind.set(pr, []); bind.get(pr).push([i, n]); };
+    g.compileShader=()=>{}; g.deleteShader=()=>{}; g.getShaderParameter=()=>true; g.getShaderInfoLog=()=>''; g.getProgramInfoLog=()=>'';
+    g.linkProgram=pr=>{ const sh=att.get(pr)||[], v=sh.find(x=>ty.get(x)===g.VERTEX_SHADER), f=sh.find(x=>ty.get(x)===g.FRAGMENT_SHADER); if(v && f) out.push({ vs:src.get(v), fs:src.get(f), binds:bind.get(pr)||[] }); };
+    const gp=g.getProgramParameter.bind(g); g.getProgramParameter=(pr, k)=>k===g.LINK_STATUS ? true : (k===g.ACTIVE_UNIFORMS || k===g.ACTIVE_ATTRIBUTES) ? 0 : gp(pr, k);
+    r2.compile(scene, camera); }
+  finally{ if(r2){ try{ r2.dispose(); r2.forceContextLoss(); }catch(e){} } }
+  return out; }
+/* issue every program now; resolves the programs (deleted by the caller once three has compiled) when all are done, alive() turns false or 60 s pass */
+async function parCompile(rr, scene, camera, alive, own=true){
+  for(const k in PAR_LOG) delete PAR_LOG[k];
+  PAR_LOG.room=own; if(parOff || speedOff() || !own) return []; const gl=rr.getContext(), ext=gl.getExtension('KHR_parallel_shader_compile'); PAR_LOG.ext=!!ext; if(!ext) return [];
+  const t0=performance.now(), S=parSources(rr, scene, camera); PAR_LOG.captureMs=Math.round(performance.now()-t0); PAR_LOG.programs=S.length;
+  const P=S.map(q=>{ const pr=gl.createProgram(); for(const [t, x] of [[gl.VERTEX_SHADER, q.vs], [gl.FRAGMENT_SHADER, parMis ? q.fs+'\n// mis' : q.fs]]){ const sh=gl.createShader(t); gl.shaderSource(sh, x); gl.compileShader(sh); gl.attachShader(pr, sh); gl.deleteShader(sh); }
+    for(const [i, n] of q.binds) gl.bindAttribLocation(pr, i, n); gl.linkProgram(pr); return pr; });
+  const done=new Set(); while(done.size<P.length && alive() && performance.now()-t0<60e3){ for(const pr of P) if(!done.has(pr) && gl.getProgramParameter(pr, ext.COMPLETION_STATUS_KHR)) done.add(pr); if(done.size<P.length) await new Promise(r=>setTimeout(r, 16)); }
+  PAR_LOG.ms=Math.round(performance.now()-t0); PAR_LOG.done=done.size; return P; }
+const parFree=(rr, P)=>{ if(!P.length) return; try{ const gl=rr.getContext(); if(!gl.isContextLost()) for(const pr of P) gl.deleteProgram(pr); }catch(e){} };
 /* NIGHT-7: compile the room's shaders a few objects at a time, the page free between them (a first opening compiles for seconds: Begin and the
    start card stay responsive). The lights stay in the scene throughout (programs are keyed by them); no frame is drawn meanwhile.
    alive(): false once this opening is superseded (a level change or a switch meanwhile) — it stops at once, the renderer may be gone */
@@ -191,7 +222,9 @@ export async function sceneOpen(id=roomId, opt={}){
     last=0; info.t0=0; info.frames=0;
     /* RUN 9 (slice 5): compile every shader NOW (inside the opening, not inside a frame later: a 1–4-s frame) */
     const rm=room, rr=renderer;
+    let par=[]; try{ par=await parCompile(rr, rm.scene, rm.camera, ()=>room===rm && renderer===rr && opening===op, rm.parCompile!==false); }catch(e){ errors.push('parallel compile: '+(e&&e.message||e)); }   // SPEED-1 step 12
     try{ await compileSliced(rr, rm.scene, rm.camera, ()=>room===rm && renderer===rr && opening===op); }catch(e){ errors.push('compile: '+(e&&e.message||e)); }
+    parFree(rr, par);
     if(room!==rm || renderer!==rr || opening!==op) return sceneInfo();   // superseded meanwhile: the newer opening is in charge
     if(rm.light){ try{ rm.light(!lightOn); rr.compile(rm.scene, rm.camera); }catch(e){ errors.push('compile (Light): '+(e&&e.message||e)); } finally{ rm.light(lightOn); } }   // SPEED-1 step 6: the other Light picture's programs too (the per-vertex plants) — its first switch waits for nothing
     info.openMs=Math.round(performance.now()-tb);

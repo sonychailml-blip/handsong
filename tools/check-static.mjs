@@ -196,7 +196,7 @@ const GLOBALS=new Set((
   'Int16Array Int32Array Uint8Array Uint8ClampedArray Uint16Array Uint32Array parseInt parseFloat isNaN isFinite encodeURIComponent '+
   'decodeURIComponent encodeURI decodeURI globalThis queueMicrotask structuredClone console setTimeout clearTimeout setInterval clearInterval '+
   /* браузер */ 'window self document navigator location history screen performance localStorage sessionStorage indexedDB IDBKeyRange crypto '+
-  'fetch URL URLSearchParams Blob File FileReader Image ImageData Path2D OffscreenCanvas TextEncoder TextDecoder AbortController Event EventTarget '+
+  'fetch URL URLSearchParams Blob File FileReader Image ImageData Path2D OffscreenCanvas WebGLRenderingContext WebGL2RenderingContext TextEncoder TextDecoder AbortController Event EventTarget '+
   'CustomEvent HTMLElement HTMLCanvasElement HTMLVideoElement alert confirm prompt matchMedia getComputedStyle requestAnimationFrame '+
   'cancelAnimationFrame innerWidth innerHeight devicePixelRatio MediaRecorder MediaStream KeyboardEvent AudioContext OfflineAudioContext webkitAudioContext OscillatorNode BiquadFilterNode GainNode WaveShaperNode DelayNode ConstantSourceNode '+
   'AudioWorkletNode OfflineAudioCompletionEvent DOMException addEventListener removeEventListener MessageChannel PerformanceObserver '+

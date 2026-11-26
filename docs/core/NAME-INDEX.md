@@ -601,7 +601,7 @@ CORE-20: Night fetches only the modes it plays — every room's moods and the pa
 
 ## apps/night/scene/host.js
 THE SCENE HOST and Night's BACKGROUNDS (VIS1b, RUN 6; Night's own since CORE-8 — the shared UI reaches it through hooks.scene).
-- const (35): `BACKGROUNDS`, `sceneRoomAdd`, `sceneRoomRemove`, `sceneRooms`, `sceneRoom`, `sceneRoomSet`, `SCENE_LEVEL_DEFAULT`, `SCENE_FADE`, `scenePausing`, `COMPILE_LOG`, `sceneFlyPick`, `sceneFlyAt`, `sceneFlyLand`, `sceneRestDbg`, `sceneLitDbg`, `sceneHeardDbg`, `backgroundOf`, `sceneLightInPlace`, `setSceneLight`, `sceneLevel`, `sceneShadowDbg`, `sceneOptDbg`, `sceneInfo`, `sceneRoomDbg`, `sceneLostDbg`, `sceneStartNote`, `sceneStartLevelDbg`, `sceneHoldDbg`, `sceneGuardDbg`, `sceneLevelDbg`, `sceneHeldDbg`, `sceneProgramsDbg`, `sceneClockDbg`, `sceneBedDbg`, `sceneOpenDbg`
+- const (36): `BACKGROUNDS`, `sceneRoomAdd`, `sceneRoomRemove`, `sceneRooms`, `sceneRoom`, `sceneRoomSet`, `SCENE_LEVEL_DEFAULT`, `SCENE_FADE`, `scenePausing`, `sceneParDbg`, `COMPILE_LOG`, `sceneFlyPick`, `sceneFlyAt`, `sceneFlyLand`, `sceneRestDbg`, `sceneLitDbg`, `sceneHeardDbg`, `backgroundOf`, `sceneLightInPlace`, `setSceneLight`, `sceneLevel`, `sceneShadowDbg`, `sceneOptDbg`, `sceneInfo`, `sceneRoomDbg`, `sceneLostDbg`, `sceneStartNote`, `sceneStartLevelDbg`, `sceneHoldDbg`, `sceneGuardDbg`, `sceneLevelDbg`, `sceneHeldDbg`, `sceneProgramsDbg`, `sceneClockDbg`, `sceneBedDbg`, `sceneOpenDbg`
 - fn (11): `loadThree`, `sceneOpen`, `sceneFadeOut`, `sceneSwitch`, `sceneClose`, `sceneRest`, `setBackground`, `setSceneLevel`, `sceneSnapDbg`, `sceneShotDbg`, `sceneLoseDbg`
 
 ## apps/night/scene/lightskip.js
@@ -1523,6 +1523,7 @@ SPLIT-2: the probe entry of the Night page: its own rows and the core rows flagg
 - → ./night/release1w.js (1): `checkRelease1W`
 - → ./night/roomswitch.js (1): `checkNightRoomSwitch`
 - → ./night/scales.js (1): `checkNightScales`
+- → ./night/speed12.js (1): `checkSpeedPar`
 - → ./night/stream.js (1): `checkNightStream`
 - → ./night/testroom.js (3): `testRoomInstall`, `testRoomRemove`, `testRoomMode`
 - → ./night/ui1.js (1): `checkNightLabels`
@@ -1704,6 +1705,10 @@ CORE-20 — row «NIGHT scales (only its own)»: the page loaded by itself exact
 - const (2): `SCALES_AT_LOAD`, `nightScalesRest`
 - fn (1): `checkNightScales`
 
+## tools/probes/night/speed12.js
+SPEED-1 step 12 — «SPEED parallel compile»: a room's programs compiled all at once before three compiles them (scene/host.js parCompile).
+- fn (1): `checkSpeedPar`
+
 ## tools/probes/night/stream.js
 NIGHT-8: row «NIGHT stream, water and ground» — (1) BUILT without a renderer, at each level: today's seven aisle rocks are instances of the stream's stones (no rock mesh of their own), every stone …
 - fn (1): `checkNightStream`
@@ -1721,7 +1726,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 UI-1 — «NIGHT labels follow the room»: the founder entered the rain and the Sound button still read «Firefly» while another timbre played.
 - fn (1): `checkNightLabels`
 
-_342 modules, 3291 exported names._
+_343 modules, 3294 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

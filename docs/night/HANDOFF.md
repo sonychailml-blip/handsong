@@ -31,6 +31,10 @@ Every older open step (120–192) is kept word for word in `archive/HANDOFF-hist
 Moved to `archive/HANDOFF-history.md` (RELEASE-1, still open there).
 
 ## Records (English, at most about 15 lines each; older ones go to `archive/HANDOFF-history.md`)
+### SPEED-1 step 12 (2026-11-26): the forest's programs compiled all at once (`host.js parCompile`, KHR_parallel_shader_compile; sources from a throwaway context whose compile does nothing). Three's programs byte-identical on / off (forest Standard 30, Detailed 30). First opening at Standard ≈ 1–2 s quicker, Detailed ≈ the same; the longest page freeze while opening 2.0–2.6 s → 0.05 s. The rain keeps the old compile (`parCompile:false`: together 35–37 s vs 30 s alone — one program takes 25.9 s and freezes the page). Row «SPEED parallel compile» 8/0. Log: `docs/night/WORK-LOG.md`
+
+### SPEED-1 step 11 (2026-11-25): stage 5 measured, nothing changed. The model is ready before the Begin tap already; the start waits for the FOREST: a first visit's opening at Standard ≈ 14.5 s (compile 8.8, build 4.4; one run 24.6 on a busy machine), a repeat 3.4 s. Shaders compiled all at once (KHR_parallel_shader_compile, present on the HD 4000) 5.5 + 0.4 s vs 7.2 serial standalone; the music playing during the opening costs ≈ 2 s. Proposed: parallel compile (invisible). Log: `docs/night/WORK-LOG.md`
+
 ### RAIN-11 (2026-11-25): the lit windows out of focus lost their square frame — the old blurred window was a plateau with a brighter rim and a 0.3 R edge (and a translucent box round a half-blurred one); now the same light (sum within 4 %, peak equal) with a soft 1.1 R edge, no rim, the pane's edge softening with the blur. In focus every byte as before (Detailed included: the founder asked for the fix). Row «RAIN no quad edges» + the windows (CONTROL the old disc, `winBokehDbg`). Captures `tools/.ui-snap/rain11/`. Log: `docs/night/WORK-LOG.md`
 
 ### SPEED-1 step 10 (2026-11-25): the rain's garbage −20…27 % (8.5 → 6.2 MB/s at Standard), the same picture byte for byte (450 frames × 3 qualities, CONTROL caught). The speed check's rain audio count exact (the lo-fi engine waited for), baseline renewed by declaration. Left: the projection's objects, the life sprites. Log: `docs/night/WORK-LOG.md`
@@ -53,31 +57,7 @@ Moved to `archive/HANDOFF-history.md` (RELEASE-1, still open there).
 - Standard ↔ Light: the shell skips the rebuild when the forest turns its Light picture in place (`sceneLightInPlace`); the wild lights are held dark instead of hidden (hiding recompiled every lit program: a 5-s first switch); the opening compiles the other Light picture's program too (+1 program, < 1 s).
 - Now: Standard ↔ Light 0.1 s (was 12–19 s); Detailed ↔ Standard again 3–5 s (was 14–43); rain → forest 4.5 s (was 17.6). Still slow: the first Detailed (41 s) and the first rain (32 s, 29 s of it compiling).
 
-### SPEED-1 step 5 (2026-11-24): Light's forest lighter. Log: `docs/night/WORK-LOG.md`
-- Three candidates measured and shown live (a temporary `?try=`, now gone); the founder chose all three.
-- The forest record's `light` (over Standard, the same mechanism as the rain's): `leafEvery:2` every other card of each plant set over 20 cards, `plantsPerVertex` Lambert copies of the plant materials (sway, cells, soft edges kept), `wildLights:false`.
-- `rooms/forest/forest-light.js` applies and undoes them in place: the host calls the room's `light(on)` at the opening (after the dark-light skip, before the compile) and when Light turns on or off; Standard comes back exactly. `?speedoff` and Detailed: nothing.
-- GPU a frame at 1920×1080 (HD 4000), Light: 16.6 → 13.0 ms. Turning Light on or off compiles the per-vertex programs once (a short hitch in the settings).
-- Row «FOREST paint» extended (39 cases; CONTROL: the kept cards against the ones in between).
-
-### SPEED-1 step 4 (2026-11-24): the far trunks in a plain bark at Standard and Light. Log: `docs/night/WORK-LOG.md`
-- `farTrunks:12` (Standard's level, Light shares it): the 83 trunks beyond 12 m of the eye are drawn with the bark map alone (Lambert); Detailed untouched; `?speedoff` none.
-- GPU a frame at 1920×1080: Standard 38.0 → 31.6 ms, Light 26.1 → 22.5.
-- Accepted by the founder: a hand light pushed deep no longer marks trunks 12–17 m (no light, no foxfire there); the safe rule (46 trunks, −1.7 ms) was offered.
-- Row «FOREST paint» extended (the split by distance, nothing lost, Detailed none; CONTROL).
-### SPEED-1 step 3 (2026-11-24): the hands' share of the GPU measured; the second hand searched every 5th frame. Log: `docs/night/WORK-LOG.md`
-- `tools/speed.mjs --detect`: main-GPU is the fastest path on the HD 4000 at every level (Standard 97 ms vs worker 168, CPU 156, worker+CPU 225).
-- «Hands first» pacing (scratch, ABAB): the GPU is saturated, the order only trades picture for hand (Standard, a hand every frame: 71 → 52 ms, picture 13 → 9 fps). The founder: never. The hand alone 35 ms a frame; with the Standard forest 71.
-- The 2D overlay canvas (screen blend) costs ~4 ms a cycle by its compositing alone (empty or still: the same) — dropped.
-- Light's forest: ~26 ms GPU a frame at 647×364 — lighting (standard material, four point lights), ~370 k triangles, ~4000 leaf cards (~5 ms); pixels are not the cost.
-- CORE-29: `apps/night/speed.js` sets the one-hand search cadence to 5 (`?speedoff` 3); Full keeps 3. The fake camera has no hand: the gain is judged by hand.
-
-### SPEED-1 step 2 (2026-11-23): dark point lights skipped — the same pixels. Log: `docs/night/WORK-LOG.md`
-- `apps/night/scene/lightskip.js`: the host patches each room's three-lit materials at opening; a point light's lighting runs only where it gives something (three's `directLight.visible`). Detailed scene 99.7 → 95.0 ms, Standard 36.2 → 34.8. `?speedoff` leaves it out.
-- «PERF invisible» + its case: 0 bytes differ at every forest level (CONTROL a broad light: 237–848 k bytes). The rain has no three-lit material.
-- Measured and dropped: mist / beams / halos at half size (~1.5 ms); the undergrowth's soft edges cost ~0. The room's frame rate barely moves detection (room not drawn: 144 → 105 ms, fake camera).
-- `tools/speed.mjs`: the resource-timing buffer was full → the start set is really 260 files / 27 MB (read 208 / 4.4 MB); baseline renewed (declared, only the start set differs). `tools/perf1.mjs --query`.
-
+### SPEED-1 steps 2–5 (2026-11-23/24). Records: `archive/HANDOFF-history.md` («Moved from docs/night/HANDOFF.md at SPEED-1 step 12»).
 ### SPEED-1 step 1 and SPEED-0 (2026-11-23). Records: `archive/HANDOFF-history.md` («Moved from docs/night/HANDOFF.md at SPEED-1 step 9»).
 ### RELEASE-1 the rain's music on the site (2026-11-20): the players' build had dropped the music's recordings. Record: `archive/HANDOFF-history.md`.
 ### RELEASE-1 the rain's music on a first visit (2026-11-20). Record: `archive/HANDOFF-history.md`.

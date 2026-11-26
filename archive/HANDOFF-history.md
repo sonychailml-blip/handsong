@@ -9031,3 +9031,30 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 - `tools/speed.mjs`: Night, both rooms × three qualities in one Chrome on this machine's GPU. COST judged exactly against `tools/prints/night-speed-cost.json` (start set, audio pool, scene census, programs, textures, buffer; any rise fails; `--control` caught); TIME reported beside the last run. Two runs equal after making three measures exact (rooms' life → census instead of per-frame draws; the start set by file list after a quiet network, probe modules out; the audio pool = sources never stopped).
 - «Measure this device» shows hand → sound and detection track / search.
 - First numbers (HD 4000, no hand → the search path): hand → sound 157–218 ms in the rooms; long tasks 184–518 ms/s; Detailed forest 15 fps; the rain makes 7–10 MB/s of garbage, the forest ~0; start set 4.4 MB before «Begin»; 42 s from «Begin» to the room in the headless run (to be explained in SPEED-1/5).
+
+## Moved from docs/night/HANDOFF.md at SPEED-1 step 12 (2026-11-26)
+### SPEED-1 step 5 (2026-11-24): Light's forest lighter. Log: `docs/night/WORK-LOG.md`
+- Three candidates measured and shown live (a temporary `?try=`, now gone); the founder chose all three.
+- The forest record's `light` (over Standard, the same mechanism as the rain's): `leafEvery:2` every other card of each plant set over 20 cards, `plantsPerVertex` Lambert copies of the plant materials (sway, cells, soft edges kept), `wildLights:false`.
+- `rooms/forest/forest-light.js` applies and undoes them in place: the host calls the room's `light(on)` at the opening (after the dark-light skip, before the compile) and when Light turns on or off; Standard comes back exactly. `?speedoff` and Detailed: nothing.
+- GPU a frame at 1920×1080 (HD 4000), Light: 16.6 → 13.0 ms. Turning Light on or off compiles the per-vertex programs once (a short hitch in the settings).
+- Row «FOREST paint» extended (39 cases; CONTROL: the kept cards against the ones in between).
+
+### SPEED-1 step 4 (2026-11-24): the far trunks in a plain bark at Standard and Light. Log: `docs/night/WORK-LOG.md`
+- `farTrunks:12` (Standard's level, Light shares it): the 83 trunks beyond 12 m of the eye are drawn with the bark map alone (Lambert); Detailed untouched; `?speedoff` none.
+- GPU a frame at 1920×1080: Standard 38.0 → 31.6 ms, Light 26.1 → 22.5.
+- Accepted by the founder: a hand light pushed deep no longer marks trunks 12–17 m (no light, no foxfire there); the safe rule (46 trunks, −1.7 ms) was offered.
+- Row «FOREST paint» extended (the split by distance, nothing lost, Detailed none; CONTROL).
+### SPEED-1 step 3 (2026-11-24): the hands' share of the GPU measured; the second hand searched every 5th frame. Log: `docs/night/WORK-LOG.md`
+- `tools/speed.mjs --detect`: main-GPU is the fastest path on the HD 4000 at every level (Standard 97 ms vs worker 168, CPU 156, worker+CPU 225).
+- «Hands first» pacing (scratch, ABAB): the GPU is saturated, the order only trades picture for hand (Standard, a hand every frame: 71 → 52 ms, picture 13 → 9 fps). The founder: never. The hand alone 35 ms a frame; with the Standard forest 71.
+- The 2D overlay canvas (screen blend) costs ~4 ms a cycle by its compositing alone (empty or still: the same) — dropped.
+- Light's forest: ~26 ms GPU a frame at 647×364 — lighting (standard material, four point lights), ~370 k triangles, ~4000 leaf cards (~5 ms); pixels are not the cost.
+- CORE-29: `apps/night/speed.js` sets the one-hand search cadence to 5 (`?speedoff` 3); Full keeps 3. The fake camera has no hand: the gain is judged by hand.
+
+### SPEED-1 step 2 (2026-11-23): dark point lights skipped — the same pixels. Log: `docs/night/WORK-LOG.md`
+- `apps/night/scene/lightskip.js`: the host patches each room's three-lit materials at opening; a point light's lighting runs only where it gives something (three's `directLight.visible`). Detailed scene 99.7 → 95.0 ms, Standard 36.2 → 34.8. `?speedoff` leaves it out.
+- «PERF invisible» + its case: 0 bytes differ at every forest level (CONTROL a broad light: 237–848 k bytes). The rain has no three-lit material.
+- Measured and dropped: mist / beams / halos at half size (~1.5 ms); the undergrowth's soft edges cost ~0. The room's frame rate barely moves detection (room not drawn: 144 → 105 ms, fake camera).
+- `tools/speed.mjs`: the resource-timing buffer was full → the start set is really 260 files / 27 MB (read 208 / 4.4 MB); baseline renewed (declared, only the start set differs). `tools/perf1.mjs --query`.
+
