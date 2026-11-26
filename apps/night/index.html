@@ -628,6 +628,19 @@
       <button id="nightSleep" class="night-rb"><span class="night-circ" data-svg="sleep"></span><span class="night-lab" data-i18n="night.sleep">Sleep</span><span class="night-val"></span></button>
     </div>
   </div>
+  <!-- SHARE-3: the players' clip button (apps/night/filmui.js) — left of Settings, shown with the controls and always while counting, recording or hinting:
+       the seconds inside, a ring filling over the minute; the countdown; one tip line under the button; the result card (the clip with its own sound, Share,
+       saved on the device). Page markup: nothing here enters a clip -->
+  <button id="nightRecBtn" class="night-ibtn night-recbtn night-glass" title="Record a clip" aria-label="Record a clip" aria-pressed="false"><svg class="night-rec-ring" viewBox="0 0 54 54" aria-hidden="true"><circle class="night-rec-track" cx="27" cy="27" r="25"></circle><circle id="nightRecArc" class="night-rec-arc" cx="27" cy="27" r="25"></circle></svg><span id="nightRecIco" class="night-rec-ico" data-svg="clip-rec"></span><span id="nightRecSec" class="night-rec-sec" hidden></span></button>
+  <p id="nightRecTip" class="night-rectip night-glass" role="status" aria-live="polite" hidden></p>
+  <div id="nightCount" class="night-count" hidden><svg viewBox="0 0 170 170" aria-hidden="true"><circle id="nightCountArc" cx="85" cy="85" r="80"></circle></svg><span id="nightCountN" aria-hidden="true">3</span><span class="night-count-lab" role="status" aria-live="polite" data-i18n="night.clip.raise">Raise your hands</span></div>
+  <div id="nightClipVeil" class="night-clipveil" hidden></div>
+  <div id="nightClip" class="night-card night-glass night-clipcard" role="dialog" aria-modal="true" aria-labelledby="nightClipTitle" hidden>
+    <div class="night-clip-head"><span id="nightClipTitle" class="night-clip-title" data-i18n="night.clip.title">Your clip</span><span id="nightClipLen" class="night-clip-len"></span><button id="nightClipClose" class="night-ibtn night-ibtn-in" data-svg="close" data-i18n-title="night.close" title="Close"></button></div>
+    <div class="night-clip-view"><video id="nightClipVideo" playsinline loop preload="auto"></video><button id="nightClipMute" class="night-clip-mute night-glass" data-svg="speaker-on" title="Sound off"></button><span class="night-clip-prog"><span id="nightClipProg"></span></span></div>
+    <p id="nightClipSaved" class="night-clip-saved" hidden><span class="night-clip-ok" data-svg="saved"></span><span data-i18n="night.clip.saved">Saved to Downloads on this device</span></p>
+    <div class="night-btns night-clip-btns"><button id="nightClipShare" class="night-btn go"><span class="night-clip-bi" data-svg="share"></span><span data-i18n="night.clip.share">Share</span></button><button id="nightClipDone" class="night-btn" data-i18n="night.clip.done">Done</button></div>
+  </div>
   <!-- DESIGN-1 part C: THE SETTINGS CARD IN THREE SHORT TABS (apps/night/settabs.js) — Sound · Picture · Hands; one line per control with a short label, any
        explanation small and dim under it; the about block (How to play) under every tab. NIGHT-13: no «More», every tab shows all its controls; the panes share
        one grid cell (#nightPanes), so the card keeps the tallest tab's height and does not jump on a switch. Every control keeps its id

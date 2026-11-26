@@ -12,5 +12,10 @@ export const NIGHT_ICONS=Object.freeze({
   'fs-exit':[['fill','path',{ d:FS_EXIT }]],
   share:[['line','path',{ d:'M8.5 9.5H6.5v11h11v-11h-2M12 3v11.5M8.5 6.5L12 3l3.5 3.5' }]],
   'add-home':[['tint','rect',{ x:4, y:4, width:16, height:16, rx:4, o:.15 }], ['line','rect',{ x:4, y:4, width:16, height:16, rx:4 }], ['acc-line','path',{ d:'M12 8.5v7M8.5 12h7' }]],
+  /* SHARE-3: the clip button (a ring beginning to fill in the room's light), the card's sound on / off, «saved» */
+  'clip-rec':[['line','circle',{ cx:12, cy:12, r:8 }], ['acc-line','path',{ d:'M12 4a8 8 0 0 1 8 8' }]],
+  'speaker-on':[['line','path',{ d:'M4 10v4h3l5 4V6L7 10H4z' }], ['acc-line','path',{ d:'M15.5 9.5a3.5 3.5 0 0 1 0 5M18 7a7 7 0 0 1 0 10' }]],
+  'speaker-off':[['line','path',{ d:'M4 10v4h3l5 4V6L7 10H4zM16 9.5l5 5M21 9.5l-5 5' }]],
+  saved:[['acc-line','path',{ d:'M5 12.5l4.5 4.5L19 7.5' }]],
 });
 for(const [name, shapes] of Object.entries(NIGHT_ICONS)){ const why=svgIconAdd(name, shapes); if(why) console.warn('[night] icon:', why); }   // eslint-disable-line no-console

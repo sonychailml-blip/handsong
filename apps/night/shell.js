@@ -38,6 +38,7 @@ import { scenePausing } from './scene/host.js';
 import { noticeOf, noticeShow, noticeHide } from './notice.js';
 import { roomMusicNote } from './roomdoors.js';   // RAIN-4
 import { QUALITIES, qualityFrom, qualityState, firstQualityOf } from './pure/quality.js';   // NIGHT-16: one quality choice
+import { filmUiWire, filmUiTick, filmBusy, filmCardOpen, filmTip } from './filmui.js';   // SHARE-3: the players' clip button
 
 const $=id=>document.getElementById(id), READ=BUS.reader();
 /* NIGHT-1 stage 2: what this app never plays leaves the graph (the sound stays the same to rounding; row «NIGHT lean path»). Its chain has no drive, brightness or tremolo; its one role is solo */
@@ -123,6 +124,7 @@ function render(){
   calSettingsRender();
   $('nightSceneTg').hidden=!devItems(); $('nightSceneTg').textContent=t('night.scene', { lvl:t('night.scene.'+sceneLevel()) });
   { const q=quality(); for(const b of $('nightQualSeg').children) b.classList.toggle('on', b.dataset.q===q); }   // NIGHT-16: one quality choice
+  { const busy=filmBusy(); for(const b of [...$('nightQualSeg').children, ...$('nightBgSeg').children]) b.disabled=busy; }   // SHARE-3: no quality or background change while a clip records
   $('nightRoomSoundRow').hidden= !amb; $('nightRoomSound').value=String(roomSound());
   { const ic=$('nightRoomSoundRow').querySelector('.night-vico'), name=room().icon||'forest';   // NIGHT-8: the room gives its own Room-sounds icon (the forest keeps the leaf)
     if(ic && ic.dataset.svg!==name){ const g=svgIcon(document, name); if(g){ ic.dataset.svg=name; ic.replaceChildren(g); } } }
@@ -141,7 +143,7 @@ function sleepSet(mins){
 function infoShow(v){ info=v; $('nightInfo').hidden=!v; if(v){ render(); camRender(); } }   // NIGHT-10: the cameras listed when the card opens
 function wire(){
   const tap=(id,f)=>{ $(id).onclick=()=>{ if(!D) return; f(); glint($(id)); render(); }; };
-  tap('nightRoom', ()=>{ const id=roomNext(); if(id){ roomSwitch(id).then(()=>render()); render(); } });   // NIGHT-8: the slider's icon follows at once   // NIGHT-3 stage 5 part 2: the next room
+  tap('nightRoom', ()=>{ if(filmBusy()){ filmTip('night.clip.noRoom'); return; } const id=roomNext(); if(id){ roomSwitch(id).then(()=>render()); render(); } });   // NIGHT-8: the slider's icon follows at once   // NIGHT-3 stage 5 part 2: the next room
   tap('nightMusic', ()=>{ const m=bedNext(bedModeOf()); bedSetMode(m, room().bed, room().bed2); save(MUSIC_KEYS.mode, m); if(amb) ambienceOn(true, roomSound()); });   // NIGHT-3 stage 4: off → still → drift → glimmer → off; the drone hands over
   tap('nightSound', ()=>{ D.setTimbre(nextOf(D.timbres(), D.timbre())); roomMusicNote(); });
   tap('nightMood', ()=>{ D.setMood(nextOf(D.moods(), D.mood())); roomMusicNote(); });   // RAIN-4: remembered per room
@@ -162,6 +164,8 @@ function wire(){
   for(const b of $('nightQualSeg').children) b.onclick=()=>{ qualitySet(b.dataset.q).then(()=>render()); render(); };
   $('nightHowTo').onclick=()=>{ infoShow(false); cardsShow(); };
   cardsWire(); noticeWire(); coachWire(); setTabsWire();
+  /* SHARE-3: the clip button — while its card plays the clip, the room and the hands are silent (the sleep timer's level comes back after); the room cannot change while it records */
+  filmUiWire({ mute:v=>outputFade(v ? 0 : lastFade, v ? 0.12 : 0.4), changed:()=>render() });
   document.addEventListener('night-room-music', ()=>{ if(!labelsStale) render(); });   // UI-1: a room's music applied (a switch, the start) — Sound, Music and Mood read what plays
   /* NIGHT-2: the background and the hand's points in settings (fingertips only, the default, or all points) */
   for(const b of $('nightBgSeg').children) b.onclick=()=>{ if(!D) return; D.setBg(b.dataset.bg); render(); };
@@ -175,7 +179,8 @@ function tick(now){
   raf=0; if(!on) return;
   const hv=READ.get('handsView'), n= Array.isArray(hv) ? hv.length : 0;
   st=showStep(st, n, now);
-  $('nightShell').classList.toggle('show', st.shown && !info && !asleep && !calActive() && !cardsOpen());
+  $('nightShell').classList.toggle('show', st.shown && !info && !asleep && !calActive() && !cardsOpen() && !filmCardOpen());
+  filmUiTick(now, { ready:!info && !asleep && !calActive() && !cardsOpen() && !noticeOf() && !scenePausing(), hands:n, coach:!!coachShown() });   // SHARE-3: the one-time hint
   if(startDue){ startDue=false; startFlow(); }
   coachNow(now);   // NIGHT-11 part 4
   if(amb){ ambienceRetune(); ambienceTick(); }   // the drone follows the mood; the crickets are scheduled ahead
@@ -186,7 +191,7 @@ function tick(now){
   BUS.set('nightSky', { mood:D.mood(), sleep:sleepProgress(sleep.t0, sleep.mins, now), wind:windNow() });   // RUN 9: the forest's palette (mood), the night's depth (sleep), the wind
   bars(now, Array.isArray(hv) ? hv : [], fxv);   // RUN 8 (slice 3)
   if(sleep.mins){ const L=sleepLevel(sleep.t0, sleep.mins, now);
-    if(Math.abs(L.level-lastFade)>0.002 || (L.level===0 && lastFade!==0)){ lastFade=L.level; outputFade(L.level, 0.4); }
+    if(Math.abs(L.level-lastFade)>0.002 || (L.level===0 && lastFade!==0)){ lastFade=L.level; if(!filmCardOpen()) outputFade(L.level, 0.4); }
     $('nightVeil').style.opacity=String(1-L.level);
     if(L.asleep && !asleep){ asleep=true; $('nightShell').classList.add('asleep'); $('nightVeilMsg').hidden=false; }
     if(st.shown && Math.floor(now/1000)!==Math.floor((now-17)/1000)) sleepLabel(now); }
@@ -217,7 +222,7 @@ let calDueC={ t:-1e9, v:false }; const homeDue=homeHintFor(cardsEnvNow());
 function coachNow(now){
   if(now-calDueC.t>1000) calDueC={ t:now, v:FLOW_OLD ? false : calDueNow() };
   const paused=scenePausing() || calActive();
-  const ready=!info && !asleep && !paused && !cardsOpen() && !noticeOf() && !document.body.classList.contains('dark-on') && !FLOW_OLD;
+  const ready=!info && !asleep && !paused && !cardsOpen() && !noticeOf() && !document.body.classList.contains('dark-on') && !FLOW_OLD && !filmBusy() && !filmCardOpen();   // SHARE-3: no coaching line over a recording or the clip's card
   coachTick(now, { ready, paused, calDue:calDueC.v, homeDue }, yes=>{ calOffered(); calDueC.t=-1e9; if(yes){ infoShow(false); calStep(()=>{}); } });
 }
 /* NIGHT-7c: THE MUSIC FROM THE TAP ON BEGIN — once the engine's master exists and the context runs (the camera, its prompt and the hand model

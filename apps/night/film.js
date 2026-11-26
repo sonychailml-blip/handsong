@@ -98,6 +98,8 @@ export async function filmStop(){ const st=S; if(!st) throw new Error('not recor
   return { blob:new Blob([bytes], { type:'video/mp4' }), name, info:{ sec:+sec.toFixed(2), frames:st.video.length, dropped:st.dropped, size:st.size, codec:st.codec, kb:Math.round(bytes.length/1024), hands:st.overlay, quality:st.qKey, kbps:Math.round(bytes.length*8/1000/Math.max(0.1, (st.video[st.video.length-1].ts)/1e6)),
     sound: audio ? `${asec.toFixed(2)} s of sound (${audio.samples.length} AAC packets, ${audio.rate} Hz), starts ${audio.startMs} ms after the first frame` : (st.err || 'none'), soundSec:+asec.toFixed(2), finishMs:Math.round(now()-stopMs), err:st.err } }; }
 
+/* SHARE-3: whether this browser's share sheet takes a video file (the players' card shows «Share» only then) */
+export function filmCanShare(){ try{ return !!(navigator.canShare && navigator.canShare({ files:[new File([new Uint8Array(8)], 'clip.mp4', { type:'video/mp4' })] })); }catch(e){ return false; } }
 /* hand the clip over: the share sheet where it takes files (call it from a tap), else a download */
 export async function filmShare(blob, name){ const file=new File([blob], name, { type:'video/mp4' });
   if(navigator.canShare && navigator.canShare({ files:[file] })){ try{ await navigator.share({ files:[file], title:'Handsong Night' }); return 'shared'; }catch(e){ if(e && e.name==='AbortError') return 'cancelled'; } }

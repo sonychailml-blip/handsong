@@ -9073,3 +9073,8 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 - Standard ↔ Light: the shell skips the rebuild when the forest turns its Light picture in place (`sceneLightInPlace`); the wild lights are held dark instead of hidden (hiding recompiled every lit program: a 5-s first switch); the opening compiles the other Light picture's program too (+1 program, < 1 s).
 - Now: Standard ↔ Light 0.1 s (was 12–19 s); Detailed ↔ Standard again 3–5 s (was 14–43); rain → forest 4.5 s (was 17.6). Still slow: the first Detailed (41 s) and the first rain (32 s, 29 s of it compiling).
 
+
+
+## docs/night/HANDOFF.md record replaced at SHARE-3 (2026-11-26), verbatim
+
+### SHARE-1 (2026-11-26): way A (film while playing) built for testing — `apps/night/pure/mp4.js` (our MP4 writer + reader, data row «SHARE mp4 writer (app)»), `apps/night/film.js` (the room canvas after each draw through `scene/host.js sceneFrameTap` + the corner mark → H.264; the heard sound → AAC; 60 s max), `apps/night/filmlab.js` (Settings → «Video clip test (development)»). SHARE-1b (the founder's test): the sound is read on the audio thread (`worklets/film-worklet.js`; the main thread's long tasks had dropped most of it) and the hands' 2D canvas is blended in as on screen (never with the camera on). SHARE-2: the depth and effects bars in the clip (`filmbars.js`); three trial qualities A / B / C in the panel for the founder to compare. Waiting: the founder's Chrome / Poco / iPhone and the messengers. Log: `docs/night/WORK-LOG.md`.

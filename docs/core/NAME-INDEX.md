@@ -73,7 +73,7 @@ NIGHT-7b — NIGHT'S EDITION: the build's (core/edition.js: 'release' in a playe
 ## apps/night/film.js
 SHARE-1 — FILMING A CLIP WHILE PLAYING (way A, the founder 2026-11-26: start and stop by the person, the screen's shape, 60 s at most, the mark on the whole clip; docs/night/SHARE-PLAN.md).
 - const (3): `FILM`, `FILM_Q`, `filmState`
-- fn (5): `filmSupport`, `filmStart`, `filmStop`, `filmShare`, `filmSave`
+- fn (6): `filmSupport`, `filmStart`, `filmStop`, `filmCanShare`, `filmShare`, `filmSave`
 
 ## apps/night/filmbars.js
 SHARE-2 — THE BARS IN A CLIP: the depth bar and the three effects bars are page markup (shell.js sets them), so a clip filmed from the canvases would not show what the hands change.
@@ -83,6 +83,11 @@ SHARE-2 — THE BARS IN A CLIP: the depth bar and the three effects bars are pag
 SHARE-1 — THE CLIP TEST (development edition only; the founder checks way A before the players' record button is built).
 - const (1): `filmLabDbg`
 - fn (2): `filmLabOpen`, `filmLabWire`
+
+## apps/night/filmui.js
+SHARE-3 — THE PLAYERS' CLIP BUTTON (the founder's choices: docs/night/SHARE-PLAN.md «The players' interface», «The look: Counter inside»).
+- const (5): `CLIP`, `filmBusy`, `filmCardOpen`, `filmUiDbg`, `filmUiTapDbg`
+- fn (4): `filmTip`, `filmUiTick`, `filmUiWire`, `filmUiSetDbg`
 
 ## apps/night/forestlabel.js
 FOREST-2 (the founder: «so I can see what is drawn»): a small label in the corner, ONLY when the address carries a forest switch (?forest=…) — «level: Detailed · forest: roots», the level the room …
@@ -1748,7 +1753,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 UI-1 — «NIGHT labels follow the room»: the founder entered the rain and the Sound button still read «Firefly» while another timbre played.
 - fn (1): `checkNightLabels`
 
-_348 modules, 3310 exported names._
+_349 modules, 3320 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

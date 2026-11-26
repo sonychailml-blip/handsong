@@ -28,6 +28,9 @@
   --night-icon:24px; --night-brand-glow-f:drop-shadow(0 0 6px var(--night-brand)); --night-tint-glow-f:drop-shadow(0 0 6px var(--night-tint));
   /* RUN 8 (slice 3): the slim bars that show the forest's depth and the three effects while the hands play (Moonglass) */
   --night-bar-w:6px; --night-bar-h:min(30vh, 200px); --night-bar-gap:16px; --night-bar-ico:20px; --night-warm:#ffb45a; --night-cold:#e6fff2;
+  /* SHARE-3: the clip button's ring, the countdown's figure over the room, the veil behind the clip's card */
+  --night-rec-ring:2px; --night-count:170px; --night-fs-count:104px; --night-fs-rec:18px; --night-lh-none:1; --night-fs-rec-end:20px; --night-clip-r:14px; --night-clip-h:min(52vh, 440px);
+  --night-text-glow:0 2px 18px rgba(0,0,0,.6); --night-text-lift:0 1px 6px rgba(0,0,0,.8); --night-veil-dim:rgba(6,10,18,.55);
   /* VIS1c (RUN 6): the NIGHT FOREST room (apps/night/rooms/forest/; moved from core/tokens.css at NIGHT-3) — the «Rooms of light» prototype's colours, read by the 3D room as its base
      colours (textures add small numeric jitter around them). The firefly greens are the hand's light; the halo / mask entries are alpha
      ramps of white used as light masks (sprites, mist), not visible colours on their own. */
@@ -102,6 +105,53 @@ body.night-plain .night-glass{ background:var(--night-surface-plain); -webkit-ba
   width:var(--night-ibtn); height:var(--night-ibtn); border-radius:var(--night-r-pill); display:flex; align-items:center; justify-content:center; }
 .night-ibtn .svgi{ width:52%; height:52%; }
 .night-ibtn.night-fsbtn{ right:auto; left:max(var(--night-edge), env(safe-area-inset-left)); }   /* NIGHT-7c: full screen, the other top corner */
+/* SHARE-3: the clip button left of Settings — shown with the controls, and always while counting, recording or hinting (.live); the ring fills over the minute */
+#nightShell .night-ibtn.night-recbtn{ right:calc(max(var(--night-edge), env(safe-area-inset-right)) + var(--night-ibtn) + var(--night-gap)); color:var(--night-ink); overflow:visible;
+  opacity:0; visibility:hidden; transition:opacity var(--night-fade) var(--night-ease), visibility 0s linear var(--night-fade), border-color var(--night-fade), box-shadow var(--night-fade); }
+#nightShell.show .night-recbtn, #nightShell .night-recbtn.live{ opacity:1; visibility:visible; pointer-events:auto;
+  transition:opacity var(--night-fade) var(--night-ease), visibility 0s, border-color var(--night-fade), box-shadow var(--night-fade); }
+#nightShell .night-recbtn.hint{ border-color:var(--night-tint); box-shadow:var(--night-tint-ring); }
+.night-rec-ring{ position:absolute; left:-4px; top:-4px; width:calc(100% + 8px); height:calc(100% + 8px); overflow:visible; pointer-events:none; transform:rotate(-90deg); }
+.night-rec-ring circle{ fill:none; stroke-width:var(--night-rec-ring); }
+.night-rec-track{ stroke:color-mix(in srgb, var(--night-ink) 16%, transparent); opacity:0; transition:opacity var(--night-fade); }
+.night-rec-arc{ stroke:var(--night-tint); stroke-linecap:round; stroke-dasharray:0 158; }
+.night-recbtn.rec .night-rec-track{ opacity:1; }
+.night-recbtn.end .night-rec-track{ stroke:color-mix(in srgb, var(--night-tint) 35%, transparent); }
+.night-rec-ico{ display:flex; width:52%; height:52%; } .night-rec-ico[hidden], .night-rec-sec[hidden]{ display:none; }
+.night-rec-sec{ font-family:var(--night-font-display); font-weight:var(--night-fw-light); font-size:var(--night-fs-rec); line-height:var(--night-lh-none); font-variant-numeric:tabular-nums; }
+.night-recbtn.end .night-rec-sec{ color:var(--night-tint); font-size:var(--night-fs-rec-end); }
+#nightShell .night-rectip{ position:absolute; top:calc(max(var(--night-edge), env(safe-area-inset-top)) + var(--night-ibtn) + var(--night-gap)); right:max(var(--night-edge), env(safe-area-inset-right));
+  width:max-content; max-width:min(320px, calc(100vw - 2 * var(--night-edge))); margin:0; box-sizing:border-box; padding:var(--night-gap) var(--night-pad); border-radius:var(--night-r-card);
+  color:var(--night-ink); font-size:var(--night-fs-value); line-height:var(--night-lh); pointer-events:none; box-shadow:var(--night-shadow); }
+#nightShell .night-rectip[hidden]{ display:none; }
+/* SHARE-3: the countdown — the figure in the room-name face, a thin ring melting; not filmed */
+#nightShell .night-count{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:var(--night-count); height:var(--night-count); display:flex; align-items:center; justify-content:center; pointer-events:none; }
+#nightShell .night-count[hidden]{ display:none; }
+.night-count svg{ position:absolute; inset:0; width:100%; height:100%; overflow:visible; transform:rotate(-90deg); }
+.night-count circle{ fill:none; stroke:var(--night-tint); stroke-opacity:.75; stroke-width:var(--night-rec-ring); stroke-linecap:round; }
+#nightCountN{ font-family:var(--night-font-display); font-weight:var(--night-fw-light); font-size:var(--night-fs-count); line-height:var(--night-lh-none); color:var(--night-ink); text-shadow:var(--night-text-glow); }
+.night-count-lab{ position:absolute; top:calc(100% + var(--night-pad)); white-space:nowrap; font-size:var(--night-fs-body); color:var(--night-ink); text-shadow:var(--night-text-lift); }
+/* SHARE-3: the clip's card over a dimmed room */
+#nightShell .night-clipveil{ position:absolute; inset:0; background:var(--night-veil-dim); pointer-events:auto; }
+#nightShell .night-clipveil[hidden]{ display:none; }
+.night-card.night-clipcard{ width:min(600px, calc(100vw - 28px)); display:flex; flex-direction:column; gap:var(--night-gap); }
+.night-card.night-clipcard[hidden]{ display:none; }
+.night-clip-head{ display:flex; align-items:center; gap:var(--night-gap); }
+.night-clip-title{ font-family:var(--night-font-display); font-weight:var(--night-fw-light); font-size:calc(var(--night-fs-body) * 1.5); color:var(--night-ink); }
+.night-clip-len{ flex:1 1 auto; color:var(--night-ink-dim); font-size:var(--night-fs-value); }
+.night-clip-view{ position:relative; align-self:center; max-width:100%; border-radius:var(--night-clip-r); overflow:hidden; border:1px solid var(--night-hairline); }
+#nightClipVideo{ display:block; max-width:100%; max-height:var(--night-clip-h); width:auto; height:auto; background:var(--night-base); }
+.night-clip-mute{ position:absolute; left:var(--night-gap-sm); top:var(--night-gap-sm); width:36px; height:36px; padding:0; border-radius:var(--night-r-pill); display:flex; align-items:center; justify-content:center; color:var(--night-ink); }
+.night-clip-mute .svgi{ width:55%; height:55%; }
+.night-clip-prog{ position:absolute; left:0; right:0; bottom:0; height:3px; background:color-mix(in srgb, var(--night-ink) 16%, transparent); }
+#nightClipProg{ display:block; height:100%; width:0; background:var(--night-tint); }
+.night-card p.night-clip-saved{ margin:0; display:flex; align-items:center; justify-content:center; gap:var(--night-gap-sm); font-size:var(--night-fs-label); }
+.night-card p.night-clip-saved[hidden]{ display:none; }
+.night-clip-ok{ display:flex; width:18px; height:18px; flex:none; }
+.night-btns.night-clip-btns{ margin-top:0; }
+#nightShell .night-clip-btns .night-btn{ display:flex; align-items:center; justify-content:center; gap:var(--night-gap-sm); }
+#nightShell .night-clip-btns .night-btn[hidden]{ display:none; }
+.night-clip-bi{ display:flex; width:20px; height:20px; }
 .night-ctl{ position:absolute; left:var(--night-edge); right:var(--night-edge); bottom:max(var(--night-edge), env(safe-area-inset-bottom)); max-width:520px;
   margin:0 auto; padding:var(--night-pad); border-radius:var(--night-r-capsule); display:grid; grid-template-columns:repeat(6,minmax(0,1fr));
   gap:var(--night-gap) var(--night-gap-sm); box-shadow:var(--night-shadow); }
