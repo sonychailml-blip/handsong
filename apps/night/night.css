@@ -304,6 +304,9 @@ body.night-cal #darkHint{ display:none !important; }
     margin:0; }
   .night-ibtn{ right:auto; left:max(var(--night-edge), env(safe-area-inset-left)); }
   .night-ibtn.night-fsbtn{ left:auto; right:max(var(--night-edge), env(safe-area-inset-right)); }
+  /* SHARE-3: Settings sits top-left here — the clip button goes to its right, its tip under it */
+  #nightShell .night-ibtn.night-recbtn{ right:auto; left:calc(max(var(--night-edge), env(safe-area-inset-left)) + var(--night-ibtn) + var(--night-gap)); }
+  #nightShell .night-rectip{ right:auto; left:max(var(--night-edge), env(safe-area-inset-left)); }
   .night-idle{ top:8%; }   /* NIGHT-11 part 4: centred (it sat off-centre, across the moon) */
   /* NIGHT-13: the coaching line stays between the two groups of bars (the wider group — three effects — counted on both sides, as the line is centred) */
   #nightShell .night-coach{ top:8%; max-width:min(560px, calc(100vw - 2 * (var(--night-side) + var(--night-fxw) + var(--night-gap)))); }
