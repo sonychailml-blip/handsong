@@ -191,7 +191,7 @@ const GLOBALS=new Set((
   /* SAFARI-1: an older iOS switches its audio session by playing our silent clip (an <audio> element) */ 'Audio '+
   /* DESIGN-1: the start still watches the start card */ 'MutationObserver '+
   /* NIGHT-14c: the forest asks the precache (Cache Storage) whether Detailed's pictures are in */ 'caches '+
-  /* SHARE-1: a clip filmed in the browser (WebCodecs; the sound's track read as AudioData) */ 'VideoEncoder AudioEncoder VideoFrame AudioData '+
+  /* SHARE-1: a clip filmed in the browser (WebCodecs; the sound's track read as AudioData) */ 'VideoEncoder AudioEncoder VideoFrame AudioData XMLSerializer '+
   /* JavaScript */ 'Math JSON Object Array Number String Boolean Symbol BigInt Map Set WeakMap WeakSet WeakRef Promise Proxy Reflect Intl Date RegExp '+
   'Error TypeError RangeError SyntaxError ReferenceError AggregateError ArrayBuffer SharedArrayBuffer DataView Float32Array Float64Array Int8Array '+
   'Int16Array Int32Array Uint8Array Uint8ClampedArray Uint16Array Uint32Array parseInt parseFloat isNaN isFinite encodeURIComponent '+

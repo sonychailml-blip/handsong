@@ -10,8 +10,14 @@ import { cv } from '../../core/palette.js';
 import { stackList } from '../../core/legacy-ui/views/stack.js';
 import { sceneFrameTap } from './scene/host.js';
 import { mp4Write, mp4Read } from './pure/mp4.js';
+import { filmBars } from './filmbars.js';
 
 export const FILM=Object.freeze({ maxSec:60, fps:30, keyEvery:60, mark:'Handsong Night · handsong.app', queueMax:8, displayMs:16, aacRates:[44100, 48000] });
+/* SHARE-2: three trial qualities for the founder to compare by eye — the frame's size (the room's drawing size, or the screen's up to 1920 on the long side),
+   bits per pixel, the encoder's mode (realtime favours speed, quality favours the picture) */
+export const FILM_Q=Object.freeze({ a:Object.freeze({ name:'A: room size, about 2.5 Mbit/s, fast (as before)', size:'room', bpp:0.10, min:2.5e6, max:12e6, mode:'realtime', rate:'variable' }),
+  b:Object.freeze({ name:'B: room size, 5 Mbit/s steady, quality', size:'room', bpp:1, min:5e6, max:5e6, mode:'quality', rate:'constant' }),
+  c:Object.freeze({ name:'C: screen size up to 1920, 6 Mbit/s steady, quality', size:'screen', bpp:1, min:6e6, max:6e6, mode:'quality', rate:'constant' }) });   // the encoder spends a steady rate only when asked (variable undershot: 1.4 of 4 Mbit/s on the room's soft pictures)
 let S=null, tapNode=null, tapReady=null;   // the recording in progress; the audio-thread tap (built once, then idle)
 const now=()=>performance.now();
 const bytesOf=d=>d instanceof ArrayBuffer ? new Uint8Array(d.slice(0)) : new Uint8Array(d.buffer.slice(d.byteOffset, d.byteOffset+d.byteLength));   // an encoder's description: a buffer or a view
@@ -33,7 +39,7 @@ async function tapBuild(){ if(tapNode) return tapNode; if(!tapReady) tapReady=(a
 /* start: throws a short reason when it cannot. o.onStop(reason) — called when it stops by itself (the 60-s cap) */
 export async function filmStart(o={}){
   if(S) return S; const sup=filmSupport(); if(!sup.video) throw new Error(sup.why);
-  const st={ t0:null, last:-1e9, frames:0, dropped:0, video:[], vcfg:null, audio:[], acfg:null, aFirst:null, aDone:false, err:null, started:now(), onStop:o.onStop||null, comp:null, cx:null, enc:null, aenc:null, tap:null, size:null, codec:null, overlay:false };
+  const q=FILM_Q[o.quality]||FILM_Q.b, st={ q, qKey:FILM_Q[o.quality] ? o.quality : 'b', bars:0, t0:null, last:-1e9, frames:0, dropped:0, video:[], vcfg:null, audio:[], acfg:null, aFirst:null, aDone:false, err:null, started:now(), onStop:o.onStop||null, comp:null, cx:null, enc:null, aenc:null, tap:null, size:null, codec:null, overlay:false };
   S=st;
   /* the sound first (so it covers the first frame): the audio thread's blocks → AudioData → AAC; each block's moment heard from the output timestamp */
   if(sup.audio){ try{ const tap=await tapBuild(); st.tap=tap; const rate=AC.sampleRate;
@@ -51,23 +57,25 @@ export async function filmStart(o={}){
     catch(e){ st.err='sound: '+(e&&e.message||e); st.tap=null; } }
   /* the picture: after each draw, on the 30-fps grid — the room, the hands' canvas blended as the page blends it, the mark */
   sceneFrameTap((gl, t)=>{ if(S!==st || st.stopping || !gl) return;
-    if(!st.enc){ const w=gl.width&~1, h=gl.height&~1, lv=levelOf(w, h); if(!lv || w<16 || h<16){ st.err='the picture is too large to film'; return; }
+    if(!st.enc){ let w=gl.width, h=gl.height; if(st.q.size==='screen'){ const dpr=window.devicePixelRatio||1, W=innerWidth*dpr, H=innerHeight*dpr, k=Math.min(1, 1920/Math.max(W, H)); w=Math.round(W*k); h=Math.round(H*k); }
+      w&=~1; h&=~1; const lv=levelOf(w, h); if(!lv || w<16 || h<16){ st.err='the picture is too large to film'; return; }
       st.size=[w, h]; st.codec='avc1.42E0'+lv; st.comp=document.createElement('canvas'); st.comp.width=w; st.comp.height=h; st.cx=st.comp.getContext('2d', { alpha:false });
       st.enc=new VideoEncoder({ output:(c, m)=>{ if(m && m.decoderConfig && m.decoderConfig.description && !st.vcfg) st.vcfg={ avcC:bytesOf(m.decoderConfig.description) };
           const d=new Uint8Array(c.byteLength); c.copyTo(d); st.video.push({ data:d, ts:c.timestamp, key:c.type==='key' }); }, error:e=>{ st.err='video: '+(e&&e.message||e); } });
-      st.enc.configure({ codec:st.codec, width:w, height:h, bitrate:Math.round(Math.min(12e6, Math.max(2.5e6, w*h*FILM.fps*0.1))), framerate:FILM.fps, avc:{ format:'avc' }, latencyMode:'realtime' }); }
+      st.enc.configure({ codec:st.codec, width:w, height:h, bitrate:Math.round(Math.min(st.q.max, Math.max(st.q.min, w*h*FILM.fps*st.q.bpp))), framerate:FILM.fps, avc:{ format:'avc' }, latencyMode:st.q.mode, bitrateMode:st.q.rate }); st.cx.imageSmoothingQuality='high'; }
     if(st.tap && !st.aFirst && now()-st.started<800) return;   // the picture starts once the sound does
     if(t-st.last<1000/FILM.fps-4) return;
     if(st.enc.encodeQueueSize>FILM.queueMax){ st.dropped++; return; }
     st.last=t; if(st.t0==null) st.t0=t;
-    const [w, h]=st.size, x=st.cx; x.globalCompositeOperation='source-over'; x.drawImage(gl, 0, 0, w, h, 0, 0, w, h);
+    const [w, h]=st.size, x=st.cx; x.globalCompositeOperation='source-over'; x.drawImage(gl, 0, 0, gl.width, gl.height, 0, 0, w, h);
     const ov=document.getElementById('canvas'); if(ov && ov.width && !cameraOn()){ x.globalCompositeOperation='screen'; x.drawImage(ov, 0, 0, ov.width, ov.height, 0, 0, w, h); x.globalCompositeOperation='source-over'; st.overlay=true; }
+    st.bars=filmBars(x, w, h);   // SHARE-2: the depth and effects bars as the page shows them
     drawMark(x, w, h);
     const f=new VideoFrame(st.comp, { timestamp:Math.round((t-st.t0)*1000) }); try{ st.enc.encode(f, { keyFrame:st.frames%FILM.keyEvery===0 }); st.frames++; }catch(e){ st.err='video: '+(e&&e.message||e); } f.close();
     if(!st.capped && (t-st.t0)/1000>=FILM.maxSec){ st.capped=true; const cb=st.onStop; setTimeout(()=>{ if(cb) cb('the 60-second limit'); }, 0); } });
   return st; }
 
-export const filmState=()=>S ? { on:true, sec:S.t0==null ? 0 : (now()-S.t0)/1000, frames:S.frames, dropped:S.dropped, size:S.size, codec:S.codec, err:S.err, sound:!!S.aFirst, hands:S.overlay } : { on:false };
+export const filmState=()=>S ? { on:true, sec:S.t0==null ? 0 : (now()-S.t0)/1000, frames:S.frames, dropped:S.dropped, size:S.size, codec:S.codec, err:S.err, sound:!!S.aFirst, hands:S.overlay, bars:S.bars, quality:S.qKey } : { on:false };
 
 /* stop → { blob, name, info } (the MP4, checked by reading it back) or throws */
 export async function filmStop(){ const st=S; if(!st) throw new Error('not recording'); sceneFrameTap(null); const stopMs=now();
@@ -87,7 +95,7 @@ export async function filmStop(){ const st=S; if(!st) throw new Error('not recor
   const bytes=mp4Write({ width:st.size[0], height:st.size[1], avcC:st.vcfg.avcC, samples:st.video }, audio), check=mp4Read(bytes);
   const d=new Date(), p=n=>String(n).padStart(2, '0'), name=`handsong-night-${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}.mp4`;
   const vd=check.tracks[0], sec=vd.durations.reduce((a, b)=>a+b, 0)/vd.scale, ad=check.tracks[1], asec= ad ? ad.durations.reduce((a, b)=>a+b, 0)/ad.scale : 0;
-  return { blob:new Blob([bytes], { type:'video/mp4' }), name, info:{ sec:+sec.toFixed(2), frames:st.video.length, dropped:st.dropped, size:st.size, codec:st.codec, kb:Math.round(bytes.length/1024), hands:st.overlay,
+  return { blob:new Blob([bytes], { type:'video/mp4' }), name, info:{ sec:+sec.toFixed(2), frames:st.video.length, dropped:st.dropped, size:st.size, codec:st.codec, kb:Math.round(bytes.length/1024), hands:st.overlay, quality:st.qKey, kbps:Math.round(bytes.length*8/1000/Math.max(0.1, (st.video[st.video.length-1].ts)/1e6)),
     sound: audio ? `${asec.toFixed(2)} s of sound (${audio.samples.length} AAC packets, ${audio.rate} Hz), starts ${audio.startMs} ms after the first frame` : (st.err || 'none'), soundSec:+asec.toFixed(2), finishMs:Math.round(now()-stopMs), err:st.err } }; }
 
 /* hand the clip over: the share sheet where it takes files (call it from a tap), else a download */
