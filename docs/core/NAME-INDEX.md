@@ -23,7 +23,7 @@ SPLIT-2: the Full app's entry.
 
 ## apps/night/audiolab.js
 AUDIO-3 — THE AUDIO LAB (development edition only; the founder hunts the rain's dropouts).
-- const (4): `LAB_LATENCY`, `labDbg`, `labWavDbg`, `labRecNodeDbg`
+- const (5): `LAB_LATENCY`, `NIGHT_LATENCY`, `labDbg`, `labWavDbg`, `labRecNodeDbg`
 - fn (2): `labOpen`, `labWire`
 
 ## apps/night/bed.js
@@ -1753,7 +1753,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 UI-1 — «NIGHT labels follow the room»: the founder entered the rain and the Sound button still read «Firefly» while another timbre played.
 - fn (1): `checkNightLabels`
 
-_349 modules, 3322 exported names._
+_349 modules, 3323 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

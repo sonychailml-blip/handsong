@@ -4,6 +4,14 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`, `archive/NIGHT-RUN-LOG-2026-10.md`. New runs start at `NIGHT-1`.
 
+# AUDIO-5 (NIGHT track, 2026-11-26, iteration mode): the rain's crackle — the output underruns; a larger output buffer for Night
+Tree hashes before: as SHARE-4's after (apps/night 30d8f7b3c797de9e). After: core and apps/full unchanged · apps/night c080c40c5c87c966.
+- The founder: the rain crackles («хрип») and sometimes breaks, at the default settings (Standard and Detailed), also in the published build. His audio lab log (Live Server): the WAV of the master is clean (our graph makes the right samples); the browser's own output statistics count underruns 51 → 135 in 15 s (10 ms each), the render drift grows 63 → 269 ms, worse from the moment a hand comes into view (the detector's long tasks 109 → 144 ms) — the audio thread does not keep up on this laptop: the rain's sound with the hands' detection is too heavy here. The forest's sound is lighter (no crackle).
+- Measured (runner Chrome, same laptop): base latency interactive 10 ms, balanced 10, playback 20, a number 0.04 → 40, 0.08 → 80 ms.
+- The founder's decision: a larger buffer, for the whole of Night (it is read once when the start click makes the audio context — a per-room buffer would restart the sound at each switch). `apps/night/audiolab.js` `NIGHT_LATENCY='playback'` set through core CORE-27 `setLatencyHint` at load (both editions; the lab still tries another in development; its menu marks «Night default»). Full unchanged (it never calls it).
+- Runner: the live context after the start click — hint playback, base 20 ms, output 52 ms. Static PASSED; `[probe-data] PASS — 109 checks, 0 differences`; name index regenerated.
+- Open: whether 10 ms more is enough — the founder's lab on the laptop decides. If not: a larger numeric buffer (a small core option: CORE-27 accepts only the three words) and/or a lighter rain sound (measure each part offline first).
+
 # SHARE-4 + FULL CHECK (NIGHT track, 2026-11-26): the iPhone way; the full check before the publish to night-release
 Tree hashes before: core=cfe3a3d190bef9ae apps/full=0148bb454440c3e3 apps/night=2d6c1af3c6922275 (SHARE-3c's after). After: core and apps/full unchanged · apps/night=30d8f7b3c797de9e.
 - The founder: no iPhone of his own; build the version that should work on iPhone and publish it to night.handsong.app, a friend checks.
