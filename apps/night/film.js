@@ -22,10 +22,23 @@ let S=null, tapNode=null, tapReady=null;   // the recording in progress; the aud
 const now=()=>performance.now();
 const bytesOf=d=>d instanceof ArrayBuffer ? new Uint8Array(d.slice(0)) : new Uint8Array(d.buffer.slice(d.byteOffset, d.byteOffset+d.byteLength));   // an encoder's description: a buffer or a view
 const cameraOn=()=>stackList().some(m=>m.id==='camera' && m.on);
-/* what this browser can do */
+/* SHARE-4: TWO WAYS to film. 'codecs' — our own encoders and MP4 writer (above; Chrome, Edge, Android). 'recorder' — the browser's own MP4
+   recorder (MediaRecorder) fed by the very same composed canvas (captureStream) and the master through a stream destination: the sound never
+   passes through script, so a busy main thread cannot drop it. iPhone and iPad take 'recorder' (Safari records MP4 with sound; its WebCodecs
+   sound encoder is not to be relied on); elsewhere it stands in where the codecs way would be silent. */
+const IOS=typeof navigator!=='undefined' && (/iP(hone|ad|od)/.test(navigator.userAgent||'') || (/Macintosh/.test(navigator.userAgent||'') && navigator.maxTouchPoints>1));
+const MP4_TYPES=['video/mp4;codecs=avc1.42E01F,mp4a.40.2', 'video/mp4;codecs="avc1.42E01F, mp4a.40.2"', 'video/mp4;codecs=avc1,mp4a', 'video/mp4'];
+let wayOver=null;   // development and probes: force a way
+const recType=()=>{ if(typeof MediaRecorder==='undefined' || typeof MediaRecorder.isTypeSupported!=='function') return null; return MP4_TYPES.find(t=>{ try{ return MediaRecorder.isTypeSupported(t); }catch(e){ return false; } })||null; };
+/* what this browser can do: the way, whether the clip has sound, a reason when it cannot */
 export function filmSupport(){ const v=typeof VideoEncoder!=='undefined' && typeof VideoFrame!=='undefined', a=typeof AudioEncoder!=='undefined' && typeof AudioData!=='undefined' && !!AC && !!AC.audioWorklet;
-  const rateOk=!AC || FILM.aacRates.includes(AC.sampleRate);
-  return { video:v, audio:a && rateOk, why: !v ? 'this browser has no video encoder (WebCodecs)' : !a ? 'no sound encoder here (the clip will be silent)' : !rateOk ? `the sound runs at ${AC.sampleRate} Hz (the clip will be silent)` : '' }; }
+  const rateOk=!AC || FILM.aacRates.includes(AC.sampleRate), codecsSound=v && a && rateOk, type=recType();
+  const canRec=!!type && !!AC && typeof AC.createMediaStreamDestination==='function' && typeof HTMLCanvasElement!=='undefined' && typeof HTMLCanvasElement.prototype.captureStream==='function';
+  let way= wayOver || (IOS ? (canRec ? 'recorder' : v ? 'codecs' : 'none') : codecsSound ? 'codecs' : canRec ? 'recorder' : v ? 'codecs' : 'none');
+  if(way==='recorder' && !canRec) way= v ? 'codecs' : 'none'; if(way==='codecs' && !v) way= canRec ? 'recorder' : 'none';
+  const sound= way==='recorder' || (way==='codecs' && codecsSound);
+  return { video:way!=='none', audio:sound, codecsSound, way, type, why: way==='none' ? 'this browser cannot film a clip' : sound ? '' : !a ? 'no sound encoder here (the clip will be silent)' : `the sound runs at ${AC.sampleRate} Hz (the clip will be silent)` }; }
+export const filmWayDbg=w=>{ wayOver= w==='codecs' || w==='recorder' ? w : null; return filmSupport(); };
 /* the H.264 level by the frame's size in macroblocks (constrained baseline: no reordered frames, every player takes it) */
 const levelOf=(w, h)=>{ const mb=Math.ceil(w/16)*Math.ceil(h/16); return mb<=3600 ? '1F' : mb<=8192 ? '28' : mb<=22080 ? '33' : null; };
 function drawMark(x, w, h){ const fs=Math.max(11, Math.round(h*0.026)), pad=Math.round(h*0.03); x.font=`500 ${fs}px system-ui, sans-serif`; x.textAlign='right'; x.textBaseline='bottom';
@@ -36,13 +49,32 @@ async function tapBuild(){ if(tapNode) return tapNode; if(!tapReady) tapReady=(a
     const n=new AudioWorkletNode(AC, 'night-film-tap', { numberOfInputs:1, numberOfOutputs:1, channelCount:2, channelCountMode:'explicit' }); n.connect(sink);
     const m=masterOut(); if(m) m.connect(n); tapNode=n; return n; })(); return tapReady; }
 
+/* SHARE-4: the recorder way begins on the first composed frame — the canvas in the page (off screen: a browser may not capture a canvas outside the
+   document), its stream at the clip's frame rate, the master through a stream destination, the browser's MP4 recorder over both */
+function recBegin(st){ try{ const c=st.comp; c.setAttribute('aria-hidden', 'true'); c.style.cssText='position:fixed;left:-10000px;top:0;width:2px;height:2px;pointer-events:none;'; document.body.appendChild(c);
+    const vs=c.captureStream(FILM.fps); st.dest=AC.createMediaStreamDestination(); const m=masterOut(); if(m) m.connect(st.dest);
+    st.ms=new MediaStream([...vs.getVideoTracks(), ...st.dest.stream.getAudioTracks()]); st.chunks=[];
+    st.rec=new MediaRecorder(st.ms, { mimeType:st.type, videoBitsPerSecond:Math.round(st.q.max), audioBitsPerSecond:160000 });
+    st.rec.ondataavailable=e=>{ if(e.data && e.data.size) st.chunks.push(e.data); }; st.rec.onerror=e=>{ st.err='recorder: '+((e && e.error && e.error.message) || 'failed'); };
+    st.rec.start(1000); st.recAt=now(); }
+  catch(e){ st.err='recorder: '+(e && e.message || e); } }
+function recEnd(st){ try{ const m=masterOut(); if(m && st.dest) m.disconnect(st.dest); }catch(e){} try{ st.ms && st.ms.getTracks().forEach(k=>k.stop()); }catch(e){} try{ st.comp && st.comp.remove(); }catch(e){} }
+async function recStop(st, stopMs){
+  await new Promise(r=>{ if(!st.rec || st.rec.state==='inactive') return r(); const lim=setTimeout(r, 4000); st.rec.onstop=()=>{ clearTimeout(lim); r(); }; try{ st.rec.stop(); }catch(e){ clearTimeout(lim); r(); } });
+  recEnd(st); S=null;
+  if(!st.chunks || !st.chunks.length) throw new Error(st.err || 'no picture was filmed');
+  const type=String(st.rec.mimeType||st.type||'video/mp4'), blob=new Blob(st.chunks, { type:type.split(';')[0] }), sec=Math.max(0, ((st.lastT||st.t0)-st.t0)/1000+1/FILM.fps);
+  return { blob, name:clipName(), info:{ way:'recorder', sec:+sec.toFixed(2), frames:st.frames, dropped:0, size:st.size, codec:type, kb:Math.round(blob.size/1024), hands:st.overlay, quality:st.qKey, kbps:Math.round(blob.size*8/1000/Math.max(0.1, sec)),
+    sound:'the browser\'s own MP4 recorder (sound from the master)', soundSec:null, finishMs:Math.round(now()-stopMs), err:st.err } }; }
+const clipName=()=>{ const d=new Date(), p=n=>String(n).padStart(2, '0'); return `handsong-night-${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}.mp4`; };
+
 /* start: throws a short reason when it cannot. o.onStop(reason) — called when it stops by itself (the 60-s cap) */
 export async function filmStart(o={}){
   if(S) return S; const sup=filmSupport(); if(!sup.video) throw new Error(sup.why);
   const q=FILM_Q[o.quality]||FILM_Q.b, st={ q, qKey:FILM_Q[o.quality] ? o.quality : 'b', bars:0, t0:null, last:-1e9, frames:0, dropped:0, video:[], vcfg:null, audio:[], acfg:null, aFirst:null, aDone:false, err:null, started:now(), onStop:o.onStop||null, comp:null, cx:null, enc:null, aenc:null, tap:null, size:null, codec:null, overlay:false };
-  S=st;
+  st.way=sup.way; st.type=sup.type; S=st;
   /* the sound first (so it covers the first frame): the audio thread's blocks → AudioData → AAC; each block's moment heard from the output timestamp */
-  if(sup.audio){ try{ const tap=await tapBuild(); st.tap=tap; const rate=AC.sampleRate;
+  if(st.way==='codecs' && sup.codecsSound){ try{ const tap=await tapBuild(); st.tap=tap; const rate=AC.sampleRate;
       st.aenc=new AudioEncoder({ output:(c, m)=>{ if(m && m.decoderConfig && m.decoderConfig.description && !st.acfg) st.acfg={ asc:bytesOf(m.decoderConfig.description), rate:m.decoderConfig.sampleRate||rate, channels:m.decoderConfig.numberOfChannels||2 };
           const d=new Uint8Array(c.byteLength); c.copyTo(d); st.audio.push({ data:d, dur:c.duration }); }, error:e=>{ st.err='sound: '+(e&&e.message||e); } });
       st.aenc.configure({ codec:'mp4a.40.2', sampleRate:rate, numberOfChannels:2, bitrate:160000 });
@@ -57,28 +89,31 @@ export async function filmStart(o={}){
     catch(e){ st.err='sound: '+(e&&e.message||e); st.tap=null; } }
   /* the picture: after each draw, on the 30-fps grid — the room, the hands' canvas blended as the page blends it, the mark */
   sceneFrameTap((gl, t)=>{ if(S!==st || st.stopping || !gl) return;
-    if(!st.enc){ let w=gl.width, h=gl.height; if(st.q.size==='screen'){ const dpr=window.devicePixelRatio||1, W=innerWidth*dpr, H=innerHeight*dpr, k=Math.min(1, 1920/Math.max(W, H)); w=Math.round(W*k); h=Math.round(H*k); }
-      w&=~1; h&=~1; const lv=levelOf(w, h); if(!lv || w<16 || h<16){ st.err='the picture is too large to film'; return; }
-      st.size=[w, h]; st.codec='avc1.42E0'+lv; st.comp=document.createElement('canvas'); st.comp.width=w; st.comp.height=h; st.cx=st.comp.getContext('2d', { alpha:false });
-      st.enc=new VideoEncoder({ output:(c, m)=>{ if(m && m.decoderConfig && m.decoderConfig.description && !st.vcfg) st.vcfg={ avcC:bytesOf(m.decoderConfig.description) };
+    if(!st.comp){ let w=gl.width, h=gl.height; if(st.q.size==='screen'){ const dpr=window.devicePixelRatio||1, W=innerWidth*dpr, H=innerHeight*dpr, k=Math.min(1, 1920/Math.max(W, H)); w=Math.round(W*k); h=Math.round(H*k); }
+      w&=~1; h&=~1; const lv=levelOf(w, h); if((!lv && st.way==='codecs') || w<16 || h<16){ st.err='the picture is too large to film'; return; }
+      st.size=[w, h]; st.codec= st.way==='codecs' ? 'avc1.42E0'+lv : st.type; st.comp=document.createElement('canvas'); st.comp.width=w; st.comp.height=h; st.cx=st.comp.getContext('2d', { alpha:false }); st.cx.imageSmoothingQuality='high';
+      if(st.way==='codecs') st.enc=new VideoEncoder({ output:(c, m)=>{ if(m && m.decoderConfig && m.decoderConfig.description && !st.vcfg) st.vcfg={ avcC:bytesOf(m.decoderConfig.description) };
           const d=new Uint8Array(c.byteLength); c.copyTo(d); st.video.push({ data:d, ts:c.timestamp, key:c.type==='key' }); }, error:e=>{ st.err='video: '+(e&&e.message||e); } });
-      st.enc.configure({ codec:st.codec, width:w, height:h, bitrate:Math.round(Math.min(st.q.max, Math.max(st.q.min, w*h*FILM.fps*st.q.bpp))), framerate:FILM.fps, avc:{ format:'avc' }, latencyMode:st.q.mode, bitrateMode:st.q.rate }); st.cx.imageSmoothingQuality='high'; }
+      if(st.enc) st.enc.configure({ codec:st.codec, width:w, height:h, bitrate:Math.round(Math.min(st.q.max, Math.max(st.q.min, w*h*FILM.fps*st.q.bpp))), framerate:FILM.fps, avc:{ format:'avc' }, latencyMode:st.q.mode, bitrateMode:st.q.rate }); }
     if(st.tap && !st.aFirst && now()-st.started<800) return;   // the picture starts once the sound does
     if(t-st.last<1000/FILM.fps-4) return;
-    if(st.enc.encodeQueueSize>FILM.queueMax){ st.dropped++; return; }
+    if(st.enc && st.enc.encodeQueueSize>FILM.queueMax){ st.dropped++; return; }
     st.last=t; if(st.t0==null) st.t0=t;
     const [w, h]=st.size, x=st.cx; x.globalCompositeOperation='source-over'; x.drawImage(gl, 0, 0, gl.width, gl.height, 0, 0, w, h);
     const ov=document.getElementById('canvas'); if(ov && ov.width && !cameraOn()){ x.globalCompositeOperation='screen'; x.drawImage(ov, 0, 0, ov.width, ov.height, 0, 0, w, h); x.globalCompositeOperation='source-over'; st.overlay=true; }
     st.bars=filmBars(x, w, h);   // SHARE-2: the depth and effects bars as the page shows them
     drawMark(x, w, h);
-    const f=new VideoFrame(st.comp, { timestamp:Math.round((t-st.t0)*1000) }); try{ st.enc.encode(f, { keyFrame:st.frames%FILM.keyEvery===0 }); st.frames++; }catch(e){ st.err='video: '+(e&&e.message||e); } f.close();
+    st.lastT=t;
+    if(st.enc){ const f=new VideoFrame(st.comp, { timestamp:Math.round((t-st.t0)*1000) }); try{ st.enc.encode(f, { keyFrame:st.frames%FILM.keyEvery===0 }); st.frames++; }catch(e){ st.err='video: '+(e&&e.message||e); } f.close(); }
+    else if(st.way==='recorder'){ if(!st.rec) recBegin(st); st.frames++; }   // SHARE-4: the recorder takes the canvas as it changes
     if(!st.capped && (t-st.t0)/1000>=FILM.maxSec){ st.capped=true; const cb=st.onStop; setTimeout(()=>{ if(cb) cb('the 60-second limit'); }, 0); } });
   return st; }
 
-export const filmState=()=>S ? { on:true, sec:S.t0==null ? 0 : (now()-S.t0)/1000, frames:S.frames, dropped:S.dropped, size:S.size, codec:S.codec, err:S.err, sound:!!S.aFirst, hands:S.overlay, bars:S.bars, quality:S.qKey } : { on:false };
+export const filmState=()=>S ? { on:true, sec:S.t0==null ? 0 : (now()-S.t0)/1000, frames:S.frames, dropped:S.dropped, size:S.size, codec:S.codec, err:S.err, sound: S.way==='recorder' ? !!S.rec : !!S.aFirst, hands:S.overlay, bars:S.bars, quality:S.qKey, way:S.way } : { on:false };
 
 /* stop → { blob, name, info } (the MP4, checked by reading it back) or throws */
 export async function filmStop(){ const st=S; if(!st) throw new Error('not recording'); sceneFrameTap(null); const stopMs=now();
+  if(st.way==='recorder') return recStop(st, stopMs);   // SHARE-4
   if(st.tap){ await new Promise(r=>setTimeout(r, 120)); st.tap.port.postMessage({ on:false }); const lim=now()+1500; while(!st.aDone && now()<lim) await new Promise(r=>setTimeout(r, 20)); }   // the sound's last block, heard a moment after the last frame
   st.stopping=true;
   try{ if(st.enc) await st.enc.flush(); if(st.aenc && st.aenc.state==='configured') await st.aenc.flush(); }
@@ -95,7 +130,7 @@ export async function filmStop(){ const st=S; if(!st) throw new Error('not recor
   const bytes=mp4Write({ width:st.size[0], height:st.size[1], avcC:st.vcfg.avcC, samples:st.video }, audio), check=mp4Read(bytes);
   const d=new Date(), p=n=>String(n).padStart(2, '0'), name=`handsong-night-${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}.mp4`;
   const vd=check.tracks[0], sec=vd.durations.reduce((a, b)=>a+b, 0)/vd.scale, ad=check.tracks[1], asec= ad ? ad.durations.reduce((a, b)=>a+b, 0)/ad.scale : 0;
-  return { blob:new Blob([bytes], { type:'video/mp4' }), name, info:{ sec:+sec.toFixed(2), frames:st.video.length, dropped:st.dropped, size:st.size, codec:st.codec, kb:Math.round(bytes.length/1024), hands:st.overlay, quality:st.qKey, kbps:Math.round(bytes.length*8/1000/Math.max(0.1, (st.video[st.video.length-1].ts)/1e6)),
+  return { blob:new Blob([bytes], { type:'video/mp4' }), name, info:{ way:'codecs', sec:+sec.toFixed(2), frames:st.video.length, dropped:st.dropped, size:st.size, codec:st.codec, kb:Math.round(bytes.length/1024), hands:st.overlay, quality:st.qKey, kbps:Math.round(bytes.length*8/1000/Math.max(0.1, (st.video[st.video.length-1].ts)/1e6)),
     sound: audio ? `${asec.toFixed(2)} s of sound (${audio.samples.length} AAC packets, ${audio.rate} Hz), starts ${audio.startMs} ms after the first frame` : (st.err || 'none'), soundSec:+asec.toFixed(2), finishMs:Math.round(now()-stopMs), err:st.err } }; }
 
 /* SHARE-3: whether this browser's share sheet takes a video file (the players' card shows «Share» only then) */

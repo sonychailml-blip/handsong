@@ -27,8 +27,9 @@ function set(m){ mode=m; LOG.push({ t:Math.round(performance.now()), mode:m }); 
 const fmt=s=>{ const n=Math.max(0, Math.round(+s||0)); return `${Math.floor(n/60)}:${String(n%60).padStart(2, '0')}`; };
 
 /* one short line under the button (a refusal, or the one-time hint) */
-export function filmTip(key){ const el=$('nightRecTip'); if(!el) return; el.textContent=t(key); el.dataset.key=key; el.hidden=false; clearTimeout(tipTimer);
-  tipTimer=setTimeout(()=>{ el.hidden=true; if(hint){ hint=false; render(); } }, key==='night.clip.hint' ? CLIP.hintShowMs : CLIP.tipMs); }
+export function filmTip(key, why=''){ const el=$('nightRecTip'); if(!el) return; el.textContent=t(key)+(why ? ' ('+String(why).slice(0, 80)+')' : '');   // why: a short technical reason after a failure (a tester's screenshot tells what to fix)
+  el.dataset.key=key; el.hidden=false; clearTimeout(tipTimer);
+  tipTimer=setTimeout(()=>{ el.hidden=true; if(hint){ hint=false; render(); } }, key==='night.clip.hint' || why ? CLIP.hintShowMs : CLIP.tipMs); }   // a failure stays long enough to be photographed
 function hintOff(){ if(!hint) return; hint=false; const el=$('nightRecTip'); if(el && el.dataset.key==='night.clip.hint') el.hidden=true; render(); }
 
 function onTap(){
@@ -43,10 +44,10 @@ function loop(){ if(raf) return; const step=now=>{ raf=0;
     else if(mode==='rec'){ render(now); raf=requestAnimationFrame(step); } };
   raf=requestAnimationFrame(step); }
 async function begin(){ set('rec');
-  try{ await filmStart({ quality:CLIP.quality, onStop:()=>finish() }); }catch(e){ if(mode==='rec'){ set('idle'); filmTip('night.clip.failed'); } return; }
+  try{ await filmStart({ quality:CLIP.quality, onStop:()=>finish() }); }catch(e){ if(mode==='rec'){ set('idle'); filmTip('night.clip.failed', e && e.message); } return; }
   if(mode==='rec') loop(); }   // the page may have been left meanwhile (finish() ran)
 async function finish(){ if(mode!=='rec') return; set('finishing');
-  try{ clip=await filmStop(); }catch(e){ clip=null; set('idle'); filmTip('night.clip.failed'); return; }
+  try{ clip=await filmStop(); }catch(e){ clip=null; set('idle'); filmTip('night.clip.failed', e && e.message); return; }
   clip.saved=false; if(!ios()){ try{ filmSave(clip.blob, clip.name); clip.saved=true; }catch(e){} }   // the founder: saved on the device at once, shared or not
   if(document.hidden) await new Promise(r=>{ const f=()=>{ if(!document.hidden){ document.removeEventListener('visibilitychange', f); r(); } }; document.addEventListener('visibilitychange', f); });
   cardOpen(); }
@@ -100,3 +101,4 @@ export function filmUiWire(h={}){ if(wired || !$('nightRecBtn')) return; wired=t
 export const filmUiDbg=()=>({ mode, hint, hintSeen, played:Math.round(played), log:LOG.slice(), clip: clip ? { ...clip.info, saved:clip.saved } : null, ios:ios() });
 export function filmUiSetDbg(o={}){ if('played' in o) played=+o.played||0; if('hintSeen' in o) hintSeen=!!o.hintSeen; if('ios' in o) iosOver=o.ios==null ? null : !!o.ios; return filmUiDbg(); }
 export const filmUiTapDbg=()=>onTap();
+export const filmUiBlobDbg=()=>clip ? clip.blob : null;   // probe only: the clip's file (a page fetch of its blob: address is refused by the CSP)

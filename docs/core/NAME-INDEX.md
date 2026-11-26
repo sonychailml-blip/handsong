@@ -72,7 +72,7 @@ NIGHT-7b — NIGHT'S EDITION: the build's (core/edition.js: 'release' in a playe
 
 ## apps/night/film.js
 SHARE-1 — FILMING A CLIP WHILE PLAYING (way A, the founder 2026-11-26: start and stop by the person, the screen's shape, 60 s at most, the mark on the whole clip; docs/night/SHARE-PLAN.md).
-- const (3): `FILM`, `FILM_Q`, `filmState`
+- const (4): `FILM`, `FILM_Q`, `filmWayDbg`, `filmState`
 - fn (6): `filmSupport`, `filmStart`, `filmStop`, `filmCanShare`, `filmShare`, `filmSave`
 
 ## apps/night/filmbars.js
@@ -86,7 +86,7 @@ SHARE-1 — THE CLIP TEST (development edition only; the founder checks way A be
 
 ## apps/night/filmui.js
 SHARE-3 — THE PLAYERS' CLIP BUTTON (the founder's choices: docs/night/SHARE-PLAN.md «The players' interface», «The look: Counter inside»).
-- const (5): `CLIP`, `filmBusy`, `filmCardOpen`, `filmUiDbg`, `filmUiTapDbg`
+- const (6): `CLIP`, `filmBusy`, `filmCardOpen`, `filmUiDbg`, `filmUiTapDbg`, `filmUiBlobDbg`
 - fn (4): `filmTip`, `filmUiTick`, `filmUiWire`, `filmUiSetDbg`
 
 ## apps/night/forestlabel.js
@@ -1753,7 +1753,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 UI-1 — «NIGHT labels follow the room»: the founder entered the rain and the Sound button still read «Firefly» while another timbre played.
 - fn (1): `checkNightLabels`
 
-_349 modules, 3320 exported names._
+_349 modules, 3322 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

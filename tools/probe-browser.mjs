@@ -864,10 +864,12 @@ async function uiNightHowTo(page, label){
    «one pane»; a note pulled up over its row must fail the layout; the panes without their shared cell (a hidden pane taking no room) must fail «stands still». */
 const SET_TABS_WANT={ sound:{ show:['nightMusicVol','nightMusicAnswerTg'] }, picture:{ show:['nightBgSeg','nightQualSeg','nightFieldTg'] },
   hands:{ show:['nightHandSeg','nightTravel','nightFxSens','nightDotsSeg','nightCalReset'] } };
-/* the card's box under each tab (real taps) → the differences from the first tab's box, px */
+/* the card's box under each tab (real taps) → the differences from the first tab's box, px. SHARE-4 full check: + the card's content height (scrollHeight) —
+   a card held at its largest height (Russian on a phone: every tab taller than the screen) keeps its box whatever the panes do, so the box alone let
+   the CONTROL pass; the content height still differs when a hidden pane takes no room */
 async function setCardStill(p){ const box=[];
   for(const tab of ['sound','picture','hands']){ await p.click(`#nightSetTabs [data-tab="${tab}"]`); await p.waitForTimeout(120);
-    box.push(await p.evaluate(()=>{ const r=document.getElementById('nightInfo').getBoundingClientRect(); return [r.top, r.left, r.width, r.height]; })); }
+    box.push(await p.evaluate(()=>{ const c=document.getElementById('nightInfo'), r=c.getBoundingClientRect(); return [r.top, r.left, r.width, r.height, c.scrollHeight]; })); }
   const moved=[]; box.forEach((b,i)=>{ if(i && b.some((v,k)=>Math.abs(v-box[0][k])>0.5)) moved.push(`${['sound','picture','hands'][i]} ${b.map(Math.round).join('/')} vs ${box[0].map(Math.round).join('/')}`); });
   return { moved, box:box[0].map(Math.round) }; }
 function setJudge(W){

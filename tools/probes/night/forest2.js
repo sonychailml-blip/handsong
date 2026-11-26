@@ -57,8 +57,9 @@ export function vegMeshes(room, noGrass=false){ const S=room.state(), out=new Se
 
 let H=null, T=null, CV=null, FM=null;
 async function kit(){ if(!H){ H=await import('../../../apps/night/scene/host.js'); T=await H.loadThree(); CV=(await import('../../../core/palette.js')).cv; FM=await import('../../../apps/night/rooms/forest/forest.js'); } return { H, T, CV, F:FM }; }
-/* the forest at `level`, the switch `on` (null: leave it), mutate(room, T) before the frames → per view { hash, cover, mass, ground } + geo, prog */
-export async function forestFrames({ level='reduced', on=false, mutate=null, veg=true, vis=false }={}){
+/* the forest at `level`, the switch `on` (null: leave it), mutate(room, T) before the frames → per view { hash, cover, mass, ground } + geo, prog;
+   speedOff: built as before SPEED-1 (forest.js SPEED_BEFORE — the pins of today's forest were made before it) */
+export async function forestFrames({ level='reduced', on=false, mutate=null, veg=true, vis=false, speedOff=false }={}){
   const { T, CV, F }=await kit(), was=F.forestNewDbg ? F.forestNewDbg() : false, wasC=F.forestCullDbg ? F.forestCullDbg() : false;
   if(F.forestNewDbg && on!=null) F.forestNewDbg(on); if(F.forestCullDbg) F.forestCullDbg(false);   // FOREST-2f: the content judged without the cull (it re-packs the instance lists; its own row proves the frames the same)
   const canvas=document.createElement('canvas'); let r=null, room=null;
@@ -68,7 +69,7 @@ export async function forestFrames({ level='reduced', on=false, mutate=null, veg
     r=new T.WebGLRenderer({ canvas, antialias:false, preserveDrawingBuffer:true }); r.setPixelRatio(1);
     r.outputEncoding=T.sRGBEncoding; r.toneMapping=T.ACESFilmicToneMapping; r.toneMappingExposure=1.0; r.info.autoReset=false; r.shadowMap.enabled=false;
     const [, w0, h0]=FOREST2_VIEWS[0];
-    room=F.buildForest(T, { C:CV, level, w:w0, h:h0, reduce:false, mood:null, shadow:false, gl2:r.capabilities.isWebGL2 });
+    room=F.buildForest(T, { C:CV, level, w:w0, h:h0, reduce:false, mood:null, shadow:false, gl2:r.capabilities.isWebGL2, speedOff });
     if(mutate) await mutate(room, T);
     const gl=r.getContext(), out={ level, on:!!(F.forestNewDbg && F.forestNewDbg()), views:{} };
     for(const [name, w, h] of FOREST2_VIEWS){ r.setSize(w, h, false); room.viewDbg(null); room.resize(w, h, h); room.viewDbg({ rest:true });
@@ -127,13 +128,16 @@ async function forestTodayRun(){
   const pin=await fetch(PIN_URL, { cache:'no-store' }).then(r=>r.ok ? r.json() : null).catch(()=>null);
   if(!ok('the pins tools/prints/forest-today.json are missing', !!pin)) return { cases:n, total:d.length, differences:d, notes };
   const { F }=await kit(); ok('forest.js has no switch door (forestNewDbg)', typeof F.forestNewDbg==='function');
-  for(const lv of ['reduced', 'full']){ const P=pin.levels[lv], off=await forestFrames({ level:lv, on:false, veg:false }), same=off.renderer===pin.renderer;
+  /* SHARE-4 full check: the pins are the forest approved 2026-11-15, made before SPEED-1 — the switch-off forest is built as then (speedOff); SPEED's own
+     changes (step 4's plain far trunks at Standard) are judged by «FOREST paint» and the speed rows against SPEED_BEFORE */
+  for(const lv of ['reduced', 'full']){ const P=pin.levels[lv], off=await forestFrames({ level:lv, on:false, veg:false, speedOff:true }), same=off.renderer===pin.renderer;
     ok(`${lv}: the switch-off forest's content differs from today's (geometry ${off.geo.hash} / ${P.geo.hash}, ${off.geo.objects} / ${P.geo.objects} objects)`, off.geo.hash===P.geo.hash);
     if(same){ ok(`${lv}: a shader program differs from today's (${off.prog.hash} / ${P.prog.hash}, ${off.prog.programs} / ${P.prog.programs} programs)`, off.prog.hash===P.prog.hash);
       for(const [k, v] of Object.entries(P.views)) ok(`${lv} ${k}: the frame differs from today's (${off.views[k].hash} / ${v.hash})`, off.views[k] && off.views[k].hash===v.hash); }
     else notes.push(`${lv}: another renderer than the pins' (${off.renderer} / ${pin.renderer}) — only the content compared`);
-    const on=await forestFrames({ level:lv, on:true, veg:false });
+    const on=await forestFrames({ level:lv, on:true, veg:false, speedOff:true });
     ok(`CONTROL ${lv}: the switch on left the content as today's — the check cannot see the switch`, on.geo.hash!==P.geo.hash);
+    if(lv==='reduced'){ const sp=await forestFrames({ level:lv, on:false, veg:false }); ok('CONTROL reduced: the SPEED build has the pre-SPEED content — the row cannot tell which forest it built', sp.geo.hash!==P.geo.hash); }
     if(same) for(const k of Object.keys(P.views)) ok(`CONTROL ${lv} ${k}: the switch on left the frame as today's`, on.views[k].hash!==P.views[k].hash);
     notes.push(`${lv}: off ${off.geo.objects} objects ${off.prog.programs} programs, frames ${Object.values(off.views).map(v=>v.hash).join(' ')}; on ${on.geo.objects} objects ${on.prog.programs} programs, calls ${Object.values(on.views).map(v=>v.calls).join('/')} (off ${Object.values(off.views).map(v=>v.calls).join('/')}), triangles ${Object.values(on.views).map(v=>v.tris).join('/')} (off ${Object.values(off.views).map(v=>v.tris).join('/')})`); }
   return { cases:n, total:d.length, differences:d, notes };
