@@ -2,7 +2,7 @@
    on a transparent canvas, with the room's uniforms. Used by the rows (tools/probes/night/rain10.js) and by the captures (tools/rain-snap.mjs --sheet).
    items: [{ x, y (the foot, view units), hw, hh (half width, half height), k (kind), ph, c (code), a, dep }]; o: { W, H, tan (view half size [x, y]),
    foc ([depth, K, widest radius, plateau]), win (the border window 0/1), time, wind, depth ({ tex, ext } a depth map and its extent: the depth test),
-   occl (0: the depth test off — the CONTROL), alphaOff (every pixel opaque — the CONTROL of an opaque quad), oneCol (RELEASE-1: every part in the coat's colour — the CONTROL),
+   occl (0: the depth test off — the CONTROL), alphaOff (every pixel opaque — the CONTROL of an opaque quad), oneCol (RELEASE-1: every part in the coat's colour — the CONTROL), veh (SPEED-1 step 14: the vehicle sprites compiled in, as the room's 'sprite' CONTROL mode does),
    amb (the look's glow, default Evening's), lamp (Warm/Bright −1…1); an item's wear (its wear code), lit (the near lamps 0…1) and view (RELEASE-1: [the walking direction's step per metre x, y in the figure's units, sin of the look-down angle, the half stride]; absent: a side view), done (the renderer released after this sheet) } → { px (RGBA, rows bottom-up), W, H, url? (o.url: a PNG data URL), dispose() } */
 /* ONE renderer for every sheet of a row (a WebGL context per sheet made the browser take the room's own context away): sheetRenderer(T, W, H), sheetDone() */
 let RR=null;
@@ -23,7 +23,7 @@ export async function lifeSheet(items, o={}){
     uSign:{ value:C('sign') }, uSignWarm:{ value:C('sign-warm') }, uCross:{ value:C('cross') }, uWalkR:{ value:C('walk-red') }, uWalkG:{ value:C('walk-green') }, uNavR:{ value:C('tail') }, uHead:{ value:C('head') },
     uDepthMap:{ value:dm ? dm.tex : blank }, uExt:{ value:new T.Vector2(dm ? dm.ext[0] : 1, dm ? dm.ext[1] : 1) }, uOccl:{ value:dm ? (o.occl==null ? 1 : o.occl) : 0 },
     uAmb:{ value:o.amb ? new T.Color(o.amb) : C('eve-glow') }, uLampC:{ value:C('lamp') }, uLamp:{ value:o.lamp||0 }, uOneCol:{ value:o.oneCol ? 1 : 0 } };
-  const m=new T.ShaderMaterial({ uniforms:u, vertexShader:G.LIFE_V, fragmentShader: o.alphaOff ? G.LIFE_F.replace('void main(){ main0();', 'void main(){ main0(); gl_FragColor.a=1.;') : G.LIFE_F, transparent:true, depthTest:false, depthWrite:false, toneMapped:false,
+  const m=new T.ShaderMaterial({ defines:o.veh ? { LIFE_VEHSPRITE:'' } : {}, uniforms:u, vertexShader:G.LIFE_V, fragmentShader: o.alphaOff ? G.LIFE_F.replace('void main(){ main0();', 'void main(){ main0(); gl_FragColor.a=1.;') : G.LIFE_F, transparent:true, depthTest:false, depthWrite:false, toneMapped:false,
     blending:T.CustomBlending, blendSrc:T.OneFactor, blendDst:T.OneMinusSrcAlphaFactor, blendSrcAlpha:T.OneFactor, blendDstAlpha:T.OneMinusSrcAlphaFactor });
   const mesh=new T.Mesh(g, m); mesh.frustumCulled=false; const scene=new T.Scene(), cam=new T.OrthographicCamera(-1, 1, 1, -1, 0, 1); scene.add(mesh);
   r.clear(); r.render(scene, cam); const gl=r.getContext(), px=new Uint8Array(W*Hh*4); gl.readPixels(0, 0, W, Hh, gl.RGBA, gl.UNSIGNED_BYTE, px);

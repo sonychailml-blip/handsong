@@ -30,7 +30,7 @@ export async function checkRain10(o={}){ const d=[], notes=[]; let n=0; const ok
       H.setSceneLight(L==='light'); await H.setSceneLevel(L==='full' ? 'full' : 'reduced');
       { const end=performance.now()+60000; while(!(st() && st().frames>3) && performance.now()<end) await wait(200); }
       if(!ok(`${L}: the rain room did not draw`, !!st())) continue;
-      const S0=st(), uPx=S0.buffer[1]/(2*S0.tan[1]), Wp=1024, Hp=512, tan=[Wp/2/uPx, Hp/2/uPx], sheet=(items, x={})=>lifeSheet(items, { W:Wp, H:Hp, tan, foc:x.foc||[0.5, 4, 0.012, 0.02], win:x.win, alphaOff:x.alphaOff, oneCol:x.oneCol });
+      const S0=st(), uPx=S0.buffer[1]/(2*S0.tan[1]), Wp=1024, Hp=512, tan=[Wp/2/uPx, Hp/2/uPx], sheet=(items, x={})=>lifeSheet(items, { W:Wp, H:Hp, tan, foc:x.foc||[0.5, 4, 0.012, 0.02], win:x.win, alphaOff:x.alphaOff, oneCol:x.oneCol, veh:items.some(q=>q.k>23.5 && q.k<26.5) });   // SPEED-1 step 14: a sheet with vehicle sprites compiles them in
       const A=(S, x, y)=>{ const X=Math.round((x/tan[0]+1)/2*Wp), Y=Math.round((y/tan[1]+1)/2*Hp); return X<0 || Y<0 || X>=Wp || Y>=Hp ? 0 : S.px[(Y*Wp+X)*4+3]; };
       const region=(S, x0, x1, y0, y1, f)=>{ const step=0.5/uPx; for(let y=y0;y<=y1;y+=step) for(let x=x0;x<=x1;x+=step) f(A(S, x, y), x, y); };
       const tag=`${L} (${uPx.toFixed(0)} px per unit)`;

@@ -38,6 +38,7 @@ also apply to new work in the two existing rooms. A rule learned in a later fix 
   - kinds split into a few programs by family (people, vehicles, signs) rather than one program for all.
   - Measure each program's first compile on the laptop, cold. Over 2 s is too big.
   - The data row «ROOM shader copies (app)» fails on a function over 1000 characters copied more than twice.
+- Code only a probe or an old mode draws stays out of the shipped program, behind a `#define` the debug switch sets (SPEED-1 step 14: the vehicle sprites, 4.6 KB). Split a sprite program by family only when the families never overlap out of depth order (an awning's fringe over a walker does).
 - **A fixed set of programs.** Never switch a `#define`, a light count or a material's feature during play: each switch compiles again.
   - Hold a light dark (intensity 0) instead of hiding it (SPEED-1 step 6).
   - The Light quality changes counts and uniforms in place, not programs (steps 5–6).

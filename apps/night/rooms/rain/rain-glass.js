@@ -396,6 +396,8 @@ void main0(){ float k=floor(vK.x+0.5), ph=fract(vK.y), sub=floor(vK.y), face=mod
     else { float down=fract(vK.y), top=1., edge=1.-down; al=(1.-smoothstep(0.97-max(sw*0.3, 0.015), 0.97, abs(p.x)))*smoothstep(sw, -sw, max(edge-yy, yy-top));
       col=vec3(0.13, 0.135, 0.14)*(0.75+0.25*step(0.5, fract(yy*26.))); col=mix(col, vec3(0.05), smoothstep(edge+0.03, edge, yy)); }
     gl_FragColor=vec4(col*al*win*vK.w, al*win*vK.w); return; }
+  /* SPEED-1 step 14: the vehicle SPRITES are drawn only in the probes' CONTROL mode 'sprite' (vehDbg defines LIFE_VEHSPRITE; play draws 3D bodies), so the shipped program leaves them out */
+#ifdef LIFE_VEHSPRITE
   else if(k>23.5){   /* RAIN-6b (1): a VEHICLE's body (pure/vehicles.js) under its own lights: the sprite runs from its near face's foot up to its roof's far edge,
        the face below ph's share, the roof seen from above beyond it, wet (a sheen step brighter under a lamp) */
     float sw=clamp(vSoft, 0.02, 0.6), win=winOf()*mix(1., vFade, uWin), f=clamp(ph, 0.12, 0.95), sh=sub/8., ax=abs(p.x), q=clamp((p.y-f)/max(1.-f, 0.05), 0., 1.);
@@ -430,6 +432,7 @@ void main0(){ float k=floor(vK.x+0.5), ph=fract(vK.y), sub=floor(vK.y), face=mod
     else { float d2=min(min(seg(p, vec2(-0.45, 0.05), vec2(0.2, 0.5), 0.02), seg(p, vec2(0.2, 0.5), vec2(-0.3, 0.95), 0.02)), min(seg(p, vec2(-0.92, 0.95), vec2(0.32, 0.95), 0.018), seg(p, vec2(-0.75, 0.05), vec2(-0.15, 0.05), 0.03)));   /* the pantograph up to the wire; RAIN-10: its bar a capsule (a thin ellipse's soft edge ran far past its quad) */
       al=smoothstep(sw, -sw, d2); col=vec3(0.03); }
     gl_FragColor=vec4(col*al*win*vK.w, al*win*vK.w); return; }
+#endif
   else if(k>22.5){   /* RAIN-5d: a delivery rider on a scooter, coming towards us: a small wheel, the rider, a helmet, the box behind, the headlamp */
     d=abs(seg(p, vec2(0., 0.1), vec2(0., 0.16), 0.06))-0.025;   /* RAIN-10: the small wheel likewise */ d=min(d, el(p, vec2(0., 0.5), vec2(0.34, 0.2))); d=min(d, el(p, vec2(0., 0.82), vec2(0.24, 0.08)));
     d=min(d, el(p, vec2(0., 0.32), vec2(0.18, 0.1))); d=min(d, seg(p, vec2(-0.47, 0.6), vec2(0.47, 0.6), 0.025)); da=el(p, vec2(0., 0.7), vec2(0.42, 0.16));
