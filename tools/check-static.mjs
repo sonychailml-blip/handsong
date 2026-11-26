@@ -191,7 +191,7 @@ const GLOBALS=new Set((
   /* SAFARI-1: an older iOS switches its audio session by playing our silent clip (an <audio> element) */ 'Audio '+
   /* DESIGN-1: the start still watches the start card */ 'MutationObserver '+
   /* NIGHT-14c: the forest asks the precache (Cache Storage) whether Detailed's pictures are in */ 'caches '+
-  /* SHARE-1: a clip filmed in the browser (WebCodecs; the sound's track read as AudioData) */ 'VideoEncoder AudioEncoder VideoFrame MediaStreamTrackProcessor '+
+  /* SHARE-1: a clip filmed in the browser (WebCodecs; the sound's track read as AudioData) */ 'VideoEncoder AudioEncoder VideoFrame AudioData '+
   /* JavaScript */ 'Math JSON Object Array Number String Boolean Symbol BigInt Map Set WeakMap WeakSet WeakRef Promise Proxy Reflect Intl Date RegExp '+
   'Error TypeError RangeError SyntaxError ReferenceError AggregateError ArrayBuffer SharedArrayBuffer DataView Float32Array Float64Array Int8Array '+
   'Int16Array Int32Array Uint8Array Uint8ClampedArray Uint16Array Uint32Array parseInt parseFloat isNaN isFinite encodeURIComponent '+
@@ -270,7 +270,7 @@ const NET_LISTED={
   'apps/night/rooms/rain/rain.js': { fetch:[2,'RAIN-1: reads the rain room\'s baked city (rooms/rain/city/<level>/*.webp, depth.png, windows.json; own origin; drawn by tools/rain-bake.mjs --city, register entry rain-city-bake) once per session and level — a development room'] },
   'apps/night/rooms/forest/forest-natural.js': { fetch:[1,'reads the new forest\'s CC0 detail files (rooms/forest/new/*.jpg, own origin; FOREST-2, composed by tools/forest-natural.mjs, register entry forest-natural) once per session, only with the address word ?forest=new'] },
   'apps/night/rooms/forest/forest.js': { fetch:[2,'reads the forest\'s own prepared files (rooms/forest/tex/*.png, own origin; NIGHT-6, drawn by tools/forest-bake.mjs, register entry forest-files) and each level\'s places file (rooms/forest/places/*.json, own origin; SPEED-1 step 7, written by tools/forest-places.mjs) once per session'] },
-  'apps/night/film.js': { share:[1,'SHARE-1: hands the person\'s own clip (the room picture and the heard sound, never the camera) to the system share sheet — only on their tap'] },
+  'apps/night/film.js': { addModule:[1,'SHARE-1: loads our own apps/night/worklets/film-worklet.js (the heard sound read on the audio thread for a clip) from the own origin into the live context, on the first recording'], share:[1,'SHARE-1: hands the person\'s own clip (the room picture and the heard sound, never the camera) to the system share sheet — only on their tap'] },
   'apps/night/audiolab.js': { addModule:[1,'development edition only (AUDIO-3): loads our own apps/night/worklets/lab-worklet.js (the glitch timing and the master recorder) from the own origin into the live context'] },
   'tools/probes/night/stream.js': { addModule:[1,'probe only (?probe): loads our own apps/night/worklets/nature-worklet.js into the offline contexts of the row «NIGHT stream, water and ground» (NIGHT-8)'] },
   'tools/probes/night/rainnature.js': { addModule:[1,'probe only (?probe): loads our own apps/night/worklets/nature-worklet.js into the offline contexts of the row «RAIN nature» (RAIN-3)'] },

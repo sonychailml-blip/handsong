@@ -679,6 +679,10 @@ NIGHT-14 — «A NEW VERSION IS READY».
 NIGHT-4: THE MUSIC BED v2 — one AudioWorklet processor «night-bed» holding every voice of the bed and its own reverb (design: docs/night/design/NIGHT-3-rooms/PLAN.md §4b; the law apps/night/pure/be…
 - exports: none
 
+## apps/night/worklets/film-worklet.js
+SHARE-1 — «night-film-tap»: the heard sound for a clip, read ON THE AUDIO THREAD (the main thread's long tasks — the hands' detection — made a main-thread capture drop whole buffers).
+- exports: none
+
 ## apps/night/worklets/lab-worklet.js
 AUDIO-3 — THE AUDIO LAB's two processors (development edition only; loaded by apps/night/audiolab.js when the founder opens the lab): «night-glitch»: no input, no output (an automatically pulled no…
 - exports: none
@@ -1740,7 +1744,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 UI-1 — «NIGHT labels follow the room»: the founder entered the rain and the Sound button still read «Firefly» while another timbre played.
 - fn (1): `checkNightLabels`
 
-_346 modules, 3308 exported names._
+_347 modules, 3308 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 
