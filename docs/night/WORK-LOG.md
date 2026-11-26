@@ -4,6 +4,13 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`, `archive/NIGHT-RUN-LOG-2026-10.md`. New runs start at `NIGHT-1`.
 
+# SHARE-0 (NIGHT track, 2026-11-26): stage 0 of «record and share a clip» — measurements only, no app change
+Tree hashes before = after: core 17a6ce078eefa5f4 · apps/full 0148bb454440c3e3 · apps/night a3091307a74bf245.
+- The founder's decisions: the person starts and stops; the mark on the whole clip; way B (re-draw after stop) if exact; the screen's shape; 60 s at most (`docs/night/SHARE-PLAN.md`).
+- Exact re-draw proved (`tools/.out/share0/replay.js`, an `--eval`): the room's build wrapped through `sceneRoomAdd`, every host call logged from its birth with cloned arguments and the clock's value; a second instance fed the log. Forest Standard 120/120, 123/123, Detailed 60/60; rain Standard 124/124, Detailed 98/98 frames equal (hash of every frame, every byte at 4); two replays always equal.
+- Found: the rain reads `performance.now()` inside its frame (`rain.js` traffic `tAudio`, the drips) — with it the replay is 160–3700 px off a frame; held at the frame's moment, exact. To fix in stage 1 (the moment passed in). The forest's mirror reads the clock too (exact in the runs).
+- Export speed (`export.js`: the log into VideoEncoder avc High; software only in the runner): ms/frame rain Standard 53, forest Standard 56, rain Detailed 76–91, forest Detailed 163–187; size hardly matters. Chrome supports H.264 and AAC / Opus encoding.
+
 # SPEED-1 step 15 (NIGHT track, 2026-11-26): the rain's per-frame garbage, the same output byte for byte
 Tree hashes before: core 17a6ce078eefa5f4 · apps/full 0148bb454440c3e3 · apps/night 17c7fb7bcbe9f0fb. After: core and apps/full unchanged · apps/night a3091307a74bf245.
 - Measured first (`node tools/speed.mjs --why --only rain`): allocated Light 6.42, Standard 5.52, Detailed 4.85 MB/s; sites lifeUpload 20 %, projectXYZ 19 %, lifeAt 7–10 %, the vehicles' put 5 %, drops, sceneAt, lightAt.

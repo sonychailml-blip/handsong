@@ -5,6 +5,8 @@ ROADMAP «After release» item 2 / Stage 2 item 1: the main growth lever.
 ## The founder's decisions (2026-11-26)
 - ⛳ **The person starts and stops the recording** (not «the last 15 s»).
 - ⛳ **The mark is on the whole clip**: a small quiet «Handsong Night · handsong.app» in a corner.
+- ⛳ **Way B (re-draw after stop)** — if the clip looks and sounds EXACTLY as played (stage 0 below: it can).
+- ⛳ **The clip has the screen's shape; 60 s at most.**
 
 ## What it gives
 - **Growth.** Every shared clip is a small advert with the address on it. A room played with the hands is unusual enough to be watched.
@@ -39,6 +41,24 @@ ROADMAP «After release» item 2 / Stage 2 item 1: the main growth lever.
 - In both: the sound from the live output tap (`core/audio.js createRecordingTap`; encoded by `AudioEncoder` AAC, or kept as PCM up to the
   cap — 60 s stereo ≈ 11 MB), the mark drawn over each frame, our own MP4 writer (ISO base media format from the standard — our code, rule
   #32; the codec is the browser's).
+
+## Stage 0 results (2026-11-26, the laptop through the runner; `tools/.out/share0/`)
+- **Exact re-draw: yes.** Each room opened through the host with its build wrapped; every call the host makes on the room from its birth logged
+  (update, held, heard, bed, glint, rest, resize, light, texBytes, render; arguments cloned, the clock's value at the call); a second instance
+  built with the same options and renderer settings and fed the log. Frames compared (hashes of every frame + every byte at 4 frames):
+  forest Standard 120/120 and 123/123, forest Detailed 60/60, rain Standard 124/124, rain Detailed 98/98 — equal byte for byte. Two replays
+  always equal each other (the rooms are deterministic).
+- **One fix needed: the rain reads the clock inside its frame** (`rain.js` traffic's `tAudio` and the drip events: `performance.now()` mid-call).
+  With the clock read mid-call the replay differed by 160–3700 px a frame (the cars a fraction of a pixel off); with the clock held at the
+  frame's moment — exact. The fix: the room takes that moment from the host (ROOM-RULES §2 already says time comes in as an argument). The
+  forest's mirror also reads the clock (`forest-mirror.js render(now=performance.now())`); exact in the runs, to be passed in too.
+- **Export speed (the runner's Chrome: software H.264 only, no hardware encoder offered there):** the log replayed into `VideoEncoder`
+  (avc High), ms per frame — rain Standard 53, forest Standard 56, rain Detailed 76–91, forest Detailed 163–187; the size matters little
+  (768×480 vs 1152×648 the same: the update, the render and the encoder's queue dominate). A 60-s clip at the live frame rate ≈ 1.5–3× its
+  length to wait on this laptop with software encoding; the founder's real Chrome may offer the hardware encoder (to measure there).
+- **Support in Chrome:** VideoEncoder H.264 (Baseline, Main, High — software in the runner), AudioEncoder AAC and Opus — MP4 with AAC works.
+- Still to measure: the founder's real Chrome (hardware encoder?), the Poco, an iPhone; a real MP4 in WhatsApp / Telegram / Instagram / TikTok
+  (needs the MP4 writer — first piece of stage 1).
 
 ## Stage 0 — measurements only (no player-visible change, ~1 slice)
 - A: the frame rate and the hand → sound while recording, against not recording (laptop: forest and rain, each quality; the Poco through «Measure
