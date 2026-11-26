@@ -24,12 +24,7 @@ import { sceneInfo, sceneRoom } from './scene/host.js';
 const $=id=>document.getElementById(id), KEY={ lat:nsKey('handsong.labLatency'), idle:nsKey('handsong.labIdleSearch') };
 const load=k=>{ try{ return localStorage.getItem(k); }catch(e){ return null; } }, save=(k, v)=>{ try{ if(v==null) localStorage.removeItem(k); else localStorage.setItem(k, v); }catch(e){} };
 export const LAB_LATENCY=['interactive', 'balanced', 'playback'], LAB_IDLE=[3, 6, 10];
-/* AUDIO-5 (the founder, 2026-11-26: the rain crackled — the output underran while the hands' detection took the processor): Night's own output buffer,
-   larger than the browser's default. Read once, when the start click makes the audio context (core CORE-27 setLatencyHint), so both rooms share it.
-   Measured in Chrome on the founder's laptop model: interactive 10 ms, playback 20 ms of base latency. The lab may still try another in development. */
-export const NIGHT_LATENCY='playback';
 /* the stored choices, before the start click (main.js imports this module early): the development edition only */
-setLatencyHint(NIGHT_LATENCY);
 if(devItems()){ const l=load(KEY.lat); if(LAB_LATENCY.includes(l)) setLatencyHint(l); const n=+load(KEY.idle); if(LAB_IDLE.includes(n)) setIdleSearchEvery(n); }
 const BED_PARTS=[['bed', 'the whole music bed'], ['piano', 'piano'], ['bass', 'bass'], ['drums', 'drums'], ['vib', 'vibraphone'], ['guitar', 'guitar'], ['busker', 'street musician'],
   ['reverb', 'reverb (convolver)'], ['chorus', 'chorus'], ['tremolo', 'tremolo + auto-pan'], ['delay', 'tape delay'], ['compressor', 'compressor'],
@@ -70,7 +65,7 @@ function render(){ if(!open) return; const S=stats(), u=S ? (S.underrunEvents!=n
   const E=bed2LofiEngine(), B=E && E.bypassed ? E.bypassed() : {}; for(const [k] of BED_PARTS){ const c=$('nightLab-'+k); if(c) c.checked=!B[k]; } }
 function build(){ if(built) return; built=true;
   const opts=(id, list, cur)=>{ const e=$(id); e.innerHTML=''; for(const [v, t] of list){ const o=document.createElement('option'); o.value=v; o.textContent=t; if(String(v)===String(cur)) o.selected=true; e.appendChild(o); } };
-  opts('nightLabLat', LAB_LATENCY.map(v=>[v, v+(v===NIGHT_LATENCY ? ' (Night default)' : '')]), load(KEY.lat)||NIGHT_LATENCY);
+  opts('nightLabLat', LAB_LATENCY.map(v=>[v, v+(v==='interactive' ? ' (today)' : '')]), load(KEY.lat)||'interactive');
   opts('nightLabIdle', LAB_IDLE.map(v=>[v, v+(v===3 ? ' frames (today)' : ' frames')]), load(KEY.idle)||3);
   const grid=$('nightLabGrid'), box=(id, label)=>{ const l=document.createElement('label'), c=document.createElement('input'); l.className='night-lab-box'; c.type='checkbox'; c.id='nightLab-'+id; c.checked=true; l.append(c, ' '+label); grid.appendChild(l); return c; };
   grid.innerHTML='';
@@ -80,7 +75,7 @@ function build(){ if(built) return; built=true;
   $('nightLabClose').onclick=()=>labOpen(false); $('nightLabRec').onclick=recToggle;
   $('nightLabCopy').onclick=async()=>{ const t=['Handsong Night — audio lab log', navigator.userAgent, `latency ${latMs()} ms, rate ${AC ? AC.sampleRate : '-'}`, ...log].join(String.fromCharCode(10)); try{ await navigator.clipboard.writeText(t); say('log copied ('+log.length+' lines)'); }catch(e){ say('copy failed'); } };
   $('nightLabReset').onclick=()=>{ late=0; longN=0; longMax=0; log.length=0; say('counters reset'); };
-  $('nightLabLat').onchange=e=>{ save(KEY.lat, e.target.value===NIGHT_LATENCY ? null : e.target.value); say('reload the page to apply the new buffer'); };
+  $('nightLabLat').onchange=e=>{ save(KEY.lat, e.target.value==='interactive' ? null : e.target.value); say('reload the page to apply the new buffer'); };
   $('nightLabIdle').onchange=e=>{ const n=+e.target.value; save(KEY.idle, n===3 ? null : String(n)); setIdleSearchEvery(n); say('palm search: every '+n+' frames with no hand'); }; }
 export function labOpen(v=!open){ if(!devItems()) return; build(); open=!!v; $('nightLab').hidden=!open; if(open) probes(); render(); }
 /* the settings' development item, and the panel's half-second clock */

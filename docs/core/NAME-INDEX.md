@@ -23,7 +23,7 @@ SPLIT-2: the Full app's entry.
 
 ## apps/night/audiolab.js
 AUDIO-3 — THE AUDIO LAB (development edition only; the founder hunts the rain's dropouts).
-- const (5): `LAB_LATENCY`, `NIGHT_LATENCY`, `labDbg`, `labWavDbg`, `labRecNodeDbg`
+- const (4): `LAB_LATENCY`, `labDbg`, `labWavDbg`, `labRecNodeDbg`
 - fn (2): `labOpen`, `labWire`
 
 ## apps/night/bed.js
@@ -1753,7 +1753,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 UI-1 — «NIGHT labels follow the room»: the founder entered the rain and the Sound button still read «Firefly» while another timbre played.
 - fn (1): `checkNightLabels`
 
-_349 modules, 3323 exported names._
+_349 modules, 3322 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 
@@ -1764,7 +1764,7 @@ _349 modules, 3323 exported names._
   `jamStep`/`applyJam`/`jamTo`, `jam.*` keys, `loop.first`, `setRegion`, `takeEv`, `revDisp`, `chBrightDisp`, `drawChordBright`,
   `verb`/`verbOut`/`revLead`/`revCh`, `leadOwner`, `fxAttach`/`fxRoleBus`/`fxRoleOut`, `roleXDriven`, `bassOwner`, `soloNoteHand`,
   per-voice `dlySend`/`revSend`, `RELEASE_TAILS` as a rule, `vision.setPicture`, `VISION_DEF.picture`, `swPicMatched`/`swPicLive`,
-  `diag.sw.pic*` keys, latmeter report `detection.picture` (LAT3: the live-camera picture switch removed), `scaledata.js`, `R.liveReverb`, `DBG.fdnLive`, `R.powerOld`, `RECT_OCT`, `ROLL_CH_EXTRA_REG`, `SWARA_OF`/`SHRUTI_OF`, `swaraLbl`/`swaraOfCents`, `gridNoteLbl`/`rectNoteLbl` pair as two functions, `rollGroups`, `#rollScale`, `rollSnapRow`, `soloEditBlock`, `tiAudit`/`tiRestamp`, `fxVolFix`/`setFxVolFix`, `chainXDriven`, `frzArmAll`, `setChBrightDisp`, `setRevDisp`, `setLiveRevWiring`, `modeDerive`/`TBL`/`RATIOS`/`CM`, `scaleIdx`, `sameDegrees`, `compat.tag`, `R.liveReverb`, the ScriptProcessor capture.
+  `diag.sw.pic*` keys, latmeter report `detection.picture` (LAT3: the live-camera picture switch removed), `scaledata.js`, `R.liveReverb`, `DBG.fdnLive`, `R.powerOld`, `RECT_OCT`, `ROLL_CH_EXTRA_REG`, `NIGHT_LATENCY` (apps/night/audiolab.js, AUDIO-5: added and taken back the same day — the larger buffer did not help), `SWARA_OF`/`SHRUTI_OF`, `swaraLbl`/`swaraOfCents`, `gridNoteLbl`/`rectNoteLbl` pair as two functions, `rollGroups`, `#rollScale`, `rollSnapRow`, `soloEditBlock`, `tiAudit`/`tiRestamp`, `fxVolFix`/`setFxVolFix`, `chainXDriven`, `frzArmAll`, `setChBrightDisp`, `setRevDisp`, `setLiveRevWiring`, `modeDerive`/`TBL`/`RATIOS`/`CM`, `scaleIdx`, `sameDegrees`, `compat.tag`, `R.liveReverb`, the ScriptProcessor capture.
 
 SPLIT-2 (2026-11; table: `tools/split-names.mjs`). The product's old name: `CALM_*`, `calm*`, `.calm-*`, `--calm-*`, `calm.*` keys, `calm-*` screens, rows `CALM x`, `P.calm`, runner `--calm` → the same with night; `calmNight` → `nightSky`; `--cv-calm-*` → `--cv-hn-*`; `calmshell.js` → `apps/night/shell.js`; `modules/effects/calm.js` → `night-fx.js`; `core/calmui.js` → `core/pure/nightui.js`; `profile.calm` → `profile.night` (the one exception of rule #37); `?calm` → the page `apps/night/`; EDITION value `calm` → `release`. The Full ↔ Night switch: `#profRow`, `#calmToFull`, `profFull`, `profCalm`, `profSep`, `profHint`, `profileBoot`. Folders: `src/` → `core/`, `src/core/` → `core/pure/`, `src/views/` → `core/legacy-ui/views/`, `data/` → `core/data/`, `src/probes/` → `tools/probes/`, `src/scaleprobe.js` → `tools/probes/full.js`, `src/main.js` → `core/legacy-ui/boot.js` + `apps/*/main.js`. Files: root `BACKLOG.md`, `WORK-LOG.md`, `NIGHT-LOG.md`, `UI-MAP.md` → `docs/<track>/` and `archive/`.
 

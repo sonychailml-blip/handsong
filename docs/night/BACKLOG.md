@@ -41,6 +41,7 @@ _Every item was checked against today's code. Closed and outdated items, word fo
 
 ## Deferred ideas (the founder parks them; not dropped)
 - ⏸ **A steady 30 fps picture to free the hands** (SPEED-1 step 15 proposal; the founder, 2026-11-26: deferred — «не будем терять плавность»). Why it came up: in a room the hand detection takes 340–490 ms/s of long frames on the laptop and shares the main thread and GPU with a picture drawn at ~43 fps. To try later behind a measuring switch first (detection ms, hand → sound, long frames, forest and rain); the person would choose it, never automatic.
+- ⏸ **The rain’s sound lighter for weak devices** (AUDIO-5; the founder, 2026-11-26: «оставим как есть — слабые устройства просто не тянут»). The rain crackles on the founder’s laptop: output underruns (the master WAV is clean), the audio thread short of processor while the hands are detected. Measured: the bed 27–36 % of a core offline; the weight is the piano’s effect chain (chorus with two moving delays, tremolo, auto-pan, high cut, 2× oversampled saturation) and the bed’s convolution reverb; the notes themselves are cheap; no lossless saving found. If taken up: the lab switches on the weak device first, then a lighter variant of that part with A/B listening files (shaper without oversampling, one chorus delay, the delay-network reverb of Light).
 
 ## 7. Product direction (the parts that belong to Night)
 _The heading and intro of §7 are in `docs/core/BACKLOG.md`._
