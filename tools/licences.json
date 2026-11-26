@@ -267,7 +267,7 @@
       "name": "The rain room's baked city (RAIN-1, development room): the whole boulevard built by our own code and rendered once offline — each mood's colour, the lit windows' colour, the depth map",
       "class": "image",
       "use": "shipped",
-      "version": "RAIN-1, 2026-11-15; RAIN-2, 2026-11-15 (each house its own, the plane trees, the sky-occlusion light, the filmic curve; tools/rain-bake.mjs --city)",
+      "version": "RAIN-1, 2026-11-15; RAIN-2, 2026-11-15 (each house its own, the plane trees, the sky-occlusion light, the filmic curve; tools/rain-bake.mjs --city; RAIN-12, 2026-11-26: chimneys, antennas and tanks on their roofs)",
       "licence": "own-work",
       "source": "Our own renders (tools/design/rain/bake/city.js, citybake.js; three.js r128, MIT, the vendored copy) of our own procedural model; its materials are CC0 Poly Haven textures (register entry rain-bake-textures, never shipped) and canvases drawn by our code (plaster weathering, abstract graffiti shapes without letters, the rooms' lives). No AI-generated image, no photograph, no real building copied, no text, no brand. RAIN-2: the materials add the CC0 textures of register entry rain-bake-textures (RAIN-2 additions); the plane trees' leaf clusters are our composition of CC0 leaves; the carved lattice and fringe are drawn by our code.",
       "files": [

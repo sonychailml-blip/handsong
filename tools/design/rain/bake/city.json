@@ -1,6 +1,6 @@
 {
  "renderer": "three.js r128 (MIT), vendored at apps/night/vendor/three-r128/",
- "ms": 93409,
+ "ms": 98916,
  "size": [
   2050,
   1106
@@ -22,32 +22,32 @@
  "windows": 187,
  "sizes": {
   "full": {
-   "late.webp": 330924,
-   "evening.webp": 344216,
-   "lit.webp": 352012,
-   "depth.png": 421507,
-   "after.webp": 334890
+   "late.webp": 330722,
+   "evening.webp": 343850,
+   "lit.webp": 351642,
+   "depth.png": 411967,
+   "after.webp": 334378
   },
   "reduced": {
-   "late.webp": 122564,
-   "evening.webp": 133420,
-   "lit.webp": 135098,
-   "depth.png": 227825,
-   "after.webp": 123718
+   "late.webp": 122432,
+   "evening.webp": 133302,
+   "lit.webp": 135362,
+   "depth.png": 221344,
+   "after.webp": 123698
   }
  },
  "light": {
   "late": {
    "skyN": 16,
-   "skyMs": 12645
+   "skyMs": 12733
   },
   "evening": {
    "skyN": 16,
-   "skyMs": 10632
+   "skyMs": 10819
   },
   "after": {
    "skyN": 16,
-   "skyMs": 10942
+   "skyMs": 12835
   }
  },
  "crowns": {

@@ -108,6 +108,15 @@ function hipRoof(W, D, top, H, o){ const A=[-o, top, o], B=[W+o, top, o], C=[W+o
   const r0=[W/2, top+H, -W/2], r1=[W/2, top+H, -D+W/2]; return [...quad(B, C, r1, r0), ...quad(Dd, A, r0, r1), [A, B, r0], [C, Dd, r1]]; }
 function gableRoof(W, D, top, H, o){ const A=[-o, top, o], B=[W+o, top, o], C=[W+o, top, -D-o], Dd=[-o, top, -D-o], r0=[-o, top+H, -D/2], r1=[W+o, top+H, -D/2];
   return { slopes:[...quad(A, B, r1, r0), ...quad(C, Dd, r0, r1)], ends:[[[0, top, 0], [0, top+H*(D/2)/(D/2+o), -D/2], [0, top, -D]], [[W, top, -D], [W, top+H*(D/2)/(D/2+o), -D/2], [W, top, 0]]] }; }
+/* the roof's height above its eave level at (u, w) — the same planes as hipRoof / gableRoof / mansardRoof, so what stands on a roof starts IN it */
+function hipY(u, w, W, D, H, o){ if(W>=D){ const dx=Math.max(0, D/2-u, u-(W-D/2)); return H*Math.max(0, 1-Math.max(Math.abs(w+D/2), dx)/(D/2+o)); }
+  const dw=Math.max(0, w+W/2, -D+W/2-w); return H*Math.max(0, 1-Math.max(Math.abs(u-W/2), dw)/(W/2+o)); }
+function roofY(kind, u, w, W, D){ const o=0.35;
+  if(kind==='hip') return hipY(u, w, W, D, Math.min(W, D)*0.32, o);
+  if(kind==='gable') return D*0.3*Math.max(0, 1-Math.abs(w+D/2)/(D/2+o));
+  const e=Math.min(u+o, W+o-u, o-w, w+D+o), i1=0.95; return e<i1+o ? 2.6*Math.max(0, e)/(i1+o) : 2.6+hipY(u-i1, w+i1, W-2*i1, D-2*i1, 1.1, 0); }
+/* the lowest roof point under a square footprint of half-size s round (u, w) */
+const roofMin=(kind, u, w, W, D, s)=>Math.min(roofY(kind, u-s, w-s, W, D), roofY(kind, u+s, w-s, W, D), roofY(kind, u-s, w+s, W, D), roofY(kind, u+s, w+s, W, D), roofY(kind, u, w, W, D));
 function mansardRoof(W, D, top, h1, i1, H2, o){ const A=[-o, top, o], B=[W+o, top, o], C=[W+o, top, -D-o], Dd=[-o, top, -D-o], t=top+h1;
   const a=[i1, t, -i1], b=[W-i1, t, -i1], c=[W-i1, t, -D+i1], d=[i1, t, -D+i1];
   return [...quad(A, B, b, a), ...quad(B, C, c, b), ...quad(C, Dd, d, c), ...quad(Dd, A, a, d), ...hipRoof(W-2*i1, D-2*i1, t, H2, 0).map(tr=>tr.map(p=>[p[0]+i1, p[1], p[2]-i1]))]; }
@@ -189,13 +198,14 @@ function house(T, m, mats, img, side, h, o, out){
       for(let k=0;k<n;k+=1+(R()<0.5 ? 1 : 0)){ const xc=(k+0.5)*bw; m.put(new T.BoxGeometry(1.1, 1.4, 1.1), mats.zinc, P, xc, top+1.6, -0.55); m.put(triGeo(T, [[[xc-0.6, top+2.3, 0.05], [xc+0.6, top+2.3, 0.05], [xc, top+2.75, 0.05]]], p=>[p[0], p[1]]), mats.zinc, P);
         m.put(new T.PlaneGeometry(0.62, 0.8), R()<0.3*o.litShare ? mats.dormerLit : mats.shopDark, P, xc, top+1.55, 0.02); } }
     m.put(new T.BoxGeometry(W+2*o2, 0.18, 0.12), mats.zinc, P, W/2, top+0.5, o2);   // the eaves' gutter
-    for(let k=0;k<Math.max(1, Math.round(W/8));k++){ const u=1+R()*(W-2), d=-2-R()*(D-4); m.put(new T.BoxGeometry(0.6, 1.6, 0.6), brick ? mats.brickBand : mats.chimney, P, u, top+0.5+Math.min(W, D)*0.25+0.4, d);
-      if(R()<0.35) m.put(new T.CylinderGeometry(0.012, 0.012, 2.2, 4), mats.dark, P, u+0.5, top+2.4, d); } }
+    for(let k=0;k<Math.max(1, Math.round(W/8));k++){ const u=1+R()*(W-2), d=-2-R()*(D-4); const b0=top+0.5+roofMin(h.roof, u, d, W, D, 0.3)-0.25, b1=top+0.5+roofY(h.roof, u, d, W, D)+1.2;   /* NIGHT: a chimney rises 1.2 m from the roof under it (it stood at one height over the eave: floating near the eaves) */
+      m.put(new T.BoxGeometry(0.6, b1-b0, 0.6), brick ? mats.brickBand : mats.chimney, P, u, (b0+b1)/2, d);
+      if(R()<0.35){ const a0=top+0.5+roofY(h.roof, u+0.5, d, W, D)-0.1; m.put(new T.CylinderGeometry(0.012, 0.012, 2.2, 4), mats.dark, P, u+0.5, a0+1.1, d); } } }
   /* RAIN-5b: each house its own character, on its own draws (nothing placed above moves): rooftop clutter — antennas (a mast, cross-bars), a water
      tank, a dish; a stairwell — a column of small windows on the half-landings between two bays, most of them dimly lit */
-  { const Rh=rngOf((KIT.seed^0x434841)+h.id*101), rt=top+0.5+Math.min(W, D)*0.2;
-    for(let k=0, na=Math.floor(Rh()*3);k<na;k++){ const u=1+Rh()*(W-2), d=-1.5-Rh()*(D-3); m.put(new T.CylinderGeometry(0.02, 0.025, 2.4, 4), mats.dark, P, u, rt+1.2, d); for(let j=0;j<3;j++) m.put(new T.BoxGeometry(0.9-j*0.2, 0.02, 0.02), mats.dark, P, u, rt+1.6+j*0.35, d); }
-    if(Rh()<0.4){ const u=1.5+Rh()*(W-3), d=-2-Rh()*(D-5); m.put(new T.CylinderGeometry(0.6, 0.6, 1.1, 10), mats.tank, P, u, rt+0.55, d); }
+  { const Rh=rngOf((KIT.seed^0x434841)+h.id*101), rt=(u, d, s)=>top+0.5+(s ? roofMin(h.roof, u, d, W, D, s) : roofY(h.roof, u, d, W, D))-0.08;   // NIGHT: on the roof under each thing (was one height over the eave)
+    for(let k=0, na=Math.floor(Rh()*3);k<na;k++){ const u=1+Rh()*(W-2), d=-1.5-Rh()*(D-3); const r0=rt(u, d); m.put(new T.CylinderGeometry(0.02, 0.025, 2.4, 4), mats.dark, P, u, r0+1.2, d); for(let j=0;j<3;j++) m.put(new T.BoxGeometry(0.9-j*0.2, 0.02, 0.02), mats.dark, P, u, r0+1.6+j*0.35, d); }
+    if(Rh()<0.4){ const u=1.5+Rh()*(W-3), d=-2-Rh()*(D-5); m.put(new T.CylinderGeometry(0.6, 0.6, 1.1, 10), mats.tank, P, u, rt(u, d, 0.6)+0.55, d); }
     if(Rh()<0.3){ const u=1+Rh()*(W-2); m.put(new T.SphereGeometry(0.35, 10, 6, 0, Math.PI*2, 0, Math.PI/2), mats.tank, P, u, top+0.3, -0.4, 0, -1.2, 0); }
     if(n>=2 && Rh()<0.75){ const sx=bw*(1+Math.floor(Rh()*(n-1))), lit=Rh()<0.8; for(let f=0;f<floors-1;f++) m.put(new T.PlaneGeometry(0.42, 0.8), lit ? mats.stairLit : mats.shopDark, P, sx, ground+f*floorH+floorH*0.78, 0.02); } }
   /* drainpipes down the facade's edges, a funnel under the gutter; rust where their brackets hold */

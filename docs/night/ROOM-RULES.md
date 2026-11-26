@@ -18,6 +18,7 @@ also apply to new work in the two existing rooms. A rule learned in a later fix 
   (rule #37). A room in development is added with `roomAdd` and is not pinned.
 - The scene object answers the host's doors: `id`, `scene`, `camera`, `update`, `render`, `resize`, `dispose`, `light(on)`, `rest`, `flyPick`,
   `flyAt` / `flyLand`, `heard`, `texBytes`, `glint`, `bed`. It also answers `parCompile`, but only when the room opts out (§3).
+- A modelled thing that stands on something (a chimney, an antenna, a tank, a lamp, a bench) starts INSIDE the surface under it, read from that surface's own law (RAIN-12: chimneys at one height over the eave floated over sloped roofs). A baked picture is re-baked with the model unchanged first: it must equal the shipped files byte for byte, so the change's difference is only the change.
 - Colours are `--cv-*` tokens in `night.css`. Words go in `texts.js`, in English and Russian. Drawings, shaders and icons are our own work
   (rule #32 for every file).
 
@@ -42,6 +43,7 @@ also apply to new work in the two existing rooms. A rule learned in a later fix 
   - The Light quality changes counts and uniforms in place, not programs (steps 5–6).
 - **Many medium programs compile in parallel** (the host's `parCompile`, step 12). This is on by default. A room opts out (`parCompile:false`) only
   when measured slower.
+- Anything that waits during an opening (a parallel compile, a load) holds the frames (`compiling`): two frames drawn end the opening and cut its work short (RAIN-12: step 12's compile, on a switch while playing). Check every opening path twice: the first visit and a switch while the room is drawn.
 - Point lights in three's lit materials are skipped per fragment when dark (`scene/lightskip.js`, automatic). Keep lights in the scene.
 
 ## 4. Transparent sprites — no square frames (RAIN-5b, RAIN-10, RAIN-11)

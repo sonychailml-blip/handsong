@@ -164,8 +164,8 @@ const openedP=id=> opening && opening.id===id ? new Promise(r=>opening.waits.pus
    come from a throwaway context where compile and link do nothing (three's own source, every define and binding); three's compile then finds each
    program in the browser's program cache. Nothing drawn changes (three still builds every program itself). No extension, ?speedoff or parOff:
    the old path alone; a room may say parCompile:false (the rain: one program dominates, and alone it compiles faster — measured). PAR_LOG: the last opening's numbers (probes) */
-let parOff=false, parMis=false; const PAR_LOG={};
-export const sceneParDbg=(v, mis)=>{ if(v!=null) parOff=!!v; if(mis!=null) parMis=!!mis; return { off:parOff, mis:parMis, ...PAR_LOG }; };   // probes: v true = the old one-by-one compile only; mis true = each program compiled ahead one line off (CONTROL: none matches three's)
+let parOff=false, parMis=false, parLoose=false; const PAR_LOG={};
+export const sceneParDbg=(v, mis, loose)=>{ if(v!=null) parOff=!!v; if(mis!=null) parMis=!!mis; if(loose!=null) parLoose=!!loose; return { off:parOff, mis:parMis, loose:parLoose, ...PAR_LOG }; };   // loose true = frames drawn during the compile (CONTROL: the step-12 defect)   // probes: v true = the old one-by-one compile only; mis true = each program compiled ahead one line off (CONTROL: none matches three's)
 function parSources(rr, scene, camera){
   const c=document.createElement('canvas'); c.width=c.height=1; let r2=null; const out=[];
   try{ r2=new THREE.WebGLRenderer({ canvas:c, antialias:false, powerPreference:'high-performance' });
@@ -184,6 +184,8 @@ function parSources(rr, scene, camera){
 async function parCompile(rr, scene, camera, alive, own=true){
   for(const k in PAR_LOG) delete PAR_LOG[k];
   PAR_LOG.room=own; if(parOff || speedOff() || !own) return []; const gl=rr.getContext(), ext=gl.getExtension('KHR_parallel_shader_compile'); PAR_LOG.ext=!!ext; if(!ext) return [];
+  const r0=info.total||0, hold=parLoose ? 0 : 1; compiling+=hold; try{ return await parIssue(rr, gl, ext, scene, camera, alive); } finally{ compiling-=hold; PAR_LOG.drawn=(info.total||0)-r0; } }   // no frame meanwhile (as compileSliced): two frames would end the opening and cut the compile short (a switch while playing)
+async function parIssue(rr, gl, ext, scene, camera, alive){
   const t0=performance.now(), S=parSources(rr, scene, camera); PAR_LOG.captureMs=Math.round(performance.now()-t0); PAR_LOG.programs=S.length;
   const P=S.map(q=>{ const pr=gl.createProgram(); for(const [t, x] of [[gl.VERTEX_SHADER, q.vs], [gl.FRAGMENT_SHADER, parMis ? q.fs+'\n// mis' : q.fs]]){ const sh=gl.createShader(t); gl.shaderSource(sh, x); gl.compileShader(sh); gl.attachShader(pr, sh); gl.deleteShader(sh); }
     for(const [i, n] of q.binds) gl.bindAttribLocation(pr, i, n); gl.linkProgram(pr); return pr; });
