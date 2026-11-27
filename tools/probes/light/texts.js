@@ -32,6 +32,7 @@ export async function checkLightTexts(){
       if(JSON.stringify(opts)!==JSON.stringify(LANGS)) miss('the language picker lists '+opts.join(', '));
       else { sel.value='ru'; sel.dispatchEvent(new Event('change')); const play=document.getElementById('startBtn').textContent, sc=document.getElementById('lightScaleName').textContent;
         if(lang!=='ru' || play!==DICTS.ru['light.play'] || sel.value!=='ru') miss(`the picker set ${lang}, Play reads «${play}»`);
+        { const n=document.getElementById('lightLangName').textContent; if(n!=='Русский') miss('the pill shows «'+n+'», not «Русский»'); }   // LIGHT-9b: the shown name follows the choice
         if(sc!==scaleName(scaleById(scaleId))) miss(`the controls did not redraw: «${sc}», not «${scaleName(scaleById(scaleId))}»`);
         sel.value='de'; sel.dispatchEvent(new Event('change')); if(document.getElementById('startBtn').textContent!==DICTS.de['light.play']) miss('German: Play reads «'+document.getElementById('startBtn').textContent+'»'); } }
   } finally { setLang(keep); }

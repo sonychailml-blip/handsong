@@ -107,9 +107,10 @@ button:focus-visible, a:focus-visible{ outline:2px solid var(--light-acc); outli
 
 /* LIGHT-9: the start card's quiet foot — the language (a native picker) and «Write to us» */
 .light-foot{ display:flex; align-items:center; justify-content:center; gap:var(--light-gap-lg); margin:var(--light-gap-lg) 0 0; font-size:var(--light-fs-small); color:var(--light-ink-faint); }
-.light-lang{ display:flex; align-items:center; gap:var(--light-gap-xs); cursor:pointer; }
+.light-lang{ position:relative; display:flex; align-items:center; gap:var(--light-gap-xs); padding:var(--light-gap-xs) var(--light-gap-sm); border:1px solid var(--light-hair); border-radius:var(--light-r-pill); color:var(--light-ink-dim); cursor:pointer; }   /* LIGHT-9b: the pill fits the shown name; the native picker lies invisible over it */
+.light-lang-name{ white-space:nowrap; }
 .light-lang-ico, .light-lang-ico svg{ display:block; width:var(--light-ico-sm); height:var(--light-ico-sm); }
-.light-lang select{ appearance:none; -webkit-appearance:none; border:none; background:none; color:var(--light-ink-dim); font:inherit; padding:var(--light-gap-xs) 0; cursor:pointer; color-scheme:dark; }
+.light-lang select{ position:absolute; inset:0; width:100%; height:100%; opacity:0; margin:0; border:none; font:inherit; cursor:pointer; color-scheme:dark; }
 .light-fb{ color:var(--light-ink-dim); text-decoration:none; border-bottom:1px solid var(--light-hair); }
 /* LIGHT-2b: «How to play» on the start card, and its card */
 .light-start .light-how-btn{ margin:var(--light-gap) 0 0; padding:var(--light-retry-pad); border-radius:var(--light-r-pill); border:1px solid var(--light-hair);

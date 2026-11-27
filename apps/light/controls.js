@@ -116,7 +116,7 @@ let tipT=0; function tip(s){ const p=$('lightCtlTip'); p.textContent=s; p.hidden
 function frame(now, hands){
   if(hands.length) seenHands=now;
   const show=lightStarted() && (!!sheet || now-seenHands>=CTL_IDLE_MS);
-  const C=$('lightCtl'); if(C.classList.contains('on')!==show){ C.classList.toggle('on', show); C.setAttribute('aria-hidden', show ? 'false' : 'true'); }
+  const C=$('lightCtl'); if(C.classList.contains('on')!==show){ C.classList.toggle('on', show); C.setAttribute('aria-hidden', show ? 'false' : 'true'); if(show) fsRender(); }   // LIGHT-9b: the toggle read afresh each time the controls show
 }
 /* the person's kept choices, after the profile is applied */
 function restore(){
@@ -132,7 +132,7 @@ export function lightControlsWire(fill){
   $('lightKeyBtn').onclick=()=>openSheet('key'); $('lightScaleBtn').onclick=()=>openSheet('scale');
   $('lightTimbreBtn').onclick=()=>openSheet('timbre'); $('lightHandsBtn').onclick=()=>openSheet('hands'); $('lightSensBtn').onclick=()=>openSheet('sens');
   $('lightCamBtn').onclick=()=>{ flipCamera(); };
-  $('lightFsBtn').onclick=()=>{ fsToggle().then(fsRender); }; fsOnChange(fsRender); fsRender();
+  $('lightFsBtn').onclick=()=>{ fsToggle().then(fsRender); }; fsOnChange(()=>{ fsRender(); setTimeout(fsRender, 300); }); fsRender();   // the browser settles its display mode a moment after the change
   $('lightSheetClose').onclick=closeSheet; $('lightSheetVeil').onclick=closeSheet;
   addEventListener('keydown', e=>{ if(e.key==='Escape' && sheet) closeSheet(); });
   onLightFrame(frame); onLightStart(restore); onLangChange(()=>{ render(); if(sheet) openSheet(sheet); });   // LIGHT-9: the language by hand

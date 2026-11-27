@@ -184,3 +184,13 @@ Tree hashes after: core 44ed0dd238a68bfb · apps/full 0148bb454440c3e3 · apps/n
   languages» + the picker (eight languages; choosing Russian, then German, switches Play's words and the controls).
 - Checks (iteration mode): static PASSED; probe-data PASS 109/0; `--app light` 10 rows PASS, CSP, network, storage PASS; smoke `--only` Light at
   `/` and `/apps/light/` ok; licences PASS; name index PASS.
+
+# LIGHT-9b (LIGHT track, 2026-11-27): full screen turns freely, the corner button stays, the language pill
+Tree hashes after: core 44ed0dd238a68bfb · apps/full 0148bb454440c3e3 · apps/night 30d8f7b3c797de9e (all unchanged) · apps/light 9a5883b463733a7c.
+- The founder's phone: full screen locked the phone to landscape — the lock is gone (both orientations).
+- The corner button vanished while full screen and for a moment after leaving: Chrome matches «display-mode: fullscreen» while the PAGE is full
+  screen through the API, and `fsStandalone` took that for a home-screen app. Now it counts only when not full through the API; the button is read
+  afresh each time the controls show and once more 300 ms after a change. ⚠ Night's `apps/night/fullscreen.js` has the same test (not fixed here:
+  outside the track).
+- The language pill: the shown name in its own span, the native picker invisible over it — the pill fits the name (it was as wide as the longest).
+- Row «LIGHT eight languages» + the pill shows the chosen name. Checks: static PASSED; probe-data PASS 109/0; `--app light` PASS; smoke Light ok.
