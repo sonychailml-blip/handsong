@@ -60,6 +60,7 @@ function target(p, from){
   if(p.timbres) s.lead=p.timbres[0];
   if(p.handFn && p.handFn.ld) s.hand={ ...p.handFn.ld };
   if(p.shell==='night'){ s.voice='poly'; s.chain=JSON.parse(JSON.stringify(NIGHT_CHAIN)); }
+  if(p.chain) s.chain=JSON.parse(JSON.stringify(p.chain));   // CORE-30 (opt-in): the profile's own solo chain, as data; absent → as before
   return s;
 }
 /* → null (done) or a refusal in words */

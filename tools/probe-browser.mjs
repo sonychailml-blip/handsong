@@ -68,9 +68,10 @@ if(!QUICK && !ALL && !REPEAT && !has('--night')) QUICK=true;   // RUN 7: --night
 /* SPLIT-2: --app full|night picks the page (night: no seed, no UI song checks, P.night by default); --json FILE writes the results for tools/split-compare.mjs;
    --dump NAME FILE writes the JSON of P[NAME]() (a baseline made on unchanged code). */
 const APP=val('--app','full'), JSON_OUT=val('--json',null), DUMP=(()=>{ const i=argv.indexOf('--dump'); return i>=0 ? [argv[i+1], argv[i+2]] : null; })();
-const NIGHT_PAGE=APP==='night';
+const NIGHT_PAGE=APP==='night', LIGHT_PAGE=APP==='light';   // LIGHT-2: --app light (no seed, no UI song checks; P.light = P.all = P.quick)
+if(!['full','night','light'].includes(APP)){ console.log('[probe-browser] --app must be full, night or light'); process.exit(2); }
 /* --root DIR: serve a built preview (tools/build.mjs --probes): the page is at its root */
-const SERVE_ROOT=val('--root',null) ? path.resolve(val('--root',null)) : ROOT, ENTRY=SERVE_ROOT!==ROOT ? '/index.html?probe' : NIGHT_PAGE ? '/apps/night/index.html?probe' : '/apps/full/index.html?probe';
+const SERVE_ROOT=val('--root',null) ? path.resolve(val('--root',null)) : ROOT, ENTRY=SERVE_ROOT!==ROOT ? '/index.html?probe' : `/apps/${APP}/index.html?probe`;
 if(NIGHT_PAGE && !has('--quick') && !has('--all')) QUICK=false;
 if(DUMP && !has('--quick') && !has('--all') && !has('--night')) QUICK=false;
 const EVAL=val('--eval',null);
@@ -1415,9 +1416,9 @@ async function session(port, plan, label){
     res.requests=[]; ctx.on('response', q=>{ const u=q.url(); if(/^(data|blob):/.test(u)) return; res.requests.push([u.replace(origin,'').split('?')[0], q.status()]); });
     await page.goto(origin+ENTRY);
     out(`[${label}] page open — waiting for the app and the probe module`);
-    await within(page.waitForFunction(()=>window.P && window.R, null, { timeout:0 }), 60e3, 'loading the app');
+    await within(page.waitForFunction(light=>window.P && (light || window.R), LIGHT_PAGE, { timeout:0 }), 60e3, 'loading the app');   // LIGHT-3: Light's page loads no renderer (it has no tracks)
     /* its own start card hides #startBtn; the same handler by script, so a first-run ghost does not play through the rows */
-    if(NIGHT_PAGE) await page.evaluate(()=>document.getElementById('startBtn').click()); else await page.click('#startBtn');
+    if(NIGHT_PAGE || LIGHT_PAGE) await page.evaluate(()=>document.getElementById('startBtn').click()); else await page.click('#startBtn');
     /* --selftest-exit sigint|error: fire that exit path once the app is starting (tests the cleanup; the run fails by design) */
     const ST=val('--selftest-exit',null);
     if(ST) setTimeout(()=>{ if(ST==='sigint') process.emit('SIGINT'); else Promise.reject(new Error('selftest')); }, 3000);
@@ -1427,12 +1428,12 @@ async function session(port, plan, label){
     res.env=env;
     out(`[${label}] started — audio ${env.ac} at ${env.rate} Hz, tab ${env.visibility}${env.hidden?' (HIDDEN — drawn-window rows will not run)':''}`);
     /* AF3: the auto-freeze watcher is paused for the whole runner session (probes drive it with their own clock); resumed before closing */
-    await page.evaluate(async ()=>{ const Q=await import('/core/frzqueue.js'); Q.afPause('runner', true); });
+    if(!LIGHT_PAGE) await page.evaluate(async ()=>{ const Q=await import('/core/frzqueue.js'); Q.afPause('runner', true); });   // LIGHT-3: Light has no auto-freeze (and must load none of its code)
     /* NIGHT-3: the ENG2 benchmark starts by itself 20 s after render.js loads on a device with none stored — every runner profile is fresh — and
        the pause above can come too late for it: it was still rendering on the engine copy when Night's first row (GOLD) took its state-guard
        snapshot. The runner runs it ONCE here and waits: one already in flight finishes first (the render queue is serial), and the stored result
        stops the timer's later one. settled() is checked, and its CONTROL (nothing stored) must read unsettled. */
-    if(!UI_ONLY){ const b=await page.evaluate(async ()=>{ const R=await import('/core/render.js'), E=await import('/core/pure/engclass.js'), t0=performance.now();
+    if(!UI_ONLY && !LIGHT_PAGE){ const b=await page.evaluate(async ()=>{ const R=await import('/core/render.js'), E=await import('/core/pure/engclass.js'), t0=performance.now();
         const r=await R.engBench();
         /* NIGHT-15: a proper settle, not a fixed 50 ms — the page's own 20-s benchmark may have queued its render behind ours (it found nothing
            stored when it looked); that render still has to run before the rows. Wait for the queue to drain, at most 30 s, then judge as before. */
@@ -1442,7 +1443,7 @@ async function session(port, plan, label){
         return { ms:Math.round(performance.now()-t0), cached:!!r.cached, drain:Math.round(performance.now()-q0), waited, ok:settled(stored, R.renderQueue()), control:settled(null, 0) }; });
       out(`[${label}] engine benchmark settled before the rows: ${b.cached ? 'already stored' : 'measured'} in ${b.ms} ms (the queue drained ${b.waited ? 'after '+b.drain+' ms' : 'at once'}) · control (nothing stored) ${b.control ? 'NOT caught' : 'caught'}`);
       if(!b.ok || b.control) throw new Error(`the engine benchmark did not settle (ok ${b.ok}, control ${b.control}) — a render could run by itself during the rows`); }
-    if(!NIGHT_PAGE && !DUMP){
+    if(!NIGHT_PAGE && !LIGHT_PAGE && !DUMP){
     /* посев: ждём ОКОНЧАНИЯ (его итог — строка «Now run P.all()») */
     const t0=Date.now();
     /* страж консоли: P.seed пускаем, НЕ дожидаясь, и тут же «набираем» P.quick() — обязан отказать словами (как у человека, набравшего его рано) */
@@ -1529,8 +1530,11 @@ async function session(port, plan, label){
        «handsong-songs» (its names as before; the songs = the offer at ▶ that Night skips) and nothing of the namespace. */
     { const L=await within(page.evaluate(()=>[...(window.__store||[])].sort()), 15e3, 'the storage census');
       const OK=[/^ls:handsong\.night/, new RegExp('^ls:handsong[.]ca'+'lm'), /^ls:handsong\.sceneLevel$/, /^ls:handsong\.handCal\.((dev-)?night|probe)$/, /^ls:handsong\.(camTest|engBench)$/, /^idb:handsong-user\.night$/];
-      const bad= NIGHT_PAGE ? L.filter(x=>!OK.some(r=>r.test(x))) : L.filter(x=>/^ls:handsong\.night\.|\.night$/.test(x));
-      const need= NIGHT_PAGE ? ['ls:handsong.night.lang','idb:handsong-user.night'] : ['ls:handsong.lang','idb:handsong-user','idb:handsong-songs'], miss=need.filter(x=>!L.includes(x));
+      /* LIGHT-2: Light touches only its namespace («handsong.light.…», «….light») and the shared device facts; never a songs database */
+      /* «handsong.nightBg»: the shared UI READS the background choice at every face (core/legacy-ui/ui.js bgStored, a core debt name); Light never writes it */
+      const OKL=[/^ls:handsong\.light\./, /^ls:handsong\.handCal\.(light|probe)$/, /^ls:handsong\.(camTest|engBench)$/, /^idb:handsong-user\.light$/, /^ls:handsong\.nightBg$/];
+      const bad= NIGHT_PAGE ? L.filter(x=>!OK.some(r=>r.test(x))) : LIGHT_PAGE ? L.filter(x=>!OKL.some(r=>r.test(x))) : L.filter(x=>/^ls:handsong\.night\.|\.night$/.test(x));
+      const need= NIGHT_PAGE ? ['ls:handsong.night.lang','idb:handsong-user.night'] : LIGHT_PAGE ? ['ls:handsong.light.lang','idb:handsong-user.light'] : ['ls:handsong.lang','idb:handsong-user','idb:handsong-songs'], miss=need.filter(x=>!L.includes(x));
       res.store={ list:L, bad, miss, pass:!bad.length && !miss.length };
       out(`[${label}] storage (CORE-11): ${L.length} name(s) touched — ${bad.length?bad.length+(NIGHT_PAGE?' NOT OF THIS APP: ':' IN THE NIGHT NAMESPACE: ')+bad.join(', '):(NIGHT_PAGE?'all its own or device facts':'none in the Night namespace')} · control (${need.join(', ')}) ${miss.length?'MISSING: '+miss.join(', '):'seen'} → ${res.store.pass?'PASS':'NOT A PASS'}`);
       await log('[storage census] '+L.join(' | ')); }
@@ -1574,7 +1578,7 @@ async function session(port, plan, label){
   }catch(e){ res.error=String(e&&e.message||e); out(`[${label}] ERROR — ${res.error}`); }
   finally{
     // resume the watcher (bounded: a page stuck past a time limit must not keep the browser alive), then close
-    if(page) await Promise.race([ page.evaluate(async ()=>{ const Q=await import('/core/frzqueue.js'); Q.afPause('runner', false); }).catch(()=>{}), timeout(5e3) ]);
+    if(page && !LIGHT_PAGE) await Promise.race([ page.evaluate(async ()=>{ const Q=await import('/core/frzqueue.js'); Q.afPause('runner', false); }).catch(()=>{}), timeout(5e3) ]);
     await closeBrowser(browser);
   }
   return res;
@@ -1720,7 +1724,7 @@ for(const s of sessions){
   if(s.stale){ out(`[${s.label}] NIGHT stale saved values, music from Begin, full screen, first frames, camera choice, honest start, how to play, settings tabs, reveal, start timeline, first contact order (NIGHT-7b, 7c, 8b, 10, 11, 12, DESIGN-1): ${s.stale.pass?'PASS':'NOT A PASS'}`); if(!s.stale.pass) pass=false; }
   if(!s.error){ out(`[${s.label}] CSP (PRIV1): ${s.csp&&s.csp.pass?'PASS — no violation, the control fetch and the old MediaPipe hosts refused':'NOT A PASS'}`); if(!(s.csp&&s.csp.pass)) pass=false;
     out(`[${s.label}] network (PRIV1, LAT2): ${s.net&&s.net.pass?`PASS — ${s.net.n} requests, all to the own origin (MediaPipe's files included)`:'NOT A PASS'}`); if(!(s.net&&s.net.pass)) pass=false;
-    out(`[${s.label}] storage (CORE-11): ${s.store&&s.store.pass?`PASS — ${s.store.list.length} names, ${NIGHT_PAGE?'all of this app or device facts':'the Full names as before'}, the control seen`:'NOT A PASS'}`); if(!(s.store&&s.store.pass)) pass=false; }
+    out(`[${s.label}] storage (CORE-11): ${s.store&&s.store.pass?`PASS — ${s.store.list.length} names, ${NIGHT_PAGE||LIGHT_PAGE?'all of this app or device facts':'the Full names as before'}, the control seen`:'NOT A PASS'}`); if(!(s.store&&s.store.pass)) pass=false; }
   if(EVAL && !(s.evalResult&&s.evalResult.ok)) pass=false;
   if(LEAK){ if(!s.leakPass) pass=false; const L=s.leak; out(`[${s.label}] --leak: ${L&&L.ok?`${L.pass?'PASS':'NOT A PASS'} — ${L.n} renders: +${L.fixMB} MB with the fix (margin ${LEAK_MARGIN_MB} MB), control +${L.ctrlMB} MB`:'ERROR '+(L&&L.why)}`); }
 }

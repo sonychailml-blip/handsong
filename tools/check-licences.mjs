@@ -39,7 +39,7 @@ function walk(dir, out=[]){
 }
 const PAGE=/(^|\/)index\.html$|^apps\/night\/licences\.html$|^apps\/site\/.+\.html$/, MANIFEST=/(^|\/)manifest\.json$/;   // SITE-1: every page of the brand site (its 404 too)
 const SITE_DIR='apps/site/';   // SITE-1: served at the root of its own domain — a root-absolute address there means a file of apps/site/
-const isShippedText=f=>/^apps\/site\/.+\.(html|css|js)$/.test(f)||/^(index\.html|apps\/(full|night)\/(index\.html|sw\.js|manifest\.json|night\.css)|apps\/night\/licences\.html|core\/legacy-ui\/style\.css|core\/tokens\.css)$/.test(f)||/^(core|apps\/(full|night))\/.+\.js$/.test(f)&&!/\/vendor\//.test(f)||/^(core|apps\/(full|night))\/data\/.+\.json$/.test(f);
+const isShippedText=f=>/^apps\/site\/.+\.(html|css|js)$/.test(f)||/^(index\.html|apps\/(full|night|light)\/(index\.html|sw\.js|manifest\.json|night\.css|light\.css)|apps\/night\/licences\.html|core\/legacy-ui\/style\.css|core\/tokens\.css)$/.test(f)||/^(core|apps\/(full|night|light))\/.+\.js$/.test(f)&&!/\/vendor\//.test(f)||/^(core|apps\/(full|night|light))\/data\/.+\.json$/.test(f);   // LIGHT-2: + the third app
 const isRefText=f=>/^docs\/night\/prototypes\/.+\.html$/.test(f);   // RUN 5: reference prototypes — their addresses must be «reference» entries
 export function gather(){
   const files=walk('').sort(), texts={};

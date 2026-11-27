@@ -1,0 +1,30 @@
+{
+  "format": "handsong/profile",
+  "version": 1,
+  "id": "profile.light",
+  "name": {"en":"Handsong","ru":"Handsong"},
+  "roles": ["ld"],
+  "handFn": {"ld":{"L":"fx","R":"note"}},
+  "noteModes": null,
+  "key": {"tonic":9,"cents":0},
+  "moods": [
+    "minor-penta", "major", "natural-minor", "harmonic-minor", "melodic-minor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "hungarian-minor", "major-penta", "blues", "chromatic", "harmonic-major", "melodic-major", "whole-tone", "octatonic-wh", "octatonic-hw", "messiaen-3", "phrygian-dominant", "double-harmonic", "enigmatic", "prometheus", "egyptian", "hungarian-penta", "scriabin-penta", "major-blues", "lydian-penta", "dorian-hexa", "mixolydian-hexa"
+  ],
+  "timbres": ["solo.supersaw"],
+  "effects": ["reverb","dly","vib","trm","bright"],
+  "scene": null,
+  "backgrounds": ["camera"],
+  "shell": "full",
+  "noteField": "full",
+  "labels": "full",
+  "recording": false,
+  "ambience": null,
+  "chain": [
+    {"fxId":"vol","params":[{"mode":"drive","hand":"play","axis":"x","inv":false}]},
+    {"fxId":"reverb","params":[{"mode":"drive","hand":"play","axis":"z","inv":false},{"mode":"fixed"},{"mode":"fixed"}]},
+    {"fxId":"dly","params":[{"mode":"drive","hand":"fx","finger":0,"axis":"y","inv":false},{"mode":"fixed"},{"mode":"fixed"}]},
+    {"fxId":"vib","params":[{"mode":"drive","hand":"fx","finger":1,"axis":"y","inv":false}]},
+    {"fxId":"trm","params":[{"mode":"drive","hand":"fx","finger":2,"axis":"y","inv":false}]},
+    {"fxId":"bright","params":[{"mode":"drive","hand":"fx","finger":3,"axis":"y","inv":false}]}
+  ]
+}

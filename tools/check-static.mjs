@@ -280,6 +280,7 @@ const NET_LISTED={
   'apps/night/roomswitch.js': { fetch:[1,'reads the forest stream recording (apps/night/rooms/forest/sound/stream.mp3, own origin; register entry stream-recording) once per session, when the nature sound is first built (NIGHT-8b)'], addModule:[1,'loads our own apps/night/worklets/nature-worklet.js (own origin; it imports apps/night/pure/brook.js) into the live audio context once, when the nature sound is first built (NIGHT-8, the stream)'] },
   'apps/night/bed2.js': { addModule:[1,'loads our own apps/night/worklets/bed-worklet.js (own origin) into an audio context once: the live one when the music bed v2 first plays, an offline one for the probes (NIGHT-4)'] },
   'core/render.js':     { addModule:[1,'track renders: lets the engine copy load only the worklets the track needs (own origin) into its offline context'], importVar:[1,'the engine copy core/audio.js?render (ENG_SPEC: own origin, a module of ours)'] },
+  'apps/light/boot.js': { importVar:[1,'?probe only: the probe facade the page itself names in <link rel="handsong-probes"> (own origin; production pages carry no such tag) — LIGHT-3'] },
   'core/legacy-ui/boot.js': { importVar:[1,'?probe only: the probe facade the page itself names in <link rel="handsong-probes"> (own origin; production pages carry no such tag)'] },
   'apps/night/sw.js':   { fetch:[3,'NIGHT-14 precache: the listed files of this build from the own origin (install, each checked against its hash), a listed file the cache lost (the same request, passed on), and RAIN-R1 an on-demand file at its first request (the same request, kept once its hash matches)'] },
   'core/clip.js':       { share:[1,'hands the person\'s own clip to the system share sheet — only on their tap (explicit action)'] },
@@ -423,6 +424,8 @@ function tokenCheck(css, tok, others){
   fails.push(...tokenCheck(css, tok, { 'apps/full/index.html':readFileSync(join(ROOT,'apps/full/index.html'),'utf8'), ...codeIn(/^apps\/full\//) }));
   /* font faces carry their own weights: they name a file, they are not interface styling */
   fails.push(...tokenCheck(ncss.replace(/@font-face\{[^}]*\}/g,''), tok+'\n'+ncss, { 'apps/night/index.html':readFileSync(join(ROOT,'apps/night/index.html'),'utf8'), ...codeIn(/^(core|apps\/night)\//) }));
+  { const lcss=readFileSync(join(ROOT,'apps/light/light.css'),'utf8');   // LIGHT-2: Light's page has its own tokens too (light.css)
+    fails.push(...tokenCheck(lcss.replace(/@font-face\{[^}]*\}/g,''), tok+'\n'+lcss, { 'apps/light/index.html':readFileSync(join(ROOT,'apps/light/index.html'),'utf8'), ...codeIn(/^(core|apps\/light)\//) })); }
   for(const f of files){ const b=mods[f].code;   // JS inline styles: no colour / px spacing literal
     for(const m of b.matchAll(/\.style\.(color|background\w*|borderColor|padding\w*|margin\w*|gap|fontSize|borderRadius|boxShadow|zIndex)\s*=\s*(['"`])([^'"`]*)\2/g))
       if(/#[0-9a-fA-F]{3,8}\b|rgba?\(|\d+px/.test(m[3])) fails.push(`${f}:${lineAt(b,m.index)}: .style.${m[1]} = '${m[3]}' — a design literal in JS; use var(--token)`); }
@@ -516,7 +519,7 @@ for(const f of files) if(SL_SCOPE(f)) fails.push(...statelessCheck(f, mods[f].ba
    imports only pure code. Static and literal dynamic imports. CONTROLS: a core → app, a cross-app and a suite → other app's import must each be caught. */
 const allowedFrom=(f,t)=>{ if(/^(core\/|apps\/[\w-]+\/(?:[\w-]+\/)*)pure\//.test(f) && !/\/pure\//.test(t)) return false;   // NIGHT-3: a room folder's pure/ is pure too
   if(f.startsWith('core/')) return t.startsWith('core/');
-  for(const a of ['full','night']){ if(f.startsWith(`apps/${a}/`)) return t.startsWith('core/')||t.startsWith(`apps/${a}/`);
+  for(const a of ['full','night','light']){ if(f.startsWith(`apps/${a}/`)) return t.startsWith('core/')||t.startsWith(`apps/${a}/`);
     if(f.startsWith(`tools/probes/${a}`)) return t.startsWith('core/')||t.startsWith(`apps/${a}/`)||t.startsWith('tools/probes/core/')||t.startsWith(`tools/probes/${a}`); }
   if(f.startsWith('tools/probes/core/')) return t.startsWith('core/')||t.startsWith('tools/probes/core/');
   return false; };
@@ -543,14 +546,30 @@ const cspOf=h=>(h.match(/<meta http-equiv="Content-Security-Policy"[^>]*>/)||[''
 function pagesCheck(pages){ const bad=[]; const idsOf={}; for(const [a,h] of Object.entries(pages)) idsOf[a]=new Set([...h.replace(/<!--[\s\S]*?-->/g,' ').matchAll(/\bid="([\w-]+)"/g)].map(x=>x[1]));
   const made=f=>new Set([...mods[f].code.matchAll(/\.id\s*=\s*'([\w-]+)'/g)].map(x=>x[1]));
   const dynamic=new Set(files.flatMap(f=>[...made(f)]));
-  for(const f of files){ const apps= f.startsWith('core/') ? ['full','night'] : f.startsWith('apps/full/') ? ['full'] : f.startsWith('apps/night/') ? ['night'] : [];
+  /* LIGHT-3: Light loads only what its entry reaches (option B: no shared legacy UI) — a core module's ids are required on the Light page only when
+     apps/light/main.js reaches it by a static or literal dynamic import; Full and Night keep every core module, as before */
+  const reachOf=entry=>{ const seen=new Set(), st=[entry]; while(st.length){ const f=st.pop(); if(seen.has(f) || !mods[f]) continue; seen.add(f);
+      for(const s of [...mods[f].imports.map(i=>i.spec), ...(mods[f].dyn||[])]){ const t=target(f,s); if(t!=null) st.push(t); } } return seen; };
+  const lightReach=reachOf('apps/light/main.js');
+  for(const f of files){ const apps= f.startsWith('core/') ? ['full','night', ...(lightReach.has(f) ? ['light'] : [])] : f.startsWith('apps/full/') ? ['full'] : f.startsWith('apps/night/') ? ['night'] : f.startsWith('apps/light/') ? ['light'] : [];   // LIGHT-2: the third page
     for(const a of apps) for(const id of new Set(idsRead(mods[f]))) if(!idsOf[a].has(id) && !dynamic.has(id) && !IDS_OPTIONAL.has(id)) bad.push(`${f}: reads #${id}, which the ${a} page does not have`); }
-  if(cspOf(pages.full)!==cspOf(pages.night) || !cspOf(pages.full)) bad.push('the Content-Security-Policy line differs between the two pages (rule #33)');
+  if(cspOf(pages.full)!==cspOf(pages.night) || cspOf(pages.full)!==cspOf(pages.light) || !cspOf(pages.full)) bad.push('the Content-Security-Policy line differs between the pages (rule #33)');   // LIGHT-2: three pages
   return bad; }
-{ const pages={ full:readFileSync(join(ROOT,'apps/full/index.html'),'utf8'), night:readFileSync(join(ROOT,'apps/night/index.html'),'utf8') };
+{ const pages={ full:readFileSync(join(ROOT,'apps/full/index.html'),'utf8'), night:readFileSync(join(ROOT,'apps/night/index.html'),'utf8'), light:readFileSync(join(ROOT,'apps/light/index.html'),'utf8') };
   fails.push(...pagesCheck(pages));
+  if(!pagesCheck({ ...pages, light:pages.light.replace("default-src 'self'","default-src 'self' https://x.example") }).some(x=>/Content-Security-Policy/.test(x))) fails.push('pages CONTROL: an altered CSP on the Light page was not caught');   // LIGHT-2
   if(!pagesCheck({ ...pages, full:pages.full.replace(/\bid="startBtn"/,'id="startBtnGone"') }).some(x=>/#startBtn\b/.test(x)) || !pagesCheck({ ...pages, night:pages.night.replace("default-src 'self'","default-src 'self' https://x.example") }).some(x=>/Content-Security-Policy/.test(x)))
     fails.push('pages CONTROL: a removed id or an altered CSP was not caught — the check cannot fail'); }
+/* 17) LIGHT-3 — LIGHT ON ITS OWN (the founder: «only what it really has; nothing hidden, nothing unused loaded»): no module reached from
+   apps/light/main.js is Full's or Night's code — the shared legacy UI, the recorder, songs, the backing, track freezing, the renderer, autosave,
+   core's own gesture state machine (Light has its copy) or another app. CONTROL: a reach set holding the recorder must fail. */
+{ const reach=(entry)=>{ const seen=new Set(), st=[entry]; while(st.length){ const f=st.pop(); if(seen.has(f) || !mods[f]) continue; seen.add(f);
+      for(const s of [...mods[f].imports.map(i=>i.spec), ...(mods[f].dyn||[])]){ const t=target(f,s); if(t!=null) st.push(t); } } return seen; };
+  const NOT_LIGHT=/^core\/(legacy-ui|song|live|freeze)\/|^core\/(recorder|arrange|autosave|clip|frzqueue|render|handcal)\.js$|^core\/gestures\/(hands|roles|looper|expr)\.js$|^core\/gestures\.js$|^apps\/(full|night)\//;
+  const own=set=>[...set].filter(f=>NOT_LIGHT.test(f)), R=reach('apps/light/main.js');
+  if(!R.size) fails.push('Light on its own: apps/light/main.js was not found');
+  for(const f of own(R)) fails.push(`Light on its own: apps/light/main.js reaches ${f} — Full's or Night's code`);
+  if(!own(new Set([...R, 'core/recorder.js'])).length) fails.push('Light-on-its-own CONTROL: a reach holding the recorder was not caught'); }
 // сведения: неиспользуемые экспорты и импорты. «...x» (spread / rest) counts as a use of x (DAY run, item 0).
 const usesName=(t,l)=>new RegExp('(?<![\\w$])(?<!(?<!\\.\\.)\\.)'+l.replace(/\$/g,'\\$')+'(?![\\w$])').test(t);
 { /* CONTROL: a name used only after a spread is used; a name used only as a property is not */

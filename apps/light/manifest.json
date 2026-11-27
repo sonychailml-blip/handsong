@@ -1,0 +1,15 @@
+{
+  "name": "Handsong",
+  "short_name": "Handsong",
+  "description": "Play music with your hands in front of the camera.",
+  "display": "standalone",
+  "background_color": "#120f0c",
+  "theme_color": "#120f0c",
+  "start_url": ".",
+  "scope": ".",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

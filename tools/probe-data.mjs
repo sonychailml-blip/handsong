@@ -657,13 +657,25 @@ async function profileCore(){
   { const RV=await import(new URL('../apps/night/pure/room.js', import.meta.url).href), F=(await import(new URL('../apps/night/rooms/forest/pure/room.js', import.meta.url).href)).FOREST_ROOM;
     known.rooms=[...RV.ROOM_IDS]; known.ambiences=[F.nature.id]; }   // CORE-8: the app's rooms and ambiences (Night's catalogue)
   const recs=[];
-  for(const name of ['apps/full/data/full.json','apps/night/data/night.json']){ n++; let r; try{ r=JSON.parse(await readFile(new URL('../'+name, import.meta.url),'utf8')); }catch(e){ miss(name+': '+e.message); continue; }
+  for(const name of ['apps/full/data/full.json','apps/night/data/night.json','apps/light/data/light.json']){ n++; let r; try{ r=JSON.parse(await readFile(new URL('../'+name, import.meta.url),'utf8')); }catch(e){ miss(name+': '+e.message); continue; }
     recs.push(r); const why=P.checkProfile(r, known); if(why) miss(`${r.id||name}: ${why}`); }
   n++; if(JSON.stringify(recs.map(r=>r.id))!==JSON.stringify([...P.PROFILE_IDS])) miss('profile ids '+JSON.stringify(recs.map(r=>r.id))+' ≠ the pinned '+JSON.stringify(P.PROFILE_IDS));
   const full=recs.find(r=>r.id==='profile.full'), night=recs.find(r=>r.id==='profile.night');
   n++; if(!full || ['handFn','noteModes','key','moods','timbres','effects','scene','ambience'].some(k=>full[k]!==null) || full.roles.length!==4 || full.shell!=='full' || full.labels!=='full' || !full.recording)
     miss('profile.full must offer everything and narrow nothing');
   n++; if(!night || night.roles.join()!=='ld' || night.recording || night.labels!=='plain' || night.key.tonic!==9 || night.noteModes.join()!=='note,hold') miss('profile.night: solo only, nothing recorded, plain labels, key A, modes note / hold');
+  /* CORE-30 / LIGHT-2: Light — solo only, nothing recorded, the camera only, Full's «Familiar» section exactly (every 12-note equal mode of
+     tradition «common», nothing else), one timbre (Full's default solo, the first solo record), its chain: Volume on the playing hand's
+     horizontal, reverb on its depth, delay / vibrato / tremolo / brightness on the effects hand's four fingers (y) */
+  const light=recs.find(r=>r.id==='profile.light');
+  { const modeOf=async id=>JSON.parse(await readFile(new URL('../core/data/modes/'+id+'.json', import.meta.url),'utf8')), common=[];
+    for(const id of ix.modes){ const m=await modeOf(id); if(m.menu && m.menu.tradition==='common') common.push({ id, edo12:m.tuning==='edo12' }); }
+    const firstSolo=tix.order.find(id=>id.startsWith('solo.')), fing=light && light.chain ? light.chain.slice(2).map(e=>e.fxId+':'+e.params[0].finger+e.params[0].axis).join() : '';
+    n++; if(!light || light.roles.join()!=='ld' || light.recording || light.backgrounds.join()!=='camera' || light.scene!==null) miss('profile.light: solo only, nothing recorded, the camera only');
+    n++; if(!light || common.some(c=>!c.edo12) || JSON.stringify([...light.moods].sort())!==JSON.stringify(common.map(c=>c.id).sort())) miss('profile.light: the moods must be exactly Full\'s «Familiar» section, all 12-note equal');
+    n++; if(!light || JSON.stringify(light.timbres)!==JSON.stringify([firstSolo])) miss(`profile.light: one timbre, Full's default solo «${firstSolo}»`);
+    n++; if(!light || !light.chain || light.chain[1].fxId!=='reverb' || light.chain[1].params[0].hand!=='play' || light.chain[1].params[0].axis!=='z' || fing!=='dly:0y,vib:1y,trm:2y,bright:3y')
+      miss('profile.light: reverb on the playing hand\'s depth; delay, vibrato, tremolo, brightness on fingers 0…3 (y): '+fing); }
   const copy=o=>JSON.parse(JSON.stringify(o));
   if(night) for(const [field, dmg] of P.PROFILE_DAMAGES){ const r=copy(night); dmg(r); n++; const why=P.checkProfile(r, known);
     if(!why) miss(`CONTROL «${field}»: a damaged profile was accepted`);

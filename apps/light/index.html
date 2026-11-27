@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<!-- PRIV1 (hard rule #33): the browser itself refuses any address not listed here. connect-src/script-src name only our own origin (CORE-22:
+     MediaPipe's pinned files are served from it too, core/vendor/mediapipe/; register tools/licences.json); the Vercel counter is same-origin. No inline script (the counter's stub is
+     core/va-stub.js); 'wasm-unsafe-eval' lets the hand model's WebAssembly compile; inline style attributes stay allowed. A new host needs
+     the user's decision, a register entry and a line here. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/>
+<!-- CORE-11: this app's own names in the shared stores (core/storens.js): on one origin with Full or Night it never reads their settings -->
+<meta name="handsong-store" content="light">
+<title data-i18n="light.title">Handsong</title>
+<!-- PWA: start_url/scope relative in the manifest; iOS reads the apple-* tags for «Add to Home Screen» -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#120f0c">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Handsong">
+<meta name="application-name" content="Handsong">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="handsong-profile" href="data/light.json">
+<!-- read only under ?probe; the shipped build removes this tag and the tools it names -->
+<link rel="handsong-probes" href="../../tools/probes/light.js">
+<link rel="stylesheet" href="../../core/tokens.css">
+<link rel="stylesheet" href="light.css">
+<!-- Vercel Web Analytics, the static form (same origin; counts only on the Vercel deployment) -->
+<script src="../../core/va-stub.js"></script>
+<script defer src="/_vercel/insights/script.js"></script>
+</head>
+<body class="light">
+<!-- LIGHT-3 (option B): only Light's own elements — the start, the bars, «How to play», the camera's video and the canvas. No markup of Full. -->
+<div id="start" class="on">
+  <div class="light-start">
+    <span class="light-emblem" data-svg="emblem" aria-hidden="true"></span>
+    <h1 class="light-word">hand<span>·</span>song</h1>
+    <p class="light-tag" data-i18n="light.tag">Play music with your hands, in front of the camera.</p>
+    <button id="startBtn" class="light-go" data-i18n="light.play">Play</button>
+    <p id="loadmsg" class="light-msg"></p>
+    <button id="camRetry" class="light-retry" data-i18n="start.retry" hidden>Try again</button>
+    <button id="lightHowBtn" class="light-how-btn" data-i18n="light.how">How to play</button>
+  </div>
+</div>
+<div id="lightFxBars" class="light-bars" aria-hidden="true">
+  <div class="light-bar" data-bar="dly"><span class="light-bar-track"><span class="light-bar-fill"></span></span><span class="light-bar-lab">DLY</span></div>
+  <div class="light-bar" data-bar="vib"><span class="light-bar-track"><span class="light-bar-fill"></span></span><span class="light-bar-lab">VIB</span></div>
+  <div class="light-bar" data-bar="trm"><span class="light-bar-track"><span class="light-bar-fill"></span></span><span class="light-bar-lab">TRM</span></div>
+  <div class="light-bar" data-bar="bright"><span class="light-bar-track"><span class="light-bar-fill"></span></span><span class="light-bar-lab">BRT</span></div>
+</div>
+<div id="lightRevBar" class="light-bars light-bars-rev" aria-hidden="true">
+  <div class="light-bar"><span class="light-bar-track"><span class="light-bar-fill"></span></span><span class="light-bar-lab">REV</span></div>
+</div>
+<div id="lightHow" class="light-how" role="dialog" aria-modal="true" aria-labelledby="lightHowTitle" hidden>
+  <div class="light-how-card">
+    <h2 id="lightHowTitle" data-i18n="light.how">How to play</h2>
+    <p data-i18n="light.how.play">Right hand: raise or lower it to pick a row of notes, pinch a finger to the thumb to play a note.</p>
+    <p data-i18n="light.how.vol">Move it left or right for volume, nearer or farther for reverb.</p>
+    <p data-i18n="light.how.fx">Left hand: each finger is an effect — pinch it and move up or down.</p>
+    <p data-i18n="light.how.menu">Take your hands out of view to see the buttons.</p>
+    <p class="light-priv" data-i18n="light.privacy">Your camera picture never leaves this device. Nothing is sent anywhere.</p>
+    <button id="lightHowClose" class="light-go" data-i18n="light.ok">Got it</button>
+  </div>
+</div>
+<video id="video" playsinline muted autoplay></video>
+<canvas id="canvas"></canvas>
+<script type="module" src="main.js"></script>
+</body>
+</html>

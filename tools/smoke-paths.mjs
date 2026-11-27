@@ -19,8 +19,8 @@ import { readPrecache, rehashPrecache } from './precache.mjs';   // NIGHT-14
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), CDN_DIR=path.join(ROOT,'tools','.cdn-cache');
 const argv=process.argv.slice(2), out=s=>console.log(s), NO_CONTROL=argv.includes('--no-control');
 /* the tree's entry pages: moved with the layout */
-const PAGES={ full:'apps/full/', night:'apps/night/' };
-const BEGIN={ full:'#startBtn', night:'#nightBegin' };
+const PAGES={ full:'apps/full/', night:'apps/night/', light:'apps/light/' };   // LIGHT-2: + the third app
+const BEGIN={ full:'#startBtn', night:'#nightBegin', light:'#startBtn' };
 const BUILD=argv.includes('--build'), BUILD_DIR=path.join(ROOT,'tools','.build');
 /* NIGHT-7: kind 'deploy' = built exactly as Vercel's production build (VERCEL_ENV=production) */
 function build(app, kind){ const dir=path.join(BUILD_DIR,`${app}-${kind}`), a=['tools/build.mjs','--out',dir]; if(kind==='preview') a.push('--probes');
@@ -73,8 +73,21 @@ async function run(app, dir, prefix, breakWorklet=false, measureOn=true, query='
     for(const w of ['ks-worklet.js','frz-worklet.js','dyn-worklet.js']){ const r=served.find(([u])=>u.endsWith('/'+w)); if(!r||r[1]!==200) miss(`worklet ${w}: ${r?'HTTP '+r[1]:'never requested'}`); }
     if(!seen.some(([u,st])=>/hand_landmarker\.task/.test(u)&&st===200)) miss('the hand model was not loaded');
     if(!seen.some(([u,st])=>/vision_wasm.*\.wasm/.test(u)&&st===200)) miss('the hand model WASM was not loaded');
-    const busUrl=urlOf('bus.js'), audioUrl=urlOf('audio.js');
-    if(!busUrl||!audioUrl) miss('bus.js or audio.js not seen');
+    const busUrl=urlOf('bus.js'), audioUrl=urlOf('audio.js'), lightBoot=urlOf('light/boot.js');
+    if(app==='light'){   // LIGHT-3: Light's own loop (no shared bus): a detected frame shown as the picture, the canvas drawn, the audio running
+      if(!lightBoot||!audioUrl) miss('light/boot.js or audio.js not seen');
+      else{ const fr=await page.evaluate(async ([b,a])=>{ const B=await import(b), A=await import(a), t0=performance.now();
+          while(performance.now()-t0<60e3){ const d=B.lightBootDbg(); if(d.frames>0 && d.picture) break; await new Promise(r=>setTimeout(r,100)); }
+          await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+          const c=document.getElementById('canvas'), g=c.getContext('2d'), d=g.getImageData(0,0,c.width,c.height).data; let lit=0; for(let i=0;i<d.length;i+=4000) if(d[i]||d[i+1]||d[i+2]||d[i+3]) lit++;
+          const D=B.lightBootDbg(); return { detected:D.frames>0 && D.picture, lit, ac:A.AC&&A.AC.state, csp:window.__csp.slice() }; }, [lightBoot,audioUrl]);
+        if(!fr.detected) miss('no camera frame was detected and shown in 60 s');
+        if(fr.ac!=='running') miss('audio is '+fr.ac);
+        if(fr.csp.length) miss('CSP violation: '+fr.csp.slice(0,3).join('; '));
+        if(!fr.lit) miss('the first frame drew nothing on the canvas'); }
+      if(seen.some(([u])=>/\/core\/legacy-ui\/|\/core\/recorder\.js|\/apps\/(full|night)\//.test(u))) miss('Light requested the shared legacy UI, the recorder or another app\'s file');
+    }
+    else if(!busUrl||!audioUrl) miss('bus.js or audio.js not seen');
     else{ const fr=await page.evaluate(async ([b,a])=>{ const B=(await import(b)).BUS, A=await import(a); const t0=performance.now();
         while(performance.now()-t0<60e3){ if(BUS_OK(B)) break; await new Promise(r=>setTimeout(r,100)); }
         function BUS_OK(x){ const p=x.get('picture'); return p && typeof ImageBitmap!=='undefined' && p instanceof ImageBitmap; }
@@ -510,7 +523,7 @@ async function precacheUrlRow(url, phone=false){
 { const i=argv.indexOf('--only'); if(i>=0){ const list=argv[i+1].split(',').map(x=>x.split('@')), j=argv.indexOf('--repeat'), N=j>=0 ? +argv[j+1] : 1; let f=0;
     for(let k=0;k<N;k++) for(const [app,prefix] of list){ const t0=Date.now(), b=await run(app,ROOT,prefix||'/'); out(`[smoke] --only ${app}@${prefix||'/'} ${k+1}/${N}: ${b.length?'stalled or failed':'ok'} in ${((Date.now()-t0)/1000).toFixed(0)} s`); if(b.length) f++; }
     out(`[smoke] --only ${argv[i+1]}: ${f} of ${N*list.length} failed (a diagnosis, not a verdict of the whole test)`); process.exit(f?1:0); } }
-for(const app of ['full','night']) for(const prefix of ['/','/some/sub/']) if((await run(app,ROOT,prefix)).length) fails++;
+for(const app of ['full','night','light']) for(const prefix of ['/','/some/sub/']) if((await run(app,ROOT,prefix)).length) fails++;   // LIGHT-2: + Light
 if((await run('night',ROOT,'/',false,false,'?release')).length) fails++;   // NIGHT-7b: ?release on Live Server = the players' settings
 if((await statsPage('repo tree',ROOT)).length) fails++;
 if((await roomPage('repo tree',ROOT,'/apps/night/')).length) fails++;

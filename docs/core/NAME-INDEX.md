@@ -21,6 +21,42 @@ SPLIT-2: the Full app's entry.
 ================= ОБУЧЕНИЕ (список уроков + интерактивные шаги) ================= «Обучение» открывает СПИСОК коротких уроков (меню возможностей инструмента).
 - fn (2): `wireStarter`, `openLessons`
 
+## apps/light/boot.js
+LIGHT-3 — LIGHT'S OWN START AND FRAME LOOP (option B: no shared legacy UI).
+- const (4): `PROFILE`, `onLightFrame`, `setLightFace`, `lightBootDbg`
+- fn (1): `lightBoot`
+
+## apps/light/draw.js
+LIGHT-3 — LIGHT'S CANVAS: the camera picture (the cover crop: the same rectangle remaps the hands — rule #12; the front camera mirrored — rule #13, through core mirrored()), the note field and the …
+- fn (2): `lightSyncViewRect`, `lightDrawFrame`
+
+## apps/light/engine.js
+LIGHT-3 — Light's LIVE NOTE ADAPTER: the hands' solo notes straight into the engine contract (core/audio.js noteOn / noteOff), priced as the shared live path prices them (core/live/eng.js ENG.leadO…
+- const (1): `lightNoteTapSet`
+- fn (3): `lightNoteOn`, `lightNoteOff`, `lightAllOff`
+
+## apps/light/gestures.js
+LIGHT-3 — LIGHT'S HANDS: core/gestures/hands.js and roles.js COPIED and cut to what Light offers (option B, the founder 2026-11-27): one role, the solo; each hand's function note / hold / theremin …
+- const (1): `setLightFxSens`
+- fn (6): `lightVoiceModeReset`, `lightHandsReset`, `lightHandsProbe`, `lightProcessHandsProbe`, `lightProcessHands`, `lightHandsView`
+
+## apps/light/main.js
+LIGHT-3 — Handsong's entry (code id light).
+- exports: none
+
+## apps/light/scalepick.js
+LIGHT-3 — only the modes Light plays: the page profile's moods (Full's «Familiar» section) and what they name.
+- exports: none
+
+## apps/light/shell.js
+LIGHT-3 — LIGHT'S BARS, as in Night but by the founder's rule (LIGHT-1/2): one bar per effect finger — DLY VIB TRM BRT on the effects hand's side, shown from the moment an effects pinch starts unti…
+- const (4): `BAR_FX_MS`, `FX_BARS`, `shownAt`, `lightShellDbg`
+- fn (2): `sideOf`, `lightShellWire`
+
+## apps/light/texts.js
+LIGHT-2 — LIGHT'S OWN TEXTS.
+- const (1): `LIGHT_TEXTS`
+
 ## apps/night/audiolab.js
 AUDIO-3 — THE AUDIO LAB (development edition only; the founder hunts the rain's dropouts).
 - const (4): `LAB_LATENCY`, `labDbg`, `labWavDbg`, `labRecNodeDbg`
@@ -1504,6 +1540,31 @@ PROBE1: Tuning and editor-row probes: pitch from the tuning index, editor rows, 
 PROBE1: Arrangement-window and mixer probes: every track reachable, AR1, MX1, MX2, AR2.
 - fn (5): `checkMixer`, `checkPan`, `checkArrange`, `checkTrackLook`, `checkTracks`
 
+## tools/probes/light.js
+LIGHT-2/3: the probe entry of the Light page (?probe): its own rows behind its own small lock (core's console guard imports the auto-freeze and autosave, Full's code — Light's page must load none, …
+- const (2): `all`, `api`
+- fn (2): `light`, `install`
+- → ./light/alone.js (1): `checkLightAlone`
+- → ./light/bars.js (1): `checkLightBars`
+- → ./light/hands.js (1): `checkLightHands`
+- → ./light/start.js (1): `checkLightStart`
+
+## tools/probes/light/alone.js
+LIGHT-3 row «LIGHT on its own» (the founder: «only what it really has; nothing hidden, nothing unused loaded»), measured in the running page — runs FIRST, before any row that imports core's gesture…
+- fn (1): `checkLightAlone`
+
+## tools/probes/light/bars.js
+LIGHT-3 row «LIGHT bars and one axis»: the four effect bars (DLY VIB TRM BRT, one per finger, in the chain's order) and REV exist and rest hidden with no hand in view; ONE axis per effect in the li…
+- fn (1): `checkLightBars`
+
+## tools/probes/light/hands.js
+LIGHT-3 row «LIGHT hands = core hands»: Light's hands (apps/light/gestures.js, a cut copy of core's) must make EXACTLY the note calls core's gesture machine makes on the same synthetic hands — the …
+- fn (1): `checkLightHands`
+
+## tools/probes/light/start.js
+LIGHT-2/3 row «LIGHT start and profile»: after ▶ the page runs in Light's profile through Light's own doors — its first mood (minor pentatonic), its one timbre (SuperSaw), key A, the playing hand r…
+- fn (1): `checkLightStart`
+
 ## tools/probes/night.js
 SPLIT-2: the probe entry of the Night page: its own rows and the core rows flagged for both pages.
 - const (2): `night`, `api`
@@ -1753,7 +1814,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 UI-1 — «NIGHT labels follow the room»: the founder entered the rain and the Sound button still read «Firefly» while another timbre played.
 - fn (1): `checkNightLabels`
 
-_349 modules, 3322 exported names._
+_362 modules, 3359 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

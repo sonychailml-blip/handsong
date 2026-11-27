@@ -1,7 +1,7 @@
-# Handsong Light — the plan (LIGHT-0, 2026-11-27)
+# Handsong (code id `light`) — the plan (LIGHT-0, 2026-11-27)
 
 The founder's idea (2026-11-27): the simplest possible Handsong, released soon, while Full and Night keep growing. Code id `light`, folder
-`apps/light/`, track `LIGHT-n`, address later https://light.handsong.app plus a card on handsong.app.
+`apps/light/`, track `LIGHT-n`, address later https://play.handsong.app plus a card on handsong.app. Shown name: **Handsong** (see «Decided after LIGHT-0»).
 
 ## What Light is (the founder's decisions)
 - **Camera picture + the note field, solo only.** No bass, chords, drums, recorder, editor, lessons or split.
@@ -72,11 +72,67 @@ third-party item expected), the site generator for the card (SITE track).
 - **LIGHT-4** — depth → reverb, the four effect fingers, sensitivity.
 - **LIGHT-5** — the clip: Full's recording with MP4 (CORE run 2), Night's interface.
 - **LIGHT-6** — texts in 8 languages; checks on the Poco and an iPhone; the full check.
-- **LIGHT-7** — publish: a Vercel project (the founder creates it), light.handsong.app, the card on handsong.app (SITE run).
+- **LIGHT-7** — publish: a Vercel project (the founder creates it), play.handsong.app, the card on handsong.app (SITE run).
 - Then: more timbres (10–15), one at a time by ear.
 
+## Decided after LIGHT-0 (the founder, 2026-11-27)
+- **Scales:** every mode of Full's «Familiar» section (`menu.tradition: "common"`) — 31, all `edo12`: diatonic (6), modes (7), ethnic (1),
+  pentatonic / blues (5), chromatic (1), symmetric (4), exotic (4), world pentatonics (3). Not the Far East 12-note sets (another
+  section), nothing from «Experiments»; some may be removed later.
+- **Timbre:** only Full's default solo timbre — `solo.supersaw` («SuperSaw», `state.leadIdx` 0, the first solo record). No others yet.
+
+- **Name:** plain **Handsong** — the simplest app carries the brand; address **play.handsong.app**; Full becomes **Handsong Studio** later, at
+  its own release (nothing renamed now). The code id stays `light` (folder, track, `profile.light`) and is never shown.
+
+## Decided at LIGHT-1 (the founder, 2026-11-27; drawings `tools/.out/light-ui/index.html`)
+- **Look:** Light's own — warm amber accent, dark glass, Inter; the start page as drawn.
+- **Controls when the hands leave: variant B** — key and A4 large on top, the scale under it (both open their menus); four round buttons
+  below: timbre, hands, camera (one tap flips front / back), sensitivity; the clip button top right.
+- **Sensitivity = two sliders, as in Night:** hand travel (depth → reverb, needs the hand setup) and effects (how sharply they follow the
+  hand's height); the hand-setup line in the same sheet.
+- **Hand setup as in Night:** the nearest point of the playing hand is measured and depth counts from it (`core/handcal.js`, the shared
+  service; Light writes its own screens with Night's flow: offer after the first start, the measure, done).
+- **Bars vertical over the note field, as in Night:** the effects hand's four (DLY, VIB, TRM, BRT) on its side, REV on the playing hand's
+  side; each set follows its hand (40 % / 60 % of the width); the bar of the finger in use glows. **Labels: three English letters in every
+  language.** Note names sit mid-band so the bars never cover them.
+- **The brand mark:** the same emblem as Night and the site (five dots), wordmark «hand·song» in Literata; Light's centre dot amber (Night's
+  lime); the app icon in the same family on a warm dark ground. **Yes** (the founder, 2026-11-27).
+- **Volume = the playing hand's left ↔ right** (as Full; the founder: never drawn — where the hand is shows it).
+- **Note names mid-band** (tried first; back to the left edge if it reads worse). The bars stay at the screen's edges (the founder: never mid-screen).
+- **When the bars show — yes** (the founder): the effects bars appear when an effects pinch starts and fade about 1.5 s after the last change
+  (not whenever the hand is in view, as Night does: `apps/night/shell.js bars`); REV shows while a note sounds, fading about 1 s after.
+
+## Decided after LIGHT-2 (the founder, 2026-11-27)
+- **One axis per effect, as in Night:** each effect finger drives ONE value on the vertical (the chain already does — `data/light.json`). Full's
+  drawing unfolds a pinched effect into all its parameters (the delay's mix, time and repeats: three bars) — Light's own bars (LIGHT-4) show
+  one bar per finger.
+- **The start page:** no privacy line under Play; a **«How to play»** button instead (a short card now; Night-like cards later). The privacy line
+  moves into that card (hard rule #33 keeps a privacy notice reachable from the start).
+
 ## Open questions for the founder
-1. Scales: all 38 12-note ones, or a shorter list?
-2. The first timbre: which of the 2–3 candidates (by ear).
-3. The controls' design (LIGHT-1).
-4. The name on the start page and the site: «Handsong Light»?
+- None blocking. Next: LIGHT-3 (the controls when the hands leave, the menus).
+
+## How a new session picks this up
+Read `CLAUDE.md` → `HANDOFF.md` (the LIGHT row) → `docs/light/HANDOFF.md` (state, next step) → this plan (every decision with its date) →
+`docs/light/WORK-LOG.md` (what each run changed, its checks). The drawings: `tools/.out/light-ui/index.html` (a working file, git-ignored — the
+decisions they led to are written here in words).
+
+## Light on its own — measured at LIGHT-3 (2026-11-27; the founder: «only what it really has, nothing hidden, nothing unused loaded»)
+- Today the skeleton boots through the shared legacy UI (`core/legacy-ui/`, Full's menus and drawing) over Full's markup kept hidden: **102
+  modules, 2.1 MB of source**; 573 KB of it is that UI alone. The build copies the whole `core/` folder (`tools/build.mjs copyTree('core')`).
+- The engine alone (audio, vision, gestures, scales, profile, i18n, icons): 85 modules, 1.55 MB — of which ≈ 0.6 MB is Full-only code it still
+  imports at load (the recorder, songs, arrangement, track freezing, the backing: `core/recorder.js`, `arrange.js`, `clip.js`, `core/song/*`,
+  `core/live/*`, `core/freeze/*`; `i18n.js` carries every app's strings) — the same debt Night has (`core/DEBT.md`).
+- Proposed (awaits the founder's yes), three layers: (1) Light's own start, frame loop and drawing (its note field with names mid-band, its
+  hands) — no Full markup, no legacy UI; app work only; (2) the build ships only the files Light's import graph reaches; (3) the engine stops
+  importing Full-only code at load (split the recorder from the engine; dictionaries per app) — CORE runs that touch Full's and Night's engine,
+  so each with both apps' full checks.
+- **One axis per effect — proved** (row «LIGHT face and bars»): in the live chain each effect has at most one driven value; effects fingers only
+  on y; the playing hand only Volume (x) and reverb (z). CONTROL: Full's three-axis reverb is refused.
+- **Copy the core and strip it?** (the founder asked.) Measured instead: the CLEAN parts of core — the sound engine, timbres, effects, scales, the
+  camera and hand model, state, the pure laws — are 49 modules, 817 KB, and import nothing of Full's recorder, songs, arrangement or menus. What
+  ties Light to Full's code is the gesture layer (`core/gestures/hands.js`, `roles.js`, `looper.js` import the recorder) and the legacy UI.
+  Proposed (awaits the founder's yes) — **option B**: Light imports only those clean parts, unchanged, and writes its own small start, drawing and
+  solo + effects-hand gestures (reusing the clean gesture pieces: `gestures/features.js`, `gestures/fxhand.js`). No core change → no shared full
+  checks; Full and Night untouched; fixes to the sound and the hand model reach Light by themselves. Option A (a copied core) would give the same
+  size but two engines drifting apart, every fix made twice, and the same untangling work inside the copy.

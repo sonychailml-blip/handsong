@@ -4,6 +4,18 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`. Checkpoints A–E of SPLIT-2 are its last sections.
 
+# CORE-30 (2026-11-27): a profile's own solo chain as data, and Light's pinned profile id — for LIGHT-2 (opt-in)
+Tree hashes before (the published state): core cfe3a3d190bef9ae · apps/full 0148bb454440c3e3 · apps/night 30d8f7b3c797de9e. After: core 5fb17bed147d3b99 · apps/full and apps/night unchanged.
+- Why: Light (the third app, `apps/light/`) needs its own effect fingers and depth → reverb. Instead of a third hard-coded chain beside Night's
+  (`NIGHT_CHAIN`, a debt), a profile may now carry its solo chain as DATA (the founder's constructor principle).
+- `core/pure/profile.js`: `PROFILE_IDS` + `profile.light`; FIELDS + `chain`; `checkChain` (Volume first and only first, each effect once, in the app and
+  offered by the profile; a parameter `fixed` {v01 0…1 or none} or `drive` {hand play | fx, axis x | y | z, inv, a finger 0…3 for the effects hand only});
+  `PROFILE_DAMAGES` + 3 (Volume not first, the effects hand without a finger, an effect not offered).
+- `core/profile.js target()`: `if(p.chain) s.chain=copy(p.chain)` after Night's line. Full's and Night's records carry no `chain`: their path is unchanged.
+- Checks (iteration mode; the founder: «полную проверку делать не будем»): static PASSED; data «C0 profile records (core)» 36/0 (controls refused with
+  «chain» in the line); Full page `--eval`: «FULL untouched» 9 cases 0 differences (controls: Night's strike path 5/5 differ, caps 232/262), the profile round
+  trip 13/0; Night page `--eval`: «NIGHT untouched» 9/0 (controls 78 / 43 / 76 values differ). Not run: the Night suite, Full `--quick` / `--all`.
+
 # CORE-29 (2026-11-24): the second hand's search cadence while one hand plays — for SPEED-1 step 3 (opt-in, Night only)
 Tree hashes before (SPEED-1 step 2's after): core 73236228bd3394c7 · apps/full 0148bb454440c3e3 · apps/night 1dd9b5b52ab01a4a. After: core 17a6ce078eefa5f4 · apps/full unchanged · apps/night 8161333f549c8d1b.
 - `core/pure/handsched.js` `schedPlan(s, policy, idleEvery, oneEvery)`: the fourth argument sets the search's cadence only while ONE hand is tracked (track1 in between); absent = HAND_SEARCH_EVERY, exactly as before. `core/vision.js` `setOneHandSearchEvery(n)` (1…30) and `searchCadence()` → {idle, one}.

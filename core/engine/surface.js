@@ -5,6 +5,10 @@
    imports from audio.js are listed under it (a new call into the engine is added here first). */
 const SURFACE={
   'core/autosave.js':['AC'],
+  'apps/light/boot.js':['initAudio', 'AC', 'setLeadInstr', 'fxSetActive', 'fxChainResplice', 'timbreIdOf', 'timbreIdx'],   // LIGHT-3: Light's own start and its profile doors
+  'apps/light/engine.js':['noteOn', 'noteOff', 'leadAllOff'],   // LIGHT-3: Light's live note adapter (the engine contract, no recorder)
+  'tools/probes/light/hands.js':['leadAllOff'],   // LIGHT-3: the hands row silences what each run left sounding
+  'apps/light/gestures.js':['fxSnapshot', 'FX_GLIDE_KEY', 'fxInstance', 'fxHandRange'],   // LIGHT-3: Light's hands (a cut copy of core's)
   'apps/night/bed.js':['AC', 'engineCtx'],   // CORE-9: the music bed's driver (NIGHT-3 stage 4)
   'apps/night/roomswitch.js':['ambienceOn', 'ambienceInfo'],
   'apps/night/lifecycle.js':['AC'],   // NIGHT-11 part 1: the context resumed after the phone looked away   // CORE-12: the room switch's nature crossfade (NIGHT-3 stage 5 part 2)

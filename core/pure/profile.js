@@ -5,7 +5,7 @@
 import { idSpace } from './registry.js';
 
 export const PROFILE_FORMAT='handsong/profile', PROFILE_VERSION=1;
-export const PROFILE_IDS=Object.freeze(['profile.full','profile.night']);   // pinned: never renamed or reused
+export const PROFILE_IDS=Object.freeze(['profile.full','profile.night','profile.light']);   // pinned: never renamed or reused (CORE-30: + Light)
 export const PROFILE_ROLES=Object.freeze(['ld','ch','bs','dr']);
 export const BACKGROUNDS=Object.freeze(['camera','forest','dark']);
 export const LEVEL_DB=24, VOICES_MAX=16;   // RUN 8: voices — how many strikes of a struck timbre may ring at once in this face   // RUN 8: the largest per-timbre trim a profile may set (dB)
@@ -13,7 +13,36 @@ export const LEVEL_DB=24, VOICES_MAX=16;   // RUN 8: voices — how many strikes
 export const HAND_FNS=Object.freeze({ ld:Object.freeze(['fx','note','hold','therm','expr','loop']), bs:Object.freeze(['fx','note','hold','therm','loop']),
   ch:Object.freeze(['fx','latch','hold','loop']), dr:Object.freeze(['fx','hit','loop']) });
 const FIELDS=['format','version','id','name','roles','handFn','noteModes','key','moods','timbres','effects','scene','backgrounds','shell',
-  'noteField','labels','recording','ambience','levels','voices','volume'];   // RUN 8: levels / voices / volume (optional) — a per-timbre level trim (dB) and strike cap; the volume curve's floor
+  'noteField','labels','recording','ambience','levels','voices','volume','chain'];   // RUN 8: levels / voices / volume (optional) — a per-timbre level trim (dB) and strike cap; the volume curve's floor   // CORE-30: chain (optional) — the solo chain as data
+const AXES=['x','y','z'];
+/* CORE-30: the optional solo chain a profile opens with (the same entries as state.fxChains): Volume first (its permanent entry), each
+   effect once; a parameter fixed (v01 0…1 or none = the instance's own value) or driven by the playing hand (no finger) or the effects
+   hand (finger 0…3) along x / y / z. null = valid; otherwise ONE line naming «chain». */
+function checkChain(c, effects, offered){
+  if(!Array.isArray(c) || !c.length) return 'chain: a list of entries';
+  const seen=new Set();
+  for(const [i,e] of c.entries()){
+    const at=`chain[${i}]`;
+    if(!plain(e) || Object.keys(e).sort().join()!=='fxId,params' || typeof e.fxId!=='string' || !Array.isArray(e.params) || !e.params.length) return at+': {fxId, params}';
+    if(i===0 ? e.fxId!=='vol' : e.fxId==='vol') return 'chain: Volume («vol») first and only first';
+    if(seen.has(e.fxId)) return `chain: «${e.fxId}» twice`; seen.add(e.fxId);
+    if(i>0 && effects && !effects.includes(e.fxId)) return `chain: «${e.fxId}» is not in this app`;
+    if(i>0 && offered && !offered.includes(e.fxId)) return `chain: «${e.fxId}» is not an effect this profile offers`;
+    for(const [j,q] of e.params.entries()){
+      const pt=`${at}.params[${j}]`;
+      if(!plain(q)) return pt+': an object';
+      if(q.mode==='fixed'){ if(Object.keys(q).some(k=>k!=='mode' && k!=='v01') || ('v01' in q && !(typeof q.v01==='number' && q.v01>=0 && q.v01<=1))) return pt+': fixed {v01 0…1}'; }
+      else if(q.mode==='drive'){
+        if(q.hand!=='play' && q.hand!=='fx') return pt+': hand «play» or «fx»';
+        if(!AXES.includes(q.axis) || typeof q.inv!=='boolean') return pt+': axis x / y / z, inv true / false';
+        if(q.hand==='fx' ? !(Number.isInteger(q.finger) && q.finger>=0 && q.finger<=3) : 'finger' in q) return pt+': a finger 0…3 for the effects hand only';
+        if(Object.keys(q).some(k=>!['mode','hand','axis','inv','finger'].includes(k))) return pt+': unknown key';
+      }
+      else return pt+': mode «fixed» or «drive»';
+    }
+  }
+  return null;
+}
 const plain=o=> o!==null && typeof o==='object' && !Array.isArray(o);
 const strList=a=> Array.isArray(a) && a.length>0 && a.every(x=>typeof x==='string') && new Set(a).size===a.length;
 /* null = valid; otherwise ONE line naming the field. known (optional, each a list): roles, handFns {role:[values]}, modes, timbres,
@@ -66,6 +95,7 @@ export function checkProfile(p, known={}){
       if(!Number.isInteger(n) || n<1 || n>VOICES_MAX) return `voices.${id}: a whole number 1…${VOICES_MAX}`; } }
   if('volume' in p && (!plain(p.volume) || Object.keys(p.volume).join()!=='left' || typeof p.volume.left!=='number' || !(p.volume.left>=0 && p.volume.left<=1)))
     return 'volume: {left: 0…1} — the amplitude at the far left as a share of the right';
+  if('chain' in p){ const why=checkChain(p.chain, known.effects, p.effects); if(why) return why; }
   return null;
 }
 /* the CONTROLS of the node row: each damage must be refused with a line naming its field */
@@ -90,4 +120,7 @@ export const PROFILE_DAMAGES=Object.freeze([
   ['levels', p=>{ p.levels={ 'solo.firefly':60 }; }],
   ['voices', p=>{ p.voices={ 'solo.handpan':99 }; }],
   ['volume', p=>{ p.volume={ left:1.5 }; }],
+  ['chain', p=>{ p.chain=[{ fxId:'cecho', params:[{ mode:'fixed' }] }]; }],   // CORE-30: Volume not first
+  ['chain', p=>{ p.chain=[{ fxId:'vol', params:[{ mode:'drive', hand:'play', axis:'x', inv:false }] }, { fxId:'cecho', params:[{ mode:'drive', hand:'fx', axis:'y', inv:false }] }]; }],   // the effects hand without a finger
+  ['chain', p=>{ p.chain=[{ fxId:'vol', params:[{ mode:'drive', hand:'play', axis:'x', inv:false }] }, { fxId:'dly', params:[{ mode:'fixed' }] }]; }],   // an effect the profile does not offer
 ]);

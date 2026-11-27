@@ -15,3 +15,43 @@ Tree hashes before and after: core cfe3a3d190bef9ae · apps/full 0148bb454440c3e
   recorder prefers WebM (`core/clip.js` candidates). Expected core runs: profile id + shell (pure), clip MP4 option — both opt-in.
 - Written: `docs/light/PLAN.md`, `docs/light/HANDOFF.md`, this log; the index `HANDOFF.md` (the LIGHT row); `CLAUDE.md` (one line: the track);
   `docs/ROADMAP.md` (one line).
+- Decided after the plan (the founder, same day): scales = Full's «Familiar» section (`menu.tradition` `common`, 31 modes, all `edo12`);
+  timbre = Full's default solo timbre only (`solo.supersaw`, `leadIdx` 0). `PLAN.md` «Decided after LIGHT-0».
+- Name (the founder, same day): plain «Handsong», address play.handsong.app; Full becomes «Handsong Studio» at its own release; code id stays `light`.
+
+# LIGHT-1 (LIGHT track, 2026-11-27): the drawings
+Tree hashes before and after: core cfe3a3d190bef9ae · apps/full 0148bb454440c3e3 · apps/night 30d8f7b3c797de9e (a working drawing + docs only).
+- `tools/.out/light-ui/index.html` (git-ignored): the play screen (phone, laptop, hands swapped, 1 note a cell), three control designs
+  (A dock, B key on top + round buttons, C tiles card), the pop-ups (hands, sensitivity, key + A4, scale), the hand setup, the start page.
+- The founder: variant B; the look, fonts and start page liked; two sensitivity sliders and Night's hand setup; bars vertical, over the
+  field, following their hands; 3-letter English labels; asked about the app mark: the brand emblem (as Night and the site) with Light's colour proposed. Second version of
+  the page drawn accordingly (A and C removed). `PLAN.md` «Decided at LIGHT-1».
+
+# LIGHT-2 (LIGHT track, 2026-11-27): the skeleton
+Tree hashes before: core cfe3a3d190bef9ae · apps/full 0148bb454440c3e3 · apps/night 30d8f7b3c797de9e (apps/light did not exist). After: core 5fb17bed147d3b99
+(CORE-30) · apps/full and apps/night unchanged · apps/light 8147ecbf6864a818.
+- `apps/light/`: `index.html` (Full's markup — the shared UI reads its ids — with Light's head: store «light», profile, probes link, `light.css`, the
+  same CSP line; Light's start card; Full's start extras kept hidden), `main.js` (`boot({ profile:'profile.light', handFiles:'own' })`), `texts.js`
+  (4 strings × 8 languages), `light.css` (tokens `--light-*`; `--night-accent` defined for core/icons.js), `data/light.json`, `manifest.json`, `sw.js`
+  (Full's, no cache), `fonts/` (Inter, Literata 300 — copies, register entries extended), `icons/` (Full's for now).
+- Core: CORE-30 (`docs/core/WORK-LOG.md`). Tools: `probe-browser.mjs --app light` (entry, no seed, Light's storage census: its namespace, the device
+  facts and the core's READ of «handsong.nightBg» — the row proves it is never written), `tools/probes/light.js` + `light/start.js` (row «LIGHT start
+  and profile»: the profile, mood, key, timbre, hands, the chain exactly, Full's bar hidden, the emblem drawn, the namespace; CONTROL Full's chain),
+  `check-static.mjs` (the third app in the boundaries, pages, CSP and tokens; CONTROL its CSP), `check-licences.mjs` (Light's shipped texts),
+  `probe-data.mjs` (Light's record in «C0 profile records»), `smoke-paths.mjs` (Light's page from the root and a sub-folder).
+- Checks (iteration mode; the founder waived the full suites): static PASSED; `--app light`: P.light PASS 1/0, CSP, network, storage PASS; smoke
+  `--only light@/,light@/some/sub/` 0 of 2 failed; Full page FULL untouched 9/0 + profile round trip 13/0; Night page NIGHT untouched 9/0.
+
+# LIGHT-3a (LIGHT track, 2026-11-27): Light on its own, the bars, «How to play»
+Tree hashes before (LIGHT-2's after): core 5fb17bed147d3b99 · apps/full 0148bb454440c3e3 · apps/night 30d8f7b3c797de9e · apps/light 8147ecbf6864a818. After: core
+c73730c7ab6c850a (only `core/engine/surface.js`, the static check's list, and CORE-30's comment renumbering) · apps/full and apps/night unchanged · apps/light bdfa284300e36c3f.
+- The founder: Light must hold only what it has (nothing hidden, nothing unused loaded); option B chosen over copying the core (measured: the clean core
+  parts are 49 modules / 817 KB with none of Full's code; the gesture layer and the legacy UI were what tied Light to Full).
+- `apps/light/`: `boot.js`, `gestures.js` (a cut copy of `core/gestures/hands.js` + `roles.js`), `engine.js`, `draw.js`, `scalepick.js`; `shell.js` rewritten (fed
+  by the loop); `index.html` only Light's elements; `light.css` stands alone; `main.js`. The profile is applied through Light's own doors (`profileWire`).
+- One axis per effect (the founder): Light's chain always had one driven value per effect; the three bars were Full's drawing unfolding the delay.
+- Tools: check-static (17) Light on its own + page ids by reach; probe-browser (Light: no renderer, no auto-freeze code loaded); smoke-paths (Light's
+  own frame check, and no legacy UI / recorder / other app requested); the probe facade with its own lock; rows «LIGHT on its own», «LIGHT start and
+  profile», «LIGHT bars and one axis», «LIGHT hands = core hands» (CONTROL: sensitivity 1.5 → 82 lines differ).
+- Checks (iteration mode): static PASSED; probe-data PASS 109/0; `--app light`: 4 rows PASS, CSP, network (155 requests), storage PASS; smoke
+  `--only light@/,light@/some/sub/` 0 of 2 failed; licences PASS; name index PASS. Full and Night untouched (their trees unchanged).
