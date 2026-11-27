@@ -76,3 +76,17 @@ static check's list) · apps/full 0148bb454440c3e3 and apps/night 30d8f7b3c797de
   left edge; the four bottom buttons in one frame. `apps/light/draw.js` (rewritten: `litFingers`, `LEFT`), `light.css` (`.light-rounds` framed;
   the bone colour token gone). Row «LIGHT bars and one axis» checks `litFingers` (two sounding fingers → both; the effects hand → its finger; no
   pinch → none). Checks: static PASSED; `--app light` 5 rows PASS, CSP, network, storage PASS. apps/full and apps/night unchanged.
+
+# LIGHT-4 (LIGHT track, 2026-11-27): the hand setup
+Tree hashes after: core e34f701f04d5c046 (only `core/engine/surface.js`, the static check's list) · apps/full 0148bb454440c3e3 and apps/night
+30d8f7b3c797de9e unchanged · apps/light 06eafa82b559024e.
+- `apps/light/calib.js` (new): the routine (`createCalRun`, farHold) fed the camera's frames while it runs (`boot.js`; the hands get none, so held notes
+  close), the record `{camera key: {near, noise}}` under `handsong.light.lightHand`, the calibrated law per hand (one filter step a frame on `S.cal`,
+  the hold band, `calDepth` with `calFarBase`), the travel slider (s = 2^−v, never below `CAL.depthMin`); the screens offer / measure (a dashed frame,
+  one line, the progress) / done / failed; offered once (`handsong.light.lightHandOffered`). `gestures.js setLightDepthLaw` (null = the plain law:
+  «hands = core hands» unchanged). `controls.js`: the setup line in the sensitivity sheet; a camera flip applies that camera's setup. Texts 18 keys × 8.
+- Row «LIGHT hand setup»: offered once; a moving hand is refused (CONTROL); a still one ends «done» (near 0.285); the mix ≈ 0 at the near point,
+  0.859 at half the size, 0.749 with the long travel; the person's kept setup put back. Core's pose marks its hands synthetic (the routine refuses
+  them); the row feeds a plain copy of the points on purpose.
+- Checks (iteration mode): static PASSED; probe-data PASS 109/0; `--app light` 6 rows PASS, CSP, network, storage PASS; smoke on Light PASS;
+  licences PASS; name index PASS.

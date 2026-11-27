@@ -18,14 +18,16 @@ const ROLE='ld', HANDS={}, monoOwner={ ld:null };
 let fxSens=1;
 export const setLightFxSens=v=>{ fxSens= v>0 ? +v : 1; };
 /* LIGHT-3b, the menus: the hand travel (the depth law's range × this; 1 = core's law) and each hand's octave shift (whole periods; 0 = core's) */
-let travel=1; const octShift={ L:0, R:0 };
+let travel=1, depthLaw=null; const octShift={ L:0, R:0 };
+/* LIGHT-4: the hand setup's calibrated law (apps/light/calib.js), or null = the plain law below */
+export const setLightDepthLaw=f=>{ depthLaw= typeof f==="function" ? f : null; };
 export const setLightTravel=v=>{ travel= v>0 ? +v : 1; };
 export const setLightOctShift=(hand,n)=>{ if(hand==='L'||hand==='R') octShift[hand]=Math.max(-3, Math.min(3, Math.round(+n||0))); };
 export const lightOctShift=hand=>octShift[hand]||0;
 
 /* ── roles.js, cut to the solo ── */
 function depthOf(S,lm){ if(S.hsF==null) S.hsF=emaS(S,'hs',dist(lm[0],lm[9]),0.15); return S.hsF; }   // ONE smoothing step per hand per frame
-const depthN=(S,lm)=>clamp01((REV_NEAR-depthOf(S,lm))/(travel===1 ? REV_RANGE : REV_RANGE*travel));
+const depthN=(S,lm)=>{ if(depthLaw){ if(S.calF==null) S.calF=depthLaw(S,lm); if(S.calF!=null) return S.calF; } return clamp01((REV_NEAR-depthOf(S,lm))/(travel===1 ? REV_RANGE : REV_RANGE*travel)); };   // calibrated: one step per hand per frame (S.calF memo)
 const polyZone=z=> z===ROLE && !isLeadMode(z), leadZone=z=> z===ROLE && isLeadMode(z);
 const liveKey=(key,finger=null)=> 'lead:'+handSide(key)+(finger==null?'':':'+finger), monoKey=()=>'lead:M';
 const wOn=(own,p,live)=>lightNoteOn(own,p,live), wOff=own=>lightNoteOff(own);
@@ -80,7 +82,7 @@ export function lightProcessHands(res){
     if(seen.has(key)) key+=i;
     seen.add(key);
     const S=HANDS[key]||(HANDS[key]={ pinch:false, deg:-1, oct:0, regOct:0, slot:-1, zone:null, vol:.6, adj:null, sm:{}, fn:null, touch:new Set(), order:[], fing:{}, snd:[] });
-    S.seen=now; S.lm=lm; S.hsF=null;
+    S.seen=now; S.lm=lm; S.hsF=null; S.calF=null;
     const rx0=0, rx1=W;
     const r=pinchRatios(lm), [mf0,mv]=minFinger(r);
     const prevTouch=S.touch||new Set(), touch=touchedFingers(r,prevTouch);

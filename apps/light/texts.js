@@ -51,8 +51,45 @@ const ROWS2={
   ka:['ტონალობა','პირველი ოქტავის ლა (A4)','ჩვეულებრივ 440. − და + ცვლის 1 ჰც-ით.','კილო','ხმა','ხელები','მარცხენა','მარჯვენა','ეფექტები','ნოტები','გაჩერებული ნოტები','თერმენვოქსი',
     'ველი','4 ნოტა ზოლში','1 ნოტა ზოლში','ოთხი ოქტავა ზედიზედ, თითო თითზე; ისრები ოთხივეს ერთად აჩოჩებს.','კამერა','მგრძნობელობა','ხელის სვლა (რევერბი)','მოკლე','გრძელი','ეფექტები','უფრო რბილად','უფრო ძლიერად','დახურვა','ამ მოწყობილობაზე მხოლოდ ერთი კამერა ჩანს.'],
 };
+/* LIGHT-4: the hand setup */
+const K3=['light.cal.offerT','light.cal.offer','light.cal.set','light.cal.skip','light.cal.near','light.cal.wait','light.cal.hold','light.cal.back','light.cal.closer','light.cal.still',
+  'light.cal.cancel','light.cal.doneT','light.cal.done','light.cal.failT','light.cal.fail','light.cal.again','light.cal.ok','light.cal.none'];
+const ROWS3={
+  en:['Set up your hand?','One step, about 10 seconds: show the camera the hand you play with. Then the reverb follows its movement more closely.','Set up','Later',
+    'The nearest point','Hold your playing hand at the closest point it reaches while you play, the whole hand in the frame. From there it moves away.','Good. Hold your hand still…',
+    'Your hand doesn’t fit the frame. Move it a little further from the camera.','The camera can’t see your hand clearly from this far. Come closer.','Your hand is moving. Hold it for a couple of seconds; you can rest your elbow on a table.',
+    'Cancel','Done','Your hand is remembered. Nearer the camera, the sound is close and dry; farther, more reverb.','Not measured','The measurement didn’t work. Try again, holding your hand still.','Set up again','Your hand is set up','Your hand isn’t set up'],
+  ru:['Настроить руку?','Один шаг, около 10 секунд: покажите камере руку, которой играете. Тогда ревер будет точнее следовать за её движением.','Настроить','Потом',
+    'Ближняя точка','Держите играющую руку в самой близкой к камере точке, до которой она доходит во время игры, — вся рука в кадре. Отсюда она будет отходить.','Хорошо. Держите руку неподвижно…',
+    'Рука не помещается в кадр. Отодвиньте её чуть дальше от камеры.','Камера плохо видит руку с такого расстояния. Подвиньтесь ближе.','Рука двигается. Подержите её пару секунд — можно опереться локтем о стол.',
+    'Отмена','Готово','Рука запомнена. Ближе к камере — звук рядом и суше; дальше — больше ревера.','Не измерено','Замер не получился. Попробуйте ещё раз и держите руку неподвижно.','Настроить заново','Рука настроена','Рука не настроена'],
+  es:['¿Ajustar tu mano?','Un paso, unos 10 segundos: muestra a la cámara la mano con la que tocas. Así la reverberación seguirá mejor su movimiento.','Ajustar','Más tarde',
+    'El punto más cercano','Mantén la mano que toca en el punto más cercano a la cámara al que llega al tocar, toda la mano en el encuadre. Desde ahí se alejará.','Bien. Mantén la mano quieta…',
+    'La mano no cabe en el encuadre. Aléjala un poco de la cámara.','Desde tan lejos la cámara no ve bien la mano. Acércate.','La mano se mueve. Mantenla un par de segundos; puedes apoyar el codo en la mesa.',
+    'Cancelar','Listo','Tu mano está guardada. Cerca de la cámara, el sonido es cercano y seco; más lejos, más reverberación.','Sin medir','La medición no salió. Vuelve a intentarlo con la mano quieta.','Ajustar de nuevo','Tu mano está ajustada','Tu mano no está ajustada'],
+  pt:['Ajustar sua mão?','Um passo, cerca de 10 segundos: mostre à câmera a mão com que você toca. Assim a reverberação acompanha melhor o movimento.','Ajustar','Depois',
+    'O ponto mais próximo','Segure a mão que toca no ponto mais próximo da câmera a que ela chega ao tocar, a mão inteira no quadro. Dali ela vai se afastar.','Bom. Mantenha a mão parada…',
+    'A mão não cabe no quadro. Afaste-a um pouco da câmera.','Daí a câmera não vê bem a mão. Chegue mais perto.','A mão está se mexendo. Segure-a por alguns segundos; pode apoiar o cotovelo na mesa.',
+    'Cancelar','Pronto','Sua mão foi guardada. Perto da câmera, o som fica próximo e seco; mais longe, mais reverberação.','Não medido','A medição não deu certo. Tente de novo, com a mão parada.','Ajustar de novo','Sua mão está ajustada','Sua mão não está ajustada'],
+  de:['Hand einrichten?','Ein Schritt, etwa 10 Sekunden: Zeig der Kamera die Hand, mit der du spielst. Dann folgt der Hall ihrer Bewegung genauer.','Einrichten','Später',
+    'Der nächste Punkt','Halte die Spielhand an den Punkt, der der Kamera beim Spielen am nächsten kommt, die ganze Hand im Bild. Von dort entfernt sie sich.','Gut. Halte die Hand still…',
+    'Die Hand passt nicht ins Bild. Halte sie etwas weiter von der Kamera weg.','Aus dieser Entfernung sieht die Kamera die Hand schlecht. Komm näher.','Die Hand bewegt sich. Halte sie ein paar Sekunden still; du kannst den Ellbogen auf den Tisch stützen.',
+    'Abbrechen','Fertig','Deine Hand ist gespeichert. Nah an der Kamera klingt es nah und trocken, weiter weg mit mehr Hall.','Nicht gemessen','Die Messung hat nicht geklappt. Versuch es noch einmal und halte die Hand still.','Neu einrichten','Deine Hand ist eingerichtet','Deine Hand ist nicht eingerichtet'],
+  fr:['Régler votre main ?','Une étape, environ 10 secondes : montrez à la caméra la main avec laquelle vous jouez. La réverbération suivra mieux son mouvement.','Régler','Plus tard',
+    'Le point le plus proche','Tenez la main qui joue au point le plus proche de la caméra qu’elle atteint en jouant, toute la main dans le cadre. Elle s’éloignera de là.','Bien. Gardez la main immobile…',
+    'La main ne tient pas dans le cadre. Éloignez-la un peu de la caméra.','De si loin, la caméra voit mal la main. Approchez-vous.','La main bouge. Tenez-la deux secondes ; vous pouvez poser le coude sur la table.',
+    'Annuler','Terminé','Votre main est enregistrée. Près de la caméra, le son est proche et sec ; plus loin, plus de réverbération.','Non mesuré','La mesure n’a pas marché. Réessayez en gardant la main immobile.','Régler à nouveau','Votre main est réglée','Votre main n’est pas réglée'],
+  it:['Impostare la mano?','Un passo, circa 10 secondi: mostra alla fotocamera la mano con cui suoni. Così il riverbero seguirà meglio il suo movimento.','Imposta','Più tardi',
+    'Il punto più vicino','Tieni la mano che suona nel punto più vicino alla fotocamera che raggiunge suonando, tutta la mano nell’inquadratura. Da lì si allontanerà.','Bene. Tieni ferma la mano…',
+    'La mano non sta nell’inquadratura. Allontanala un po’ dalla fotocamera.','Da così lontano la fotocamera vede male la mano. Avvicinati.','La mano si muove. Tienila ferma un paio di secondi; puoi appoggiare il gomito sul tavolo.',
+    'Annulla','Fatto','La tua mano è salvata. Vicino alla fotocamera il suono è vicino e asciutto; più lontano, più riverbero.','Non misurato','La misura non è riuscita. Riprova tenendo ferma la mano.','Imposta di nuovo','La tua mano è impostata','La tua mano non è impostata'],
+  ka:['ხელი მოვარგოთ?','ერთი ნაბიჯი, დაახლოებით 10 წამი: აჩვენეთ კამერას ხელი, რომლითაც უკრავთ. მაშინ რევერბი უფრო ზუსტად გაჰყვება მის მოძრაობას.','მორგება','მოგვიანებით',
+    'უახლოესი წერტილი','დაიჭირეთ დამკვრელი ხელი კამერასთან უახლოეს წერტილში, სადამდეც დაკვრისას აღწევს, მთელი ხელი კადრში. იქიდან ის დაშორდება.','კარგია. გააჩერეთ ხელი…',
+    'ხელი კადრში არ ეტევა. ოდნავ დააშორეთ კამერას.','ამ მანძილიდან კამერა ხელს კარგად ვერ ხედავს. მიუახლოვდით.','ხელი მოძრაობს. გააჩერეთ რამდენიმე წამით; შეგიძლიათ იდაყვი მაგიდას დააყრდნოთ.',
+    'გაუქმება','მზადაა','ხელი დამახსოვრებულია. კამერასთან ახლოს ხმა ახლოა და მშრალი; შორს — მეტი რევერბი.','არ გაიზომა','გაზომვა ვერ მოხერხდა. სცადეთ ხელახლა, ხელი გააჩერეთ.','ხელახლა მორგება','ხელი მორგებულია','ხელი არ არის მორგებული'],
+};
 export const LIGHT_TEXTS=Object.freeze(Object.fromEntries(Object.entries(ROWS).map(([lang, row])=>{
-  if(row.length!==K.length || !ROWS2[lang] || ROWS2[lang].length!==K2.length) throw new Error('[light] texts: '+lang+' is incomplete');
-  return [lang, Object.freeze({ ...Object.fromEntries(K.map((k,i)=>[k, row[i]])), ...Object.fromEntries(K2.map((k,i)=>[k, ROWS2[lang][i]])) })]; })));
+  if(row.length!==K.length || !ROWS2[lang] || ROWS2[lang].length!==K2.length || !ROWS3[lang] || ROWS3[lang].length!==K3.length) throw new Error('[light] texts: '+lang+' is incomplete');
+  return [lang, Object.freeze({ ...Object.fromEntries(K.map((k,i)=>[k, row[i]])), ...Object.fromEntries(K2.map((k,i)=>[k, ROWS2[lang][i]])), ...Object.fromEntries(K3.map((k,i)=>[k, ROWS3[lang][i]])) })]; })));
 langsAdd(Object.keys(LIGHT_TEXTS));
 for(const [lang, T] of Object.entries(LIGHT_TEXTS)) Object.assign(DICTS[lang], T);

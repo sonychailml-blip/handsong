@@ -31,3 +31,7 @@ Read: `docs/light/PLAN.md` (decisions, where each part comes from, core changes,
   arrows, the field 4 / 1 notes; hand travel and effects sliders); the choices kept on this device. Next: `LIGHT-4` — Night's hand setup (the nearest
   point; the travel slider then works on the calibrated law), then `LIGHT-5` the clip.
 - `LIGHT-3c` (2026-11-27): the hands as points (fingertips larger, every sounding finger lit), the names back at the left edge, the four buttons in one frame.
+- `LIGHT-4` (2026-11-27): the hand setup as in Night (`apps/light/calib.js` on core's PURE laws `core/pure/handcal.js` — the routine with farHold,
+  `calDepth`/`calFilter`/`calHold`; not `core/handcal.js`, which imports the recorder): offered once after the first start, «Set up again» in the
+  sensitivity sheet, kept per camera on this device (numbers only); while it runs the hands play nothing; the travel slider acts on the calibrated law.
+  Next: `LIGHT-5` — the clip (Full's recording made MP4 where the browser can; Night's button, countdown and card).

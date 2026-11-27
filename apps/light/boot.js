@@ -13,6 +13,7 @@ import { t } from '../../core/i18n.js';
 import { lightProcessHands, lightHandsView, lightHandsReset, lightVoiceModeReset } from './gestures.js';
 import { lightAllOff } from './engine.js';
 import { lightDrawFrame, lightSyncViewRect } from './draw.js';
+import { lightCalBusy, lightCalFrame } from './calib.js';   // LIGHT-4: the hand setup takes the frames while it runs
 
 export const PROFILE='profile.light';
 const $=id=>document.getElementById(id);
@@ -51,18 +52,20 @@ profileWire({
 });
 export const setLightFace=f=>{ face=f; };
 
-let frames=0;   // processed camera frames (the path check and the probes read it)
+let frames=0, rawHands=[];   // processed camera frames (the path check and the probes read it); this frame's raw hands (drawn during the setup)
 function onHands(f){
   frames++;
   if(f.frame) lightSyncViewRect(f.frame.width, f.frame.height);
-  lightProcessHands(f.res);
+  rawHands=((f.res&&f.res.landmarks)||[]).map(lm=>({ lm, pinch:false, play:false }));
+  if(lightCalBusy()){ lightCalFrame(f.res, performance.now()); lightProcessHands(null); }   // the setup runs: the hands play nothing (held notes close by the watchdog)
+  else lightProcessHands(f.res);
   if(f.frame){ if(shown) shown.close(); shown=f.frame; }
 }
 const sxOf=x=>sx(x, canvas.width), syOf=y=>sy(y, canvas.height);
 function loop(now){
   requestAnimationFrame(loop);
   pollFrame();
-  const hands=lightHandsView();
+  const hands=lightCalBusy() ? rawHands : lightHandsView();
   lightDrawFrame(shown || video, hands, sxOf, syOf);
   for(const f of listeners) f(now, hands);
 }

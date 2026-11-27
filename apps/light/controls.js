@@ -14,6 +14,7 @@ import { nsKey } from '../../core/storens.js';
 import { lightAllOff } from './engine.js';
 import { lightHandsReset, setLightFxSens, setLightTravel, setLightOctShift, lightOctShift } from './gestures.js';
 import { onLightFrame, onLightStart, lightStarted, PROFILE } from './boot.js';
+import { lightCalOn, lightCalStart, setLightCalTravel, lightCalCamera } from './calib.js';   // LIGHT-4: the hand setup
 
 export const CTL_IDLE_MS=700, A4_MIN=380, A4_MAX=480, A4_CHIPS=Object.freeze([432,440,442]), FNS=Object.freeze(['fx','note','hold','therm']), OCT_MIN=-3, OCT_MAX=3;
 const PREFS=nsKey('handsong.lightPrefs');
@@ -35,7 +36,7 @@ export function setTimbre(id){ if(!prof().timbres.includes(id)) return false; co
 export function setHand(hand, fn){ if((hand!=='L' && hand!=='R') || !FNS.includes(fn)) return false; if(handFn.ld[hand]!==fn){ quiet(); setHandFn('ld',hand,fn); } return true; }
 export function setField(v){ const m= v==='rows' ? 'rows' : 'rect'; if(rectPref!==m){ quiet(); setRectPref(m); } return true; }
 export function setOct(hand, n){ quiet(); setLightOctShift(hand, Math.max(OCT_MIN, Math.min(OCT_MAX, n))); return lightOctShift(hand); }
-export function setSens(kind, v){ v=Math.max(-1, Math.min(1, +v||0)); sens={ ...sens, [kind]:v }; if(kind==='fx') setLightFxSens(Math.pow(2, v)); else setLightTravel(Math.pow(2, v)); return v; }
+export function setSens(kind, v){ v=Math.max(-1, Math.min(1, +v||0)); sens={ ...sens, [kind]:v }; if(kind==='fx') setLightFxSens(Math.pow(2, v)); else { setLightTravel(Math.pow(2, v)); setLightCalTravel(v); } return v; }   // the travel: the plain law and the calibrated one
 const after=f=>(...a)=>{ const r=f(...a); prefsSave(); render(); if(sheet) openSheet(sheet); return r; };
 
 /* the lowest note of a hand's four octaves («A2») and its range («A2 – A5») */
@@ -82,6 +83,8 @@ function openSheet(kind){
     B.appendChild(el('p','light-note', t('light.oct.note')));
     fillIcons(B);
   }else if(kind==='sens'){
+    { const row=el('div','light-calrow'), on=lightCalOn(), b=el('button','light-calgo', t(on ? 'light.cal.again' : 'light.cal.set'));   // LIGHT-4: the hand setup's line
+      row.append(el('span', on ? 'light-cal-ok' : 'light-cal-none', t(on ? 'light.cal.ok' : 'light.cal.none')), b); b.onclick=()=>{ closeSheet(); lightCalStart(); }; B.appendChild(row); }
     for(const [k, label, lo, hi] of [['travel','light.travel','light.short','light.long'], ['fx','light.fxsens','light.softer','light.stronger']]){
       const w=el('div','light-sl'); w.appendChild(el('p','light-lbl', t(label)));
       const r=el('input'); r.type='range'; r.min='-1'; r.max='1'; r.step='0.01'; r.value=String(sens[k]); r.oninput=()=>{ setSens(k, r.value); prefsSave(); };
@@ -95,6 +98,7 @@ const fillIcons=root=>{ if(iconFill) iconFill(root); };
 async function flipCamera(){
   const was=camFacing;
   try{ await switchCamera(was==='user' ? 'environment' : 'user'); }catch(e){ tip(t('light.camOne')); try{ await switchCamera(was); }catch(e2){} }
+  lightCalCamera();   // LIGHT-4: each camera keeps its own hand setup
 }
 let tipT=0; function tip(s){ const p=$('lightCtlTip'); p.textContent=s; p.hidden=false; clearTimeout(tipT); tipT=setTimeout(()=>{ p.hidden=true; }, 3500); }
 

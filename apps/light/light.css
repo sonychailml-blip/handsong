@@ -44,6 +44,7 @@
   --light-title-top:44px; --light-rounds-pad:10px 12px 9px; --light-r-rounds:26px; --light-rounds-bottom:30px; --light-rd:56px; --light-rd-w:76px; --light-ico:26px; --light-ico-sm:16px; --light-chip-pad:8px 15px;
   --light-r-sheet:24px 24px 0 0; --light-sheet-max:78vh; --light-sheet-w:520px; --light-grab-w:38px; --light-grab-h:4px; --light-x:32px;
   --light-chip:rgba(246,241,232,.08); --light-chip-dim:rgba(246,241,232,.045); --light-acc-soft:rgba(255,180,74,.18); --light-acc-ring:inset 0 0 0 1px rgba(255,180,74,.75);
+  --light-prog-h:4px;
   --light-item-pad:9px 11px; --light-key-pad:10px 0; --light-r-item:11px;
   --light-veil:rgba(8,7,6,.6); --light-glass-hi:rgba(28,26,24,.86); --light-r-card:22px; --light-pad-sheet:20px 20px 18px; --light-fs-h2:19px;
 }
@@ -163,3 +164,21 @@ button:focus-visible, a:focus-visible{ outline:2px solid var(--light-acc); outli
 .light-seg button{ flex:1; }
 .light-sl input{ width:100%; accent-color:var(--light-acc); }
 .light-sl-ends{ display:flex; justify-content:space-between; font-size:var(--light-fs-small); color:var(--light-ink-faint); }
+
+/* LIGHT-4: the hand setup — the dashed frame while measuring, a card at the bottom (one line, the progress, its buttons) */
+.light-cal{ position:fixed; inset:0; z-index:var(--light-z-sheet); pointer-events:auto; }
+.light-cal[hidden], .light-cal-frame[hidden], .light-cal-prog[hidden], .light-cal-btns button[hidden]{ display:none; }
+.light-cal[data-kind="offer"], .light-cal[data-kind="done"], .light-cal[data-kind="failed"]{ background:var(--light-veil); }
+.light-cal-frame{ position:absolute; inset:7%; border:1.5px dashed var(--light-ink-faint); border-radius:var(--light-r-card); pointer-events:none; }
+.light-cal-card{ position:absolute; left:var(--light-gap-lg); right:var(--light-gap-lg); bottom:max(var(--light-gap-lg), env(safe-area-inset-bottom)); max-width:var(--light-sheet-w); margin:0 auto;
+  border-radius:var(--light-r-card); padding:var(--light-pad-sheet); background:var(--light-glass-hi); box-shadow:var(--light-bars-ring); color:var(--light-ink); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); }
+.light-cal-card h4{ margin:0 0 var(--light-gap-xs); font-size:var(--light-fs-h2); font-weight:var(--light-fw-semi); }
+.light-cal-card p{ margin:0; font-size:var(--light-fs-msg); line-height:var(--light-lh); color:var(--light-ink-dim); }
+.light-cal-prog{ position:relative; height:var(--light-prog-h); margin:var(--light-gap) 0 0; border-radius:var(--light-r-pill); background:var(--light-bar-bg); overflow:hidden; }
+.light-cal-prog b{ position:absolute; left:0; top:0; bottom:0; width:0; border-radius:var(--light-r-pill); background:var(--light-acc); transition:width .2s linear; }
+.light-cal-btns{ display:flex; justify-content:flex-end; gap:var(--light-gap-sm); margin:var(--light-gap) 0 0; }
+.light-cal-btns button{ padding:var(--light-retry-pad); border:none; border-radius:var(--light-r-pill); background:var(--light-chip); color:var(--light-ink-dim); cursor:pointer; }
+.light-cal-btns .light-cal-go{ background:var(--light-acc); color:var(--light-on-acc); font-weight:var(--light-fw-bold); }
+.light-calrow{ display:flex; justify-content:space-between; align-items:center; gap:var(--light-gap-sm); padding:var(--light-item-pad); border-radius:var(--light-r-item); background:var(--light-chip-dim); font-size:var(--light-fs-msg); }
+.light-cal-ok{ color:var(--light-ink); } .light-cal-none{ color:var(--light-ink-dim); }
+.light-calgo{ border:none; background:none; color:var(--light-acc); font-weight:var(--light-fw-semi); cursor:pointer; padding:0; }

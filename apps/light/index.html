@@ -72,6 +72,16 @@
   <div class="light-sheet-head"><h3 id="lightSheetTitle"></h3><button id="lightSheetClose" class="light-x" data-i18n-title="light.close" title="Close"><span data-svg="close" aria-hidden="true"></span></button></div>
   <div id="lightSheetBody" class="light-sheet-body"></div>
 </div>
+<!-- LIGHT-4: the hand setup (apps/light/calib.js): the offer, the measure (a dashed frame, one line, the progress), done, failed -->
+<div id="lightCal" class="light-cal" hidden>
+  <div id="lightCalFrame" class="light-cal-frame" hidden></div>
+  <div class="light-cal-card" role="dialog" aria-modal="true" aria-labelledby="lightCalTitle">
+    <h4 id="lightCalTitle"></h4>
+    <p id="lightCalText"></p>
+    <div class="light-cal-prog" hidden><b id="lightCalProg"></b></div>
+    <div class="light-cal-btns"><button id="lightCalNo" class="light-cal-no"></button><button id="lightCalGo" class="light-cal-go"></button></div>
+  </div>
+</div>
 <div id="lightHow" class="light-how" role="dialog" aria-modal="true" aria-labelledby="lightHowTitle" hidden>
   <div class="light-how-card">
     <h2 id="lightHowTitle" data-i18n="light.how">How to play</h2>
