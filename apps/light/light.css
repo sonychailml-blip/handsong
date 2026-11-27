@@ -36,12 +36,12 @@
   --light-bar-glow:0 0 10px rgba(255,255,255,.35); --light-fs-bar:10px; --light-fw-semi:650; --light-track-bar:.06em; --light-fade:.35s;
   --light-z-bars:var(--z-field); --light-z-card:var(--z-help);
   --light-cv-dim:rgba(8,7,6,.32); --light-cv-band:rgba(246,241,232,.03); --light-cv-line:rgba(246,241,232,.10); --light-cv-on:rgba(255,180,74,.16);
-  --light-cv-online:rgba(255,180,74,.75); --light-cv-dot:rgba(255,255,255,.85); --light-cv-bone:rgba(255,255,255,.35);   /* the canvas (draw.js reads them once) */
+  --light-cv-online:rgba(255,180,74,.75); --light-cv-dot:rgba(255,255,255,.85);   /* the canvas (draw.js reads them once) */
   --light-z-start:var(--z-menu);
   /* LIGHT-3b: the controls and sheets */
   --light-z-ctl:var(--z-panel); --light-z-sheet:var(--z-overlay);
   --light-fs-key:46px; --light-fs-chip:15px; --light-lh-none:1; --light-track-key:-.02em; --light-sup-lift:16px; --light-text-shadow:0 2px 18px rgba(0,0,0,.45);
-  --light-title-top:44px; --light-rounds-bottom:30px; --light-rd:56px; --light-rd-w:76px; --light-ico:26px; --light-ico-sm:16px; --light-chip-pad:8px 15px;
+  --light-title-top:44px; --light-rounds-pad:10px 12px 9px; --light-r-rounds:26px; --light-rounds-bottom:30px; --light-rd:56px; --light-rd-w:76px; --light-ico:26px; --light-ico-sm:16px; --light-chip-pad:8px 15px;
   --light-r-sheet:24px 24px 0 0; --light-sheet-max:78vh; --light-sheet-w:520px; --light-grab-w:38px; --light-grab-h:4px; --light-x:32px;
   --light-chip:rgba(246,241,232,.08); --light-chip-dim:rgba(246,241,232,.045); --light-acc-soft:rgba(255,180,74,.18); --light-acc-ring:inset 0 0 0 1px rgba(255,180,74,.75);
   --light-item-pad:9px 11px; --light-key-pad:10px 0; --light-r-item:11px;
@@ -119,13 +119,14 @@ button:focus-visible, a:focus-visible{ outline:2px solid var(--light-acc); outli
 .light-scalebtn{ display:flex; align-items:center; gap:var(--light-gap-sm); padding:var(--light-chip-pad); border:none; border-radius:var(--light-r-pill); background:var(--light-glass);
   box-shadow:var(--light-bars-ring); color:var(--light-ink); font-size:var(--light-fs-chip); cursor:pointer; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); }
 .light-chev, .light-chev .svgi{ display:flex; width:var(--light-ico-sm); height:var(--light-ico-sm); color:var(--light-ink-dim); }
-.light-rounds{ position:absolute; left:0; right:0; bottom:max(var(--light-rounds-bottom), env(safe-area-inset-bottom)); display:flex; justify-content:center; gap:var(--light-gap); }
+/* the four buttons in ONE frame (the founder: as the bars share theirs) */
+.light-rounds{ position:absolute; left:50%; transform:translateX(-50%); bottom:max(var(--light-rounds-bottom), env(safe-area-inset-bottom)); display:flex; justify-content:center; gap:var(--light-gap-sm);
+  padding:var(--light-rounds-pad); border-radius:var(--light-r-rounds); background:var(--light-bars-bg); box-shadow:var(--light-bars-ring); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); }
 .light-rd{ display:flex; flex-direction:column; align-items:center; gap:var(--light-gap-sm); border:none; background:none; color:var(--light-ink); cursor:pointer; padding:0; min-width:var(--light-rd-w); }
-.light-rd-c{ display:flex; align-items:center; justify-content:center; width:var(--light-rd); height:var(--light-rd); border-radius:var(--light-r-pill); background:var(--light-glass);
-  box-shadow:var(--light-bars-ring); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); }
+.light-rd-c{ display:flex; align-items:center; justify-content:center; width:var(--light-rd); height:var(--light-rd); border-radius:var(--light-r-pill); background:var(--light-chip); }
 .light-rd-c .svgi, .light-rd-c svg{ width:var(--light-ico); height:var(--light-ico); }
 .light-rd-l{ font-size:var(--light-fs-small); color:var(--light-ink-dim); max-width:var(--light-rd-w); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.light-tip{ position:absolute; left:50%; bottom:calc(var(--light-rounds-bottom) + var(--light-rd) + var(--light-gap-lg)); transform:translateX(-50%); margin:0; padding:var(--light-chip-pad);
+.light-tip{ position:absolute; left:50%; bottom:calc(var(--light-rounds-bottom) + var(--light-rd) + var(--light-gap-lg) + var(--light-gap-lg)); transform:translateX(-50%); margin:0; padding:var(--light-chip-pad);
   border-radius:var(--light-r-pill); background:var(--light-glass-hi); color:var(--light-ink); font-size:var(--light-fs-msg); white-space:nowrap; }
 .light-tip[hidden]{ display:none; }
 /* the sheets: from the bottom on a phone, a centred window on a wide screen */

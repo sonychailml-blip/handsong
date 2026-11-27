@@ -30,3 +30,4 @@ Read: `docs/light/PLAN.md` (decisions, where each part comes from, core changes,
   sensitivity) and their sheets (12 keys + A4 432/440/442 ±1 Hz; the 31 moods by group; the timbres; each hand's function and octaves «A2 – A5» with
   arrows, the field 4 / 1 notes; hand travel and effects sliders); the choices kept on this device. Next: `LIGHT-4` — Night's hand setup (the nearest
   point; the travel slider then works on the calibrated law), then `LIGHT-5` the clip.
+- `LIGHT-3c` (2026-11-27): the hands as points (fingertips larger, every sounding finger lit), the names back at the left edge, the four buttons in one frame.

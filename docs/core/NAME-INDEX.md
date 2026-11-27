@@ -33,7 +33,7 @@ LIGHT-3b — THE CONTROLS WHEN THE HANDS LEAVE (variant B, the founder's choice 
 
 ## apps/light/draw.js
 LIGHT-3 — LIGHT'S CANVAS: the camera picture (the cover crop: the same rectangle remaps the hands — rule #12; the front camera mirrored — rule #13, through core mirrored()), the note field and the …
-- fn (2): `lightSyncViewRect`, `lightDrawFrame`
+- fn (3): `lightSyncViewRect`, `litFingers`, `lightDrawFrame`
 
 ## apps/light/engine.js
 LIGHT-3 — Light's LIVE NOTE ADAPTER: the hands' solo notes straight into the engine contract (core/audio.js noteOn / noteOff), priced as the shared live path prices them (core/live/eng.js ENG.leadO…
@@ -1828,7 +1828,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 UI-1 — «NIGHT labels follow the room»: the founder entered the rain and the Sound button still read «Firefly» while another timbre played.
 - fn (1): `checkNightLabels`
 
-_365 modules, 3382 exported names._
+_365 modules, 3383 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

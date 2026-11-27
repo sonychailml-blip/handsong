@@ -136,3 +136,9 @@ decisions they led to are written here in words).
   solo + effects-hand gestures (reusing the clean gesture pieces: `gestures/features.js`, `gestures/fxhand.js`). No core change → no shared full
   checks; Full and Night untouched; fixes to the sound and the hand model reach Light by themselves. Option A (a copied core) would give the same
   size but two engines drifting apart, every fix made twice, and the same untangling work inside the copy.
+
+## Decided after trying LIGHT-3b (the founder, 2026-11-27)
+- **The hands:** points without connecting lines; the fingertips larger (as in Full and Night); EVERY sounding finger lights (several notes per
+  hand), with the thumb — not only the first pinched.
+- **The note names back at the left edge** (mid-band tried and dropped); the effects bars may lie over them.
+- **The four bottom buttons in one shared frame**, as the bars share theirs.

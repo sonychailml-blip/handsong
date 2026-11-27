@@ -70,3 +70,9 @@ static check's list) · apps/full 0148bb454440c3e3 and apps/night 30d8f7b3c797de
   core's arithmetic).
 - Checks (iteration mode): static PASSED; probe-data PASS 109/0; `--app light` 5 rows PASS, CSP, network, storage PASS; smoke `--only light@/` PASS;
   licences PASS; name index PASS.
+
+# LIGHT-3c (LIGHT track, 2026-11-27): the hands' look, the names left, one frame for the buttons
+- The founder after trying LIGHT-3b: no lines between the hand's points; fingertips larger; every sounding finger lit; the note names back at the
+  left edge; the four bottom buttons in one frame. `apps/light/draw.js` (rewritten: `litFingers`, `LEFT`), `light.css` (`.light-rounds` framed;
+  the bone colour token gone). Row «LIGHT bars and one axis» checks `litFingers` (two sounding fingers → both; the effects hand → its finger; no
+  pinch → none). Checks: static PASSED; `--app light` 5 rows PASS, CSP, network, storage PASS. apps/full and apps/night unchanged.

@@ -4,6 +4,7 @@
    40 % / 60 % (CONTROL: inside the band it stays), a set shows for exactly its hold after the last activity (CONTROL: at the hold it is hidden). */
 import { fxChainOf, chainKeyOf } from '../../../core/state.js';
 import { profileOf } from '../../../core/profile.js';
+import { litFingers } from '../../../apps/light/draw.js';
 import { FX_BARS, BAR_FX_MS, BAR_REV_MS, sideOf, shownAt, lightShellDbg, drivenIndex } from '../../../apps/light/shell.js';
 
 export async function checkLightBars(){
@@ -19,6 +20,9 @@ export async function checkLightBars(){
   if(drivenIndex('reverb')!==2) miss('the reverb\'s driven value is parameter '+drivenIndex('reverb')+', not the mix (2)');
   const fullDefault=[{ fxId:'vol', params:[{ mode:'drive', hand:'play', axis:'x' }] }, { fxId:'reverb', params:['y','x','z'].map(axis=>({ mode:'drive', hand:'fx', finger:0, axis })) }];
   if(!oneAxis(fullDefault).length) miss('CONTROL: Full\'s three-axis reverb passed the one-axis check');
+  /* LIGHT-3c (the founder): EVERY sounding finger lights, not only the first pinched; the effects hand lights its pinching finger; no pinch, none */
+  { const ids=s=>[...s].sort().join(); const two=litFingers({ pinch:true, play:true, fing:{ 0:{}, 2:{} }, finger:0 }), fx=litFingers({ pinch:true, play:false, finger:1 }), off=litFingers({ pinch:false, play:true, fing:{ 0:{} }, finger:0 });
+    if(ids(two)!=='0,2') miss('two sounding fingers light as «'+ids(two)+'», not «0,2»'); if(ids(fx)!=='1') miss('the effects hand lights «'+ids(fx)+'»'); if(off.size) miss('a hand without a pinch lights fingers'); }
   await new Promise(r=>setTimeout(r, 2*BAR_FX_MS));   // no hand in view (the fake camera): both sets rest hidden
   const D=lightShellDbg(); if(!D.running) miss('the bars are not fed by the frame loop'); if(D.fx.on || D.rev.on) miss('a set shows with no hand: '+JSON.stringify(D));
   if(sideOf('right', 300, 1000)!=='left' || sideOf('left', 700, 1000)!=='right') miss('the side law does not switch past 40 % / 60 %');
