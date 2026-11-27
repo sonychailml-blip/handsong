@@ -13,6 +13,8 @@ Handsong Night — the forest and the rain — is public at https://night.handso
 6. **A new room.** After items 1–3 hold (new rooms come after Stage 2).
 7. **Full (Handsong).** Stage 5: saving, export, audio take, the mixer; the calibration screen (`docs/full/HANDOFF.md`). `main` stays the old public version until then.
 
+▶ **Handsong Light** (the founder, 2026-11-27): a third, simplest app, released soon at light.handsong.app — camera + note field, solo, 12-note equal temperament, clips in MP4. Plan `docs/light/PLAN.md`, runs `LIGHT-n`.
+
 ## Stage 1 — the rain room for testers (done: released)
 - Works for everyone: smooth on weak devices; the target is the LIGHT level with no stutter and no audio dropouts on the founder's laptop (Intel HD 4000) and his Poco M5 — that defines the minimum requirements. Detailed is never degraded; Standard gets only invisible optimisations; Light may simplify visibly. iPhone/Safari tested. The bed's electric piano is not changed unless the measurements force it.
 - Then a full check, then the rain goes to night-release. No publish before that.

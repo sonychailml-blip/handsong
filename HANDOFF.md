@@ -1,6 +1,6 @@
 # HANDOFF — Handsong, the index (read at the start of every session, then your track's handoff)
 
-Two apps, one engine. Rules: `CLAUDE.md`. Every run belongs to one track: `CORE-n`, `FULL-n` or `NIGHT-n`, counted separately (`NIGHT-0` is history, so Night starts at `NIGHT-1`).
+Two apps, one engine. Rules: `CLAUDE.md`. Every run belongs to one track: `CORE-n`, `FULL-n`, `NIGHT-n`, `SITE-n` or `LIGHT-n`, counted separately (`NIGHT-0` is history, so Night starts at `NIGHT-1`).
 
 | Track | Folder | Read | Where it stands |
 |---|---|---|---|
@@ -8,6 +8,7 @@ Two apps, one engine. Rules: `CLAUDE.md`. Every run belongs to one track: `CORE-
 | **FULL** | `apps/full/` | `docs/full/HANDOFF.md`, `BACKLOG.md`, `WORK-LOG.md`, `UI-MAP.md`, `UX-INVENTORY.md` | Waits for the first release. Next: stage 5 (saving, export, audio take, mixer) and the calibration screen. |
 | **NIGHT** | `apps/night/` | `docs/night/HANDOFF.md`, `BACKLOG.md`, `WORK-LOG.md`, `STAGE4-NIGHT-plan.md`, `QUALITY.md` | ✅ **Released** (`RELEASE-1`, 2026-11): the forest and the rain are live at https://night.handsong.app. Next: the founder picks from `docs/ROADMAP.md` «After release». |
 | **SITE** | `apps/site/` | `docs/site/HANDOFF.md`, `WORK-LOG.md` | ✅ handsong.app is live (`SITE-1`…`SITE-3`; the demo at demo.handsong.app). |
+| **LIGHT** | `apps/light/` | `docs/light/HANDOFF.md`, `PLAN.md`, `WORK-LOG.md` | `LIGHT-0` plan (2026-11-27); next the drawings. |
 
 Product roadmap: docs/ROADMAP.md — read it before proposing work.
 

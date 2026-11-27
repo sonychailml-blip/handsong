@@ -372,6 +372,7 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
 
 ## Two apps, one core (user, SPLIT-1, 2026-11-01)
 ⛳ Handsong (`apps/full/`) and Handsong Night (`apps/night/`, code id `night`) share `core/`. Every run belongs to ONE track: CORE-n, FULL-n, NIGHT-n or SITE-n (SITE-1, 2026-11-13: the brand site handsong.app — `apps/site/`, `docs/site/HANDOFF.md`; it imports nothing from `core/` or the apps).
+⛳ **Third app, LIGHT track** (the founder, LIGHT-0, 2026-11-27): Handsong Light (`apps/light/`, code id `light`) — the simplest Handsong (camera + note field, solo, 12-note equal temperament); runs `LIGHT-n`, `docs/light/HANDOFF.md`, plan `docs/light/PLAN.md`. Every rule of this section binds it as a third app; ⛳ Full and Night must not change because of it (a core need = an opt-in CORE run with both apps' full checks); no shared UI with Night.
 
 1. **Only code used by both apps goes in `core/`.**
 2. **No UI in `core/`.** Exception: `core/legacy-ui/`, inherited from the split. It only shrinks; no new file, no new feature there beyond what
