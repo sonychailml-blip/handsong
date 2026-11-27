@@ -2,7 +2,7 @@
    shown from the moment an effects pinch starts until BAR_FX_MS after the last change; REV on the playing hand's side while it pinches and BAR_REV_MS
    after. A set's side follows its hand (40 % / 60 % of the width, hysteresis); the effects set never shares the playing hand's side. Labels: three
    English letters. Fed once per screen frame by Light's loop (boot.js onLightFrame) with Light's own hands. */
-import { chainKeyOf } from '../../core/state.js';
+import { chainKeyOf, fxChainOf } from '../../core/state.js';
 import { fxParamsOf } from '../../core/gestures/fxhand.js';
 import { canvas } from '../../core/vision.js';
 import { onLightFrame } from './boot.js';
@@ -17,7 +17,9 @@ export function sideOf(prev, x, W){ const f=x/Math.max(1,W); return f<SIDE_LO ? 
 /* the visibility law: shown while active and for `hold` ms after the last activity */
 export const shownAt=(seen, now, hold)=> now-seen<hold;
 
-const valOf=id=>{ const p=fxParamsOf(chainKeyOf('ld'), id)[0]; return p ? Math.max(0, Math.min(1, +p.get()||0)) : 0; };
+/* a bar shows its effect's DRIVEN value (the one its hand moves — for the reverb the mix, its third parameter), from the live chain */
+export const drivenIndex=id=>{ const e=fxChainOf(chainKeyOf('ld')).find(x=>x.fxId===id); const i=e ? e.params.findIndex(q=>q.mode==='drive') : -1; return i<0 ? 0 : i; };
+const valOf=id=>{ const p=fxParamsOf(chainKeyOf('ld'), id)[drivenIndex(id)]; return p ? Math.max(0, Math.min(1, +p.get()||0)) : 0; };
 function place(el, side){ el.classList.toggle('left', side==='left'); el.classList.toggle('right', side!=='left'); }
 function fill(bar, v){ bar.querySelector('.light-bar-fill').style.height=(v*100).toFixed(1)+'%'; }
 

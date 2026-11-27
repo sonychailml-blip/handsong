@@ -51,6 +51,27 @@
 <div id="lightRevBar" class="light-bars light-bars-rev" aria-hidden="true">
   <div class="light-bar"><span class="light-bar-track"><span class="light-bar-fill"></span></span><span class="light-bar-lab">REV</span></div>
 </div>
+<!-- LIGHT-3b: the controls when the hands leave (variant B, the founder's choice): the key and A4 large on top, the scale under it; four round
+     buttons below (sound, hands, camera, sensitivity). apps/light/controls.js shows them and fills the sheets. -->
+<div id="lightCtl" class="light-ctl" aria-hidden="true">
+  <div class="light-title">
+    <button id="lightKeyBtn" class="light-keybtn"><span id="lightKeyName">A</span><sup id="lightKeyHz">440</sup></button>
+    <button id="lightScaleBtn" class="light-scalebtn"><span id="lightScaleName"></span><span class="light-chev" data-svg="chev-down" aria-hidden="true"></span></button>
+  </div>
+  <div class="light-rounds">
+    <button id="lightTimbreBtn" class="light-rd"><span class="light-rd-c" data-svg="timbre" aria-hidden="true"></span><span id="lightTimbreName" class="light-rd-l"></span></button>
+    <button id="lightHandsBtn" class="light-rd"><span class="light-rd-c" data-svg="hands" aria-hidden="true"></span><span class="light-rd-l" data-i18n="light.hands">Hands</span></button>
+    <button id="lightCamBtn" class="light-rd"><span class="light-rd-c" data-svg="camera-flip" aria-hidden="true"></span><span class="light-rd-l" data-i18n="light.camera">Camera</span></button>
+    <button id="lightSensBtn" class="light-rd"><span class="light-rd-c" data-svg="sliders" aria-hidden="true"></span><span class="light-rd-l" data-i18n="light.sens">Sensitivity</span></button>
+  </div>
+  <p id="lightCtlTip" class="light-tip" hidden></p>
+</div>
+<div id="lightSheetVeil" class="light-sheetveil" hidden></div>
+<div id="lightSheet" class="light-sheet" role="dialog" aria-modal="true" aria-labelledby="lightSheetTitle" hidden>
+  <div class="light-sheet-grab"></div>
+  <div class="light-sheet-head"><h3 id="lightSheetTitle"></h3><button id="lightSheetClose" class="light-x" data-i18n-title="light.close" title="Close"><span data-svg="close" aria-hidden="true"></span></button></div>
+  <div id="lightSheetBody" class="light-sheet-body"></div>
+</div>
 <div id="lightHow" class="light-how" role="dialog" aria-modal="true" aria-labelledby="lightHowTitle" hidden>
   <div class="light-how-card">
     <h2 id="lightHowTitle" data-i18n="light.how">How to play</h2>

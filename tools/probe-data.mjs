@@ -674,8 +674,11 @@ async function profileCore(){
     n++; if(!light || light.roles.join()!=='ld' || light.recording || light.backgrounds.join()!=='camera' || light.scene!==null) miss('profile.light: solo only, nothing recorded, the camera only');
     n++; if(!light || common.some(c=>!c.edo12) || JSON.stringify([...light.moods].sort())!==JSON.stringify(common.map(c=>c.id).sort())) miss('profile.light: the moods must be exactly Full\'s «Familiar» section, all 12-note equal');
     n++; if(!light || JSON.stringify(light.timbres)!==JSON.stringify([firstSolo])) miss(`profile.light: one timbre, Full's default solo «${firstSolo}»`);
-    n++; if(!light || !light.chain || light.chain[1].fxId!=='reverb' || light.chain[1].params[0].hand!=='play' || light.chain[1].params[0].axis!=='z' || fing!=='dly:0y,vib:1y,trm:2y,bright:3y')
-      miss('profile.light: reverb on the playing hand\'s depth; delay, vibrato, tremolo, brightness on fingers 0…3 (y): '+fing); }
+    /* LIGHT-3b (the founder: the reverb barely grew): the depth drives the reverb's MIX — its third parameter (core/modules/effects/reverb.js
+       REV_PARAMS: decay, tone, mix); the tail is fixed longer (v01 0.7 ≈ 1.8 s). Before, the depth drove the decay with the mix left at 0.25. */
+    const rv=light && light.chain && light.chain[1], rvMix=rv && rv.params[2], rvTail=rv && rv.params[0];
+    n++; if(!rv || rv.fxId!=='reverb' || !rvMix || rvMix.mode!=='drive' || rvMix.hand!=='play' || rvMix.axis!=='z' || !rvTail || rvTail.mode!=='fixed' || !(rvTail.v01>=0.5) || fing!=='dly:0y,vib:1y,trm:2y,bright:3y')
+      miss('profile.light: the reverb\'s mix on the playing hand\'s depth with a long fixed tail; delay, vibrato, tremolo, brightness on fingers 0…3 (y): '+fing); }
   const copy=o=>JSON.parse(JSON.stringify(o));
   if(night) for(const [field, dmg] of P.PROFILE_DAMAGES){ const r=copy(night); dmg(r); n++; const why=P.checkProfile(r, known);
     if(!why) miss(`CONTROL «${field}»: a damaged profile was accepted`);

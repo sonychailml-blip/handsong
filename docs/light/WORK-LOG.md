@@ -55,3 +55,18 @@ c73730c7ab6c850a (only `core/engine/surface.js`, the static check's list, and CO
   profile», «LIGHT bars and one axis», «LIGHT hands = core hands» (CONTROL: sensitivity 1.5 → 82 lines differ).
 - Checks (iteration mode): static PASSED; probe-data PASS 109/0; `--app light`: 4 rows PASS, CSP, network (155 requests), storage PASS; smoke
   `--only light@/,light@/some/sub/` 0 of 2 failed; licences PASS; name index PASS. Full and Night untouched (their trees unchanged).
+
+# LIGHT-3b (LIGHT track, 2026-11-27): the reverb, the controls and the menus
+Tree hashes before (LIGHT-3a's after): core c73730c7ab6c850a · apps/light bdfa284300e36c3f. After: core 4dd86761f57ed46c (only `core/engine/surface.js`: the
+static check's list) · apps/full 0148bb454440c3e3 and apps/night 30d8f7b3c797de9e unchanged · apps/light 35345e9e9bd220b3.
+- The reverb (the founder: «barely grows»): `REV_PARAMS` are decay, tone, mix — the profile drove params[0] (the TAIL) with the mix left at its 0.25.
+  Now `{fixed v01 0.7 (≈ 1.84 s), fixed tone, drive play z → the mix 0…0.85}`; the REV bar shows the driven value (`shell.js drivenIndex`). Data row
+  C0 checks it (mix on the depth, a long fixed tail).
+- `apps/light/controls.js` (new): variant B and the sheets; `icons.js` (timbre, hands, camera-flip, sliders, chevrons — our drawings, through
+  `svgIconAdd`); `gestures.js`: each hand's octave shift (whole periods, `periodOf` — rule #2) and the hand travel (the depth range × 2^v); `boot.js`
+  `onLightStart`; texts: 26 keys × 8 languages; `light.css` the controls and sheets; the choices kept under `handsong.light.lightPrefs`.
+- Row «LIGHT controls and menus» (shown with no hand; each sheet's content; each change reaches the state and the labels; A4 clamped; CONTROL a maqam
+  refused; the octave range moves by one octave; everything put back). «LIGHT hands = core hands» still 108 equal calls (shift 0 and travel 1 =
+  core's arithmetic).
+- Checks (iteration mode): static PASSED; probe-data PASS 109/0; `--app light` 5 rows PASS, CSP, network, storage PASS; smoke `--only light@/` PASS;
+  licences PASS; name index PASS.

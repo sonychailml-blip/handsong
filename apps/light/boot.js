@@ -20,6 +20,9 @@ let shown=null, started=false, starting=false, face=null;
 const stage={ audio:false, det:false };
 const listeners=[];
 export const onLightFrame=f=>{ listeners.push(f); };   // the shell's bars, once per screen frame, with the hands in view
+const starts=[];
+export const onLightStart=f=>{ starts.push(f); };   // LIGHT-3b: once the start is done and the profile applied (the controls restore the person's choices)
+export const lightStarted=()=>started;
 
 /* a profile's solo chain into the live state and sound (as the shared UI's profChain): the data, then the sound halves, then each fixed value */
 function chainApply(key, entries, amts){
@@ -81,6 +84,7 @@ async function start(){
     await startCamera();
     try{ await navigator.wakeLock.request('screen'); }catch(e){}
     { const why=profileApply(PROFILE); if(why) console.warn('[light] the profile: '+why); }   // eslint-disable-line no-console
+    for(const f of starts){ try{ f(); }catch(e){ console.warn('[light] a start listener failed', e); } }   // eslint-disable-line no-console
     $('start').classList.remove('busy','on');
     started=true; requestAnimationFrame(loop);
     return true;

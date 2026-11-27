@@ -25,3 +25,8 @@ Read: `docs/light/PLAN.md` (decisions, where each part comes from, core changes,
   recorder); the page holds only Light's elements; no shared legacy UI or its styles. Proved: static check (17) and row «LIGHT on its own» (no Full or
   Night file loaded; 67 app scripts and sheets). Bars as in Night, one per finger (DLY VIB TRM BRT, REV), shown only while used; one axis per effect
   proved. Start page: «How to play» card (privacy line inside). Next: `LIGHT-3b` — the controls when the hands leave (variant B) and their menus.
+- `LIGHT-3b` (2026-11-27): the reverb fixed (the depth drove the reverb's TAIL with the mix at 25 %: now it drives the MIX 0…85 %, the tail fixed
+  ≈ 1.8 s — `data/light.json`); the controls when the hands leave (variant B: key + A4 on top, the scale under it; sound, hands, camera flip,
+  sensitivity) and their sheets (12 keys + A4 432/440/442 ±1 Hz; the 31 moods by group; the timbres; each hand's function and octaves «A2 – A5» with
+  arrows, the field 4 / 1 notes; hand travel and effects sliders); the choices kept on this device. Next: `LIGHT-4` — Night's hand setup (the nearest
+  point; the travel slider then works on the calibrated law), then `LIGHT-5` the clip.

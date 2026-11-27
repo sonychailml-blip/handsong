@@ -3,12 +3,15 @@
    Full's recorder, songs, arrangement or menus. Order: the modes it plays (before core/scales.js loads), its texts, then the page. */
 import './scalepick.js';
 import './texts.js';
+import './icons.js';   // LIGHT-3b: Light's drawn icons join the shared table before the markup is filled
 import { applyI18n } from '../../core/i18n.js';
 import { lightBoot } from './boot.js';
 import { lightShellWire } from './shell.js';
+import { lightControlsWire } from './controls.js';
 
-applyI18n();   // the page's [data-i18n] texts and drawn icons (the emblem) in the chosen language
+applyI18n();   // the page's [data-i18n] texts and drawn icons (the emblem, the buttons) in the chosen language
 lightShellWire();   // the bars, once per screen frame
+lightControlsWire(root=>applyI18n(root));   // LIGHT-3b: the controls when the hands leave and their sheets (the sheets' icons filled the same way)
 lightBoot();
 /* LIGHT-2b: «How to play» — a short card from the start (the privacy line at its foot) */
 { const card=document.getElementById('lightHow');

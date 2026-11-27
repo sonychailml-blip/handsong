@@ -6,7 +6,7 @@
    core's on the same synthetic hands. Notes go to apps/light/engine.js (no recorder). */
 import { FINGER_TIPS, PINCH_HOLD, REV_NEAR, REV_RANGE, WATCHDOG_MS, volAmp } from '../../core/config.js';
 import { fxChainOf, chainKeyOf, FX_VOL, flipX, leadIdx, handFnOf, playsNotes, isLeadMode, pinchFingers, sx, sy, handSide, rectOctReg, volFloor } from '../../core/state.js';
-import { IVX, rectGrid, rectLayout, rectBase, rectNoteAt, thereminHz } from '../../core/scales.js';
+import { IVX, rectGrid, rectLayout, rectBase, rectNoteAt, thereminHz, periodOf, CUR } from '../../core/scales.js';
 import { fxSnapshot, FX_GLIDE_KEY, fxInstance, fxHandRange } from '../../core/audio.js';
 import { canvas } from '../../core/vision.js';
 import { clamp01, clamp, dist, pinchRatios, minFinger, touchedFingers, emaS, degHyst } from '../../core/gestures/features.js';
@@ -17,10 +17,15 @@ const ROLE='ld', HANDS={}, monoOwner={ ld:null };
 /* the effects sensitivity (LIGHT-4 sets it; 1 = core's own law, and 1*x is exactly x) */
 let fxSens=1;
 export const setLightFxSens=v=>{ fxSens= v>0 ? +v : 1; };
+/* LIGHT-3b, the menus: the hand travel (the depth law's range × this; 1 = core's law) and each hand's octave shift (whole periods; 0 = core's) */
+let travel=1; const octShift={ L:0, R:0 };
+export const setLightTravel=v=>{ travel= v>0 ? +v : 1; };
+export const setLightOctShift=(hand,n)=>{ if(hand==='L'||hand==='R') octShift[hand]=Math.max(-3, Math.min(3, Math.round(+n||0))); };
+export const lightOctShift=hand=>octShift[hand]||0;
 
 /* ── roles.js, cut to the solo ── */
 function depthOf(S,lm){ if(S.hsF==null) S.hsF=emaS(S,'hs',dist(lm[0],lm[9]),0.15); return S.hsF; }   // ONE smoothing step per hand per frame
-const depthN=(S,lm)=>clamp01((REV_NEAR-depthOf(S,lm))/REV_RANGE);
+const depthN=(S,lm)=>clamp01((REV_NEAR-depthOf(S,lm))/(travel===1 ? REV_RANGE : REV_RANGE*travel));
 const polyZone=z=> z===ROLE && !isLeadMode(z), leadZone=z=> z===ROLE && isLeadMode(z);
 const liveKey=(key,finger=null)=> 'lead:'+handSide(key)+(finger==null?'':':'+finger), monoKey=()=>'lead:M';
 const wOn=(own,p,live)=>lightNoteOn(own,p,live), wOff=own=>lightNoteOff(own);
@@ -150,16 +155,17 @@ export function lightProcessHands(res){
           eff.params.forEach((pa,i)=>{ if(pa.mode!=='drive' || pa.hand!=='play' || pa.axis!=='x') return; if(!ps) ps=fxParamsOf(zk,eff.fxId); const p=ps[i]; if(p) p.set(pa.inv ? 1-xn : xn); });
         }
         const noteFx=m=> thereminOn && m && m[FX_GLIDE_KEY]!=null ? (({[FX_GLIDE_KEY]:_g, ...rest})=>rest)(m) : m;
-        const payload=(deg,oct,fxSnap)=>({ deg, oct, vol:S.vol, fx:fxSnap, inst:leadIdx });
+        const sh=octShift[handSide(key)]||0, liveHz= thereminOn ? (sh ? S.hz*Math.pow(periodOf(CUR()), sh) : S.hz) : null;   // the hand's octave shift (0: exactly core's values)
+        const payload=(deg,oct,fxSnap)=>({ deg, oct:sh ? oct+sh : oct, vol:S.vol, fx:fxSnap, inst:leadIdx });
         if(poly){
           const noteKey=f=> (multi&&!thereminOn) ? liveKey(key,f) : liveKey(key);
           const keys=act.map(noteKey), prevSnd=S.snd||[];
           for(const kk of prevSnd) if(!keys.includes(kk)) wOff(kk);
           S.snd=keys;
           if(!idle){ const fxSnap=noteFx(fxSnapshot(zk));
-            for(const f of act){ const n=S.fing[f]; if(!n) continue; wOn(noteKey(f), payload(n.deg,n.oct,fxSnap), thereminOn?S.hz:null); } }
+            for(const f of act){ const n=S.fing[f]; if(!n) continue; wOn(noteKey(f), payload(n.deg,n.oct,fxSnap), liveHz); } }
         }else if(idle){ if(monoOwner.ld===key) wOff(monoKey()); }
-        else if(monoOwner.ld===key){ const fxSnap=noteFx(fxSnapshot(zk)); wOn(monoKey(), payload(S.deg,S.regOct,fxSnap), thereminOn?S.hz:null); }
+        else if(monoOwner.ld===key){ const fxSnap=noteFx(fxSnapshot(zk)); wOn(monoKey(), payload(S.deg,S.regOct,fxSnap), liveHz); }
       }
     }
     /* the playing hand's depth → the chain's play:z values (absolute: nearer 0 … farther 1); nothing written while no playing hand is seen */

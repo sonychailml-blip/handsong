@@ -23,8 +23,13 @@ SPLIT-2: the Full app's entry.
 
 ## apps/light/boot.js
 LIGHT-3 — LIGHT'S OWN START AND FRAME LOOP (option B: no shared legacy UI).
-- const (4): `PROFILE`, `onLightFrame`, `setLightFace`, `lightBootDbg`
+- const (6): `PROFILE`, `onLightFrame`, `onLightStart`, `lightStarted`, `setLightFace`, `lightBootDbg`
 - fn (1): `lightBoot`
+
+## apps/light/controls.js
+LIGHT-3b — THE CONTROLS WHEN THE HANDS LEAVE (variant B, the founder's choice at LIGHT-1) and their menus.
+- const (5): `CTL_IDLE_MS`, `keyName`, `octRange`, `lightControlsDbg`, `lightControlsOpenDbg`
+- fn (9): `setScale`, `setKey`, `setA4`, `setTimbre`, `setHand`, `setField`, `setOct`, `setSens`, `lightControlsWire`
 
 ## apps/light/draw.js
 LIGHT-3 — LIGHT'S CANVAS: the camera picture (the cover crop: the same rectangle remaps the hands — rule #12; the front camera mirrored — rule #13, through core mirrored()), the note field and the …
@@ -37,8 +42,12 @@ LIGHT-3 — Light's LIVE NOTE ADAPTER: the hands' solo notes straight into the e
 
 ## apps/light/gestures.js
 LIGHT-3 — LIGHT'S HANDS: core/gestures/hands.js and roles.js COPIED and cut to what Light offers (option B, the founder 2026-11-27): one role, the solo; each hand's function note / hold / theremin …
-- const (1): `setLightFxSens`
+- const (4): `setLightFxSens`, `setLightTravel`, `setLightOctShift`, `lightOctShift`
 - fn (6): `lightVoiceModeReset`, `lightHandsReset`, `lightHandsProbe`, `lightProcessHandsProbe`, `lightProcessHands`, `lightHandsView`
+
+## apps/light/icons.js
+LIGHT-3b — LIGHT'S OWN DRAWN ICONS (our own work, rule #32; the shapes of the founder's approved drawing, tools/.out/light-ui/), added to the shared table through core's door (core/icons.js svgIcon…
+- const (1): `LIGHT_ICONS`
 
 ## apps/light/main.js
 LIGHT-3 — Handsong's entry (code id light).
@@ -50,7 +59,7 @@ LIGHT-3 — only the modes Light plays: the page profile's moods (Full's «Famil
 
 ## apps/light/shell.js
 LIGHT-3 — LIGHT'S BARS, as in Night but by the founder's rule (LIGHT-1/2): one bar per effect finger — DLY VIB TRM BRT on the effects hand's side, shown from the moment an effects pinch starts unti…
-- const (4): `BAR_FX_MS`, `FX_BARS`, `shownAt`, `lightShellDbg`
+- const (5): `BAR_FX_MS`, `FX_BARS`, `shownAt`, `drivenIndex`, `lightShellDbg`
 - fn (2): `sideOf`, `lightShellWire`
 
 ## apps/light/texts.js
@@ -1546,6 +1555,7 @@ LIGHT-2/3: the probe entry of the Light page (?probe): its own rows behind its o
 - fn (2): `light`, `install`
 - → ./light/alone.js (1): `checkLightAlone`
 - → ./light/bars.js (1): `checkLightBars`
+- → ./light/controls.js (1): `checkLightControls`
 - → ./light/hands.js (1): `checkLightHands`
 - → ./light/start.js (1): `checkLightStart`
 
@@ -1556,6 +1566,10 @@ LIGHT-3 row «LIGHT on its own» (the founder: «only what it really has; nothin
 ## tools/probes/light/bars.js
 LIGHT-3 row «LIGHT bars and one axis»: the four effect bars (DLY VIB TRM BRT, one per finger, in the chain's order) and REV exist and rest hidden with no hand in view; ONE axis per effect in the li…
 - fn (1): `checkLightBars`
+
+## tools/probes/light/controls.js
+LIGHT-3b row «LIGHT controls and menus»: with no hand in view the controls show (variant B) and read the live state (the key and A4, the scale, the sound); each sheet holds what it must (12 keys an…
+- fn (1): `checkLightControls`
 
 ## tools/probes/light/hands.js
 LIGHT-3 row «LIGHT hands = core hands»: Light's hands (apps/light/gestures.js, a cut copy of core's) must make EXACTLY the note calls core's gesture machine makes on the same synthetic hands — the …
@@ -1814,7 +1828,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 UI-1 — «NIGHT labels follow the room»: the founder entered the rain and the Sound button still read «Firefly» while another timbre played.
 - fn (1): `checkNightLabels`
 
-_362 modules, 3359 exported names._
+_365 modules, 3382 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

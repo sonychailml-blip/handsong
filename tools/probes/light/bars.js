@@ -4,7 +4,7 @@
    40 % / 60 % (CONTROL: inside the band it stays), a set shows for exactly its hold after the last activity (CONTROL: at the hold it is hidden). */
 import { fxChainOf, chainKeyOf } from '../../../core/state.js';
 import { profileOf } from '../../../core/profile.js';
-import { FX_BARS, BAR_FX_MS, BAR_REV_MS, sideOf, shownAt, lightShellDbg } from '../../../apps/light/shell.js';
+import { FX_BARS, BAR_FX_MS, BAR_REV_MS, sideOf, shownAt, lightShellDbg, drivenIndex } from '../../../apps/light/shell.js';
 
 export async function checkLightBars(){
   const diffs=[], miss=s=>diffs.push(s);
@@ -15,6 +15,8 @@ export async function checkLightBars(){
       for(const q of dr) if(q.hand==='fx' ? q.axis!=='y' : !((e.fxId==='vol' && q.axis==='x') || (e.fxId==='reverb' && q.axis==='z'))) bad.push(`${e.fxId}: ${q.hand} on ${q.axis}`); }
     return bad; };
   oneAxis(fxChainOf(chainKeyOf('ld'))).forEach(s=>miss('more than one axis: '+s));
+  /* LIGHT-3b: the depth drives the reverb's MIX (its third parameter); the REV bar shows that value */
+  if(drivenIndex('reverb')!==2) miss('the reverb\'s driven value is parameter '+drivenIndex('reverb')+', not the mix (2)');
   const fullDefault=[{ fxId:'vol', params:[{ mode:'drive', hand:'play', axis:'x' }] }, { fxId:'reverb', params:['y','x','z'].map(axis=>({ mode:'drive', hand:'fx', finger:0, axis })) }];
   if(!oneAxis(fullDefault).length) miss('CONTROL: Full\'s three-axis reverb passed the one-axis check');
   await new Promise(r=>setTimeout(r, 2*BAR_FX_MS));   // no hand in view (the fake camera): both sets rest hidden
