@@ -10,15 +10,20 @@ import { t, onLangChange } from '../../core/i18n.js';
 export const CARDS=Object.freeze(['play','depth','fx','menu','clip']), CARDS_KEY='handsong.lightCards', CARDS_V='1';
 const $=id=>document.getElementById(id);
 /* a hand seen from the palm, its wrist at (x, y), scale s, mirrored for the left one; pinch: which finger touches the thumb; tips: lit fingertips */
-function handSvg(x, y, s, o={}){ const m=o.left ? -1 : 1, P=(dx,dy)=>`${(x+dx*s*m).toFixed(1)},${(y+dy*s).toFixed(1)}`, sp=q=>q.split(',');
-  const palm=`M${P(-16,0)} Q${P(-21,-22)} ${P(-15,-34)} L${P(15,-34)} Q${P(21,-22)} ${P(16,0)} Z`;
-  const fx=[-12,-4,4,12], fl=[30,33,30,23], pin=new Set(o.pinch||[]);
-  const fin=fx.map((f,i)=> pin.has(i) ? `<path d="M${P(f,-32)} Q${P(f-6,-48)} ${P(-17,-44)}" class="lp-limb" stroke-width="${(7*s).toFixed(1)}"/>`
-    : `<line x1="${sp(P(f,-32))[0]}" y1="${sp(P(f,-32))[1]}" x2="${sp(P(f+(i-1.5)*1.6,-32-fl[i]))[0]}" y2="${sp(P(f+(i-1.5)*1.6,-32-fl[i]))[1]}" class="lp-limb" stroke-width="${(7*s).toFixed(1)}"/>`).join('');
-  const thumbTip= pin.size ? P(-19,-42) : P(-36,-30), thumb=`<path d="M${P(-15,-6)} Q${P(-30,-12)} ${thumbTip}" class="lp-limb" stroke-width="${(8*s).toFixed(1)}"/>`;
-  const touch= pin.size ? `<circle cx="${sp(P(-18,-43))[0]}" cy="${sp(P(-18,-43))[1]}" r="${(5*s).toFixed(1)}" class="lp-glow"/>` : '';
-  const tips=(o.tips||[]).map(([i,cls])=>{ const q=sp(P(fx[i]+(i-1.5)*1.6, -32-fl[i])); return `<circle cx="${q[0]}" cy="${q[1]}" r="${(4.5*s).toFixed(1)}" class="${cls}"/>`; }).join('');
-  return `<g class="lp-hand"><path d="${palm}" class="lp-palm"/>${fin}${thumb}</g>${touch}${tips}`; }
+/* LIGHT-6b (the founder: the old hand looked odd) — a clean PICTOGRAM hand seen from the palm: a rounded palm, four rounded fingers of natural
+   lengths fanning a little, the thumb from the palm's side; its wrist at (x, y), scale s, mirrored for the left hand. pinch: the fingers that touch
+   the thumb (each bends to the thumb's tip, a glow where they meet); tips: [finger, class] lit fingertips. All parts one soft colour (lp-hf). */
+function handSvg(x, y, s, o={}){ const m=o.left ? -1 : 1, X=dx=>+(x+dx*s*m).toFixed(1), Y=dy=>+(y+dy*s).toFixed(1), W=w=>+(w*s).toFixed(1);
+  const pin=new Set(o.pinch||[]), base=[-12,-4,4,12], len=[26,30,28,21], lean=[-2.5,-0.8,0.8,2.5], thumbTip= pin.size ? [-15,-47] : [-31,-27];
+  const tipOf=i=> pin.has(i) ? [thumbTip[0]+1.5+i*1.2, thumbTip[1]-1.5] : [base[i]+lean[i], -33-len[i]];
+  const palm=`<rect x="${Math.min(X(-17),X(17))}" y="${Y(-37)}" width="${W(34)}" height="${W(37)}" rx="${W(11)}" class="lp-hf"/>`;
+  const fingers=base.map((b,i)=>{ const [tx,ty]=tipOf(i);
+    return pin.has(i) ? `<path d="M${X(b)},${Y(-31)} Q${X(b-1)},${Y(-50)} ${X(tx)},${Y(ty)}" class="lp-hs" stroke-width="${W(8)}"/>`
+      : `<line x1="${X(b)}" y1="${Y(-31)}" x2="${X(tx)}" y2="${Y(ty)}" class="lp-hs" stroke-width="${W(8)}"/>`; }).join('');
+  const thumb=`<path d="M${X(-13)},${Y(-11)} Q${X(-26)},${Y(-16)} ${X(thumbTip[0])},${Y(thumbTip[1])}" class="lp-hs" stroke-width="${W(9)}"/>`;
+  const touch= pin.size ? `<circle cx="${X(thumbTip[0]+1)}" cy="${Y(thumbTip[1]-1)}" r="${W(5)}" class="lp-glow"/>` : '';
+  const tips=(o.tips||[]).map(([i,cls])=>{ const [tx,ty]=tipOf(i); return `<circle cx="${X(tx)}" cy="${Y(ty)}" r="${W(4.6)}" class="${cls}"/>`; }).join('');
+  return `<g class="lp-hand">${palm}${fingers}${thumb}</g>${touch}${tips}`; }
 const arcs=(x, y)=>[14, 24, 34].map((r,k)=>`<path d="M${x+r*0.5},${y-r*0.87} A${r},${r} 0 0 1 ${x+r*0.5},${y+r*0.87}" class="lp-wave${k ? ' lp-faint' : ''}"/>`).join('');
 const arrowV=(x, y0, y1)=>`<path d="M${x},${y0} L${x},${y1} M${x-5},${y0+6} L${x},${y0} L${x+5},${y0+6} M${x-5},${y1-6} L${x},${y1} L${x+5},${y1-6}" class="lp-line"/>`;
 const arrowH=(y, x0, x1)=>`<path d="M${x0},${y} L${x1},${y} M${x0+6},${y-5} L${x0},${y} L${x0+6},${y+5} M${x1-6},${y-5} L${x1},${y} L${x1-6},${y+5}" class="lp-line"/>`;

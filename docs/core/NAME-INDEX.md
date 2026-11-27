@@ -57,8 +57,8 @@ LIGHT-3 — Light's LIVE NOTE ADAPTER: the hands' solo notes straight into the e
 
 ## apps/light/gestures.js
 LIGHT-3 — LIGHT'S HANDS: core/gestures/hands.js and roles.js COPIED and cut to what Light offers (option B, the founder 2026-11-27): one role, the solo; each hand's function note / hold / theremin …
-- const (5): `setLightFxSens`, `setLightDepthLaw`, `setLightTravel`, `setLightOctShift`, `lightOctShift`
-- fn (6): `lightVoiceModeReset`, `lightHandsReset`, `lightHandsProbe`, `lightProcessHandsProbe`, `lightProcessHands`, `lightHandsView`
+- const (8): `setLightFxSens`, `setLightDepthLaw`, `setLightTravel`, `setLightOctShift`, `lightOctShift`, `lightTrackKey`, `lightChainOfHand`, `setLightTrackFx`
+- fn (8): `setLightPerHandReverb`, `lightMirrorFx`, `lightVoiceModeReset`, `lightHandsReset`, `lightHandsProbe`, `lightProcessHandsProbe`, `lightProcessHands`, `lightHandsView`
 
 ## apps/light/icons.js
 LIGHT-3b — LIGHT'S OWN DRAWN ICONS (our own work, rule #32; the shapes of the founder's approved drawing, tools/.out/light-ui/), added to the shared table through core's door (core/icons.js svgIcon…
@@ -1579,6 +1579,7 @@ LIGHT-2/3: the probe entry of the Light page (?probe): its own rows behind its o
 - → ./light/clip.js (1): `checkLightClip`
 - → ./light/controls.js (1): `checkLightControls`
 - → ./light/hands.js (1): `checkLightHands`
+- → ./light/perhand.js (1): `checkLightPerHand`
 - → ./light/start.js (1): `checkLightStart`
 - → ./light/texts.js (1): `checkLightTexts`
 
@@ -1609,6 +1610,10 @@ LIGHT-3b row «LIGHT controls and menus»: with no hand in view the controls sho
 ## tools/probes/light/hands.js
 LIGHT-3 row «LIGHT hands = core hands»: Light's hands (apps/light/gestures.js, a cut copy of core's) must make EXACTLY the note calls core's gesture machine makes on the same synthetic hands — the …
 - fn (1): `checkLightHands`
+
+## tools/probes/light/perhand.js
+LIGHT-6b row «LIGHT each hand its own reverb»: with both hands playing notes, (1) the left hand's voices go to the second solo head and the right hand's to the live one (the engine's router at each…
+- fn (1): `checkLightPerHand`
 
 ## tools/probes/light/start.js
 LIGHT-2/3 row «LIGHT start and profile»: after ▶ the page runs in Light's profile through Light's own doors — its first mood (minor pentatonic), its one timbre (SuperSaw), key A, the playing hand r…
@@ -1867,7 +1872,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 UI-1 — «NIGHT labels follow the room»: the founder entered the rain and the Sound button still read «Firefly» while another timbre played.
 - fn (1): `checkNightLabels`
 
-_373 modules, 3431 exported names._
+_374 modules, 3438 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

@@ -118,3 +118,16 @@ Tree hashes after: core f685c1fe10916012 (unchanged since LIGHT-5) · apps/full 
   languages — CONTROL a maqam has none —, «Mayor (jónico)» in the Spanish sheet).
 - Checks (iteration mode): static PASSED; probe-data PASS 109/0; `--app light` 9 rows PASS, CSP, network, storage PASS; smoke on Light PASS;
   licences PASS; name index PASS.
+
+# LIGHT-6b (LIGHT track, 2026-11-27): theremin lines, a reverb per hand, outlines, the cards' hand
+Tree hashes after: core 44ed0dd238a68bfb (only `core/engine/surface.js`) · apps/full 0148bb454440c3e3 and apps/night 30d8f7b3c797de9e unchanged · apps/light 2cb43ab8a5a170d6.
+- `draw.js`: `thereminLines` (core `thereminSpan`; tonic lines amber-tinted, the theremin hand's line lit) and the sounding row outlined in the
+  rows view. `gestures.js`: a reverb per hand — `setTrackRouteOf` sends the left hand's voices («lead:L…») to the engine's second solo head (its
+  «track» head: Light has no tracks), each hand's depth writes its own chain (the entries read from the live chain), `lightMirrorFx` copies the other
+  values (the delay) each frame; `setLightPerHandReverb(false)` = core's one reverb (the comparison row runs that way). `boot.js lightTrackChain`
+  builds the second chain's bus effects with their fixed values. `shell.js`: REV shows the playing hand's chain. `cards.js`: a pictogram hand;
+  `light.css`: opaque cards.
+- Row «LIGHT each hand its own reverb»: the router (L → second head, R → live); left near / right far → live 0.82, second 0.00, swapped → 0.00 /
+  0.82; the delay mirrored; off → the left hand live (CONTROL: alone, it moves the live mix, 0.82).
+- Checks (iteration mode): static PASSED; probe-data PASS 109/0; `--app light` 10 rows PASS, CSP, network, storage PASS; smoke on Light PASS;
+  licences PASS; name index PASS.

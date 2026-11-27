@@ -37,7 +37,7 @@
   --light-bar-glow:0 0 10px rgba(255,255,255,.35); --light-fs-bar:10px; --light-fw-semi:650; --light-track-bar:.06em; --light-fade:.35s;
   --light-z-bars:var(--z-field); --light-z-card:var(--z-help);
   --light-cv-dim:rgba(8,7,6,.32); --light-cv-band:rgba(246,241,232,.03); --light-cv-line:rgba(246,241,232,.10); --light-cv-on:rgba(255,180,74,.16);
-  --light-cv-online:rgba(255,180,74,.75); --light-cv-dot:rgba(255,255,255,.85);   /* the canvas (draw.js reads them once) */
+  --light-cv-online:rgba(255,180,74,.75); --light-cv-dot:rgba(255,255,255,.85); --light-cv-ther:rgba(246,241,232,.22); --light-cv-ther-tonic:rgba(255,180,74,.5);   /* the canvas (draw.js reads them once) */
   --light-z-start:var(--z-menu);
   /* LIGHT-3b: the controls and sheets */
   --light-z-ctl:var(--z-panel); --light-z-sheet:var(--z-overlay);
@@ -46,7 +46,7 @@
   --light-r-sheet:24px 24px 0 0; --light-sheet-max:78vh; --light-sheet-w:520px; --light-grab-w:38px; --light-grab-h:4px; --light-x:32px;
   --light-chip:rgba(246,241,232,.08); --light-chip-dim:rgba(246,241,232,.045); --light-acc-soft:rgba(255,180,74,.18); --light-acc-ring:inset 0 0 0 1px rgba(255,180,74,.75);
   --light-prog-h:4px;
-  --light-pic-h:150px; --light-dot:7px;
+  --light-pic-h:150px; --light-dot:7px; --light-hand:rgba(246,241,232,.82); --light-card-bg:#1d1a17; --light-veil-solid:rgba(8,7,6,.86);
   /* LIGHT-5: the clip */
   --light-z-rec:var(--z-panel-top); --light-rec:46px; --light-rec-ring-out:-4px; --light-rec-ring-grow:8px; --light-rec-shadow:0 0 0 1px rgba(246,241,232,.08), 0 0 14px rgba(255,180,74,.22);
   --light-count:180px; --light-fs-count:84px; --light-clip-h:56vh;
@@ -104,9 +104,9 @@ button:focus-visible, a:focus-visible{ outline:2px solid var(--light-acc); outli
 /* LIGHT-2b: «How to play» on the start card, and its card */
 .light-start .light-how-btn{ margin:var(--light-gap) 0 0; padding:var(--light-retry-pad); border-radius:var(--light-r-pill); border:1px solid var(--light-hair);
   background:none; color:var(--light-ink-dim); font-family:var(--light-font); font-size:var(--light-fs-msg); cursor:pointer; }
-.light-how{ position:fixed; inset:0; z-index:var(--light-z-card); display:flex; align-items:center; justify-content:center; padding:var(--light-pad-card); background:var(--light-veil); }
+.light-how{ position:fixed; inset:0; z-index:var(--light-z-card); display:flex; align-items:center; justify-content:center; padding:var(--light-pad-card); background:var(--light-veil-solid); }   /* LIGHT-6b: the cards no longer show the start through them */
 .light-how[hidden]{ display:none; }
-.light-how-card{ max-width:var(--light-card-w); border-radius:var(--light-r-card); padding:var(--light-pad-sheet); background:var(--light-glass-hi); box-shadow:var(--light-bars-ring);
+.light-how-card{ max-width:var(--light-card-w); border-radius:var(--light-r-card); padding:var(--light-pad-sheet); background:var(--light-card-bg); box-shadow:var(--light-bars-ring);
   color:var(--light-ink); font-family:var(--light-font); display:flex; flex-direction:column; gap:var(--light-gap-sm); text-align:left; }
 .light-how-card h2{ margin:0 0 var(--light-gap-xs); font-size:var(--light-fs-h2); font-weight:var(--light-fw-semi); }
 .light-how-card p{ margin:0; font-size:var(--light-fs-msg); line-height:var(--light-lh); color:var(--light-ink-dim); }
@@ -233,8 +233,9 @@ button:focus-visible, a:focus-visible{ outline:2px solid var(--light-acc); outli
 .light-cards{ gap:var(--light-gap-sm); }
 .light-card-pic{ color:var(--light-ink); }
 .light-pic{ display:block; width:100%; height:auto; max-height:var(--light-pic-h); }
-.lp-limb{ fill:none; stroke:currentColor; stroke-linecap:round; opacity:.85; }
-.lp-palm{ fill:var(--light-chip); stroke:currentColor; stroke-width:1.6; }
+/* LIGHT-6b: the pictogram hand — one soft colour, rounded */
+.lp-hf{ fill:var(--light-hand); }
+.lp-hs{ fill:none; stroke:var(--light-hand); stroke-linecap:round; }
 .lp-line{ fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; opacity:.8; }
 .lp-dash{ fill:none; stroke:currentColor; stroke-width:1.6; stroke-dasharray:4 4; opacity:.6; }
 .lp-hold{ fill:none; stroke:var(--light-acc); stroke-width:3; stroke-linecap:round; }

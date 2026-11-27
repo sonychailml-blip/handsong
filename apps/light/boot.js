@@ -3,14 +3,14 @@
    doors (core/profile.js: the «Familiar» modes, SuperSaw, key A, the hands, the solo chain as data) and the loop starts. FRAME (rule #8): each
    processed camera frame → its crop (rule #12) → Light's hands (sound now) → it becomes the shown picture; every screen frame draws that picture,
    the field and the hands. A failed start leaves the card usable: «Try again» retries only what failed (sound and model are built once). */
-import { initAudio, AC, setLeadInstr, fxSetActive, fxChainResplice, timbreIdOf, timbreIdx } from '../../core/audio.js';
+import { initAudio, AC, setLeadInstr, fxSetActive, fxChainResplice, timbreIdOf, timbreIdx, FX_FACTORY } from '../../core/audio.js';
 import { video, initDetector, startCamera, setHandsSink, pollFrame, canvas } from '../../core/vision.js';
 import { profileWire, profileApply } from '../../core/profile.js';
 import { scaleId, tonic, tonicCents, leadIdx, phoneInstr, splitOn, handFn, voiceMode, fx, fxChainOf, chainKeyOf, fxIsScalar, setFxChain,
   setScaleId, setTonic, setTonicCents, setHandFn, setVoiceMode, sx, sy } from '../../core/state.js';
 import { fxParamsOf } from '../../core/gestures/fxhand.js';
 import { t } from '../../core/i18n.js';
-import { lightProcessHands, lightHandsView, lightHandsReset, lightVoiceModeReset } from './gestures.js';
+import { lightProcessHands, lightHandsView, lightHandsReset, lightVoiceModeReset, lightTrackKey, setLightTrackFx } from './gestures.js';
 import { lightAllOff } from './engine.js';
 import { lightDrawFrame, lightSyncViewRect } from './draw.js';
 import { lightCalBusy, lightCalFrame } from './calib.js';   // LIGHT-4: the hand setup takes the frames while it runs
@@ -36,6 +36,15 @@ function chainApply(key, entries, amts){
   for(const eff of fxChainOf(key)) eff.params.forEach((pa,pi)=>{ if(pa.mode==='fixed' && pa.v01!=null){ const p=fxParamsOf(key,eff.fxId)[pi]; if(p) p.set(pa.v01); } });
   if(amts) for(const eff of fxChainOf(key)) if(fxIsScalar(eff.fxId) && amts[eff.fxId]!=null && fx[eff.fxId]!==amts[eff.fxId]){ const p=fxParamsOf(key,eff.fxId)[0]; if(p) p.set(amts[eff.fxId]); }
 }
+/* LIGHT-6b: the second hand's chain (the engine's second solo head): the same BUS and INSERT effects as the live chain (the voice effects and the
+   old scalars ride in each note's values), their fixed values set; then the gestures mirror the rest and drive its play:z from the left hand */
+let trackIds=[];
+function lightTrackChain(entries){ const T=lightTrackKey(), ids=entries.map(e=>e.fxId).filter(id=>FX_FACTORY[id] && FX_FACTORY[id].kind!=='voice');
+  for(const id of trackIds) if(!ids.includes(id)) fxSetActive(T,id,false);
+  for(const id of ids) fxSetActive(T,id,true);
+  fxChainResplice(T); trackIds=ids;
+  for(const e of entries) if(ids.includes(e.fxId)) e.params.forEach((pa,pi)=>{ if(pa.mode==='fixed' && pa.v01!=null){ const p=fxParamsOf(T,e.fxId)[pi]; if(p) p.set(pa.v01); } });
+  setLightTrackFx(ids); }
 /* Light's doors to core/profile.js: read the live state, write a state (every live note off first), put the face on */
 profileWire({
   busy:()=>null,
@@ -47,7 +56,7 @@ profileWire({
     const li=timbreIdx('ld', s.lead); if(li!=null && li!==leadIdx) setLeadInstr(li);
     setHandFn('ld','L',s.hand.L); setHandFn('ld','R',s.hand.R);
     if(voiceMode.ld!==s.voice){ setVoiceMode('ld',s.voice); lightVoiceModeReset(); }
-    if(s.chain) chainApply(chainKeyOf('ld'), s.chain, s.scalars); },
+    if(s.chain){ chainApply(chainKeyOf('ld'), s.chain, s.scalars); lightTrackChain(s.chain); } },
   face:p=>{ if(face) face(p); },
 });
 export const setLightFace=f=>{ face=f; };

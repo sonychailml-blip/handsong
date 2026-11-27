@@ -5,9 +5,9 @@
    tutorial taps, calibration (LIGHT-4). Every kept line keeps core's arithmetic and order — the probe compares this machine's note calls with
    core's on the same synthetic hands. Notes go to apps/light/engine.js (no recorder). */
 import { FINGER_TIPS, PINCH_HOLD, REV_NEAR, REV_RANGE, WATCHDOG_MS, volAmp } from '../../core/config.js';
-import { fxChainOf, chainKeyOf, FX_VOL, flipX, leadIdx, handFnOf, playsNotes, isLeadMode, pinchFingers, sx, sy, handSide, rectOctReg, volFloor } from '../../core/state.js';
+import { fxChainOf, chainKeyOf, trackChainKeyOf, FX_VOL, flipX, leadIdx, handFnOf, playsNotes, isLeadMode, pinchFingers, sx, sy, handSide, rectOctReg, volFloor } from '../../core/state.js';
 import { IVX, rectGrid, rectLayout, rectBase, rectNoteAt, thereminHz, periodOf, CUR } from '../../core/scales.js';
-import { fxSnapshot, FX_GLIDE_KEY, fxInstance, fxHandRange } from '../../core/audio.js';
+import { fxSnapshot, FX_GLIDE_KEY, fxInstance, fxHandRange, setTrackRouteOf } from '../../core/audio.js';
 import { canvas } from '../../core/vision.js';
 import { clamp01, clamp, dist, pinchRatios, minFinger, touchedFingers, emaS, degHyst } from '../../core/gestures/features.js';
 import { fxParamsOf, captureFx } from '../../core/gestures/fxhand.js';
@@ -24,6 +24,23 @@ export const setLightDepthLaw=f=>{ depthLaw= typeof f==="function" ? f : null; }
 export const setLightTravel=v=>{ travel= v>0 ? +v : 1; };
 export const setLightOctShift=(hand,n)=>{ if(hand==='L'||hand==='R') octShift[hand]=Math.max(-3, Math.min(3, Math.round(+n||0))); };
 export const lightOctShift=hand=>octShift[hand]||0;
+/* LIGHT-6b (the founder): EACH PLAYING HAND ITS OWN REVERB. The engine's second solo head (its «track» head — Light has no tracks) takes the LEFT
+   hand's voices (the router at each attack, core setTrackRouteOf); its chain holds the same bus effects (boot.js lightTrackChain). Each hand's depth
+   drives the play:z values of ITS chain; every other value of the live chain (the effects hand's delay, the fixed tail) is mirrored into the second
+   one each frame (lightMirrorFx). Off = core's single reverb (the comparison row turns it off). */
+let perHand=true;
+const TRACK_SOLO=trackChainKeyOf(chainKeyOf(ROLE));
+export const lightTrackKey=()=>TRACK_SOLO;
+const routeLeft=owner=> perHand && typeof owner==='string' && /^lead:L(:|$)/.test(owner);
+export function setLightPerHandReverb(on){ perHand=!!on; setTrackRouteOf(routeLeft); }
+export const lightChainOfHand=key=>chainOfHand(key);   // the shell's REV bar shows the playing hand's own reverb
+setTrackRouteOf(routeLeft);
+const chainOfHand=key=> perHand && handSide(key)==='L' ? TRACK_SOLO : chainKeyOf(ROLE);
+const mirrored=new Map(); let trackFx=[];
+export const setLightTrackFx=ids=>{ trackFx=[...ids]; mirrored.clear(); };   // boot.js: the bus effects the second chain was built with
+export function lightMirrorFx(){ const live=chainKeyOf(ROLE);
+  for(const eff of fxChainOf(live)){ if(!trackFx.includes(eff.fxId)) continue; const L=fxParamsOf(live,eff.fxId), T=fxParamsOf(TRACK_SOLO,eff.fxId);
+    eff.params.forEach((pa,i)=>{ if(pa.mode==='drive' && pa.hand==='play' && pa.axis==='z') return; const a=L[i], b=T[i]; if(!a||!b) return; const v=a.get(), k=eff.fxId+':'+i; if(mirrored.get(k)!==v){ mirrored.set(k,v); b.set(v); } }); } }
 
 /* ── roles.js, cut to the solo ── */
 function depthOf(S,lm){ if(S.hsF==null) S.hsF=emaS(S,'hs',dist(lm[0],lm[9]),0.15); return S.hsF; }   // ONE smoothing step per hand per frame
@@ -172,8 +189,9 @@ export function lightProcessHands(res){
     }
     /* the playing hand's depth → the chain's play:z values (absolute: nearer 0 … farther 1); nothing written while no playing hand is seen */
     if(noteHand(key)){
-      const vD=depthN(S,lm), ck=chainKeyOf(ROLE);
-      for(const eff of fxChainOf(ck)){
+      const vD=depthN(S,lm), ck=chainOfHand(key);   // LIGHT-6b: written into this hand's own chain; the entries are the live chain's (the second chain has no list of its own in the state)
+      for(const eff of fxChainOf(chainKeyOf(ROLE))){
+        if(ck!==chainKeyOf(ROLE) && !trackFx.includes(eff.fxId)) continue;
         if(!eff||eff.fxId===FX_VOL) continue;
         let ps=null;
         eff.params.forEach((pa,i)=>{ if(pa.mode!=='drive' || pa.hand!=='play' || pa.axis!=='z') return; if(!ps) ps=fxParamsOf(ck,eff.fxId); const p=ps[i]; if(p) p.set(pa.inv ? 1-vD : vD); });
@@ -183,6 +201,7 @@ export function lightProcessHands(res){
   /* the watchdog: a hand gone mid-pinch is released after WATCHDOG_MS (forgives a tracking blink) */
   for(const k of Object.keys(HANDS)){ const S=HANDS[k]; if(!seen.has(k)&&now-S.seen>WATCHDOG_MS){ endPinch(k,S); delete HANDS[k]; } }
   if(monoOwner.ld&&!HANDS[monoOwner.ld]){ wOff(monoKey()); monoOwner.ld=null; }
+  if(perHand && !PRB) lightMirrorFx();   // the effects hand's values reach the second hand's chain too
 }
 
 /* what the drawing and the bars need of each hand in view (canvas px; read-only) */
@@ -191,6 +210,6 @@ export function lightHandsView(){
   for(const k in HANDS){ const S=HANDS[k], lm=S.lm; if(!lm || now-S.seen>WATCHDOG_MS) continue;
     const tip=FINGER_TIPS[S.pinch && S.oct>=0 ? S.oct : 0]||8;
     out.push({ key:k, x:sx((lm[4].x+lm[tip].x)/2, W), y:sy((lm[4].y+lm[tip].y)/2, H), pinch:!!S.pinch, play:noteHand(k), finger: S.pinch && S.oct>=0 ? S.oct : -1,
-      zone:S.zone, slot:S.slot, deg:S.deg, oct:S.regOct, fing:{ ...(S.fing||{}) }, lm }); }
+      zone:S.zone, fn:S.fn, slot:S.slot, deg:S.deg, oct:S.regOct, fing:{ ...(S.fing||{}) }, lm }); }
   return out;
 }

@@ -6,6 +6,7 @@ import { chainKeyOf, fxChainOf } from '../../core/state.js';
 import { fxParamsOf } from '../../core/gestures/fxhand.js';
 import { canvas } from '../../core/vision.js';
 import { onLightFrame } from './boot.js';
+import { lightChainOfHand } from './gestures.js';
 
 export const BAR_FX_MS=1500, BAR_REV_MS=1000, SIDE_LO=0.4, SIDE_HI=0.6;
 export const FX_BARS=Object.freeze([['dly','DLY'],['vib','VIB'],['trm','TRM'],['bright','BRT']]);   // finger 0…3, as data/light.json's chain
@@ -19,7 +20,7 @@ export const shownAt=(seen, now, hold)=> now-seen<hold;
 
 /* a bar shows its effect's DRIVEN value (the one its hand moves — for the reverb the mix, its third parameter), from the live chain */
 export const drivenIndex=id=>{ const e=fxChainOf(chainKeyOf('ld')).find(x=>x.fxId===id); const i=e ? e.params.findIndex(q=>q.mode==='drive') : -1; return i<0 ? 0 : i; };
-const valOf=id=>{ const p=fxParamsOf(chainKeyOf('ld'), id)[drivenIndex(id)]; return p ? Math.max(0, Math.min(1, +p.get()||0)) : 0; };
+const valOf=(id, key=chainKeyOf('ld'))=>{ const p=fxParamsOf(key, id)[drivenIndex(id)]; return p ? Math.max(0, Math.min(1, +p.get()||0)) : 0; };
 function place(el, side){ el.classList.toggle('left', side==='left'); el.classList.toggle('right', side!=='left'); }
 function fill(bar, v){ bar.querySelector('.light-bar-fill').style.height=(v*100).toFixed(1)+'%'; }
 
@@ -34,7 +35,7 @@ function frame(now, hands){
   if(fx){ let s=sideOf(SIDE.fx, fx.x, W); if(play && s===SIDE.play) s= SIDE.play==='left' ? 'right' : 'left'; SIDE.fx=s; }
   place(R, SIDE.play); place(F, SIDE.fx);
   FX_BARS.forEach(([id],i)=>{ const b=F.querySelector(`[data-bar="${id}"]`); fill(b, vals[i]); b.classList.toggle('act', !!(fx && fx.pinch && fx.finger===i)); });
-  const rb=R.querySelector('.light-bar'); fill(rb, valOf('reverb')); rb.classList.toggle('act', !!(play && play.pinch));
+  const rb=R.querySelector('.light-bar'); fill(rb, valOf('reverb', play ? lightChainOfHand(play.key) : chainKeyOf('ld')));   // LIGHT-6b: the playing hand's own reverb rb.classList.toggle('act', !!(play && play.pinch));
   F.classList.toggle('on', shownAt(fxSeen, now, BAR_FX_MS));
   R.classList.toggle('on', shownAt(revSeen, now, BAR_REV_MS));
 }

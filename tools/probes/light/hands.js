@@ -9,7 +9,7 @@ import { CAM_MARGIN } from '../../../core/config.js';
 import { leadAllOff } from '../../../core/audio.js';
 import { pose } from '../../../core/gestures/pose.js';
 import { fxParamsOf } from '../../../core/gestures/fxhand.js';
-import { lightHandsProbe, lightProcessHandsProbe, lightHandsReset, setLightFxSens } from '../../../apps/light/gestures.js';
+import { lightHandsProbe, lightProcessHandsProbe, lightHandsReset, setLightFxSens, setLightPerHandReverb } from '../../../apps/light/gestures.js';
 import { lightNoteTapSet } from '../../../apps/light/engine.js';
 
 const FPS=30, W=1000, H=600, PIN=0.05, OPEN=1;
@@ -81,11 +81,12 @@ export async function checkLightHands(){
   const core={ begin:(clk,tap)=>{ G.handsProbe(clk, ()=>true); REC.wTapSet(tap); }, frame:res=>G.processHandsProbe(res), end:()=>{ REC.wTapSet(null); G.handsProbe(null); } };
   const light={ begin:(clk,tap)=>{ lightHandsProbe(clk); lightNoteTapSet(tap); }, frame:res=>lightProcessHandsProbe(res), end:()=>{ lightNoteTapSet(null); lightHandsProbe(null); } };
   let a, b, c;
+  setLightPerHandReverb(false);   // LIGHT-6b: core has ONE reverb for both hands; the comparison runs Light the same way
   try{
     envSet(base); fxRestore(fx0); a=perform(core);
     envSet(base); fxRestore(fx0); b=perform(light);
     envSet(base); fxRestore(fx0); setLightFxSens(1.5); try{ c=perform(light); } finally { setLightFxSens(1); }
-  } finally { envSet(keep); fxRestore(fx0); lightHandsReset(); }
+  } finally { envSet(keep); fxRestore(fx0); lightHandsReset(); setLightPerHandReverb(true); }
   const calls=x=>x.filter(l=>/ W /.test(l)).length;
   notes.push(`core ${a.length} lines (${calls(a)} note calls), Light ${b.length} (${calls(b)})`);
   if(calls(a)<20) miss('the performance made only '+calls(a)+' note calls in core — it proves nothing');

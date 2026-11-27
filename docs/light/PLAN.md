@@ -149,3 +149,12 @@ decisions they led to are written here in words).
 - **The teaching cards, as in Night:** five cards (play, volume and reverb, effects, the buttons, the clip with the privacy line), from «How to play»
   and once after the first start, before the hand-setup offer.
 - **The emblem's dot flares on Play** and settles back (from Night, without the flight).
+
+## Decided after trying LIGHT-6 (the founder, 2026-11-27)
+- **Theremin lines:** when either hand plays the theremin, a line through each note's place shows where the pitch is exactly that note (Full's
+  system: `thereminSpan`); the line a theremin hand is on lights.
+- **Each playing hand its own reverb:** the left hand's notes go through the engine's second solo head with its own reverb (and the mirrored delay);
+  each hand's depth moves only its own reverb; the REV bar shows the playing hand's.
+- **The sounding band outlined in both field views** (1 note a band too).
+- **The cards' hand redrawn** (a clean pictogram) and **the cards opaque** (the start no longer shows through).
+- **The cards' Russian texts** to be edited by the founder first, then translated.
