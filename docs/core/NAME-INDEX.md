@@ -31,6 +31,11 @@ LIGHT-4 — THE HAND SETUP, as in Night (the founder): the playing hand held at 
 - const (6): `lightCalOn`, `setLightCalTravel`, `lightCalBusy`, `lightCalProbeSet`, `lightCalCamera`, `lightCalDbg`
 - fn (7): `lightCalFrameProbe`, `lightCalFrame`, `lightCalStart`, `lightCalCancel`, `lightCalOffer`, `lightCalWire`, `lightCalForgetDbg`
 
+## apps/light/clip.js
+LIGHT-5 — THE CLIP.
+- const (7): `CLIP`, `REC_FPS`, `MIME_ORDER`, `IOS`, `clipBusy`, `clipCanShare`, `lightClipDbg`
+- fn (4): `clipType`, `lightClipWire`, `lightClipRecordDbg`, `lightClipCloseDbg`
+
 ## apps/light/controls.js
 LIGHT-3b — THE CONTROLS WHEN THE HANDS LEAVE (variant B, the founder's choice at LIGHT-1) and their menus.
 - const (5): `CTL_IDLE_MS`, `keyName`, `octRange`, `lightControlsDbg`, `lightControlsOpenDbg`
@@ -1561,6 +1566,7 @@ LIGHT-2/3: the probe entry of the Light page (?probe): its own rows behind its o
 - → ./light/alone.js (1): `checkLightAlone`
 - → ./light/bars.js (1): `checkLightBars`
 - → ./light/calib.js (1): `checkLightCalib`
+- → ./light/clip.js (1): `checkLightClip`
 - → ./light/controls.js (1): `checkLightControls`
 - → ./light/hands.js (1): `checkLightHands`
 - → ./light/start.js (1): `checkLightStart`
@@ -1576,6 +1582,10 @@ LIGHT-3 row «LIGHT bars and one axis»: the four effect bars (DLY VIB TRM BRT, 
 ## tools/probes/light/calib.js
 LIGHT-4 row «LIGHT hand setup»: (1) offered once — with no setup kept and never offered, the offer shows; a second call does not; (2) the routine on a synthetic hand held still at its nearest point…
 - fn (1): `checkLightCalib`
+
+## tools/probes/light/clip.js
+LIGHT-5 row «LIGHT clip»: (1) the format — MP4 first (the founder): where the browser records MP4 the clip is MP4; the order puts every MP4 ahead of WebM (CONTROL: a list with WebM first would not)…
+- fn (1): `checkLightClip`
 
 ## tools/probes/light/controls.js
 LIGHT-3b row «LIGHT controls and menus»: with no hand in view the controls show (variant B) and read the live state (the key and A4, the scale, the sound); each sheet holds what it must (12 keys an…
@@ -1838,7 +1848,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 UI-1 — «NIGHT labels follow the room»: the founder entered the rain and the Sound button still read «Firefly» while another timbre played.
 - fn (1): `checkNightLabels`
 
-_367 modules, 3399 exported names._
+_369 modules, 3412 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

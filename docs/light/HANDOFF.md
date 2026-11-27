@@ -35,3 +35,9 @@ Read: `docs/light/PLAN.md` (decisions, where each part comes from, core changes,
   `calDepth`/`calFilter`/`calHold`; not `core/handcal.js`, which imports the recorder): offered once after the first start, «Set up again» in the
   sensitivity sheet, kept per camera on this device (numbers only); while it runs the hands play nothing; the travel slider acts on the calibrated law.
   Next: `LIGHT-5` — the clip (Full's recording made MP4 where the browser can; Night's button, countdown and card).
+- `LIGHT-5` (2026-11-27): the clip (`apps/light/clip.js`): recorded the way Full records (the canvas at 0 fps with one requested frame per drawn frame,
+  ≤ 30 fps; the heard sound through `createRecordingTap`) but MP4 first (H.264 + AAC; WebM only where MP4 is not offered) — Light's own module, not
+  `core/clip.js` (Full's; no core change); the camera picture is in the clip (the founder); Night's interface (the button top right, 3-2-1 without
+  words, the seconds and the minute ring, the card playing with its own sound while the live sound is silent, Share, saved to Downloads — iPhone:
+  Save to Photos —, leaving the page stops and keeps it, the one-time hint). The bars and controls (DOM) are not in the clip. Next: `LIGHT-6` —
+  the mode names in 8 languages, the core's start messages, Light's own icons; checks on the Poco and an iPhone; then `LIGHT-7` publish.

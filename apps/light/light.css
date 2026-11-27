@@ -45,6 +45,9 @@
   --light-r-sheet:24px 24px 0 0; --light-sheet-max:78vh; --light-sheet-w:520px; --light-grab-w:38px; --light-grab-h:4px; --light-x:32px;
   --light-chip:rgba(246,241,232,.08); --light-chip-dim:rgba(246,241,232,.045); --light-acc-soft:rgba(255,180,74,.18); --light-acc-ring:inset 0 0 0 1px rgba(255,180,74,.75);
   --light-prog-h:4px;
+  /* LIGHT-5: the clip */
+  --light-z-rec:var(--z-panel-top); --light-rec:46px; --light-rec-ring-out:-4px; --light-rec-ring-grow:8px; --light-rec-shadow:0 0 0 1px rgba(246,241,232,.08), 0 0 14px rgba(255,180,74,.22);
+  --light-count:180px; --light-fs-count:84px; --light-clip-h:56vh;
   --light-item-pad:9px 11px; --light-key-pad:10px 0; --light-r-item:11px;
   --light-veil:rgba(8,7,6,.6); --light-glass-hi:rgba(28,26,24,.86); --light-r-card:22px; --light-pad-sheet:20px 20px 18px; --light-fs-h2:19px;
 }
@@ -182,3 +185,38 @@ button:focus-visible, a:focus-visible{ outline:2px solid var(--light-acc); outli
 .light-calrow{ display:flex; justify-content:space-between; align-items:center; gap:var(--light-gap-sm); padding:var(--light-item-pad); border-radius:var(--light-r-item); background:var(--light-chip-dim); font-size:var(--light-fs-msg); }
 .light-cal-ok{ color:var(--light-ink); } .light-cal-none{ color:var(--light-ink-dim); }
 .light-calgo{ border:none; background:none; color:var(--light-acc); font-weight:var(--light-fw-semi); cursor:pointer; padding:0; }
+
+/* LIGHT-5: the clip button (top right; with the controls, and always while recording), the countdown, the card */
+.light-recbtn{ position:fixed; top:max(var(--light-gap), env(safe-area-inset-top)); right:max(var(--light-gap), env(safe-area-inset-right)); z-index:var(--light-z-rec);
+  width:var(--light-rec); height:var(--light-rec); border:none; border-radius:var(--light-r-pill); background:var(--light-glass); box-shadow:var(--light-rec-shadow);
+  color:var(--light-ink); display:flex; align-items:center; justify-content:center; cursor:pointer; opacity:0; visibility:hidden; pointer-events:none; transition:opacity var(--light-fade) ease;
+  backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); }
+.light-ctl.on ~ .light-recbtn, .light-recbtn.live{ opacity:1; visibility:visible; pointer-events:auto; }
+.light-rec-ring{ position:absolute; inset:var(--light-rec-ring-out); width:calc(100% + var(--light-rec-ring-grow)); height:calc(100% + var(--light-rec-ring-grow)); transform:rotate(-90deg); pointer-events:none; overflow:visible; }
+.light-rec-track{ fill:none; stroke:var(--light-bar-bg); stroke-width:2; }
+.light-rec-arc{ fill:none; stroke:var(--light-acc); stroke-width:2.5; stroke-linecap:round; }
+.light-rec-ico, .light-rec-ico .svgi, .light-rec-ico svg{ display:flex; width:var(--light-ico); height:var(--light-ico); }
+.light-rec-ico[hidden]{ display:none; }
+.light-rec-sec{ font-size:var(--light-fs-msg); font-weight:var(--light-fw-semi); font-variant-numeric:tabular-nums; }
+.light-rectip{ position:fixed; top:calc(max(var(--light-gap), env(safe-area-inset-top)) + var(--light-rec) + var(--light-gap-sm)); right:max(var(--light-gap), env(safe-area-inset-right)); z-index:var(--light-z-rec);
+  max-width:var(--light-priv-w); margin:0; padding:var(--light-chip-pad); border-radius:var(--light-r-item); background:var(--light-glass-hi); color:var(--light-ink); font-size:var(--light-fs-msg); line-height:var(--light-lh); }
+.light-rectip[hidden]{ display:none; }
+.light-count{ position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); z-index:var(--light-z-rec); width:var(--light-count); height:var(--light-count); display:flex; align-items:center; justify-content:center; pointer-events:none; }
+.light-count[hidden]{ display:none; }
+.light-count svg{ position:absolute; inset:0; width:100%; height:100%; transform:rotate(-90deg); }
+#lightCountN{ font-family:var(--light-font-word); font-weight:var(--light-fw-light); font-size:var(--light-fs-count); line-height:var(--light-lh-none); color:var(--light-ink); text-shadow:var(--light-text-shadow); }
+.light-clipcard{ position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); z-index:var(--light-z-sheet); width:min(var(--light-sheet-w), calc(100vw - 2 * var(--light-gap))); max-height:calc(100vh - 2 * var(--light-gap));
+  overflow-y:auto; border-radius:var(--light-r-card); padding:var(--light-pad-sheet); background:var(--light-glass-hi); box-shadow:var(--light-bars-ring); color:var(--light-ink); }
+.light-clipcard[hidden]{ display:none; }
+.light-clipcard h3{ margin:0 0 var(--light-gap); font-size:var(--light-fs-h2); font-weight:var(--light-fw-semi); }
+.light-clip-view{ position:relative; border-radius:var(--light-r-item); overflow:hidden; background:var(--light-base); }
+.light-clip-view video{ display:block; width:100%; max-height:var(--light-clip-h); object-fit:contain; }
+.light-clip-mute{ position:absolute; right:var(--light-gap-sm); bottom:var(--light-gap-sm); width:var(--light-x); height:var(--light-x); border:none; border-radius:var(--light-r-pill); background:var(--light-glass); color:var(--light-ink); display:flex; align-items:center; justify-content:center; cursor:pointer; }
+.light-clip-mute .svgi, .light-clip-mute svg{ width:var(--light-ico-sm); height:var(--light-ico-sm); }
+.light-clip-saved{ display:flex; align-items:center; gap:var(--light-gap-sm); margin:var(--light-gap) 0 0; font-size:var(--light-fs-small); color:var(--light-ink-dim); }
+.light-clip-saved[hidden]{ display:none; }
+.light-clip-saved .svgi, .light-clip-saved svg{ width:var(--light-ico-sm); height:var(--light-ico-sm); }
+.light-clip-btns{ display:flex; justify-content:flex-end; gap:var(--light-gap-sm); margin:var(--light-gap) 0 0; }
+.light-clip-btns button{ padding:var(--light-retry-pad); border:none; border-radius:var(--light-r-pill); background:var(--light-chip); color:var(--light-ink); cursor:pointer; }
+.light-clip-btns .light-cal-go{ background:var(--light-acc); color:var(--light-on-acc); font-weight:var(--light-fw-bold); }
+.light-clip-btns button[hidden]{ display:none; }

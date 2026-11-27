@@ -90,3 +90,16 @@ Tree hashes after: core e34f701f04d5c046 (only `core/engine/surface.js`, the sta
   them); the row feeds a plain copy of the points on purpose.
 - Checks (iteration mode): static PASSED; probe-data PASS 109/0; `--app light` 6 rows PASS, CSP, network, storage PASS; smoke on Light PASS;
   licences PASS; name index PASS.
+
+# LIGHT-5 (LIGHT track, 2026-11-27): the clip
+Tree hashes after: core f685c1fe10916012 (only `core/engine/surface.js`, the static check's list) · apps/full 0148bb454440c3e3 and apps/night
+30d8f7b3c797de9e unchanged · apps/light 527c7b87e788512b.
+- `apps/light/clip.js` (new): Full's way of recording (canvas `captureStream(0)` + `requestFrame` from Light's loop after drawing, capped at 30 fps;
+  `createRecordingTap`; Full's bitrate law) with the format order MP4 → WebM; Night's interface (button, countdown ring and number, the seconds and
+  the minute ring, the card with its sound — `outputFade` 0 while open, 1 after —, the speaker toggle, Share where the browser shares files, saved to
+  Downloads at once, iPhone through the share sheet, hidden page → stop and keep, the hint after 2 minutes once). Markup, styles, 4 icons, 12 keys × 8.
+  `core/clip.js` stays Full's (static check (17) still forbids it for Light). The network guard lists its one share call.
+- Row «LIGHT clip»: MP4 ahead of WebM (CONTROL a WebM-first list fails); a real 1.5 s recording in the runner's Chrome: 85 061 bytes,
+  `video/mp4; avc1 + mp4a`; the card open with the live sound at 0 and back at 1 after; the button shown with the controls.
+- Checks (iteration mode): static PASSED; probe-data PASS 109/0; `--app light` 7 rows PASS, CSP, network, storage PASS; smoke on Light from the root
+  and a sub-folder PASS; licences PASS; name index PASS.

@@ -88,8 +88,21 @@ const ROWS3={
     'ხელი კადრში არ ეტევა. ოდნავ დააშორეთ კამერას.','ამ მანძილიდან კამერა ხელს კარგად ვერ ხედავს. მიუახლოვდით.','ხელი მოძრაობს. გააჩერეთ რამდენიმე წამით; შეგიძლიათ იდაყვი მაგიდას დააყრდნოთ.',
     'გაუქმება','მზადაა','ხელი დამახსოვრებულია. კამერასთან ახლოს ხმა ახლოა და მშრალი; შორს — მეტი რევერბი.','არ გაიზომა','გაზომვა ვერ მოხერხდა. სცადეთ ხელახლა, ხელი გააჩერეთ.','ხელახლა მორგება','ხელი მორგებულია','ხელი არ არის მორგებული'],
 };
-export const LIGHT_TEXTS=Object.freeze(Object.fromEntries(Object.entries(ROWS).map(([lang, row])=>{
-  if(row.length!==K.length || !ROWS2[lang] || ROWS2[lang].length!==K2.length || !ROWS3[lang] || ROWS3[lang].length!==K3.length) throw new Error('[light] texts: '+lang+' is incomplete');
-  return [lang, Object.freeze({ ...Object.fromEntries(K.map((k,i)=>[k, row[i]])), ...Object.fromEntries(K2.map((k,i)=>[k, ROWS2[lang][i]])), ...Object.fromEntries(K3.map((k,i)=>[k, ROWS3[lang][i]])) })]; })));
+/* LIGHT-5: the clip */
+const K4=['light.clip.rec','light.clip.stop','light.clip.title','light.clip.share','light.clip.done','light.clip.savePhotos','light.clip.saved','light.clip.mute','light.clip.unmute','light.clip.hint','light.clip.cannot','light.clip.failed'];
+const ROWS4={
+  en:['Record a clip','Stop recording','Your clip','Share','Done','Save to Photos','Saved to Downloads on this device','Sound off','Sound on','Like how it sounds? Record a clip of up to a minute and send it to friends.','This browser can’t record clips.','The clip didn’t work. Try again.'],
+  ru:['Записать ролик','Остановить запись','Ваш ролик','Поделиться','Готово','Сохранить в Фото','Сохранён в «Загрузки» на этом устройстве','Выключить звук','Включить звук','Нравится, как звучит? Запишите ролик до минуты и отправьте друзьям.','Этот браузер не умеет записывать ролики.','Ролик не получился. Попробуйте ещё раз.'],
+  es:['Grabar un vídeo','Detener la grabación','Tu vídeo','Compartir','Listo','Guardar en Fotos','Guardado en Descargas de este dispositivo','Quitar el sonido','Poner el sonido','¿Te gusta cómo suena? Graba un vídeo de hasta un minuto y envíalo a tus amigos.','Este navegador no puede grabar vídeos.','El vídeo no salió. Inténtalo de nuevo.'],
+  pt:['Gravar um vídeo','Parar a gravação','Seu vídeo','Compartilhar','Pronto','Salvar em Fotos','Salvo em Downloads neste dispositivo','Tirar o som','Ligar o som','Gostou do som? Grave um vídeo de até um minuto e mande para os amigos.','Este navegador não consegue gravar vídeos.','O vídeo não deu certo. Tente de novo.'],
+  de:['Clip aufnehmen','Aufnahme beenden','Dein Clip','Teilen','Fertig','In Fotos sichern','In den Downloads dieses Geräts gespeichert','Ton aus','Ton an','Gefällt dir der Klang? Nimm einen Clip von bis zu einer Minute auf und schick ihn Freunden.','Dieser Browser kann keine Clips aufnehmen.','Der Clip hat nicht geklappt. Versuch es noch einmal.'],
+  fr:['Enregistrer une vidéo','Arrêter l’enregistrement','Votre vidéo','Partager','Terminé','Enregistrer dans Photos','Enregistrée dans les téléchargements de cet appareil','Couper le son','Remettre le son','Vous aimez le son ? Enregistrez une vidéo d’une minute au plus et envoyez-la à vos amis.','Ce navigateur ne sait pas enregistrer de vidéo.','La vidéo n’a pas marché. Réessayez.'],
+  it:['Registra un video','Ferma la registrazione','Il tuo video','Condividi','Fatto','Salva in Foto','Salvato nei Download di questo dispositivo','Togli l’audio','Attiva l’audio','Ti piace come suona? Registra un video fino a un minuto e mandalo agli amici.','Questo browser non sa registrare video.','Il video non è riuscito. Riprova.'],
+  ka:['ვიდეოს ჩაწერა','ჩაწერის შეჩერება','თქვენი ვიდეო','გაზიარება','მზადაა','ფოტოებში შენახვა','შენახულია ამ მოწყობილობის „ჩამოტვირთვებში“','ხმის გამორთვა','ხმის ჩართვა','მოგწონთ, როგორ ჟღერს? ჩაწერეთ ვიდეო წუთამდე და გაუგზავნეთ მეგობრებს.','ეს ბრაუზერი ვიდეოს ვერ იწერს.','ვიდეო ვერ გამოვიდა. სცადეთ ხელახლა.'],
+};
+const PARTS=[[K,ROWS],[K2,ROWS2],[K3,ROWS3],[K4,ROWS4]];
+export const LIGHT_TEXTS=Object.freeze(Object.fromEntries(Object.keys(ROWS).map(lang=>{
+  for(const [keys,rows] of PARTS) if(!rows[lang] || rows[lang].length!==keys.length) throw new Error('[light] texts: '+lang+' is incomplete');
+  return [lang, Object.freeze(Object.assign({}, ...PARTS.map(([keys,rows])=>Object.fromEntries(keys.map((k,i)=>[k, rows[lang][i]])))))]; })));
 langsAdd(Object.keys(LIGHT_TEXTS));
 for(const [lang, T] of Object.entries(LIGHT_TEXTS)) Object.assign(DICTS[lang], T);

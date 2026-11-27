@@ -66,6 +66,23 @@
   </div>
   <p id="lightCtlTip" class="light-tip" hidden></p>
 </div>
+<!-- LIGHT-5: the clip (apps/light/clip.js) — the button top right (shown with the controls, and always while recording), the countdown, the card -->
+<button id="lightRecBtn" class="light-recbtn" data-i18n-title="light.clip.rec" title="Record a clip" aria-label="Record a clip">
+  <svg class="light-rec-ring" viewBox="0 0 54 54" aria-hidden="true"><circle cx="27" cy="27" r="25" class="light-rec-track"/><circle id="lightRecArc" cx="27" cy="27" r="25" class="light-rec-arc" stroke-dasharray="157.08" stroke-dashoffset="157.08"/></svg>
+  <span id="lightRecIco" class="light-rec-ico" data-svg="clip-rec" aria-hidden="true"></span><span id="lightRecSec" class="light-rec-sec"></span>
+</button>
+<p id="lightRecTip" class="light-rectip" hidden></p>
+<div id="lightCount" class="light-count" hidden aria-live="assertive">
+  <svg viewBox="0 0 180 180" aria-hidden="true"><circle cx="90" cy="90" r="80" class="light-rec-track"/><circle id="lightCountArc" cx="90" cy="90" r="80" class="light-rec-arc" stroke-dasharray="502.65" stroke-dashoffset="0"/></svg>
+  <span id="lightCountN" role="timer">3</span>
+</div>
+<div id="lightClipVeil" class="light-sheetveil" hidden></div>
+<div id="lightClip" class="light-clipcard" role="dialog" aria-modal="true" aria-labelledby="lightClipTitle" hidden>
+  <h3 id="lightClipTitle" data-i18n="light.clip.title">Your clip</h3>
+  <div class="light-clip-view"><video id="lightClipVideo" playsinline loop preload="auto"></video><button id="lightClipMute" class="light-clip-mute" data-svg="speaker-on" title="Sound off"></button></div>
+  <p id="lightClipSaved" class="light-clip-saved" hidden><span data-svg="saved" aria-hidden="true"></span><span data-i18n="light.clip.saved">Saved to Downloads on this device</span></p>
+  <div class="light-clip-btns"><button id="lightClipShare" class="light-cal-go"><span data-i18n="light.clip.share">Share</span></button><button id="lightClipDone" data-i18n="light.clip.done">Done</button></div>
+</div>
 <div id="lightSheetVeil" class="light-sheetveil" hidden></div>
 <div id="lightSheet" class="light-sheet" role="dialog" aria-modal="true" aria-labelledby="lightSheetTitle" hidden>
   <div class="light-sheet-grab"></div>

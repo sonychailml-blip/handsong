@@ -10,5 +10,10 @@ export const LIGHT_ICONS=Object.freeze({
   sliders:[['line','path',{ d:'M4 7h9M17 7h3M4 17h3M11 17h9' }], ['acc','circle',{ cx:15, cy:7, r:2 }], ['acc','circle',{ cx:9, cy:17, r:2 }]],
   'chev-down':[['line','path',{ d:'M6 9l6 6 6-6' }]],
   'chev-up':[['line','path',{ d:'M6 15l6-6 6 6' }]],
+  /* LIGHT-5: the clip button (a ring with an amber dot — never red, as in Night), the card's sound on / off, «saved» */
+  'clip-rec':[['line','circle',{ cx:12, cy:12, r:8 }], ['acc','circle',{ cx:12, cy:12, r:3.6 }]],
+  'speaker-on':[['line','path',{ d:'M4 10v4h3l5 4V6L7 10H4z' }], ['acc-line','path',{ d:'M15.5 9.5a3.5 3.5 0 0 1 0 5M18 7a7 7 0 0 1 0 10' }]],
+  'speaker-off':[['line','path',{ d:'M4 10v4h3l5 4V6L7 10H4zM16 9.5l5 5M21 9.5l-5 5' }]],
+  saved:[['acc-line','path',{ d:'M5 12.5l4.5 4.5L19 7.5' }]],
 });
 for(const [name, shapes] of Object.entries(LIGHT_ICONS)){ const why=svgIconAdd(name, shapes); if(why) console.warn('[light] icon:', why); }   // eslint-disable-line no-console
