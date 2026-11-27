@@ -180,7 +180,19 @@ const ROWS7={
   pt:['Tela cheia','Sair da tela cheia'], de:['Vollbild','Vollbild beenden'], fr:['Plein écran','Quitter le plein écran'],
   it:['Schermo intero','Esci da schermo intero'], ka:['მთელ ეკრანზე','მთელი ეკრანიდან გამოსვლა'],
 };
-const PARTS=[[K,ROWS],[K2,ROWS2],[K3,ROWS3],[K4,ROWS4],[K5,ROWS5],[K6,ROWS6],[K7,ROWS7]];
+/* LIGHT-9: the language picker's name, «Write to us», the iPhone home-screen card, the clip's mark */
+const K8=['light.lang','light.feedback','light.card.home.t','light.card.home.b'];
+const ROWS8={
+  en:['Language','Write to us','Full screen on iPhone','Tap Share at the bottom of Safari, then «Add to Home Screen». Handsong then opens from the home screen without the browser’s bars.'],
+  ru:['Язык','Написать нам','Во весь экран на iPhone','Нажмите «Поделиться» внизу Safari, затем «На экран „Домой“». Тогда Handsong откроется с экрана «Домой» без панелей браузера.'],
+  es:['Idioma','Escríbenos','Pantalla completa en iPhone','Toca Compartir abajo en Safari y luego «Añadir a pantalla de inicio». Así Handsong se abre desde la pantalla de inicio sin las barras del navegador.'],
+  pt:['Idioma','Fale conosco','Tela cheia no iPhone','Toque em Compartilhar na parte de baixo do Safari e depois em «Adicionar à Tela de Início». Assim o Handsong abre da Tela de Início sem as barras do navegador.'],
+  de:['Sprache','Schreib uns','Vollbild auf dem iPhone','Tippe in Safari unten auf Teilen und dann auf «Zum Home-Bildschirm». Dann öffnet sich Handsong vom Home-Bildschirm ohne die Leisten des Browsers.'],
+  fr:['Langue','Nous écrire','Plein écran sur iPhone','Touchez Partager en bas de Safari, puis « Sur l’écran d’accueil ». Handsong s’ouvre alors depuis l’écran d’accueil, sans les barres du navigateur.'],
+  it:['Lingua','Scrivici','Schermo intero su iPhone','Tocca Condividi in basso in Safari, poi «Aggiungi alla schermata Home». Così Handsong si apre dalla schermata Home senza le barre del browser.'],
+  ka:['ენა','მოგვწერეთ','მთელ ეკრანზე iPhone-ზე','Safari-ში ქვემოთ დააჭირეთ „გაზიარებას“, შემდეგ — „მთავარ ეკრანზე დამატებას“. ასე Handsong მთავარი ეკრანიდან ბრაუზერის ზოლების გარეშე გაიხსნება.'],
+};
+const PARTS=[[K,ROWS],[K2,ROWS2],[K3,ROWS3],[K4,ROWS4],[K5,ROWS5],[K6,ROWS6],[K7,ROWS7],[K8,ROWS8]];
 export const LIGHT_TEXTS=Object.freeze(Object.fromEntries(Object.keys(ROWS).map(lang=>{
   for(const [keys,rows] of PARTS) if(!rows[lang] || rows[lang].length!==keys.length) throw new Error('[light] texts: '+lang+' is incomplete');
   return [lang, Object.freeze(Object.assign({}, ...PARTS.map(([keys,rows])=>Object.fromEntries(keys.map((k,i)=>[k, rows[lang][i]])))))]; })));

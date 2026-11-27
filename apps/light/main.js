@@ -9,17 +9,23 @@ import { lightBoot } from './boot.js';
 import { lightShellWire } from './shell.js';
 import { lightControlsWire } from './controls.js';
 import { onLightStart } from './boot.js';
-import { lightCalWire, lightCalOffer } from './calib.js';   // LIGHT-4: the hand setup
-import { lightClipWire } from './clip.js';   // LIGHT-5: the clip
-import { lightCardsWire, lightCardsShow, lightCardsDue } from './cards.js';   // LIGHT-5b: the teaching cards
+import { lightCalWire, lightCalOfferTick } from './calib.js';   // LIGHT-4: the hand setup
+import { lightClipWire, clipBusy } from './clip.js';   // LIGHT-5: the clip
+import { lightLangWire } from './lang.js';   // LIGHT-9: the language by hand
+import { onLightFrame } from './boot.js';
+import { lightSheetOpen } from './controls.js';
+import { lightCardsWire, lightCardsShow, lightCardsDue, lightCardsOpen } from './cards.js';   // LIGHT-5b: the teaching cards
 import { nsKey } from '../../core/storens.js';
 
 applyI18n();   // the page's [data-i18n] texts and drawn icons (the emblem, the buttons) in the chosen language
+lightLangWire();   // LIGHT-9
 lightShellWire();   // the bars, once per screen frame
 lightControlsWire(root=>applyI18n(root));   // LIGHT-3b: the controls when the hands leave and their sheets (the sheets' icons filled the same way)
 lightCalWire(()=>{});   // LIGHT-4: the kept setup applied (per camera); its screens' buttons
 lightCardsWire(nsKey);   // LIGHT-5b
-onLightStart(()=>{ if(lightCardsDue()) lightCardsShow(()=>lightCalOffer()); else lightCalOffer(); });   // the first start: the cards, then the hand-setup offer (each once)
+onLightStart(()=>{ if(lightCardsDue()) lightCardsShow(); });   // the first start: the cards (once; «Skip» on each)
+/* LIGHT-9: the hand-setup offer after about a minute of playing, when the hands leave and nothing else is open (once) */
+onLightFrame((now, hands)=>{ lightCalOfferTick(now, hands, lightCardsOpen() || lightSheetOpen() || clipBusy()); });
 lightClipWire(root=>applyI18n(root));   // LIGHT-5: the clip button, its countdown and card
 lightBoot();
 /* LIGHT-5b: «How to play» opens the teaching cards */

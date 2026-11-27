@@ -6,8 +6,16 @@
    From the start page («How to play») and once after the first start (then the hand-setup offer). Skippable at every card. The pictures are our own
    line drawings (inline SVG, currentColor and Light's accent), the hand drawn as Night's cards draw it. */
 import { t, onLangChange } from '../../core/i18n.js';
+import { fsApi, fsStandalone } from './fullscreen.js';
+import { IOS } from './clip.js';
 
-export const CARDS=Object.freeze(['play','depth','fx','menu','clip']), CARDS_KEY='handsong.lightCards', CARDS_V='1';
+/* LIGHT-9: on iPhone Safari (no full screen there, not opened from the home screen) a sixth card shows how to add Handsong to the home screen */
+export const CARDS_BASE=Object.freeze(['play','depth','fx','menu','clip']), CARDS_KEY='handsong.lightCards', CARDS_V='1';
+let homeForce=null;
+const homeDue=()=> homeForce!=null ? homeForce : (IOS && !fsApi() && !fsStandalone());
+export let CARDS=CARDS_BASE;
+function cardsNow(){ const want= homeDue() ? Object.freeze([...CARDS_BASE, 'home']) : CARDS_BASE; if(want.length!==CARDS.length){ CARDS=want; dots(); } }
+function dots(){ $('lightCardDots').replaceChildren(...CARDS.map((_,k)=>{ const d=document.createElement('span'); d.className='light-cards-dot'; d.dataset.i=String(k); return d; })); }
 const $=id=>document.getElementById(id);
 /* a hand seen from the palm, its wrist at (x, y), scale s, mirrored for the left one; pinch: which finger touches the thumb; tips: lit fingertips */
 /* LIGHT-6b (the founder: the old hand looked odd) — a clean PICTOGRAM hand seen from the palm: a rounded palm, four rounded fingers of natural
@@ -45,6 +53,10 @@ const PICS={
   /* your clip: the round button top right, a minute's ring; a clip with its sound */
   clip:()=>`<rect x="20" y="16" width="120" height="88" rx="8" class="lp-line"/><path d="M70,46 L94,60 L70,74 Z" class="lp-line"/>
     <circle cx="168" cy="36" r="18" class="lp-line"/><path d="M168,18 A18,18 0 0 1 186,36" class="lp-hold"/><circle cx="168" cy="36" r="6" class="lp-glow"/>`,
+  /* LIGHT-9, iPhone: Safari's Share sign (a box with an arrow up) → «Add to Home Screen» (a rounded square with a plus) */
+  home:()=>`<path d="M40,52 L32,52 L32,98 L76,98 L76,52 L68,52" class="lp-line"/><path d="M54,74 L54,24 M44,34 L54,24 L64,34" class="lp-line"/>
+    <path d="M92,61 L112,61 M106,55 L112,61 L106,67" class="lp-line lp-faint"/>
+    <rect x="128" y="38" width="46" height="46" rx="12" class="lp-line"/><path d="M151,50 L151,72 M140,61 L162,61" class="lp-line"/><circle cx="151" cy="61" r="4" class="lp-glow"/>`,
 };
 let open=false, i=0, done=null;
 function render(){ const k=CARDS[i];
@@ -57,12 +69,12 @@ function render(){ const k=CARDS[i];
 function close(){ if(!open) return; open=false; $('lightCards').hidden=true; try{ localStorage.setItem(KEY(), CARDS_V); }catch(e){} const f=done; done=null; if(f) f(); }
 let KEY=()=>CARDS_KEY;
 /* show the cards from the first; then(): called once they close (finished or skipped) */
-export function lightCardsShow(then){ open=true; i=0; done=then||null; $('lightCards').hidden=false; render(); $('lightCardNext').focus({ preventScroll:true }); }
+export function lightCardsShow(then){ cardsNow(); open=true; i=0; done=then||null; $('lightCards').hidden=false; render(); $('lightCardNext').focus({ preventScroll:true }); }
 export const lightCardsOpen=()=>open;
 export const lightCardsDue=()=>{ try{ return localStorage.getItem(KEY())!==CARDS_V; }catch(e){ return true; } };
 export function lightCardsWire(nsKey){
   KEY=()=>nsKey(CARDS_KEY);
-  $('lightCardDots').replaceChildren(...CARDS.map((_,k)=>{ const d=document.createElement('span'); d.className='light-cards-dot'; d.dataset.i=String(k); return d; }));
+  cardsNow(); dots();
   $('lightCardNext').onclick=()=>{ if(i<CARDS.length-1){ i++; render(); } else close(); };
   $('lightCardSkip').onclick=()=>close();
   document.addEventListener('keydown', e=>{ if(open && e.key==='Escape') close(); });
@@ -70,4 +82,5 @@ export function lightCardsWire(nsKey){
 /* probe only */
 export const lightCardsDbg=()=>({ open, i, n:CARDS.length, title:$('lightCardTitle').textContent, text:$('lightCardText').textContent, pic:!!$('lightCardPic').querySelector('svg') });
 export const lightCardsStepDbg=n=>{ i=Math.max(0, Math.min(CARDS.length-1, n)); render(); return lightCardsDbg(); };
+export const lightCardsHomeDbg=v=>{ homeForce= v==null ? null : !!v; cardsNow(); return CARDS.length; };   // LIGHT-9: the iPhone card on / off / back to the device's own answer
 export const lightCardsCloseDbg=()=>{ const was=done; done=null; close(); done=was; };

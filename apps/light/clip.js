@@ -71,8 +71,17 @@ export function paintBars(g, kx, ky){
       g.fillStyle=ls.color; g.font=ls.fontWeight+' '+(parseFloat(ls.fontSize)*ky)+'px '+ls.fontFamily; g.textAlign='center'; g.textBaseline='middle'; g.fillText(lab.textContent, (L.left+L.width/2)*kx, (L.top+L.height/2)*ky); }
     g.restore(); }
 }
+/* LIGHT-9 (the founder): the clip carries «handsong.app» in its bottom right corner, so a forwarded clip leads back — quiet white with the emblem's
+   amber dot, sized to the frame */
+export function paintMark(g, w, h){
+  const fs=Math.max(11, Math.round(Math.min(w, h)*0.032)), pad=Math.round(fs*0.9), cs=getComputedStyle(document.documentElement);
+  const v=k=>cs.getPropertyValue(k).trim(), font=v('--light-font')||'sans-serif';
+  g.save(); g.font='600 '+fs+'px '+font; g.textAlign='right'; g.textBaseline='alphabetic';
+  const txt='handsong.app', tw=g.measureText(txt).width, x=w-pad, y=h-pad;
+  g.shadowColor=v('--light-cv-mark-shadow'); g.shadowBlur=fs*0.4; g.globalAlpha=0.78; g.fillStyle=v('--light-ink'); g.fillText(txt, x, y);
+  g.globalAlpha=0.95; g.fillStyle=v('--light-acc'); g.beginPath(); g.arc(x-tw-fs*0.55, y-fs*0.34, fs*0.22, 0, 2*Math.PI); g.fill(); g.restore(); }
 function compose(){ if(!compCtx) return; if(comp.width!==canvas.width || comp.height!==canvas.height){ comp.width=canvas.width; comp.height=canvas.height; }
-  compCtx.drawImage(canvas,0,0); paintBars(compCtx, comp.width/innerWidth, comp.height/innerHeight); }
+  compCtx.drawImage(canvas,0,0); const R=canvas.getBoundingClientRect(); paintBars(compCtx, comp.width/(R.width||innerWidth), comp.height/(R.height||innerHeight)); paintMark(compCtx, comp.width, comp.height); }   // LIGHT-9: page px → buffer px by the canvas's own box
 
 /* the card: the clip plays with its own sound while the live sound is silent */
 function openCard(){

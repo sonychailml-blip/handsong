@@ -166,3 +166,21 @@ Tree hashes after: core 44ed0dd238a68bfb · apps/full 0148bb454440c3e3 · apps/n
 - Row «LIGHT controls and menus» + the toggle: in the controls, hidden exactly where full screen cannot be had, icon and words follow the state.
 - Checks (iteration mode): static PASSED; probe-data PASS 109/0; `--app light` 10 rows PASS, CSP, network, storage PASS; smoke-paths PASS;
   name index PASS.
+
+# LIGHT-9 (LIGHT track, 2026-11-27): the bottom band on Android, the language, the first minute, the iPhone card, the clip's mark, «Write to us»
+Tree hashes after: core 44ed0dd238a68bfb · apps/full 0148bb454440c3e3 · apps/night 30d8f7b3c797de9e (all unchanged) · apps/light f5dfb3c5143e4e10.
+- The bottom band under Android's system buttons (the founder's phone, browser not full screen): `#canvas` was 100vh tall — on Android Chrome the
+  height WITHOUT the address bar, taller than the visible page — while its buffer was innerHeight, so the drawing was stretched and its bottom cut.
+  Now `height:100dvh` minus an edge-to-edge bottom inset, `boot.js lightFit` sizes the buffer from the laid-out box (after core's resize), the
+  round buttons and the sheet sit above the bottom inset, the clip maps the bars by the canvas's own box.
+- `lang.js` (new): the start card's language picker (the eight endonyms, core `setLang`); the controls and an open sheet redraw on a change.
+- The first minute: the hand-setup offer no longer comes at the first start — after about a minute of playing, once the hands leave and no card,
+  sheet or clip is open (`calib.js lightCalOfferTick`, `CAL_OFFER`); the cards stay (Skip on each).
+- iPhone Safari (no full screen, not from the home screen): a sixth card «Full screen on iPhone» — Share → Add to Home Screen, with its drawing.
+- The clip carries «handsong.app» bottom right (`clip.js paintMark`, white with the amber dot, sized to the frame).
+- «Write to us» on the start card: the feedback form (register entry `link-feedback-form`, a link the person opens).
+- Rows: «LIGHT hand setup» + the offer's timing (not before a minute, not while the hands are in view; CONTROL: not while something is open);
+  «LIGHT cards, flare, bars in the clip» + the iPhone card (5 / 6 cards, the dots follow) and the mark (pixels bottom right only); «LIGHT eight
+  languages» + the picker (eight languages; choosing Russian, then German, switches Play's words and the controls).
+- Checks (iteration mode): static PASSED; probe-data PASS 109/0; `--app light` 10 rows PASS, CSP, network, storage PASS; smoke `--only` Light at
+  `/` and `/apps/light/` ok; licences PASS; name index PASS.

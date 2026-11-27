@@ -2,14 +2,14 @@
    on a synthetic hand held still at its nearest point (3 s at 30 fps, the probe's own clock — the app's frames are set aside) ends «done», keeps
    the near size per camera (≈ the hand's size) and turns the calibrated law on; (3) the law: the playing hand at that size drives the reverb's mix to
    ≈ 0, a hand at half the size to a clearly larger value; (4) the travel slider acts on the calibrated law (long travel → less mix at the same
-   distance). CONTROL: a hand that keeps moving never ends «done» in the same time. The person's own kept setup is put back at the end. */
+   distance); (5) LIGHT-9: the offer comes only after about a minute of playing, with the hands gone and nothing else open. CONTROL: a hand that keeps moving never ends «done» in the same time. The person's own kept setup is put back at the end. */
 import { pose } from '../../../core/gestures/pose.js';
 import * as ST from '../../../core/state.js';
 import { CAM_MARGIN } from '../../../core/config.js';
 import { leadAllOff } from '../../../core/audio.js';
 import { fxParamsOf } from '../../../core/gestures/fxhand.js';
 import { nsKey } from '../../../core/storens.js';
-import { lightCalStart, lightCalCancel, lightCalOffer, lightCalOn, lightCalDbg, lightCalForgetDbg, lightCalProbeSet, lightCalFrameProbe, setLightCalTravel, lightCalWire } from '../../../apps/light/calib.js';
+import { lightCalStart, lightCalCancel, lightCalOffer, lightCalOn, lightCalDbg, lightCalForgetDbg, lightCalProbeSet, lightCalFrameProbe, setLightCalTravel, lightCalWire, lightCalOfferTick, lightCalOfferResetDbg, CAL_OFFER } from '../../../apps/light/calib.js';
 import { lightHandsProbe, lightProcessHandsProbe } from '../../../apps/light/gestures.js';
 
 const KEYS=[nsKey('handsong.lightHand'), nsKey('handsong.lightHandOffered')], FPS=30, W=1000, H=600;
@@ -24,6 +24,13 @@ export async function checkLightCalib(){
   try{
     lightCalForgetDbg();
     if(!lightCalOffer()) miss('with no setup kept, the offer did not show'); if(lightCalOffer()) miss('the offer showed a second time'); lightCalCancel();
+    /* LIGHT-9: the offer comes after about a minute of playing, once the hands leave and nothing else is open */
+    { lightCalForgetDbg(); lightCalOfferResetDbg(); const P=[{ play:true }], step=1000/FPS; let tt=0, got=false; const run=(ms, hands, blocked)=>{ const end=tt+ms; while(tt<end && !got){ tt+=step; got=lightCalOfferTick(tt, hands, blocked); } };
+      run(CAL_OFFER.afterMs-2000, P, false); if(got) miss('the offer came before a minute of playing');
+      run(4000, P, false); if(got) miss('the offer came while the hands are still in view');
+      run(CAL_OFFER.idleMs+500, [], true); if(got) miss('CONTROL: the offer came while something else is open');
+      run(500, [], false); if(!got) miss('after a minute of playing and the hands gone, the offer did not come'); else notes.push('the offer after '+Math.round(CAL_OFFER.afterMs/1000)+' s of playing, the hands out of view');
+      lightCalCancel(); lightCalOfferResetDbg(); }
     /* CONTROL first: a moving hand (its wrist swings) */
     let t=1000; lightCalStart(t);
     for(let i=0;i<3*FPS;i++){ t+=1000/FPS; lightCalFrameProbe(res({ x:0.5+0.12*Math.sin(i*0.7), y:0.5, s:0.3, gaps:[1,1,1,1] }), t); }

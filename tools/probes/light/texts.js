@@ -7,6 +7,7 @@ import { LIGHT_MODE_IDS, modeNameOf, groupNameOf } from '../../../apps/light/mod
 import { DICTS, lang, setLang } from '../../../core/i18n.js';
 import { profileOf } from '../../../core/profile.js';
 import { scaleById } from '../../../core/scales.js';
+import { scaleId } from '../../../core/state.js';
 import { scaleName } from '../../../apps/light/controls.js';
 
 const LANGS=['en','ru','es','pt','de','fr','it','ka'], START=['load.model','load.warm','load.camera','load.error','cam.busy','cam.notfound','cam.denied','start.retry'];
@@ -26,6 +27,13 @@ export async function checkLightTexts(){
       const groups=[...new Set(moods.map(id=>scaleById(id).grpKey))].filter(k=>!groupNameOf(k)); if(groups.length) miss(`${L}: groups without a name (${groups.join(', ')})`);
       if(modeNameOf('maqam-rast')) miss('CONTROL: a mode outside the profile has a name'); }
     setLang('es'); const es=scaleName(scaleById('major')); if(es!=='Mayor (jónico)') miss('the Spanish major reads «'+es+'»');
+    /* LIGHT-9: the language by hand — the start card's picker lists the eight languages; a choice there switches the page's texts and the controls */
+    { const sel=document.getElementById('lightLang'), opts=sel ? [...sel.options].map(o=>o.value) : [];
+      if(JSON.stringify(opts)!==JSON.stringify(LANGS)) miss('the language picker lists '+opts.join(', '));
+      else { sel.value='ru'; sel.dispatchEvent(new Event('change')); const play=document.getElementById('startBtn').textContent, sc=document.getElementById('lightScaleName').textContent;
+        if(lang!=='ru' || play!==DICTS.ru['light.play'] || sel.value!=='ru') miss(`the picker set ${lang}, Play reads «${play}»`);
+        if(sc!==scaleName(scaleById(scaleId))) miss(`the controls did not redraw: «${sc}», not «${scaleName(scaleById(scaleId))}»`);
+        sel.value='de'; sel.dispatchEvent(new Event('change')); if(document.getElementById('startBtn').textContent!==DICTS.de['light.play']) miss('German: Play reads «'+document.getElementById('startBtn').textContent+'»'); } }
   } finally { setLang(keep); }
   return { pass:!diffs.length, diffs, note:`${keys.length} keys × 8 languages, ${moods.length} modes` };
 }

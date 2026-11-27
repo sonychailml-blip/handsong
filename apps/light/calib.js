@@ -44,6 +44,17 @@ export function lightCalStart(now=performance.now()){ run=createCalRun({ t:now, 
 export function lightCalCancel(){ if(run) run.cancel(); run=null; show(null); }
 export function lightCalOffer(){ let seen=false; try{ seen=localStorage.getItem(OFFERED)==='1'; }catch(e){} if(seen || lightCalOn()) return false;
   try{ localStorage.setItem(OFFERED,'1'); }catch(e){} show('offer'); return true; }
+/* LIGHT-9: the offer no longer comes before the first sound — once the person has PLAYED about a minute (a hand with a note function in view)
+   and then takes the hands out of view, when nothing else is open (blocked: the cards, a sheet, a clip) */
+export const CAL_OFFER=Object.freeze({ afterMs:60e3, idleMs:1500, stepMs:100 });
+const offerDue=()=>{ try{ if(localStorage.getItem(OFFERED)==='1') return false; }catch(e){} return !lightCalOn() && !run; };
+let offerPlay=0, offerLast=null, offerHand=-Infinity;
+export function lightCalOfferTick(now, hands, blocked){
+  const dt= offerLast==null ? 0 : Math.max(0, Math.min(CAL_OFFER.stepMs, now-offerLast)); offerLast=now;
+  if(hands.length){ offerHand=now; if(hands.some(h=>h.play)) offerPlay+=dt; }
+  if(offerPlay<CAL_OFFER.afterMs || now-offerHand<CAL_OFFER.idleMs || blocked || !offerDue()) return false;
+  return lightCalOffer(); }
+export const lightCalOfferResetDbg=()=>{ offerPlay=0; offerLast=null; offerHand=-Infinity; };
 
 /* ── the screens: offer, measure (the frame, one line, the progress), done, failed ── */
 const ADVICE={ back:'light.cal.back', closer:'light.cal.closer', still:'light.cal.still' };

@@ -24,26 +24,27 @@ SPLIT-2: the Full app's entry.
 ## apps/light/boot.js
 LIGHT-3 — LIGHT'S OWN START AND FRAME LOOP (option B: no shared legacy UI).
 - const (6): `PROFILE`, `onLightFrame`, `onLightStart`, `lightStarted`, `setLightFace`, `lightBootDbg`
-- fn (2): `flare`, `lightBoot`
+- fn (3): `lightFit`, `flare`, `lightBoot`
 
 ## apps/light/calib.js
 LIGHT-4 — THE HAND SETUP, as in Night (the founder): the playing hand held at the nearest point it reaches while playing, the whole hand in the frame; depth then counts from that point (0 near … 1 …
-- const (6): `lightCalOn`, `setLightCalTravel`, `lightCalBusy`, `lightCalProbeSet`, `lightCalCamera`, `lightCalDbg`
-- fn (7): `lightCalFrameProbe`, `lightCalFrame`, `lightCalStart`, `lightCalCancel`, `lightCalOffer`, `lightCalWire`, `lightCalForgetDbg`
+- const (8): `lightCalOn`, `setLightCalTravel`, `lightCalBusy`, `lightCalProbeSet`, `CAL_OFFER`, `lightCalOfferResetDbg`, `lightCalCamera`, `lightCalDbg`
+- fn (8): `lightCalFrameProbe`, `lightCalFrame`, `lightCalStart`, `lightCalCancel`, `lightCalOffer`, `lightCalOfferTick`, `lightCalWire`, `lightCalForgetDbg`
 
 ## apps/light/cards.js
 LIGHT-5b — THE TEACHING CARDS (the founder: as in Night): five short cards with simple drawn pictures, written from Light's real gestures (apps/light/gestures.js; the profile data/light.json): 1.
-- const (6): `CARDS`, `lightCardsOpen`, `lightCardsDue`, `lightCardsDbg`, `lightCardsStepDbg`, `lightCardsCloseDbg`
+- const (7): `CARDS_BASE`, `lightCardsOpen`, `lightCardsDue`, `lightCardsDbg`, `lightCardsStepDbg`, `lightCardsHomeDbg`, `lightCardsCloseDbg`
 - fn (2): `lightCardsShow`, `lightCardsWire`
+- let (1): `CARDS`
 
 ## apps/light/clip.js
 LIGHT-5 — THE CLIP.
 - const (7): `CLIP`, `REC_FPS`, `MIME_ORDER`, `IOS`, `clipBusy`, `clipCanShare`, `lightClipDbg`
-- fn (5): `clipType`, `paintBars`, `lightClipWire`, `lightClipRecordDbg`, `lightClipCloseDbg`
+- fn (6): `clipType`, `paintBars`, `paintMark`, `lightClipWire`, `lightClipRecordDbg`, `lightClipCloseDbg`
 
 ## apps/light/controls.js
 LIGHT-3b — THE CONTROLS WHEN THE HANDS LEAVE (variant B, the founder's choice at LIGHT-1) and their menus.
-- const (6): `scaleName`, `CTL_IDLE_MS`, `keyName`, `octRange`, `lightControlsDbg`, `lightControlsOpenDbg`
+- const (7): `scaleName`, `CTL_IDLE_MS`, `keyName`, `octRange`, `lightControlsDbg`, `lightSheetOpen`, `lightControlsOpenDbg`
 - fn (9): `setScale`, `setKey`, `setA4`, `setTimbre`, `setHand`, `setField`, `setOct`, `setSens`, `lightControlsWire`
 
 ## apps/light/draw.js
@@ -68,6 +69,11 @@ LIGHT-3 — LIGHT'S HANDS: core/gestures/hands.js and roles.js COPIED and cut to
 ## apps/light/icons.js
 LIGHT-3b — LIGHT'S OWN DRAWN ICONS (our own work, rule #32; the shapes of the founder's approved drawing, tools/.out/light-ui/), added to the shared table through core's door (core/icons.js svgIcon…
 - const (1): `LIGHT_ICONS`
+
+## apps/light/lang.js
+LIGHT-9 — THE LANGUAGE BY HAND: a native picker on the start card listing Light's eight languages by their own names (core LANG_LABEL); a choice goes through core's door (setLang: kept on this devi…
+- const (1): `lightLangDbg`
+- fn (1): `lightLangWire`
 
 ## apps/light/main.js
 LIGHT-3 — Handsong's entry (code id light).
@@ -1877,7 +1883,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 UI-1 — «NIGHT labels follow the room»: the founder entered the rain and the Sound button still read «Firefly» while another timbre played.
 - fn (1): `checkNightLabels`
 
-_375 modules, 3452 exported names._
+_376 modules, 3462 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

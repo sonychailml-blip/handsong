@@ -37,6 +37,7 @@
   --light-bar-glow:0 0 10px rgba(255,255,255,.35); --light-fs-bar:10px; --light-fw-semi:650; --light-track-bar:.06em; --light-fade:.35s;
   --light-z-bars:var(--z-field); --light-z-card:var(--z-help);
   --light-cv-dim:rgba(8,7,6,.32); --light-cv-band:rgba(246,241,232,.03); --light-cv-line:rgba(246,241,232,.10); --light-cv-on:rgba(255,180,74,.16);
+  --light-cv-mark-shadow:rgba(0,0,0,.45);   /* LIGHT-9: the clip's mark */
   --light-cv-online:rgba(255,180,74,.75); --light-cv-dot:rgba(255,255,255,.85); --light-cv-ther:rgba(246,241,232,.22); --light-cv-ther-tonic:rgba(255,180,74,.5);   /* the canvas (draw.js reads them once) */
   --light-z-start:var(--z-menu);
   /* LIGHT-3b: the controls and sheets */
@@ -57,7 +58,10 @@
 /* the page */
 *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 html, body{ margin:0; height:100%; overflow:hidden; touch-action:none; overscroll-behavior:none; background:var(--light-base); color:var(--light-ink); font-family:var(--light-font); }
-#canvas{ position:fixed; inset:0; width:100vw; height:100vh; display:block; }
+/* LIGHT-9: the canvas fills what is SEEN — 100vh on Android Chrome is the height without the address bar (taller than the visible page, the
+   bottom band fell under the system buttons); dvh follows the bars, and an edge-to-edge browser's bottom inset is left out (boot.js sizes the
+   drawing buffer from this box) */
+#canvas{ position:fixed; left:0; top:0; width:100%; height:100vh; height:calc(100dvh - env(safe-area-inset-bottom)); display:block; }
 #video{ display:none; }
 button{ font:inherit; }
 button:focus-visible, a:focus-visible{ outline:2px solid var(--light-acc); outline-offset:2px; }
@@ -101,6 +105,12 @@ button:focus-visible, a:focus-visible{ outline:2px solid var(--light-acc); outli
 .light-bar.act{ color:var(--light-ink); }
 .light-bar.act .light-bar-track{ box-shadow:var(--light-bar-glow); }
 
+/* LIGHT-9: the start card's quiet foot — the language (a native picker) and «Write to us» */
+.light-foot{ display:flex; align-items:center; justify-content:center; gap:var(--light-gap-lg); margin:var(--light-gap-lg) 0 0; font-size:var(--light-fs-small); color:var(--light-ink-faint); }
+.light-lang{ display:flex; align-items:center; gap:var(--light-gap-xs); cursor:pointer; }
+.light-lang-ico, .light-lang-ico svg{ display:block; width:var(--light-ico-sm); height:var(--light-ico-sm); }
+.light-lang select{ appearance:none; -webkit-appearance:none; border:none; background:none; color:var(--light-ink-dim); font:inherit; padding:var(--light-gap-xs) 0; cursor:pointer; color-scheme:dark; }
+.light-fb{ color:var(--light-ink-dim); text-decoration:none; border-bottom:1px solid var(--light-hair); }
 /* LIGHT-2b: «How to play» on the start card, and its card */
 .light-start .light-how-btn{ margin:var(--light-gap) 0 0; padding:var(--light-retry-pad); border-radius:var(--light-r-pill); border:1px solid var(--light-hair);
   background:none; color:var(--light-ink-dim); font-family:var(--light-font); font-size:var(--light-fs-msg); cursor:pointer; }
@@ -126,7 +136,7 @@ button:focus-visible, a:focus-visible{ outline:2px solid var(--light-acc); outli
   box-shadow:var(--light-bars-ring); color:var(--light-ink); font-size:var(--light-fs-chip); cursor:pointer; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); }
 .light-chev, .light-chev .svgi{ display:flex; width:var(--light-ico-sm); height:var(--light-ico-sm); color:var(--light-ink-dim); }
 /* the four buttons in ONE frame (the founder: as the bars share theirs) */
-.light-rounds{ position:absolute; left:50%; transform:translateX(-50%); bottom:max(var(--light-rounds-bottom), env(safe-area-inset-bottom)); display:flex; justify-content:center; gap:var(--light-gap-sm);
+.light-rounds{ position:absolute; left:50%; transform:translateX(-50%); bottom:calc(var(--light-rounds-bottom) + env(safe-area-inset-bottom)); display:flex; justify-content:center; gap:var(--light-gap-sm);
   padding:var(--light-rounds-pad); border-radius:var(--light-r-rounds); background:var(--light-bars-bg); box-shadow:var(--light-bars-ring); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); }
 .light-rd{ display:flex; flex-direction:column; align-items:center; gap:var(--light-gap-sm); border:none; background:none; color:var(--light-ink); cursor:pointer; padding:0; min-width:var(--light-rd-w); }
 .light-rd-c{ display:flex; align-items:center; justify-content:center; width:var(--light-rd); height:var(--light-rd); border-radius:var(--light-r-pill); background:var(--light-chip); }
@@ -139,7 +149,7 @@ button:focus-visible, a:focus-visible{ outline:2px solid var(--light-acc); outli
 .light-sheetveil{ position:fixed; inset:0; z-index:var(--light-z-sheet); background:var(--light-veil); }
 .light-sheetveil[hidden], .light-sheet[hidden]{ display:none; }
 .light-sheet{ position:fixed; left:0; right:0; bottom:0; z-index:var(--light-z-sheet); max-height:var(--light-sheet-max); overflow-y:auto; border-radius:var(--light-r-sheet);
-  padding:var(--light-pad-sheet); background:var(--light-glass-hi); box-shadow:var(--light-bars-ring); color:var(--light-ink); backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px); }
+  padding:var(--light-pad-sheet); padding-bottom:calc(var(--light-gap-lg) + env(safe-area-inset-bottom)); background:var(--light-glass-hi); box-shadow:var(--light-bars-ring); color:var(--light-ink); backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px); }
 @media (min-width:720px){ .light-sheet{ left:50%; right:auto; bottom:50%; width:var(--light-sheet-w); transform:translate(-50%,50%); border-radius:var(--light-r-card); } .light-sheet-grab{ display:none; } }
 .light-sheet-grab{ width:var(--light-grab-w); height:var(--light-grab-h); border-radius:var(--light-r-pill); background:var(--light-ink-faint); margin:0 auto var(--light-gap); }
 .light-sheet-head{ display:flex; justify-content:space-between; align-items:center; margin:0 0 var(--light-gap); }
@@ -213,7 +223,7 @@ button:focus-visible, a:focus-visible{ outline:2px solid var(--light-acc); outli
 .light-count[hidden]{ display:none; }
 .light-count svg{ position:absolute; inset:0; width:100%; height:100%; transform:rotate(-90deg); }
 #lightCountN{ font-family:var(--light-font-word); font-weight:var(--light-fw-light); font-size:var(--light-fs-count); line-height:var(--light-lh-none); color:var(--light-ink); text-shadow:var(--light-text-shadow); }
-.light-clipcard{ position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); z-index:var(--light-z-sheet); width:min(var(--light-sheet-w), calc(100vw - 2 * var(--light-gap))); max-height:calc(100vh - 2 * var(--light-gap));
+.light-clipcard{ position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); z-index:var(--light-z-sheet); width:min(var(--light-sheet-w), calc(100vw - 2 * var(--light-gap))); max-height:calc(100vh - 2 * var(--light-gap)); max-height:calc(100dvh - 2 * var(--light-gap));
   overflow-y:auto; border-radius:var(--light-r-card); padding:var(--light-pad-sheet); background:var(--light-glass-hi); box-shadow:var(--light-bars-ring); color:var(--light-ink); }
 .light-clipcard[hidden]{ display:none; }
 .light-clipcard h3{ margin:0 0 var(--light-gap); font-size:var(--light-fs-h2); font-weight:var(--light-fw-semi); }

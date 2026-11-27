@@ -25,6 +25,11 @@ export const onLightFrame=f=>{ listeners.push(f); };   // the shell's bars, once
 const starts=[];
 export const onLightStart=f=>{ starts.push(f); };   // LIGHT-3b: once the start is done and the profile applied (the controls restore the person's choices)
 export const lightStarted=()=>started;
+/* LIGHT-9: the drawing buffer = the canvas's box as laid out (light.css: the visible height, without an edge-to-edge bottom inset); core's own
+   resize (innerWidth × innerHeight) runs first on each resize, this one after it */
+export function lightFit(){ const r=canvas.getBoundingClientRect(), w=Math.round(r.width)||innerWidth, h=Math.round(r.height)||innerHeight;
+  if(canvas.width!==w) canvas.width=w; if(canvas.height!==h) canvas.height=h; }
+addEventListener('resize', lightFit); if(window.visualViewport) window.visualViewport.addEventListener('resize', lightFit); lightFit();
 
 /* a profile's solo chain into the live state and sound (as the shared UI's profChain): the data, then the sound halves, then each fixed value */
 function chainApply(key, entries, amts){

@@ -49,6 +49,9 @@ Read: `docs/light/PLAN.md` (decisions, where each part comes from, core changes,
   production from `light-release` (checked: Light's page, `core/recorder.js` 404).
 - `LIGHT-8` (2026-11-27): full screen as in Night (`fullscreen.js`, Light's own copy): asked in the Play tap, never while the camera prompt may come;
   a corner toggle top left, shown and hidden with the controls; none on iPhone Safari or in the home-screen app.
+- `LIGHT-9` (2026-11-27): the bottom band on Android fixed (the canvas was 100vh); the language picker on the start card; the hand-setup offer
+  after a minute of playing; the iPhone home-screen card; «handsong.app» in the clip; «Write to us». Next: `LIGHT-10` — offline (precache after
+  the start, a new-version notice as in Night); then the timbres (the founder's choice), the phone checks, the site card.
 
 ## Deploy (LIGHT-7; the founder sets the project up once, as for Night)
 - Vercel → Add New Project → this repository; name `handsong-light`; Framework **Other**; Root Directory: the repository root (the shared

@@ -170,3 +170,10 @@ decisions they led to are written here in words).
 - **A timbre for each hand — later, when there are more timbres** (10–15). The timbre sheet then shows two columns (left / right) only while both
   hands play notes; with one playing hand it stays one list. Not now: with one timbre it would add a choice that does nothing.
 - **Full screen** (after the first publish): Play opens full screen; a corner button toggles it, shown with the other controls, hidden while playing.
+- **The language by hand** on the start card (the founder, 2026-11-27).
+- **The first minute** (the founder agreed): the cards at the first start (skippable); the hand-setup offer after about a minute of playing.
+- **iPhone:** a home-screen card (no full screen in Safari). **The clip** carries «handsong.app». **«Write to us»** on the start card.
+- **Offline:** cached in the background after the start, once; a notice of a new version as in Night (LIGHT-10).
+- **Timbres** (the founder): few but good, from different families — lead (the main one for Light), piano, organ, winds, bass and others; existing
+  records first, our own new ones where needed.
+- **Android app** (later, after the web version): a Trusted Web Activity wrapping play.handsong.app for Google Play.

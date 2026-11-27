@@ -9,7 +9,7 @@ import { scaleId, tonic, aRef, handFn, rectPref, camFacing, leadIdx, setScaleId,
 import { setLeadInstr, timbreIdx, timbreIdOf, timbresOf } from '../../core/audio.js';
 import { switchCamera } from '../../core/vision.js';
 import { profileOf } from '../../core/profile.js';
-import { L, t } from '../../core/i18n.js';
+import { L, t, onLangChange } from '../../core/i18n.js';
 import { nsKey } from '../../core/storens.js';
 import { lightAllOff } from './engine.js';
 import { lightHandsReset, setLightFxSens, setLightTravel, setLightOctShift, lightOctShift } from './gestures.js';
@@ -135,9 +135,10 @@ export function lightControlsWire(fill){
   $('lightFsBtn').onclick=()=>{ fsToggle().then(fsRender); }; fsOnChange(fsRender); fsRender();
   $('lightSheetClose').onclick=closeSheet; $('lightSheetVeil').onclick=closeSheet;
   addEventListener('keydown', e=>{ if(e.key==='Escape' && sheet) closeSheet(); });
-  onLightFrame(frame); onLightStart(restore);
+  onLightFrame(frame); onLightStart(restore); onLangChange(()=>{ render(); if(sheet) openSheet(sheet); });   // LIGHT-9: the language by hand
 }
 /* probe only */
 export const lightControlsDbg=()=>({ shown:$('lightCtl').classList.contains('on'), sheet, key:$('lightKeyName').textContent, hz:$('lightKeyHz').textContent, scale:$('lightScaleName').textContent,
   timbre:$('lightTimbreName').textContent, sens:{ ...sens }, fs:{ hidden:$('lightFsBtn').hidden, icon:$('lightFsBtn').dataset.svg, label:$('lightFsBtn').getAttribute('aria-label') } });
+export const lightSheetOpen=()=>!!sheet;   // LIGHT-9: the hand-setup offer waits while a sheet is open
 export const lightControlsOpenDbg=k=>{ if(k) openSheet(k); else closeSheet(); return sheet; };
