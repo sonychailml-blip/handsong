@@ -194,3 +194,8 @@ Tree hashes after: core 44ed0dd238a68bfb · apps/full 0148bb454440c3e3 · apps/n
   outside the track).
 - The language pill: the shown name in its own span, the native picker invisible over it — the pill fits the name (it was as wide as the longest).
 - Row «LIGHT eight languages» + the pill shows the chosen name. Checks: static PASSED; probe-data PASS 109/0; `--app light` PASS; smoke Light ok.
+
+# LIGHT-9c (LIGHT track, 2026-11-27): one full-screen icon
+- The founder: the «leave full screen» icon (four corners pointing in) reads as a swastika — the toggle now shows the same outward corners both ways
+  (its words and aria-pressed still tell the state); `fs-exit` removed from Light's icons. ⚠ Night's `fs-exit` is the same drawing (not changed here).
+- Row «LIGHT controls and menus»: the one icon. Checks: static PASSED; `--app light` PASS; licences PASS. core, apps/full, apps/night unchanged.

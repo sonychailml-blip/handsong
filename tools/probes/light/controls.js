@@ -22,7 +22,7 @@ export async function checkLightControls(){
     { const b=document.getElementById('lightFsBtn'), full=fsOn();   // LIGHT-8: the full-screen toggle lives in the controls (shown and hidden with them) and shows its state
       if(!b || b.parentElement!==document.getElementById('lightCtl')) miss('the full-screen button is not in the controls');
       if(D.fs.hidden!==!fsCanToggle()) miss(`the full-screen button hidden=${D.fs.hidden} where full screen can${fsCanToggle() ? '' : 'not'} be had`);
-      if(D.fs.icon!==(full ? 'fs-exit' : 'fs-enter') || D.fs.label!==t(full ? 'light.fs.exit' : 'light.fs.enter') || !b.querySelector('svg')) miss(`the full-screen button reads ${D.fs.icon} «${D.fs.label}» with full=${full}`); }
+      if(D.fs.icon!=='fs-enter' || D.fs.label!==t(full ? 'light.fs.exit' : 'light.fs.enter') || !b.querySelector('svg')) miss(`the full-screen button reads ${D.fs.icon} «${D.fs.label}» with full=${full}`); }
     const B=()=>document.getElementById('lightSheetBody');
     lightControlsOpenDbg('key'); if(B().querySelectorAll('.light-keys button').length!==12) miss('the key sheet does not hold 12 keys');
     lightControlsOpenDbg('scale'); if(B().querySelectorAll('.light-item').length!==p.moods.length) miss(`the scale sheet holds ${B().querySelectorAll('.light-item').length} moods, not ${p.moods.length}`);

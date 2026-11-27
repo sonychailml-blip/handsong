@@ -54,9 +54,10 @@ function render(){
   const tm=timbresOf('ld').find(x=>x.idx===leadIdx); $('lightTimbreName').textContent= tm ? L(tm.name) : '';
   fsRender();
 }
-/* LIGHT-8: the full-screen toggle shows its state; not shown where full screen cannot be had (iPhone Safari) or is given (home-screen app) */
+/* LIGHT-8: the full-screen toggle shows its state in its words and aria-pressed — LIGHT-9c (the founder): ONE icon both ways (the inward
+   corners read as a swastika); not shown where full screen cannot be had (iPhone Safari) or is given (home-screen app) */
 function fsRender(){
-  const b=$('lightFsBtn'), full=fsOn(), name= full ? 'fs-exit' : 'fs-enter', tt=t(full ? 'light.fs.exit' : 'light.fs.enter'); b.hidden=!fsCanToggle();
+  const b=$('lightFsBtn'), full=fsOn(), name='fs-enter', tt=t(full ? 'light.fs.exit' : 'light.fs.enter'); b.hidden=!fsCanToggle();
   if(b.dataset.svg!==name || !b.firstChild){ const g=svgIcon(document, name); if(g){ b.dataset.svg=name; b.replaceChildren(g); } }
   b.title=tt; b.setAttribute('aria-label', tt); b.setAttribute('aria-pressed', full ? 'true' : 'false');
 }

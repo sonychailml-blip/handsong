@@ -17,8 +17,7 @@ export const LIGHT_ICONS=Object.freeze({
   saved:[['acc-line','path',{ d:'M5 12.5l4.5 4.5L19 7.5' }]],
   /* LIGHT-9: the language (a globe), the iPhone's Share sign and «add» square (the home-screen card) */
   globe:[['line','circle',{ cx:12, cy:12, r:8.5 }], ['line','path',{ d:'M3.5 12h17M12 3.5c2.4 2.3 3.6 5.1 3.6 8.5s-1.2 6.2-3.6 8.5M12 3.5C9.6 5.8 8.4 8.6 8.4 12s1.2 6.2 3.6 8.5' }]],
-  /* LIGHT-8: full screen — four corner brackets, the same drawing as Night's (apps/night/pure/fsicons.js; out: corners point out, in: they point in) */
+  /* LIGHT-8: full screen — four corner brackets pointing out, Night's drawing (apps/night/pure/fsicons.js); LIGHT-9c: the same icon both ways */
   'fs-enter':[['fill','path',{ d:'M3.5 3.5H9V5.5H5.5V9H3.5ZM20.5 3.5V9H18.5V5.5H15V3.5ZM20.5 20.5H15V18.5H18.5V15H20.5ZM3.5 20.5V15H5.5V18.5H9V20.5Z' }]],
-  'fs-exit':[['fill','path',{ d:'M7.5 3.5H9.5V9.5H3.5V7.5H7.5ZM16.5 3.5H14.5V9.5H20.5V7.5H16.5ZM16.5 20.5H14.5V14.5H20.5V16.5H16.5ZM7.5 20.5H9.5V14.5H3.5V16.5H7.5Z' }]],
 });
 for(const [name, shapes] of Object.entries(LIGHT_ICONS)){ const why=svgIconAdd(name, shapes); if(why) console.warn('[light] icon:', why); }   // eslint-disable-line no-console
