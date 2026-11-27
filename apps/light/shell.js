@@ -10,8 +10,8 @@ import { lightChainOfHand } from './gestures.js';
 
 export const BAR_FX_MS=1500, BAR_REV_MS=1000, SIDE_LO=0.4, SIDE_HI=0.6;
 export const FX_BARS=Object.freeze([['dly','DLY'],['vib','VIB'],['trm','TRM'],['bright','BRT']]);   // finger 0…3, as data/light.json's chain
-const $=id=>document.getElementById(id), SIDE={ play:'right', fx:'left' };
-let fxSeen=-Infinity, revSeen=-Infinity, lastVals='', ticks=0;
+const $=id=>document.getElementById(id), SIDE={ play:'right', fx:'left', play2:'left' };
+let fxSeen=-Infinity, revSeen=-Infinity, rev2Seen=-Infinity, lastVals='', ticks=0;
 
 /* the side law: past 40 % / 60 % of the width the side changes; between them it stays */
 export function sideOf(prev, x, W){ const f=x/Math.max(1,W); return f<SIDE_LO ? 'left' : f>SIDE_HI ? 'right' : prev; }
@@ -26,23 +26,31 @@ function fill(bar, v){ bar.querySelector('.light-bar-fill').style.height=(v*100)
 
 function frame(now, hands){
   ticks++;
-  const W=canvas.width||innerWidth, play=hands.find(h=>h.play), fx=hands.find(h=>!h.play), F=$('lightFxBars'), R=$('lightRevBar');
+  /* LIGHT-6c (the founder): both hands playing notes → two REV bars, each at its own hand's side with its own reverb (the effects set cannot show then) */
+  const W=canvas.width||innerWidth, plays=hands.filter(h=>h.play), play=plays.find(h=>!/^Left/.test(h.key)) || plays[0], play2=plays.find(h=>h!==play), fx=hands.find(h=>!h.play), F=$('lightFxBars'), R=$('lightRevBar'), R2=$('lightRevBar2');
   const vals=FX_BARS.map(([id])=>valOf(id)), key=vals.map(v=>v.toFixed(3)).join();
   if((fx && fx.pinch) || (key!==lastVals && lastVals!=='')) fxSeen=now;
   lastVals=key;
   if(play && play.pinch) revSeen=now;
+  if(play2 && play2.pinch) rev2Seen=now;
+  if(play2) SIDE.play2=sideOf(SIDE.play2, play2.x, W);
   if(play) SIDE.play=sideOf(SIDE.play, play.x, W);
   if(fx){ let s=sideOf(SIDE.fx, fx.x, W); if(play && s===SIDE.play) s= SIDE.play==='left' ? 'right' : 'left'; SIDE.fx=s; }
-  place(R, SIDE.play); place(F, SIDE.fx);
+  if(play && play2 && SIDE.play2===SIDE.play) SIDE.play2= SIDE.play==='left' ? 'right' : 'left';   // two hands: never one edge
+  place(R, SIDE.play); place(F, SIDE.fx); place(R2, SIDE.play2);
   FX_BARS.forEach(([id],i)=>{ const b=F.querySelector(`[data-bar="${id}"]`); fill(b, vals[i]); b.classList.toggle('act', !!(fx && fx.pinch && fx.finger===i)); });
   const rb=R.querySelector('.light-bar'); fill(rb, valOf('reverb', play ? lightChainOfHand(play.key) : chainKeyOf('ld')));   // LIGHT-6b: the playing hand's own reverb rb.classList.toggle('act', !!(play && play.pinch));
   F.classList.toggle('on', shownAt(fxSeen, now, BAR_FX_MS));
   R.classList.toggle('on', shownAt(revSeen, now, BAR_REV_MS));
+  { const b=R2.querySelector('.light-bar'); if(play2) fill(b, valOf('reverb', lightChainOfHand(play2.key))); b.classList.toggle('act', !!(play2 && play2.pinch)); R2.classList.toggle('on', !!play2 && shownAt(rev2Seen, now, BAR_REV_MS)); }
 }
 export function lightShellWire(){ onLightFrame(frame); }
+/* probe only: one frame with the given hands */
+export const lightShellFrameDbg=(now, hands)=>frame(now, hands);
 /* probe only: the effects marked as just used (as a pinch would), so the set shows for its hold */
 export const lightShellPokeDbg=()=>{ fxSeen=performance.now(); };
 /* probe only: the bars' state */
 export const lightShellDbg=()=>{ const F=$('lightFxBars'), R=$('lightRevBar'), h=b=>b.querySelector('.light-bar-fill').style.height;
   return { fx:{ on:F.classList.contains('on'), side:F.classList.contains('left')?'left':'right', bars:Object.fromEntries(FX_BARS.map(([id])=>[id, h(F.querySelector(`[data-bar="${id}"]`))])) },
-    rev:{ on:R.classList.contains('on'), side:R.classList.contains('left')?'left':'right', h:h(R.querySelector('.light-bar')) }, running:ticks>0 }; };
+    rev:{ on:R.classList.contains('on'), side:R.classList.contains('left')?'left':'right', h:h(R.querySelector('.light-bar')) },
+    rev2:{ on:$('lightRevBar2').classList.contains('on'), side:$('lightRevBar2').classList.contains('left')?'left':'right' }, running:ticks>0 }; };

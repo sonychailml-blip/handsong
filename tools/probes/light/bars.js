@@ -5,7 +5,7 @@
 import { fxChainOf, chainKeyOf } from '../../../core/state.js';
 import { profileOf } from '../../../core/profile.js';
 import { litFingers } from '../../../apps/light/draw.js';
-import { FX_BARS, BAR_FX_MS, BAR_REV_MS, sideOf, shownAt, lightShellDbg, drivenIndex } from '../../../apps/light/shell.js';
+import { FX_BARS, BAR_FX_MS, BAR_REV_MS, sideOf, shownAt, lightShellDbg, drivenIndex, lightShellFrameDbg } from '../../../apps/light/shell.js';
 
 export async function checkLightBars(){
   const diffs=[], miss=s=>diffs.push(s);
@@ -23,6 +23,12 @@ export async function checkLightBars(){
   /* LIGHT-3c (the founder): EVERY sounding finger lights, not only the first pinched; the effects hand lights its pinching finger; no pinch, none */
   { const ids=s=>[...s].sort().join(); const two=litFingers({ pinch:true, play:true, fing:{ 0:{}, 2:{} }, finger:0 }), fx=litFingers({ pinch:true, play:false, finger:1 }), off=litFingers({ pinch:false, play:true, fing:{ 0:{} }, finger:0 });
     if(ids(two)!=='0,2') miss('two sounding fingers light as «'+ids(two)+'», not «0,2»'); if(ids(fx)!=='1') miss('the effects hand lights «'+ids(fx)+'»'); if(off.size) miss('a hand without a pinch lights fingers'); }
+  /* LIGHT-6c: both hands playing → two REV bars at their own sides; one playing hand + the effects hand → one REV (CONTROL) */
+  { const t=performance.now()-20000, W=innerWidth;   // times in the past: the real frames after this see the holds long over
+    lightShellFrameDbg(t, [{ key:'Left', play:true, pinch:true, x:W*0.2 }, { key:'Right', play:true, pinch:true, x:W*0.8 }]); const two=lightShellDbg();
+    if(!two.rev.on || !two.rev2.on || two.rev.side===two.rev2.side) miss('two playing hands: the REV bars '+JSON.stringify({ r:two.rev, r2:two.rev2 }));
+    lightShellFrameDbg(t+5000, [{ key:'Left', play:false, pinch:false, x:W*0.2 }, { key:'Right', play:true, pinch:true, x:W*0.8 }]); const one=lightShellDbg();
+    if(one.rev2.on) miss('CONTROL: one playing hand shows a second REV bar'); }
   await new Promise(r=>setTimeout(r, 2*BAR_FX_MS));   // no hand in view (the fake camera): both sets rest hidden
   const D=lightShellDbg(); if(!D.running) miss('the bars are not fed by the frame loop'); if(D.fx.on || D.rev.on) miss('a set shows with no hand: '+JSON.stringify(D));
   if(sideOf('right', 300, 1000)!=='left' || sideOf('left', 700, 1000)!=='right') miss('the side law does not switch past 40 % / 60 %');

@@ -158,3 +158,10 @@ decisions they led to are written here in words).
 - **The sounding band outlined in both field views** (1 note a band too).
 - **The cards' hand redrawn** (a clean pictogram) and **the cards opaque** (the start no longer shows through).
 - **The cards' Russian texts** to be edited by the founder first, then translated.
+
+## Decided (the founder, 2026-11-27, after LIGHT-6b)
+- **Two REV bars when both hands play notes**, each at its own hand's side with its own reverb (the effects set cannot show then).
+- **The theremin in the 4-notes view lights the note it is nearest**, not the band's note under the finger (the drawing only; the sound was right).
+- **The volume by hand:** only the right hand plays — as before (quiet at the left edge, loud at the right); only the left — mirrored (loud at the
+  left edge); both play — the right loudest at the right edge, the left at the left, both silent toward the centre.
+- **The cards' texts** in the founder's Russian wording; the other seven languages translated from it.

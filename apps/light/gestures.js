@@ -5,7 +5,7 @@
    tutorial taps, calibration (LIGHT-4). Every kept line keeps core's arithmetic and order — the probe compares this machine's note calls with
    core's on the same synthetic hands. Notes go to apps/light/engine.js (no recorder). */
 import { FINGER_TIPS, PINCH_HOLD, REV_NEAR, REV_RANGE, WATCHDOG_MS, volAmp } from '../../core/config.js';
-import { fxChainOf, chainKeyOf, trackChainKeyOf, FX_VOL, flipX, leadIdx, handFnOf, playsNotes, isLeadMode, pinchFingers, sx, sy, handSide, rectOctReg, volFloor } from '../../core/state.js';
+import { fxChainOf, chainKeyOf, trackChainKeyOf, FX_VOL, flipX, leadIdx, handFn, handFnOf, playsNotes, isLeadMode, pinchFingers, sx, sy, handSide, rectOctReg, volFloor } from '../../core/state.js';
 import { IVX, rectGrid, rectLayout, rectBase, rectNoteAt, thereminHz, periodOf, CUR } from '../../core/scales.js';
 import { fxSnapshot, FX_GLIDE_KEY, fxInstance, fxHandRange, setTrackRouteOf } from '../../core/audio.js';
 import { canvas } from '../../core/vision.js';
@@ -33,7 +33,17 @@ const TRACK_SOLO=trackChainKeyOf(chainKeyOf(ROLE));
 export const lightTrackKey=()=>TRACK_SOLO;
 const routeLeft=owner=> perHand && typeof owner==='string' && /^lead:L(:|$)/.test(owner);
 export function setLightPerHandReverb(on){ perHand=!!on; setTrackRouteOf(routeLeft); }
-export const lightChainOfHand=key=>chainOfHand(key);   // the shell's REV bar shows the playing hand's own reverb
+export const lightChainOfHand=key=>chainOfHand(key);
+/* LIGHT-6c (the founder): THE VOLUME BY HAND. Only the right hand plays: as core (quiet at the left edge, loud at the right). Only the left hand plays:
+   mirrored (loud at the left edge, quiet at the right). Both play: the right hand loudest at the right edge, the left at the left, each quietest
+   toward the centre. Off = core's law for every hand (the comparison row turns it off). x is the screen position (mirroring already in sx). */
+let mirrorVol=true;
+export const setLightMirrorVolume=on=>{ mirrorVol=!!on; };
+export function volX(key, x, rx0, rx1){
+  const plain=clamp01((x-rx0)/(rx1-rx0)); if(!mirrorVol) return plain;
+  const both=playsNotes(handFn.ld.L) && playsNotes(handFn.ld.R), left=handSide(key)==='L', mid=(rx0+rx1)/2;
+  if(both) return left ? clamp01((mid-x)/(mid-rx0)) : clamp01((x-mid)/(rx1-mid));
+  return left ? 1-plain : plain; }   // the shell's REV bar shows the playing hand's own reverb
 setTrackRouteOf(routeLeft);
 const chainOfHand=key=> perHand && handSide(key)==='L' ? TRACK_SOLO : chainKeyOf(ROLE);
 const mirrored=new Map(); let trackFx=[];
@@ -166,7 +176,7 @@ export function lightProcessHands(res){
           }
           for(const f of Object.keys(S.fing)) if(!act.includes(+f)) delete S.fing[f];
         }
-        const xn=clamp01((x-rx0)/(rx1-rx0)), zk=chainKeyOf(ROLE);
+        const xn=volX(key,x,rx0,rx1), zk=chainKeyOf(ROLE);   // LIGHT-6c: the mirrored volume (off = core's law)
         S.vol=noteVolOf(zk,xn,()=>depthN(S,lm));
         for(const eff of fxChainOf(zk)){
           if(!eff||eff.fxId===FX_VOL) continue;
@@ -210,6 +220,6 @@ export function lightHandsView(){
   for(const k in HANDS){ const S=HANDS[k], lm=S.lm; if(!lm || now-S.seen>WATCHDOG_MS) continue;
     const tip=FINGER_TIPS[S.pinch && S.oct>=0 ? S.oct : 0]||8;
     out.push({ key:k, x:sx((lm[4].x+lm[tip].x)/2, W), y:sy((lm[4].y+lm[tip].y)/2, H), pinch:!!S.pinch, play:noteHand(k), finger: S.pinch && S.oct>=0 ? S.oct : -1,
-      zone:S.zone, fn:S.fn, slot:S.slot, deg:S.deg, oct:S.regOct, fing:{ ...(S.fing||{}) }, lm }); }
+      zone:S.zone, fn:S.fn, vol:S.vol, slot:S.slot, deg:S.deg, oct:S.regOct, fing:{ ...(S.fing||{}) }, lm }); }
   return out;
 }

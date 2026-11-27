@@ -57,8 +57,8 @@ LIGHT-3 — Light's LIVE NOTE ADAPTER: the hands' solo notes straight into the e
 
 ## apps/light/gestures.js
 LIGHT-3 — LIGHT'S HANDS: core/gestures/hands.js and roles.js COPIED and cut to what Light offers (option B, the founder 2026-11-27): one role, the solo; each hand's function note / hold / theremin …
-- const (8): `setLightFxSens`, `setLightDepthLaw`, `setLightTravel`, `setLightOctShift`, `lightOctShift`, `lightTrackKey`, `lightChainOfHand`, `setLightTrackFx`
-- fn (8): `setLightPerHandReverb`, `lightMirrorFx`, `lightVoiceModeReset`, `lightHandsReset`, `lightHandsProbe`, `lightProcessHandsProbe`, `lightProcessHands`, `lightHandsView`
+- const (9): `setLightFxSens`, `setLightDepthLaw`, `setLightTravel`, `setLightOctShift`, `lightOctShift`, `lightTrackKey`, `lightChainOfHand`, `setLightMirrorVolume`, `setLightTrackFx`
+- fn (9): `setLightPerHandReverb`, `volX`, `lightMirrorFx`, `lightVoiceModeReset`, `lightHandsReset`, `lightHandsProbe`, `lightProcessHandsProbe`, `lightProcessHands`, `lightHandsView`
 
 ## apps/light/icons.js
 LIGHT-3b — LIGHT'S OWN DRAWN ICONS (our own work, rule #32; the shapes of the founder's approved drawing, tools/.out/light-ui/), added to the shared table through core's door (core/icons.js svgIcon…
@@ -78,7 +78,7 @@ LIGHT-3 — only the modes Light plays: the page profile's moods (Full's «Famil
 
 ## apps/light/shell.js
 LIGHT-3 — LIGHT'S BARS, as in Night but by the founder's rule (LIGHT-1/2): one bar per effect finger — DLY VIB TRM BRT on the effects hand's side, shown from the moment an effects pinch starts unti…
-- const (6): `BAR_FX_MS`, `FX_BARS`, `shownAt`, `drivenIndex`, `lightShellPokeDbg`, `lightShellDbg`
+- const (7): `BAR_FX_MS`, `FX_BARS`, `shownAt`, `drivenIndex`, `lightShellFrameDbg`, `lightShellPokeDbg`, `lightShellDbg`
 - fn (2): `sideOf`, `lightShellWire`
 
 ## apps/light/texts.js
@@ -1872,7 +1872,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 UI-1 — «NIGHT labels follow the room»: the founder entered the rain and the Sound button still read «Firefly» while another timbre played.
 - fn (1): `checkNightLabels`
 
-_374 modules, 3438 exported names._
+_374 modules, 3441 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

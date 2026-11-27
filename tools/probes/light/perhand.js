@@ -7,7 +7,7 @@ import { CAM_MARGIN } from '../../../core/config.js';
 import { routeOfOwner, leadAllOff } from '../../../core/audio.js';
 import { pose } from '../../../core/gestures/pose.js';
 import { fxParamsOf } from '../../../core/gestures/fxhand.js';
-import { lightHandsProbe, lightProcessHandsProbe, lightTrackKey, lightMirrorFx, setLightPerHandReverb } from '../../../apps/light/gestures.js';
+import { lightHandsProbe, lightProcessHandsProbe, lightTrackKey, lightMirrorFx, setLightPerHandReverb, volX, setLightMirrorVolume } from '../../../apps/light/gestures.js';
 
 const W=1000, H=600, FPS=30;
 export async function checkLightPerHand(){
@@ -31,8 +31,17 @@ export async function checkLightPerHand(){
     if(routeOfOwner('lead:L')!=='live') miss('off: the left hand still goes to the second head');
     const c=play(0.12,null); notes.push(`off, the left hand alone far: live ${c[0].toFixed(2)}`);   // off: one reverb — the only playing hand drives it
     if(!(c[0]>0.3)) miss('CONTROL: off, the far left hand did not move the live mix');
+    /* LIGHT-6c: the volume by hand (x across 0…1000) — both play: right loud at the right edge, left at the left, both silent at the centre;
+       only the left plays: mirrored; only the right: core's law; off: core's law for the left too (CONTROL) */
+    const v=(k,x)=>+volX(k,x,0,1000).toFixed(3);
+    ST.setHandFn('ld','L','note'); ST.setHandFn('ld','R','note');
+    if(!(v('Right',900)===0.8 && v('Right',500)===0 && v('Left',100)===0.8 && v('Left',500)===0 && v('Left',700)===0)) miss('both play: '+[v('Right',900),v('Right',500),v('Left',100),v('Left',500),v('Left',700)].join(', '));
+    ST.setHandFn('ld','R','fx'); if(!(v('Left',100)===0.9 && v('Left',900)===0.1)) miss('only the left plays: '+v('Left',100)+', '+v('Left',900));
+    ST.setHandFn('ld','L','fx'); ST.setHandFn('ld','R','note'); if(!(v('Right',900)===0.9 && v('Right',100)===0.1)) miss('only the right plays: '+v('Right',900)+', '+v('Right',100));
+    setLightMirrorVolume(false); ST.setHandFn('ld','L','note'); ST.setHandFn('ld','R','fx'); if(v('Left',100)!==0.1) miss('CONTROL: off, the left hand is not on the plain law ('+v('Left',100)+')'); setLightMirrorVolume(true);
+    notes.push('volume by hand: both 0.8 at their edges, 0 at the centre; the left alone mirrored');
   } finally {
-    setLightPerHandReverb(true); ST.setHandFn('ld','L',hand.L); ST.setHandFn('ld','R',hand.R); ST.setViewRect(vr);
+    setLightPerHandReverb(true); setLightMirrorVolume(true); ST.setHandFn('ld','L',hand.L); ST.setHandFn('ld','R',hand.R); ST.setViewRect(vr);
     { const p=fxParamsOf(live,'reverb')[2], q=fxParamsOf(T,'reverb')[2]; if(p) p.set(m0[0]); if(q && !Number.isNaN(m0[1])) q.set(m0[1]); }
   }
   return { pass:!diffs.length, diffs, note:notes.join(' · ') };

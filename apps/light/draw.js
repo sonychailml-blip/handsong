@@ -30,7 +30,9 @@ function picture(src){
 const isTonic=(deg,s)=> IVX(s)[deg]%s.edo===0;
 function field(hands){
   const W=canvas.width, H=canvas.height, s=CUR(), c=colours(), lit=new Set(), litDeg=new Set();
-  for(const h of hands) if(h.play && h.zone==='ld') for(const n of Object.values(h.fing||{})){ if(n.slot>=0) lit.add(n.slot); litDeg.add(n.deg); }
+  for(const h of hands) if(h.play && h.zone==='ld'){
+    if(h.fn==='therm'){ if(h.pinch){ if(h.slot>=0) lit.add(h.slot); litDeg.add(h.deg); } continue; }   // LIGHT-6c (the founder): the theremin lights the note it is NEAREST (its own slot), not the band's note under the finger
+    for(const n of Object.values(h.fing||{})){ if(n.slot>=0) lit.add(n.slot); litDeg.add(n.deg); } }
   ctx.textBaseline='middle'; ctx.textAlign='left';
   if(rectGrid()){
     const RL=rectLayout(), nB=RL.bands, base=rectBase(rectOctReg('ld')), fs=Math.max(10, Math.min(14, Math.round(H/nB/6)));

@@ -131,3 +131,14 @@ Tree hashes after: core 44ed0dd238a68bfb (only `core/engine/surface.js`) · apps
   0.82; the delay mirrored; off → the left hand live (CONTROL: alone, it moves the live mix, 0.82).
 - Checks (iteration mode): static PASSED; probe-data PASS 109/0; `--app light` 10 rows PASS, CSP, network, storage PASS; smoke on Light PASS;
   licences PASS; name index PASS.
+
+# LIGHT-6c (LIGHT track, 2026-11-27): two REV bars, the theremin's lit note, the volume by hand, the cards' words
+Tree hashes after: core 44ed0dd238a68bfb (unchanged) · apps/full 0148bb454440c3e3 and apps/night 30d8f7b3c797de9e unchanged · apps/light bb3b5e6cbb4e1a9d.
+- `index.html` + `shell.js`: `#lightRevBar2` — the second playing hand's REV at its own side (never the first's edge), its own chain's mix.
+- `draw.js`: a theremin hand lights its own nearest slot (core's theremin law `slot`), not the band's finger slot (the payload stays core's).
+- `gestures.js volX` + `setLightMirrorVolume` (off = core's law; the comparison row runs off): the volume by hand as decided.
+- `texts.js`: the cards' 5 texts in the founder's Russian, translated to the seven other languages.
+- Rows: «LIGHT bars and one axis» + two playing hands → two REV bars on opposite sides (CONTROL one playing hand → one); «LIGHT each hand its own
+  reverb and volume» + the volume law (both 0.8 at their edges, 0 at the centre; the left alone mirrored; off → the plain law, CONTROL).
+- Checks (iteration mode): static PASSED; probe-data PASS 109/0; `--app light` 10 rows PASS, CSP, network, storage PASS; smoke on Light PASS;
+  licences PASS; name index PASS.
