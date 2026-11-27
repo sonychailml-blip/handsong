@@ -153,3 +153,16 @@ Tree hashes after: core 44ed0dd238a68bfb (unchanged) · apps/full 0148bb454440c3
   `window.P`); static PASSED; probe-data PASS 109/0; `--app light` 10 rows PASS (LIGHT-6c). Tree hashes: core 44ed0dd238a68bfb · apps/full
   0148bb454440c3e3 · apps/night 30d8f7b3c797de9e · apps/light bb3b5e6cbb4e1a9d. Vercel: project `handsong-light` created by the founder, the domain
   play.handsong.app added (its Cloudflare CNAME pending), the production branch `light-release` set once the branch exists.
+- Published 2026-11-27: `light-release` created by the founder; Vercel did not build it (the same commit was built as a `dev` preview) — started
+  by Deployments → Create Deployment. play.handsong.app (CNAME to the project's own Vercel target) serves Light's production.
+
+# LIGHT-8 (LIGHT track, 2026-11-27): full screen
+Tree hashes after: core 44ed0dd238a68bfb · apps/full 0148bb454440c3e3 · apps/night 30d8f7b3c797de9e (all unchanged) · apps/light 81b81bfc58a0d9b3.
+- `apps/light/fullscreen.js` (new; Night's law, its own copy — apps never import each other): the Play tap asks for full screen when the camera
+  is already granted; otherwise once the camera runs while the tap still counts, else on the next tap (twice at most); Android tries a landscape
+  lock; nothing asked on iPhone Safari or from the home screen. `boot.js` calls it in the Play / Try again taps, after the camera, at the start.
+- `#lightFsBtn` in `#lightCtl` (top left, the clip button's twin; shown and hidden with the controls), drawn icons `fs-enter` / `fs-exit` (Night's
+  bracket drawing), words `light.fs.enter/exit` in 8 languages; `controls.js fsRender` shows the state; hidden where full screen cannot be had.
+- Row «LIGHT controls and menus» + the toggle: in the controls, hidden exactly where full screen cannot be had, icon and words follow the state.
+- Checks (iteration mode): static PASSED; probe-data PASS 109/0; `--app light` 10 rows PASS, CSP, network, storage PASS; smoke-paths PASS;
+  name index PASS.

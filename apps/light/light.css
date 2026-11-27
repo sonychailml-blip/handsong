@@ -188,6 +188,12 @@ button:focus-visible, a:focus-visible{ outline:2px solid var(--light-acc); outli
 .light-cal-ok{ color:var(--light-ink); } .light-cal-none{ color:var(--light-ink-dim); }
 .light-calgo{ border:none; background:none; color:var(--light-acc); font-weight:var(--light-fw-semi); cursor:pointer; padding:0; }
 
+/* LIGHT-8: the full-screen toggle (top left, the clip button's twin; shown with the controls) */
+.light-fsbtn{ position:absolute; top:max(var(--light-gap), env(safe-area-inset-top)); left:max(var(--light-gap), env(safe-area-inset-left));
+  width:var(--light-rec); height:var(--light-rec); border:none; border-radius:var(--light-r-pill); background:var(--light-glass); color:var(--light-ink);
+  display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0; backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); }
+.light-fsbtn[hidden]{ display:none; }
+.light-fsbtn svg, .light-fsbtn .svgi{ display:block; width:var(--light-ico); height:var(--light-ico); }
 /* LIGHT-5: the clip button (top right; with the controls, and always while recording), the countdown, the card */
 .light-recbtn{ position:fixed; top:max(var(--light-gap), env(safe-area-inset-top)); right:max(var(--light-gap), env(safe-area-inset-right)); z-index:var(--light-z-rec);
   width:var(--light-rec); height:var(--light-rec); border:none; border-radius:var(--light-r-pill); background:var(--light-glass); box-shadow:var(--light-rec-shadow);

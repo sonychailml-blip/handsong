@@ -16,6 +16,8 @@ import { lightHandsReset, setLightFxSens, setLightTravel, setLightOctShift, ligh
 import { onLightFrame, onLightStart, lightStarted, PROFILE } from './boot.js';
 import { lightCalOn, lightCalStart, setLightCalTravel, lightCalCamera } from './calib.js';   // LIGHT-4: the hand setup
 import { modeNameOf, groupNameOf } from './modenames.js';   // LIGHT-6: the names in the six added languages
+import { fsToggle, fsOn, fsOnChange, fsCanToggle } from './fullscreen.js';   // LIGHT-8: the corner toggle
+import { svgIcon } from '../../core/icons.js';
 export const scaleName=s=>modeNameOf(s.id) || L(s.name);
 
 export const CTL_IDLE_MS=700, A4_MIN=380, A4_MAX=480, A4_CHIPS=Object.freeze([432,440,442]), FNS=Object.freeze(['fx','note','hold','therm']), OCT_MIN=-3, OCT_MAX=3;
@@ -50,6 +52,13 @@ function render(){
   $('lightKeyName').textContent=keyName(tonic); $('lightKeyHz').textContent=String(aRef);
   const s=scaleById(scaleId); $('lightScaleName').textContent= s ? scaleName(s) : scaleId;
   const tm=timbresOf('ld').find(x=>x.idx===leadIdx); $('lightTimbreName').textContent= tm ? L(tm.name) : '';
+  fsRender();
+}
+/* LIGHT-8: the full-screen toggle shows its state; not shown where full screen cannot be had (iPhone Safari) or is given (home-screen app) */
+function fsRender(){
+  const b=$('lightFsBtn'), full=fsOn(), name= full ? 'fs-exit' : 'fs-enter', tt=t(full ? 'light.fs.exit' : 'light.fs.enter'); b.hidden=!fsCanToggle();
+  if(b.dataset.svg!==name || !b.firstChild){ const g=svgIcon(document, name); if(g){ b.dataset.svg=name; b.replaceChildren(g); } }
+  b.title=tt; b.setAttribute('aria-label', tt); b.setAttribute('aria-pressed', full ? 'true' : 'false');
 }
 /* ── the sheets ── */
 function closeSheet(){ sheet=null; $('lightSheet').hidden=true; $('lightSheetVeil').hidden=true; }
@@ -123,11 +132,12 @@ export function lightControlsWire(fill){
   $('lightKeyBtn').onclick=()=>openSheet('key'); $('lightScaleBtn').onclick=()=>openSheet('scale');
   $('lightTimbreBtn').onclick=()=>openSheet('timbre'); $('lightHandsBtn').onclick=()=>openSheet('hands'); $('lightSensBtn').onclick=()=>openSheet('sens');
   $('lightCamBtn').onclick=()=>{ flipCamera(); };
+  $('lightFsBtn').onclick=()=>{ fsToggle().then(fsRender); }; fsOnChange(fsRender); fsRender();
   $('lightSheetClose').onclick=closeSheet; $('lightSheetVeil').onclick=closeSheet;
   addEventListener('keydown', e=>{ if(e.key==='Escape' && sheet) closeSheet(); });
   onLightFrame(frame); onLightStart(restore);
 }
 /* probe only */
 export const lightControlsDbg=()=>({ shown:$('lightCtl').classList.contains('on'), sheet, key:$('lightKeyName').textContent, hz:$('lightKeyHz').textContent, scale:$('lightScaleName').textContent,
-  timbre:$('lightTimbreName').textContent, sens:{ ...sens } });
+  timbre:$('lightTimbreName').textContent, sens:{ ...sens }, fs:{ hidden:$('lightFsBtn').hidden, icon:$('lightFsBtn').dataset.svg, label:$('lightFsBtn').getAttribute('aria-label') } });
 export const lightControlsOpenDbg=k=>{ if(k) openSheet(k); else closeSheet(); return sheet; };

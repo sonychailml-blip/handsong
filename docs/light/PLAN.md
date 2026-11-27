@@ -169,3 +169,4 @@ decisions they led to are written here in words).
 ## Decided (the founder, 2026-11-27, after LIGHT-6c)
 - **A timbre for each hand — later, when there are more timbres** (10–15). The timbre sheet then shows two columns (left / right) only while both
   hands play notes; with one playing hand it stays one list. Not now: with one timbre it would add a choice that does nothing.
+- **Full screen** (after the first publish): Play opens full screen; a corner button toggles it, shown with the other controls, hidden while playing.

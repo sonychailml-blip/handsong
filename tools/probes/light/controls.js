@@ -2,11 +2,14 @@
    the sound); each sheet holds what it must (12 keys and the A4 choices; the profile's 31 moods; its timbres; both hands' four functions, their
    octaves and the field; two sliders); each change reaches the state and the labels — the key, A4 (clamped 380…480), the scale (only the profile's:
    CONTROL a maqam is refused), a hand's function, the field, a hand's octave shift (its range moves by one octave), the sensitivities. Everything is
-   put back at the end (the kept choices on this device are not written by this row). */
+   put back at the end (the kept choices on this device are not written by this row). LIGHT-8: the full-screen toggle sits in the controls and
+   reads its state (icon and words). */
 import { scaleId, tonic, aRef, handFn, rectPref } from '../../../core/state.js';
 import { profileOf } from '../../../core/profile.js';
 import { CTL_IDLE_MS, setKey, setA4, setScale, setHand, setField, setOct, setSens, octRange, keyName, lightControlsDbg, lightControlsOpenDbg } from '../../../apps/light/controls.js';
 import { lightOctShift } from '../../../apps/light/gestures.js';
+import { fsOn, fsCanToggle } from '../../../apps/light/fullscreen.js';
+import { t } from '../../../core/i18n.js';
 
 export async function checkLightControls(){
   const diffs=[], miss=s=>diffs.push(s), p=profileOf('profile.light');
@@ -16,6 +19,10 @@ export async function checkLightControls(){
     let D=lightControlsDbg(); if(!D.shown) miss('the controls do not show with no hand in view');
     if(D.key!==keyName(tonic) || D.hz!==String(aRef)) miss(`the key reads ${D.key} ${D.hz}, the state ${keyName(tonic)} ${aRef}`);
     if(!D.scale || !D.timbre) miss('the scale or sound label is empty');
+    { const b=document.getElementById('lightFsBtn'), full=fsOn();   // LIGHT-8: the full-screen toggle lives in the controls (shown and hidden with them) and shows its state
+      if(!b || b.parentElement!==document.getElementById('lightCtl')) miss('the full-screen button is not in the controls');
+      if(D.fs.hidden!==!fsCanToggle()) miss(`the full-screen button hidden=${D.fs.hidden} where full screen can${fsCanToggle() ? '' : 'not'} be had`);
+      if(D.fs.icon!==(full ? 'fs-exit' : 'fs-enter') || D.fs.label!==t(full ? 'light.fs.exit' : 'light.fs.enter') || !b.querySelector('svg')) miss(`the full-screen button reads ${D.fs.icon} «${D.fs.label}» with full=${full}`); }
     const B=()=>document.getElementById('lightSheetBody');
     lightControlsOpenDbg('key'); if(B().querySelectorAll('.light-keys button').length!==12) miss('the key sheet does not hold 12 keys');
     lightControlsOpenDbg('scale'); if(B().querySelectorAll('.light-item').length!==p.moods.length) miss(`the scale sheet holds ${B().querySelectorAll('.light-item').length} moods, not ${p.moods.length}`);

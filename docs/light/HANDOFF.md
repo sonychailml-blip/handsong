@@ -45,12 +45,18 @@ Read: `docs/light/PLAN.md` (decisions, where each part comes from, core changes,
   in the six added languages (`modenames.js`, kept in the app: the shared records would change Night), the start messages in all eight on Light's page
   (English and Russian now say «Play»), Light's own icons (`tools/light-icons.mjs`, amber centre). Left of LIGHT-6: the founder's checks on the Poco
   and an iPhone; a native reader for the Georgian terms. Then `LIGHT-7` — the build (`tools/build.mjs` learns light) and play.handsong.app.
+- `LIGHT-7` (2026-11-27): published. `tools/build.mjs` learns light (production pruned to what Light loads); play.handsong.app serves Light's
+  production from `light-release` (checked: Light's page, `core/recorder.js` 404).
+- `LIGHT-8` (2026-11-27): full screen as in Night (`fullscreen.js`, Light's own copy): asked in the Play tap, never while the camera prompt may come;
+  a corner toggle top left, shown and hidden with the controls; none on iPhone Safari or in the home-screen app.
 
 ## Deploy (LIGHT-7; the founder sets the project up once, as for Night)
 - Vercel → Add New Project → this repository; name `handsong-light`; Framework **Other**; Root Directory: the repository root (the shared
   `vercel.json` builds with `node tools/build.mjs` into `dist/`); Environment Variable **`HANDSONG_APP=light`** (Production and Preview).
-- Settings → Git → **Production Branch `light-release`** (proposed, as Night's `night-release`): the founder publishes with
+- Settings → Environments → Production → **Branch Tracking `light-release`** (was Settings → Git; done 2026-11-27) (proposed, as Night's `night-release`): the founder publishes with
   `git push origin dev:light-release`; `dev` pushes give previews (with `?probe`).
-- Settings → Domains: `play.handsong.app`. Cloudflare DNS (DNS only, grey cloud): `CNAME play cname.vercel-dns.com` (or what Vercel's Domains
-  page shows).
+- Settings → Domains: `play.handsong.app`. Cloudflare DNS (DNS only, grey cloud): `CNAME play` → the project's own target Vercel shows under
+  «DNS Change Recommended» (`29aeda2c5b29ceeb.vercel-dns-017.com`; the generic `cname.vercel-dns.com` works but is flagged).
+- First publish: a new branch on a commit Vercel already built (as a preview from `dev`) starts NO build — Deployments → «⋯» (top right) →
+  Create Deployment → `light-release`. Later pushes to `light-release` with new commits build by themselves.
 - The production tree is pruned to what Light loads (`tools/build.mjs`: the legacy UI, the recorder, songs, Night's code are not shipped).

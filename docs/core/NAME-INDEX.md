@@ -55,6 +55,11 @@ LIGHT-3 — Light's LIVE NOTE ADAPTER: the hands' solo notes straight into the e
 - const (1): `lightNoteTapSet`
 - fn (3): `lightNoteOn`, `lightNoteOff`, `lightAllOff`
 
+## apps/light/fullscreen.js
+LIGHT-8 — FULL SCREEN, the way Night does it (apps/night/fullscreen.js, NIGHT-7c/8b/11; apps never import each other, so Light keeps its own copy).
+- const (8): `fsApi`, `fsOn`, `fsStandalone`, `FS_RETRIES`, `fsStarted`, `fsOnChange`, `fsCanToggle`, `fsDbg`
+- fn (3): `fsBegin`, `fsCamera`, `fsToggle`
+
 ## apps/light/gestures.js
 LIGHT-3 — LIGHT'S HANDS: core/gestures/hands.js and roles.js COPIED and cut to what Light offers (option B, the founder 2026-11-27): one role, the solo; each hand's function note / hold / theremin …
 - const (9): `setLightFxSens`, `setLightDepthLaw`, `setLightTravel`, `setLightOctShift`, `lightOctShift`, `lightTrackKey`, `lightChainOfHand`, `setLightMirrorVolume`, `setLightTrackFx`
@@ -1872,7 +1877,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 UI-1 — «NIGHT labels follow the room»: the founder entered the rain and the Sound button still read «Firefly» while another timbre played.
 - fn (1): `checkNightLabels`
 
-_374 modules, 3441 exported names._
+_375 modules, 3452 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

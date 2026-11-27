@@ -173,7 +173,14 @@ const ROWS6={
     'კამერა დაკავებულია ან არ პასუხობს. დახურეთ Zoom და სხვა პროგრამები, რომლებიც კამერას იყენებს, და ისევ დააჭირეთ „დაკვრას“.','კამერა ვერ მოიძებნა. შეამოწმეთ, რომ ჩართული და მიერთებულია, და ისევ დააჭირეთ „დაკვრას“.',
     'ამ გვერდისთვის კამერაზე წვდომა დაბლოკილია. დააჭირეთ კამერის ან ბოქლომის ნიშანს მისამართის ზოლის მარცხნივ, დაუშვით კამერა და ისევ დააჭირეთ „დაკვრას“.','ხელახლა ცდა'],
 };
-const PARTS=[[K,ROWS],[K2,ROWS2],[K3,ROWS3],[K4,ROWS4],[K5,ROWS5],[K6,ROWS6]];
+/* LIGHT-8: the full-screen corner button */
+const K7=['light.fs.enter','light.fs.exit'];
+const ROWS7={
+  en:['Full screen','Leave full screen'], ru:['Во весь экран','Выйти из полноэкранного режима'], es:['Pantalla completa','Salir de pantalla completa'],
+  pt:['Tela cheia','Sair da tela cheia'], de:['Vollbild','Vollbild beenden'], fr:['Plein écran','Quitter le plein écran'],
+  it:['Schermo intero','Esci da schermo intero'], ka:['მთელ ეკრანზე','მთელი ეკრანიდან გამოსვლა'],
+};
+const PARTS=[[K,ROWS],[K2,ROWS2],[K3,ROWS3],[K4,ROWS4],[K5,ROWS5],[K6,ROWS6],[K7,ROWS7]];
 export const LIGHT_TEXTS=Object.freeze(Object.fromEntries(Object.keys(ROWS).map(lang=>{
   for(const [keys,rows] of PARTS) if(!rows[lang] || rows[lang].length!==keys.length) throw new Error('[light] texts: '+lang+' is incomplete');
   return [lang, Object.freeze(Object.assign({}, ...PARTS.map(([keys,rows])=>Object.fromEntries(keys.map((k,i)=>[k, rows[lang][i]])))))]; })));

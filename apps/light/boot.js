@@ -14,6 +14,7 @@ import { lightProcessHands, lightHandsView, lightHandsReset, lightVoiceModeReset
 import { lightAllOff } from './engine.js';
 import { lightDrawFrame, lightSyncViewRect } from './draw.js';
 import { lightCalBusy, lightCalFrame } from './calib.js';   // LIGHT-4: the hand setup takes the frames while it runs
+import { fsBegin, fsCamera, fsStarted } from './fullscreen.js';   // LIGHT-8: full screen on Play (never while the camera prompt may come)
 
 export const PROFILE='profile.light';
 const $=id=>document.getElementById(id);
@@ -93,12 +94,12 @@ async function start(){
     await AC.resume();
     if(!stage.det){ await initDetector(msg, { files:'own' }); stage.det=true; }
     msg(t('load.camera'));
-    await startCamera();
+    await startCamera(); fsCamera();   // LIGHT-8: the camera is decided now; full screen while the Play tap still counts
     try{ await navigator.wakeLock.request('screen'); }catch(e){}
     { const why=profileApply(PROFILE); if(why) console.warn('[light] the profile: '+why); }   // eslint-disable-line no-console
     for(const f of starts){ try{ f(); }catch(e){ console.warn('[light] a start listener failed', e); } }   // eslint-disable-line no-console
     $('start').classList.remove('busy','on');
-    started=true; requestAnimationFrame(loop);
+    started=true; fsStarted(); requestAnimationFrame(loop);
     return true;
   }catch(err){ console.warn('[light] the start failed:', err); fail(err); return false; }   // eslint-disable-line no-console
   finally{ starting=false; }
@@ -107,8 +108,8 @@ async function start(){
 export function flare(){ const e=document.querySelector('#start .light-emblem'); if(!e) return; e.classList.remove('flare'); void e.offsetWidth; e.classList.add('flare'); e.addEventListener('animationend', ()=>e.classList.remove('flare'), { once:true }); }
 export function lightBoot(){
   setHandsSink(onHands, ()=>false);
-  $('startBtn').onclick=()=>{ flare(); start(); };   // LIGHT-5b: the emblem's dot flares on Play
-  $('camRetry').onclick=()=>{ start(); };
+  $('startBtn').onclick=()=>{ flare(); start(); fsBegin(); };   // LIGHT-5b: the emblem's dot flares on Play; LIGHT-8: full screen asked in the tap
+  $('camRetry').onclick=()=>{ start(); fsBegin(); };
   if(new URLSearchParams(location.search).has('probe')){ const l=document.querySelector('link[rel="handsong-probes"]');   // ?probe: the page's probe facade (a shipped page has no such tag)
     if(l) import(l.href).then(m=>m.install()).catch(e=>console.warn('[probe] the probes failed to load', e)); }   // eslint-disable-line no-console
 }
