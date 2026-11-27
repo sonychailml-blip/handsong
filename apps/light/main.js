@@ -11,17 +11,16 @@ import { lightControlsWire } from './controls.js';
 import { onLightStart } from './boot.js';
 import { lightCalWire, lightCalOffer } from './calib.js';   // LIGHT-4: the hand setup
 import { lightClipWire } from './clip.js';   // LIGHT-5: the clip
+import { lightCardsWire, lightCardsShow, lightCardsDue } from './cards.js';   // LIGHT-5b: the teaching cards
+import { nsKey } from '../../core/storens.js';
 
 applyI18n();   // the page's [data-i18n] texts and drawn icons (the emblem, the buttons) in the chosen language
 lightShellWire();   // the bars, once per screen frame
 lightControlsWire(root=>applyI18n(root));   // LIGHT-3b: the controls when the hands leave and their sheets (the sheets' icons filled the same way)
 lightCalWire(()=>{});   // LIGHT-4: the kept setup applied (per camera); its screens' buttons
-onLightStart(()=>{ lightCalOffer(); });   // offered once, after the first start
+lightCardsWire(nsKey);   // LIGHT-5b
+onLightStart(()=>{ if(lightCardsDue()) lightCardsShow(()=>lightCalOffer()); else lightCalOffer(); });   // the first start: the cards, then the hand-setup offer (each once)
 lightClipWire(root=>applyI18n(root));   // LIGHT-5: the clip button, its countdown and card
 lightBoot();
-/* LIGHT-2b: «How to play» — a short card from the start (the privacy line at its foot) */
-{ const card=document.getElementById('lightHow');
-  document.getElementById('lightHowBtn').onclick=()=>{ card.hidden=false; document.getElementById('lightHowClose').focus(); };
-  document.getElementById('lightHowClose').onclick=()=>{ card.hidden=true; };
-  card.addEventListener('click', e=>{ if(e.target===card) card.hidden=true; });
-  addEventListener('keydown', e=>{ if(e.key==='Escape' && !card.hidden) card.hidden=true; }); }
+/* LIGHT-5b: «How to play» opens the teaching cards */
+document.getElementById('lightHowBtn').onclick=()=>lightCardsShow();

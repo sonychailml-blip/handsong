@@ -17,7 +17,7 @@ export const REC_FPS=30;
 export const MIME_ORDER=Object.freeze(['video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4;codecs=avc1,mp4a','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm']);
 export const IOS=(()=>{ try{ const u=navigator.userAgent||''; return /iP(hone|ad|od)/.test(u) || (/Macintosh/.test(u) && navigator.maxTouchPoints>1); }catch(e){ return false; } })();
 const $=id=>document.getElementById(id);
-let mode='idle', rec=null, chunks=[], tap=null, vTrack=null, lastCap=0, t0=0, countT0=0, blob=null, url=null, mime='', playStart=null, hinted=false, muted=false, noSave=false, tipT=0;
+let comp=null, compCtx=null, mode='idle', rec=null, chunks=[], tap=null, vTrack=null, lastCap=0, t0=0, countT0=0, blob=null, url=null, mime='', playStart=null, hinted=false, muted=false, noSave=false, tipT=0;
 
 /* the browser's best container (MP4 first) or '' when it can record nothing */
 export function clipType(){ if(typeof MediaRecorder==='undefined' || !canvas.captureStream) return null; for(const m of MIME_ORDER) if(MediaRecorder.isTypeSupported(m)) return m; return ''; }
@@ -30,7 +30,8 @@ function tip(key){ const p=$('lightRecTip'); p.textContent=t(key); p.hidden=fals
 function begin(){
   const m=clipType(); if(m==null){ mode='idle'; tip('light.clip.cannot'); render(); return; }
   tap=createRecordingTap(); if(!tap){ mode='idle'; tip('light.clip.failed'); render(); return; }
-  const vid=canvas.captureStream(0); vTrack=vid.getVideoTracks()[0]; lastCap=0;
+  comp=document.createElement("canvas"); comp.width=canvas.width; comp.height=canvas.height; compCtx=comp.getContext("2d");   // LIGHT-5b: the clip's frame = the canvas + the bars as shown
+  const vid=comp.captureStream(0); vTrack=vid.getVideoTracks()[0]; lastCap=0;
   const stream=new MediaStream([...vid.getVideoTracks(), ...tap.stream.getAudioTracks()]), opts={ videoBitsPerSecond:bitrate(canvas.width, canvas.height) };
   if(m) opts.mimeType=m;
   try{ rec=new MediaRecorder(stream, opts); }catch(e){ cleanup(); mode='idle'; tip('light.clip.failed'); render(); return; }
@@ -41,7 +42,7 @@ function begin(){
   rec.start(1000); t0=performance.now(); mode='rec'; render();
 }
 function stop(){ if(mode!=='rec' || !rec) return; mode='finishing'; render(); try{ rec.stop(); }catch(e){ cleanup(); mode='idle'; render(); } }
-function cleanup(){ if(tap) tap.dispose(); tap=null; rec=null; vTrack=null; }
+function cleanup(){ if(tap) tap.dispose(); tap=null; rec=null; vTrack=null; comp=null; compCtx=null; }
 function finish(type){
   cleanup();
   if(!chunks.length){ mode='idle'; tip('light.clip.failed'); render(); return; }
@@ -53,6 +54,25 @@ function finish(type){
 function download(){ const a=document.createElement('a'); a.href=url; a.download=nameOf(blob.type); document.body.appendChild(a); a.click(); a.remove(); }
 export const clipCanShare=()=>{ try{ return !!(blob && navigator.canShare && navigator.share && navigator.canShare({ files:[new File([blob], nameOf(blob.type), { type:blob.type })] })); }catch(e){ return false; } };
 async function share(){ try{ await navigator.share({ files:[new File([blob], nameOf(blob.type), { type:blob.type })], title:'Handsong' }); }catch(e){} }
+
+/* LIGHT-5b (the founder: the bars must be in the clip too): each recorded frame is the canvas, then every bar set as the page shows it — its glass
+   box, each track and fill, the glow of the bar in use, the three-letter label — read from the page (boxes and colours) and scaled to the canvas;
+   a set's fade is its opacity. The live screen is untouched (the bars stay DOM there); the clip button and the controls are not drawn. */
+function rr(g,x,y,w,h,r){ r=Math.min(r,w/2,h/2); g.beginPath(); g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r); g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath(); }
+export function paintBars(g, kx, ky){
+  for(const set of document.querySelectorAll('.light-bars')){ const cs=getComputedStyle(set), a=+cs.opacity||0; if(a<0.02) continue;
+    const B=set.getBoundingClientRect(); g.save(); g.globalAlpha=a;
+    g.fillStyle=cs.backgroundColor; rr(g,B.left*kx,B.top*ky,B.width*kx,B.height*ky,parseFloat(cs.borderTopLeftRadius)*kx||0); g.fill();
+    for(const bar of set.querySelectorAll('.light-bar')){ const tr=bar.querySelector('.light-bar-track'), fi=bar.querySelector('.light-bar-fill'), lab=bar.querySelector('.light-bar-lab');
+      const T=tr.getBoundingClientRect(), F=fi.getBoundingClientRect(), ts=getComputedStyle(tr), fs=getComputedStyle(fi), ls=getComputedStyle(lab), L=lab.getBoundingClientRect();
+      if(bar.classList.contains('act')){ g.save(); g.shadowColor=ls.color; g.shadowBlur=10*kx; g.fillStyle=ts.backgroundColor; rr(g,T.left*kx,T.top*ky,T.width*kx,T.height*ky,T.width*kx/2); g.fill(); g.restore(); }
+      g.fillStyle=ts.backgroundColor; rr(g,T.left*kx,T.top*ky,T.width*kx,T.height*ky,T.width*kx/2); g.fill();
+      if(F.height>0.5){ g.fillStyle=fs.backgroundColor; rr(g,F.left*kx,F.top*ky,F.width*kx,F.height*ky,F.width*kx/2); g.fill(); }
+      g.fillStyle=ls.color; g.font=ls.fontWeight+' '+(parseFloat(ls.fontSize)*ky)+'px '+ls.fontFamily; g.textAlign='center'; g.textBaseline='middle'; g.fillText(lab.textContent, (L.left+L.width/2)*kx, (L.top+L.height/2)*ky); }
+    g.restore(); }
+}
+function compose(){ if(!compCtx) return; if(comp.width!==canvas.width || comp.height!==canvas.height){ comp.width=canvas.width; comp.height=canvas.height; }
+  compCtx.drawImage(canvas,0,0); paintBars(compCtx, comp.width/innerWidth, comp.height/innerHeight); }
 
 /* the card: the clip plays with its own sound while the live sound is silent */
 function openCard(){
@@ -80,7 +100,7 @@ function render(){
 }
 function frame(now, hands){
   /* in phase with the drawing: one requested frame per drawn frame, at most REC_FPS */
-  if(mode==='rec' && vTrack && vTrack.requestFrame && now-lastCap>=1000/REC_FPS){ lastCap=now; try{ vTrack.requestFrame(); }catch(e){} }
+  if(mode==='rec' && vTrack && vTrack.requestFrame && now-lastCap>=1000/REC_FPS){ lastCap=now; compose(); try{ vTrack.requestFrame(); }catch(e){} }
   if(mode==='count'){ const left=CLIP.countMs-(now-countT0), n=Math.max(1, Math.ceil(left/1000));
     $('lightCountN').textContent=String(n); $('lightCountArc').style.strokeDashoffset=String(CLIP.countRing*(1-Math.max(0,left)/CLIP.countMs));
     if(left<=0) begin(); }

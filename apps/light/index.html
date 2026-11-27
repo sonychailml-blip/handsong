@@ -99,15 +99,15 @@
     <div class="light-cal-btns"><button id="lightCalNo" class="light-cal-no"></button><button id="lightCalGo" class="light-cal-go"></button></div>
   </div>
 </div>
-<div id="lightHow" class="light-how" role="dialog" aria-modal="true" aria-labelledby="lightHowTitle" hidden>
-  <div class="light-how-card">
-    <h2 id="lightHowTitle" data-i18n="light.how">How to play</h2>
-    <p data-i18n="light.how.play">Right hand: raise or lower it to pick a row of notes, pinch a finger to the thumb to play a note.</p>
-    <p data-i18n="light.how.vol">Move it left or right for volume, nearer or farther for reverb.</p>
-    <p data-i18n="light.how.fx">Left hand: each finger is an effect — pinch it and move up or down.</p>
-    <p data-i18n="light.how.menu">Take your hands out of view to see the buttons.</p>
-    <p class="light-priv" data-i18n="light.privacy">Your camera picture never leaves this device. Nothing is sent anywhere.</p>
-    <button id="lightHowClose" class="light-go" data-i18n="light.ok">Got it</button>
+<!-- LIGHT-5b: the teaching cards (apps/light/cards.js), as in Night: five short cards with drawn pictures; from «How to play» and once after the first start -->
+<div id="lightCards" class="light-how" role="dialog" aria-modal="true" aria-labelledby="lightCardTitle" hidden>
+  <div class="light-how-card light-cards">
+    <div id="lightCardPic" class="light-card-pic" aria-hidden="true"></div>
+    <h2 id="lightCardTitle"></h2>
+    <p id="lightCardText"></p>
+    <p id="lightCardPriv" class="light-priv" data-i18n="light.privacy" hidden>Your camera picture never leaves this device. Nothing is sent anywhere.</p>
+    <div class="light-cards-foot"><span id="lightCardDots" class="light-cards-dots" aria-hidden="true"></span><span id="lightCardStep" class="light-cards-step"></span></div>
+    <div class="light-cal-btns"><button id="lightCardSkip"></button><button id="lightCardNext" class="light-cal-go"></button></div>
   </div>
 </div>
 <video id="video" playsinline muted autoplay></video>

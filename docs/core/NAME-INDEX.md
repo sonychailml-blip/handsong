@@ -24,21 +24,26 @@ SPLIT-2: the Full app's entry.
 ## apps/light/boot.js
 LIGHT-3 — LIGHT'S OWN START AND FRAME LOOP (option B: no shared legacy UI).
 - const (6): `PROFILE`, `onLightFrame`, `onLightStart`, `lightStarted`, `setLightFace`, `lightBootDbg`
-- fn (1): `lightBoot`
+- fn (2): `flare`, `lightBoot`
 
 ## apps/light/calib.js
 LIGHT-4 — THE HAND SETUP, as in Night (the founder): the playing hand held at the nearest point it reaches while playing, the whole hand in the frame; depth then counts from that point (0 near … 1 …
 - const (6): `lightCalOn`, `setLightCalTravel`, `lightCalBusy`, `lightCalProbeSet`, `lightCalCamera`, `lightCalDbg`
 - fn (7): `lightCalFrameProbe`, `lightCalFrame`, `lightCalStart`, `lightCalCancel`, `lightCalOffer`, `lightCalWire`, `lightCalForgetDbg`
 
+## apps/light/cards.js
+LIGHT-5b — THE TEACHING CARDS (the founder: as in Night): five short cards with simple drawn pictures, written from Light's real gestures (apps/light/gestures.js; the profile data/light.json): 1.
+- const (6): `CARDS`, `lightCardsOpen`, `lightCardsDue`, `lightCardsDbg`, `lightCardsStepDbg`, `lightCardsCloseDbg`
+- fn (2): `lightCardsShow`, `lightCardsWire`
+
 ## apps/light/clip.js
 LIGHT-5 — THE CLIP.
 - const (7): `CLIP`, `REC_FPS`, `MIME_ORDER`, `IOS`, `clipBusy`, `clipCanShare`, `lightClipDbg`
-- fn (4): `clipType`, `lightClipWire`, `lightClipRecordDbg`, `lightClipCloseDbg`
+- fn (5): `clipType`, `paintBars`, `lightClipWire`, `lightClipRecordDbg`, `lightClipCloseDbg`
 
 ## apps/light/controls.js
 LIGHT-3b — THE CONTROLS WHEN THE HANDS LEAVE (variant B, the founder's choice at LIGHT-1) and their menus.
-- const (5): `CTL_IDLE_MS`, `keyName`, `octRange`, `lightControlsDbg`, `lightControlsOpenDbg`
+- const (6): `scaleName`, `CTL_IDLE_MS`, `keyName`, `octRange`, `lightControlsDbg`, `lightControlsOpenDbg`
 - fn (9): `setScale`, `setKey`, `setA4`, `setTimbre`, `setHand`, `setField`, `setOct`, `setSens`, `lightControlsWire`
 
 ## apps/light/draw.js
@@ -63,13 +68,17 @@ LIGHT-3b — LIGHT'S OWN DRAWN ICONS (our own work, rule #32; the shapes of the 
 LIGHT-3 — Handsong's entry (code id light).
 - exports: none
 
+## apps/light/modenames.js
+LIGHT-6 — THE MODE AND GROUP NAMES in Light's six added languages (es, pt, de, fr, it, ka).
+- const (3): `LIGHT_MODE_IDS`, `modeNameOf`, `groupNameOf`
+
 ## apps/light/scalepick.js
 LIGHT-3 — only the modes Light plays: the page profile's moods (Full's «Familiar» section) and what they name.
 - exports: none
 
 ## apps/light/shell.js
 LIGHT-3 — LIGHT'S BARS, as in Night but by the founder's rule (LIGHT-1/2): one bar per effect finger — DLY VIB TRM BRT on the effects hand's side, shown from the moment an effects pinch starts unti…
-- const (5): `BAR_FX_MS`, `FX_BARS`, `shownAt`, `drivenIndex`, `lightShellDbg`
+- const (6): `BAR_FX_MS`, `FX_BARS`, `shownAt`, `drivenIndex`, `lightShellPokeDbg`, `lightShellDbg`
 - fn (2): `sideOf`, `lightShellWire`
 
 ## apps/light/texts.js
@@ -1566,10 +1575,12 @@ LIGHT-2/3: the probe entry of the Light page (?probe): its own rows behind its o
 - → ./light/alone.js (1): `checkLightAlone`
 - → ./light/bars.js (1): `checkLightBars`
 - → ./light/calib.js (1): `checkLightCalib`
+- → ./light/cards.js (1): `checkLightCards`
 - → ./light/clip.js (1): `checkLightClip`
 - → ./light/controls.js (1): `checkLightControls`
 - → ./light/hands.js (1): `checkLightHands`
 - → ./light/start.js (1): `checkLightStart`
+- → ./light/texts.js (1): `checkLightTexts`
 
 ## tools/probes/light/alone.js
 LIGHT-3 row «LIGHT on its own» (the founder: «only what it really has; nothing hidden, nothing unused loaded»), measured in the running page — runs FIRST, before any row that imports core's gesture…
@@ -1582,6 +1593,10 @@ LIGHT-3 row «LIGHT bars and one axis»: the four effect bars (DLY VIB TRM BRT, 
 ## tools/probes/light/calib.js
 LIGHT-4 row «LIGHT hand setup»: (1) offered once — with no setup kept and never offered, the offer shows; a second call does not; (2) the routine on a synthetic hand held still at its nearest point…
 - fn (1): `checkLightCalib`
+
+## tools/probes/light/cards.js
+LIGHT-5b row «LIGHT cards, flare, bars in the clip»: (1) the five teaching cards each have a title, a text and a drawn picture, the step reads «n of 5», the privacy line shows on the last card only…
+- fn (1): `checkLightCards`
 
 ## tools/probes/light/clip.js
 LIGHT-5 row «LIGHT clip»: (1) the format — MP4 first (the founder): where the browser records MP4 the clip is MP4; the order puts every MP4 ahead of WebM (CONTROL: a list with WebM first would not)…
@@ -1598,6 +1613,10 @@ LIGHT-3 row «LIGHT hands = core hands»: Light's hands (apps/light/gestures.js,
 ## tools/probes/light/start.js
 LIGHT-2/3 row «LIGHT start and profile»: after ▶ the page runs in Light's profile through Light's own doors — its first mood (minor pentatonic), its one timbre (SuperSaw), key A, the playing hand r…
 - fn (1): `checkLightStart`
+
+## tools/probes/light/texts.js
+LIGHT-6 row «LIGHT eight languages»: (1) every Light text key has a text in each of the eight languages, and so do the shared start messages on Light's page; (2) every key the page names ([data-i18…
+- fn (1): `checkLightTexts`
 
 ## tools/probes/night.js
 SPLIT-2: the probe entry of the Night page: its own rows and the core rows flagged for both pages.
@@ -1848,7 +1867,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 UI-1 — «NIGHT labels follow the room»: the founder entered the rain and the Sound button still read «Firefly» while another timbre played.
 - fn (1): `checkNightLabels`
 
-_369 modules, 3412 exported names._
+_373 modules, 3431 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

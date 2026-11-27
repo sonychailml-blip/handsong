@@ -103,3 +103,18 @@ Tree hashes after: core f685c1fe10916012 (only `core/engine/surface.js`, the sta
   `video/mp4; avc1 + mp4a`; the card open with the live sound at 0 and back at 1 after; the button shown with the controls.
 - Checks (iteration mode): static PASSED; probe-data PASS 109/0; `--app light` 7 rows PASS, CSP, network, storage PASS; smoke on Light from the root
   and a sub-folder PASS; licences PASS; name index PASS.
+
+# LIGHT-5b + LIGHT-6 (LIGHT track, 2026-11-27): the bars in the clip, the cards, the flare; the names, messages and icons
+Tree hashes after: core f685c1fe10916012 (unchanged since LIGHT-5) · apps/full 0148bb454440c3e3 and apps/night 30d8f7b3c797de9e unchanged · apps/light 16ee91e9874e6ef2.
+- `clip.js`: a composing canvas per recording (the canvas + `paintBars`: each shown set's glass box, tracks, fills, the glow of the finger in use,
+  the labels — read from the page, scaled; a set's fade is its opacity); `shell.js lightShellPokeDbg` (probe). `cards.js` (new) with five pictures
+  (our own line drawings, the hand as Night's cards draw it), markup replaces the short card; first start: cards → hand-setup offer. `boot.js flare`
+  + CSS `lightFlare` (a still version under reduced motion).
+- LIGHT-6: `modenames.js` (31 modes + 8 groups × es, pt, de, fr, it, ka; Georgian awaits a native check) used by the scale label and sheet; texts:
+  cards 14 keys, start messages 8 keys × 8 languages; `tools/light-icons.mjs` (new) draws `apps/light/icons/*` (rounded 192 / 512, maskable 512) —
+  register entry `light-app-icons` (the Full / Night entry no longer lists Light's files).
+- Rows: «LIGHT cards, flare, bars in the clip» (5 cards filled, the privacy line on the last; the flare's animation; 30 279 px painted for a shown
+  set, 0 for a hidden one — CONTROL); «LIGHT eight languages» (88 keys × 8, the start messages, the page's keys, 31 modes and their groups in the six
+  languages — CONTROL a maqam has none —, «Mayor (jónico)» in the Spanish sheet).
+- Checks (iteration mode): static PASSED; probe-data PASS 109/0; `--app light` 9 rows PASS, CSP, network, storage PASS; smoke on Light PASS;
+  licences PASS; name index PASS.

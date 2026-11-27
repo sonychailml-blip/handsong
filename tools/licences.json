@@ -136,13 +136,25 @@
         "apps/full/icons/icon-512-maskable.png",
         "apps/night/icons/icon-192.png",
         "apps/night/icons/icon-512.png",
-        "apps/night/icons/icon-512-maskable.png",
+        "apps/night/icons/icon-512-maskable.png"
+      ],
+      "replace": "kept — the user's chosen Night design (RUN 7); the earlier «H» icons were replaced"
+    },
+    {
+      "id": "light-app-icons",
+      "name": "App icons of Handsong (code id light) — the brand emblem: five dots in an arc, the centre one glowing amber, on a warm dark ground",
+      "class": "image",
+      "use": "shipped",
+      "version": "—",
+      "licence": "AI-generated",
+      "source": "the founder's chosen design (LIGHT-1: the brand emblem with Light's amber centre), drawn by code by Claude Code in this project (tools/light-icons.mjs: circles and radial gradients written as PNG; no font, no traced artwork)",
+      "tool": "Claude Code (Anthropic); output owned by the user under Anthropic's commercial terms",
+      "files": [
         "apps/light/icons/icon-192.png",
         "apps/light/icons/icon-512.png",
         "apps/light/icons/icon-512-maskable.png"
       ],
-      "replace": "kept — the user's chosen Night design (RUN 7); the earlier «H» icons were replaced",
-      "notes": "LIGHT-2: Light carries the same icons for now; its own (the same emblem, an amber centre) come later."
+      "replace": "kept — the founder's chosen design (LIGHT-1)"
     },
     {
       "id": "forest-files",

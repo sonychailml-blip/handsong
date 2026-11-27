@@ -142,3 +142,10 @@ decisions they led to are written here in words).
   hand), with the thumb — not only the first pinched.
 - **The note names back at the left edge** (mid-band tried and dropped); the effects bars may lie over them.
 - **The four bottom buttons in one shared frame**, as the bars share theirs.
+
+## Decided after trying LIGHT-5 (the founder, 2026-11-27)
+- **The bars in the clip too:** each recorded frame is the canvas plus the bar sets as the page shows them (`clip.js paintBars`); the live screen
+  untouched; the controls and the clip button stay out of the clip.
+- **The teaching cards, as in Night:** five cards (play, volume and reverb, effects, the buttons, the clip with the privacy line), from «How to play»
+  and once after the first start, before the hand-setup offer.
+- **The emblem's dot flares on Play** and settles back (from Night, without the flight).

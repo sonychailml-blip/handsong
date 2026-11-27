@@ -39,6 +39,8 @@ function frame(now, hands){
   R.classList.toggle('on', shownAt(revSeen, now, BAR_REV_MS));
 }
 export function lightShellWire(){ onLightFrame(frame); }
+/* probe only: the effects marked as just used (as a pinch would), so the set shows for its hold */
+export const lightShellPokeDbg=()=>{ fxSeen=performance.now(); };
 /* probe only: the bars' state */
 export const lightShellDbg=()=>{ const F=$('lightFxBars'), R=$('lightRevBar'), h=b=>b.querySelector('.light-bar-fill').style.height;
   return { fx:{ on:F.classList.contains('on'), side:F.classList.contains('left')?'left':'right', bars:Object.fromEntries(FX_BARS.map(([id])=>[id, h(F.querySelector(`[data-bar="${id}"]`))])) },

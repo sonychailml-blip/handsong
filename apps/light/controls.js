@@ -15,6 +15,8 @@ import { lightAllOff } from './engine.js';
 import { lightHandsReset, setLightFxSens, setLightTravel, setLightOctShift, lightOctShift } from './gestures.js';
 import { onLightFrame, onLightStart, lightStarted, PROFILE } from './boot.js';
 import { lightCalOn, lightCalStart, setLightCalTravel, lightCalCamera } from './calib.js';   // LIGHT-4: the hand setup
+import { modeNameOf, groupNameOf } from './modenames.js';   // LIGHT-6: the names in the six added languages
+export const scaleName=s=>modeNameOf(s.id) || L(s.name);
 
 export const CTL_IDLE_MS=700, A4_MIN=380, A4_MAX=480, A4_CHIPS=Object.freeze([432,440,442]), FNS=Object.freeze(['fx','note','hold','therm']), OCT_MIN=-3, OCT_MAX=3;
 const PREFS=nsKey('handsong.lightPrefs');
@@ -46,7 +48,7 @@ export const octRange=hand=>{ const sh=lightOctShift(hand); return noteOf(sh)+' 
 
 function render(){
   $('lightKeyName').textContent=keyName(tonic); $('lightKeyHz').textContent=String(aRef);
-  const s=scaleById(scaleId); $('lightScaleName').textContent= s ? L(s.name) : scaleId;
+  const s=scaleById(scaleId); $('lightScaleName').textContent= s ? scaleName(s) : scaleId;
   const tm=timbresOf('ld').find(x=>x.idx===leadIdx); $('lightTimbreName').textContent= tm ? L(tm.name) : '';
 }
 /* ── the sheets ── */
@@ -65,8 +67,8 @@ function openSheet(kind){
   }else if(kind==='scale'){
     const groups=new Map(); for(const id of prof().moods){ const s=scaleById(id); if(!s) continue; const k=s.grpKey||''; if(!groups.has(k)) groups.set(k, []); groups.get(k).push(s); }
     const order=[...Object.keys(GRP), ''].filter(k=>groups.has(k));
-    for(const k of order){ if(k) B.appendChild(el('p','light-lbl', L(GRP[k])));
-      for(const s of groups.get(k)){ const b=el('button', 'light-item'+(s.id===scaleId ? ' on' : ''), L(s.name)); b.onclick=()=>after(setScale)(s.id); B.appendChild(b); } }
+    for(const k of order){ if(k) B.appendChild(el('p','light-lbl', groupNameOf(k) || L(GRP[k])));
+      for(const s of groups.get(k)){ const b=el('button', 'light-item'+(s.id===scaleId ? ' on' : ''), scaleName(s)); b.onclick=()=>after(setScale)(s.id); B.appendChild(b); } }
   }else if(kind==='timbre'){
     for(const id of prof().timbres){ const tm=timbresOf('ld').find(x=>x.id===id); const b=el('button', 'light-item'+(timbreIdOf('ld',leadIdx)===id ? ' on' : ''), tm ? L(tm.name) : id); b.onclick=()=>after(setTimbre)(id); B.appendChild(b); }
   }else if(kind==='hands'){

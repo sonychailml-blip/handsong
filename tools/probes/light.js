@@ -7,11 +7,13 @@ import { checkLightHands } from './light/hands.js';
 import { checkLightControls } from './light/controls.js';   // LIGHT-3b
 import { checkLightCalib } from './light/calib.js';   // LIGHT-4
 import { checkLightClip } from './light/clip.js';   // LIGHT-5
+import { checkLightCards } from './light/cards.js';   // LIGHT-5b
+import { checkLightTexts } from './light/texts.js';   // LIGHT-6
 
-export { checkLightAlone, checkLightStart, checkLightBars, checkLightHands, checkLightControls, checkLightCalib, checkLightClip };
+export { checkLightAlone, checkLightStart, checkLightBars, checkLightHands, checkLightControls, checkLightCalib, checkLightClip, checkLightCards, checkLightTexts };
 /* every Light row, one verdict line (the runner reads «[probe] …» lines); «on its own» runs first (the hands row imports core's gestures) */
 export async function light(){
-  const rows=[['LIGHT on its own', checkLightAlone], ['LIGHT start and profile', checkLightStart], ['LIGHT bars and one axis', checkLightBars], ['LIGHT hands = core hands', checkLightHands], ['LIGHT controls and menus', checkLightControls], ['LIGHT hand setup', checkLightCalib], ['LIGHT clip', checkLightClip]], out=[]; let bad=0;
+  const rows=[['LIGHT on its own', checkLightAlone], ['LIGHT start and profile', checkLightStart], ['LIGHT bars and one axis', checkLightBars], ['LIGHT hands = core hands', checkLightHands], ['LIGHT controls and menus', checkLightControls], ['LIGHT hand setup', checkLightCalib], ['LIGHT clip', checkLightClip], ['LIGHT cards, flare, bars in the clip', checkLightCards], ['LIGHT eight languages', checkLightTexts]], out=[]; let bad=0;
   for(const [name, f] of rows){ const t0=performance.now(); let r;
     try{ r=await f(); }catch(e){ r={ pass:false, diffs:['threw: '+(e&&e.stack||e)] }; }
     if(!r.pass) bad++; out.push({ check:name, status:r.pass?'pass':'NOT A PASS', differences:(r.diffs||[]).length, ms:Math.round(performance.now()-t0), diffs:r.diffs||[] });   // the runner's summary reads check / status / differences / ms
@@ -22,7 +24,7 @@ export async function light(){
 export const all=light, quick=light;
 /* one probe at a time: a call while another runs refuses in words */
 let LOCK=null; const API={};
-for(const [n,v] of Object.entries({ light, all, quick, checkLightAlone, checkLightStart, checkLightBars, checkLightHands, checkLightControls, checkLightCalib, checkLightClip }))
+for(const [n,v] of Object.entries({ light, all, quick, checkLightAlone, checkLightStart, checkLightBars, checkLightHands, checkLightControls, checkLightCalib, checkLightClip, checkLightCards, checkLightTexts }))
   API[n]=(...a)=>{ if(LOCK){ const why=`P.${LOCK} is still running — wait for its result before P.${n}()`; console.warn('[probe] '+why); return { pass:false, refused:true, why }; }   // eslint-disable-line no-console
     LOCK=n; let r; try{ r=v(...a); }catch(e){ LOCK=null; throw e; } if(r && typeof r.then==='function') return r.finally(()=>{ LOCK=null; }); LOCK=null; return r; };
 export const api=()=>API;

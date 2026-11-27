@@ -27,6 +27,7 @@
   --light-emblem-w:130px; --light-emblem-h:26px; --light-card-w:340px; --light-priv-w:280px;
   /* light and shadow */
   --light-glow-f:drop-shadow(0 0 7px rgba(255,180,74,.75));
+  --light-glow-hi:drop-shadow(0 0 16px rgba(255,200,110,1)) brightness(1.35); --light-flare:1.2s;
   --light-go-shadow:0 8px 26px rgba(255,180,74,.28);
   --light-start-bg:radial-gradient(70% 50% at 50% 30%, var(--light-base-warm), var(--light-base) 70%);
   /* LIGHT-3: the bars and cards */
@@ -45,6 +46,7 @@
   --light-r-sheet:24px 24px 0 0; --light-sheet-max:78vh; --light-sheet-w:520px; --light-grab-w:38px; --light-grab-h:4px; --light-x:32px;
   --light-chip:rgba(246,241,232,.08); --light-chip-dim:rgba(246,241,232,.045); --light-acc-soft:rgba(255,180,74,.18); --light-acc-ring:inset 0 0 0 1px rgba(255,180,74,.75);
   --light-prog-h:4px;
+  --light-pic-h:150px; --light-dot:7px;
   /* LIGHT-5: the clip */
   --light-z-rec:var(--z-panel-top); --light-rec:46px; --light-rec-ring-out:-4px; --light-rec-ring-grow:8px; --light-rec-shadow:0 0 0 1px rgba(246,241,232,.08), 0 0 14px rgba(255,180,74,.22);
   --light-count:180px; --light-fs-count:84px; --light-clip-h:56vh;
@@ -220,3 +222,33 @@ button:focus-visible, a:focus-visible{ outline:2px solid var(--light-acc); outli
 .light-clip-btns button{ padding:var(--light-retry-pad); border:none; border-radius:var(--light-r-pill); background:var(--light-chip); color:var(--light-ink); cursor:pointer; }
 .light-clip-btns .light-cal-go{ background:var(--light-acc); color:var(--light-on-acc); font-weight:var(--light-fw-bold); }
 .light-clip-btns button[hidden]{ display:none; }
+
+/* LIGHT-5b (the founder, from Night): the emblem's dot flares up on Play and settles back — no flight */
+.light-emblem .emblem-glow{ transform-box:fill-box; transform-origin:center; }
+.light-emblem.flare .emblem-glow{ animation:lightFlare var(--light-flare) ease-in-out 1; }
+@keyframes lightFlare{ 0%{ transform:scale(1); filter:var(--light-glow-f); } 45%{ transform:scale(1.9); filter:var(--light-glow-hi); } 100%{ transform:scale(1); filter:var(--light-glow-f); } }
+@media (prefers-reduced-motion:reduce){ .light-emblem.flare .emblem-glow{ animation:lightFlareStill var(--light-flare) ease-in-out 1; } @keyframes lightFlareStill{ 45%{ filter:var(--light-glow-hi); } } }
+
+/* LIGHT-5b: the teaching cards (as in Night): a picture, the title, the text, dots and the step, Skip / Next */
+.light-cards{ gap:var(--light-gap-sm); }
+.light-card-pic{ color:var(--light-ink); }
+.light-pic{ display:block; width:100%; height:auto; max-height:var(--light-pic-h); }
+.lp-limb{ fill:none; stroke:currentColor; stroke-linecap:round; opacity:.85; }
+.lp-palm{ fill:var(--light-chip); stroke:currentColor; stroke-width:1.6; }
+.lp-line{ fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; opacity:.8; }
+.lp-dash{ fill:none; stroke:currentColor; stroke-width:1.6; stroke-dasharray:4 4; opacity:.6; }
+.lp-hold{ fill:none; stroke:var(--light-acc); stroke-width:3; stroke-linecap:round; }
+.lp-wave{ fill:none; stroke:var(--light-acc); stroke-width:1.6; }
+.lp-faint{ opacity:.45; }
+.lp-glow{ fill:var(--light-acc); filter:var(--light-glow-f); }
+.lp-band{ fill:none; stroke:currentColor; stroke-width:1.2; opacity:.5; }
+.lp-band.lp-on{ fill:var(--light-acc-soft); stroke:var(--light-acc); opacity:1; }
+.lp-bar{ fill:var(--light-bar-bg); }
+.lp-t1{ fill:var(--light-fx1); } .lp-t2{ fill:var(--light-fx2); } .lp-t3{ fill:var(--light-fx3); } .lp-t4{ fill:var(--light-fx4); }
+.lp-key{ fill:currentColor; font-family:var(--light-font); font-size:var(--light-fs-word); font-weight:var(--light-fw-bold); text-anchor:middle; }
+.light-cards-foot{ display:flex; justify-content:space-between; align-items:center; margin:var(--light-gap-sm) 0 0; }
+.light-cards-dots{ display:flex; gap:var(--light-gap-xs); }
+.light-cards-dot{ width:var(--light-dot); height:var(--light-dot); border-radius:var(--light-r-pill); background:var(--light-ink-faint); }
+.light-cards-dot.on{ background:var(--light-acc); }
+.light-cards-step{ font-size:var(--light-fs-small); color:var(--light-ink-faint); }
+#lightCardPriv[hidden]{ display:none; }

@@ -41,3 +41,7 @@ Read: `docs/light/PLAN.md` (decisions, where each part comes from, core changes,
   words, the seconds and the minute ring, the card playing with its own sound while the live sound is silent, Share, saved to Downloads — iPhone:
   Save to Photos —, leaving the page stops and keeps it, the one-time hint). The bars and controls (DOM) are not in the clip. Next: `LIGHT-6` —
   the mode names in 8 languages, the core's start messages, Light's own icons; checks on the Poco and an iPhone; then `LIGHT-7` publish.
+- `LIGHT-5b/6` (2026-11-27): the bars painted into the clip; the teaching cards; the emblem's flare on Play; LIGHT-6 begun: the mode and group names
+  in the six added languages (`modenames.js`, kept in the app: the shared records would change Night), the start messages in all eight on Light's page
+  (English and Russian now say «Play»), Light's own icons (`tools/light-icons.mjs`, amber centre). Left of LIGHT-6: the founder's checks on the Poco
+  and an iPhone; a native reader for the Georgian terms. Then `LIGHT-7` — the build (`tools/build.mjs` learns light) and play.handsong.app.

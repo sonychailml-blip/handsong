@@ -94,9 +94,11 @@ async function start(){
   }catch(err){ console.warn('[light] the start failed:', err); fail(err); return false; }   // eslint-disable-line no-console
   finally{ starting=false; }
 }
+/* LIGHT-5b: the emblem's dot flares up and settles back (CSS animation; restarted on each tap) */
+export function flare(){ const e=document.querySelector('#start .light-emblem'); if(!e) return; e.classList.remove('flare'); void e.offsetWidth; e.classList.add('flare'); e.addEventListener('animationend', ()=>e.classList.remove('flare'), { once:true }); }
 export function lightBoot(){
   setHandsSink(onHands, ()=>false);
-  $('startBtn').onclick=()=>{ start(); };
+  $('startBtn').onclick=()=>{ flare(); start(); };   // LIGHT-5b: the emblem's dot flares on Play
   $('camRetry').onclick=()=>{ start(); };
   if(new URLSearchParams(location.search).has('probe')){ const l=document.querySelector('link[rel="handsong-probes"]');   // ?probe: the page's probe facade (a shipped page has no such tag)
     if(l) import(l.href).then(m=>m.install()).catch(e=>console.warn('[probe] the probes failed to load', e)); }   // eslint-disable-line no-console
