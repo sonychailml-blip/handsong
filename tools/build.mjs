@@ -13,8 +13,8 @@ import { renderNightLicences } from './check-licences.mjs';   // NIGHT-15: Night
 
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), argv=process.argv.slice(2), posix=path.posix;
 const die=s=>{ console.error('[build] FAILED — '+s); process.exit(1); };
-const app=process.env.HANDSONG_APP; if(!['full','night'].includes(app)) die('HANDSONG_APP must be full or night (Vercel: Settings → Environment Variables)');
-const other=app==='full' ? 'night' : 'full', i=argv.indexOf('--out'), OUT=path.resolve(ROOT, i>=0 ? argv[i+1] : 'dist');
+const app=process.env.HANDSONG_APP; if(!['full','night','light'].includes(app)) die('HANDSONG_APP must be full, night or light (Vercel: Settings → Environment Variables)');   // LIGHT-7: + light
+const others=['full','night','light'].filter(a=>a!==app), other=app==='full' ? 'night' : 'full', i=argv.indexOf('--out'), OUT=path.resolve(ROOT, i>=0 ? argv[i+1] : 'dist');
 /* NIGHT-7: Night's Vercel PRODUCTION build is the release edition by itself (no development items for players), unless HANDSONG_EDITION=dev */
 const PREVIEW=argv.includes('--probes') || process.env.VERCEL_ENV==='preview', RELEASE=process.env.HANDSONG_EDITION==='release' || (app==='night' && process.env.VERCEL_ENV==='production' && process.env.HANDSONG_EDITION!=='dev');
 const PAGE_LEVEL=['manifest.json','sw.js','icons', ...(app==='night' ? ['licences.html'] : [])], BASE=`apps/${app}`;   // NIGHT-15: Night's «Licences» page sits beside the page
@@ -66,8 +66,9 @@ const page=readFileSync(path.join(OUT,'index.html'),'utf8').replace(/<!--[\s\S]*
 for(const m of page.matchAll(/\b(?:src|href)="([^"]+)"/g)){ const u=m[1]; if(/^([a-z]+:|\/|#)/i.test(u)) continue; walkModule(u.split(/[?#]/)[0]); }
 for(const f of ['core/engine/worklets/ks-worklet.js','core/engine/worklets/frz-worklet.js','core/engine/worklets/dyn-worklet.js','core/engine/worklets/probe-cap-worklet.js','core/hand-worker.js','core/data/timbres.bundle.json','core/data/index.json']) walkModule(f);
 const listAll=d=>readdirSync(d,{ withFileTypes:true }).flatMap(e=>e.isDirectory() ? listAll(path.join(d,e.name)) : [path.join(d,e.name)]);
+const listDirs=d=>readdirSync(d,{ withFileTypes:true }).filter(e=>e.isDirectory()).flatMap(e=>[...listDirs(path.join(d,e.name)), path.join(d,e.name)]);   // LIGHT-7: deepest first
 const all=listAll(OUT).map(f=>path.relative(OUT,f).replace(/\\/g,'/')).sort();
-if(!PREVIEW){ if(existsSync(path.join(OUT,'tools'))) bad.push('production holds tools/'); if(/handsong-probes/.test(page)) bad.push('production keeps the probes tag'); if(existsSync(path.join(OUT,'apps',other))) bad.push('production holds the other app'); }
+if(!PREVIEW){ if(existsSync(path.join(OUT,'tools'))) bad.push('production holds tools/'); if(/handsong-probes/.test(page)) bad.push('production keeps the probes tag'); for(const o of others) if(existsSync(path.join(OUT,'apps',o))) bad.push('production holds the other app '+o); }
 else if(existsSync(path.join(OUT,'apps',other)) && (other==='full' || all.some(f=>f.startsWith('apps/night/')&&f!=='apps/night/data/night.json'))) bad.push('a preview holds more of the other app than the probes need');
 if(!/rel="handsong-profile"/.test(page)) bad.push('the page declares no profile');
 if(RELEASE && app==='night'){ for(const f of ['apps/night/rooms/rain/rain.js', 'apps/night/rooms/rain/install.js', 'apps/night/rooms/rain/still/still-reduced.webp', 'apps/night/rooms/rain/still/still-full.webp', 'apps/night/rooms/rain/city/windows.json'])
@@ -75,6 +76,23 @@ if(RELEASE && app==='night'){ for(const f of ['apps/night/rooms/rain/rain.js', '
   { const sm=path.join(OUT,'apps/night/rooms/rain/samples'), M=existsSync(path.join(sm,'samples.json')) ? JSON.parse(readFileSync(path.join(sm,'samples.json'),'utf8')) : null;   // RELEASE-1: the music's recordings, every one
     if(!M) bad.push("a players' build lacks the rain music's recordings (rooms/rain/samples/samples.json)"); else for(const f of Object.values(M.files)) if(!existsSync(path.join(sm,f.file))) bad.push("a players' build lacks the rain music's "+f.file); } }
 if(bad.length){ for(const b of bad.slice(0,30)) console.error('  '+b); die(bad.length+' problem(s)'); }
+/* LIGHT-7 (the founder: «only what it really has»): Light's tree keeps of core/ only the modules its page reaches (the walk above: static, literal
+   dynamic and new URL imports) and what is fetched by name while it runs — the data (core/data/), the hand model and its library (core/vendor/), the
+   audio worklets (core/engine/worklets/) and the hand worker. Every other core file (the shared legacy UI, the recorder, songs, Night's code…) goes.
+   Then the tree is walked again: a load that now misses fails the build. A preview keeps everything (its probes import core's own rows). */
+let pruned=0;
+if(app==='light' && !PREVIEW){
+  const KEEP=/^core\/(data|vendor|engine\/worklets)\/|^core\/hand-worker\.js$/;
+  for(const f of listAll(path.join(OUT,'core')).map(x=>path.relative(OUT,x).replace(/\\/g,'/'))) if(!seen.has(f) && !KEEP.test(f)){ rmSync(path.join(OUT,f)); pruned++; }
+  for(let k=0;k<4;k++) for(const d of listDirs(path.join(OUT,'core'))) if(existsSync(d) && !readdirSync(d).length) rmSync(d,{ recursive:true, force:true });   // empty folders, deepest first over a few passes
+  const again=new Set(seen); seen.clear(); bad.length=0;
+  for(const m of page.matchAll(/\b(?:src|href)="([^"]+)"/g)){ const u=m[1]; if(/^([a-z]+:|\/|#)/i.test(u)) continue; walkModule(u.split(/[?#]/)[0]); }
+  for(const f of again) if(!existsSync(path.join(OUT,f))) bad.push('pruned away but loaded: '+f);   // every load of the first walk still resolves
+  if(bad.length){ for(const b of bad.slice(0,30)) console.error('  '+b); die('the pruned Light tree misses a load ('+bad.length+')'); }
+  if(existsSync(path.join(OUT,'core/legacy-ui')) || existsSync(path.join(OUT,'core/recorder.js'))) die('the pruned Light tree still holds Full\'s code');
+  all.splice(0, all.length, ...listAll(OUT).map(f=>path.relative(OUT,f).replace(/\\/g,'/')).sort());   // the tree as shipped
+}
+
 /* CORE-20 (audit P5 item 3): the page's module script and its STATIC closure (import … from / import '…' / export … from; never import()) as
    <link rel="modulepreload"> before </head>, so the built page fetches its modules in one wave instead of one per import depth */
 const STATIC=SPEC.slice(0,2), closure=[], seenS=new Set();
@@ -87,4 +105,4 @@ for(const m of page.matchAll(/<script\b[^>]*\btype="module"[^>]*\bsrc="([^"]+)"/
 /* NIGHT-14: Night's precache list, written into its sw.js last (after every change to the tree, so the hashes are the shipped bytes) */
 let pc=null; if(app==='night') pc=writePrecache(OUT, precachePaths(OUT, seen, NIGHT_SKIP, NIGHT_INCLUDE), NIGHT_LATER, NIGHT_DEMAND);   // RAIN-R1: the rain's media on demand
 const bytes=all.reduce((n,f)=>n+statSync(path.join(OUT,f)).size,0), h=createHash('sha256'); for(const f of all){ h.update(f); h.update(readFileSync(path.join(OUT,f))); }
-console.log(`[build] PASS — ${app}${PREVIEW?' · preview: ?probe kept':' · production: no probes'}${RELEASE?' · release edition':''} · ${all.length} files, ${(bytes/1048576).toFixed(1)} MB, ${seen.size} loads resolved, ${closure.length} modules preloaded${pc ? ` · precache ${pc.version}: ${pc.n} files, ${(pc.simdBytes/1048576).toFixed(1)} MB cached, ${(pc.startBytes/1048576).toFixed(1)} MB of it to start, ${(pc.demandBytes/1048576).toFixed(1)} MB on demand (${(pc.bytes/1048576).toFixed(1)} MB listed with both MediaPipe builds)` : ''} · tree ${h.digest('hex').slice(0,16)} → ${path.relative(ROOT,OUT).replace(/\\/g,'/')}`);
+console.log(`[build] PASS — ${app}${pruned?' · '+pruned+' unused core files left out':''}${PREVIEW?' · preview: ?probe kept':' · production: no probes'}${RELEASE?' · release edition':''} · ${all.length} files, ${(bytes/1048576).toFixed(1)} MB, ${seen.size} loads resolved, ${closure.length} modules preloaded${pc ? ` · precache ${pc.version}: ${pc.n} files, ${(pc.simdBytes/1048576).toFixed(1)} MB cached, ${(pc.startBytes/1048576).toFixed(1)} MB of it to start, ${(pc.demandBytes/1048576).toFixed(1)} MB on demand (${(pc.bytes/1048576).toFixed(1)} MB listed with both MediaPipe builds)` : ''} · tree ${h.digest('hex').slice(0,16)} → ${path.relative(ROOT,OUT).replace(/\\/g,'/')}`);

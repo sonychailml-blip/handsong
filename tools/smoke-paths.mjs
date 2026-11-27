@@ -542,6 +542,10 @@ if(BUILD){ fails+=await redirectCheck();
     if((await statsPage(`${app} preview`,prev)).length) fails++; fails+=await statsAbsent(prod);
     if(app==='night'){ if((await roomPage('night preview',prev,'/')).length) fails++; if((await tailPill('night preview',prev,'/')).length) fails++; if((await bedPill('night preview',prev,'/')).length) fails++; fails+=await roomAbsent(prod); }
     if((await panelGate(`${app} preview`,prev,'/',true)).length) fails++; if((await panelGate(`${app} production`,prod,'/',false)).length) fails++; }
+  { const prod=build('light','production'), prev=build('light','preview');   // LIGHT-7: Light's trees (production pruned to what it loads)
+    for(const prefix of ['/','/some/sub/']) if((await run('light',prod,prefix)).length) fails++;
+    if((await run('light',prev,'/')).length) fails++;
+    fails+=await probeGate('light',prod,false); fails+=await probeGate('light',prev,true); }
   if((await run('night',build('night','release'),'/',false,false)).length) fails++;
   { const dep=build('night','deploy'), ed=await readFile(path.join(dep,'core/edition.js'),'utf8');   // NIGHT-7: the tree Vercel's production makes for Night: the release edition, no probes
     if(!/EDITION='release'/.test(ed)){ out('[smoke] night deploy: NOT A PASS — not the release edition'); fails++; }

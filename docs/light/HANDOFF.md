@@ -45,3 +45,12 @@ Read: `docs/light/PLAN.md` (decisions, where each part comes from, core changes,
   in the six added languages (`modenames.js`, kept in the app: the shared records would change Night), the start messages in all eight on Light's page
   (English and Russian now say «Play»), Light's own icons (`tools/light-icons.mjs`, amber centre). Left of LIGHT-6: the founder's checks on the Poco
   and an iPhone; a native reader for the Georgian terms. Then `LIGHT-7` — the build (`tools/build.mjs` learns light) and play.handsong.app.
+
+## Deploy (LIGHT-7; the founder sets the project up once, as for Night)
+- Vercel → Add New Project → this repository; name `handsong-light`; Framework **Other**; Root Directory: the repository root (the shared
+  `vercel.json` builds with `node tools/build.mjs` into `dist/`); Environment Variable **`HANDSONG_APP=light`** (Production and Preview).
+- Settings → Git → **Production Branch `light-release`** (proposed, as Night's `night-release`): the founder publishes with
+  `git push origin dev:light-release`; `dev` pushes give previews (with `?probe`).
+- Settings → Domains: `play.handsong.app`. Cloudflare DNS (DNS only, grey cloud): `CNAME play cname.vercel-dns.com` (or what Vercel's Domains
+  page shows).
+- The production tree is pruned to what Light loads (`tools/build.mjs`: the legacy UI, the recorder, songs, Night's code are not shipped).

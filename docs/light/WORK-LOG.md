@@ -142,3 +142,14 @@ Tree hashes after: core 44ed0dd238a68bfb (unchanged) · apps/full 0148bb454440c3
   reverb and volume» + the volume law (both 0.8 at their edges, 0 at the centre; the left alone mirrored; off → the plain law, CONTROL).
 - Checks (iteration mode): static PASSED; probe-data PASS 109/0; `--app light` 10 rows PASS, CSP, network, storage PASS; smoke on Light PASS;
   licences PASS; name index PASS.
+
+# LIGHT-7 (LIGHT track, 2026-11-27): the build
+- `tools/build.mjs`: `HANDSONG_APP=light`; a Light production tree keeps of `core/` only what its page reaches (+ `core/data/`, `core/vendor/`,
+  `core/engine/worklets/`, the hand worker), walks again (a missing load fails the build), refuses a tree holding the legacy UI or the recorder;
+  production holds no other app. Light production: 265 files, 30.5 MB (55 unused core files left out; the hand model and its library are most of it).
+  Full and Night build as before. `tools/smoke-paths.mjs --build`: Light's production (root and a sub-folder) and preview, `?probe` gate.
+- Checks before the first publish (Level 4 for Light): `node tools/smoke-paths.mjs --build` PASS — every target loaded, the control caught (Full,
+  Night and Light trees; Light's production from the root and a sub-folder, its preview, the `?probe` gate: production loads nothing, the preview has
+  `window.P`); static PASSED; probe-data PASS 109/0; `--app light` 10 rows PASS (LIGHT-6c). Tree hashes: core 44ed0dd238a68bfb · apps/full
+  0148bb454440c3e3 · apps/night 30d8f7b3c797de9e · apps/light bb3b5e6cbb4e1a9d. Vercel: project `handsong-light` created by the founder, the domain
+  play.handsong.app added (its Cloudflare CNAME pending), the production branch `light-release` set once the branch exists.
