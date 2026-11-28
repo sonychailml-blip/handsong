@@ -20,7 +20,7 @@ export async function checkLightTimbres(){
     /* (1) */
     const refused=lightTimbresInstall(), av=lightTimbresAvailable();
     if(refused.length) miss('refused: '+refused.join('; '));
-    if(av.length!==14) miss(`${av.length} timbres to pick, not 14`);
+    if(av.length!==17) miss(`${av.length} timbres to pick, not 17`);   // LIGHT-13: + three pads
     for(const r of LIGHT_RECORDS){ if(!/^light\//.test(r.id)) miss(r.id+': not a «light/» pack id'); if(timbreIdx('ld', r.id)==null) miss(r.id+': not installed'); }
     /* (2) */
     for(const L of LANGS){ setLang(L);
@@ -29,9 +29,9 @@ export async function checkLightTimbres(){
     /* (3) */
     const B=()=>document.getElementById('lightSheetBody');
     setHand('L','fx'); setHand('R','note'); lightControlsOpenDbg('timbre');
-    if(B().querySelectorAll('.light-item').length!==14 || B().querySelectorAll('.light-hcol').length) miss('one hand playing: not one list of 14');
+    if(B().querySelectorAll('.light-item').length!==17 || B().querySelectorAll('.light-hcol').length) miss('one hand playing: not one list of 17');
     setHand('L','note'); lightControlsOpenDbg('timbre');
-    if(B().querySelectorAll('.light-hcol').length!==2 || B().querySelectorAll('.light-hcol .light-item').length!==28) miss('both hands playing: not two columns of 14');
+    if(B().querySelectorAll('.light-hcol').length!==2 || B().querySelectorAll('.light-hcol .light-item').length!==34) miss('both hands playing: not two columns of 17');
     lightControlsOpenDbg(null);
     /* (4) both hands pinch the index finger; the tap sees each note's timbre position */
     setTimbre('light/brass','L'); setTimbre('solo.organ','R');

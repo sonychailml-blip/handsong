@@ -75,9 +75,21 @@ const TIPS=new Set([4,8,12,16,20]);   // thumb, index, middle, ring, little: dra
 /* the fingers sounding now: every finger of the playing hand's notes (several at once), else the pinching finger (the effects hand) */
 export function litFingers(h){ if(!h.pinch) return new Set();
   const f=h.play && h.fing ? Object.keys(h.fing).map(Number) : []; return new Set(f.length ? f : h.finger>=0 ? [h.finger] : []); }
+/* LIGHT-13 (the founder; Full's two rings, but at EVERY sounding finger — Full keeps them at the first one only): where a playing hand's thumb
+   meets each sounding finger (the theremin: at its pinch point), a ring and a fainter outer ring, both growing with the note's volume */
+function rings(h, lit, sxOf, syOf, c){
+  if(!h.play || !h.pinch) return;
+  const v=Math.max(0, Math.min(1, +h.vol||0)), at=[];
+  if(h.fn==='therm') at.push([h.x, h.y]);
+  else for(const f of lit){ const t=h.lm[FINGER_TIPS[f]]; if(t) at.push([sxOf((h.lm[4].x+t.x)/2), syOf((h.lm[4].y+t.y)/2)]); }
+  ctx.strokeStyle=c.acc; ctx.lineWidth=2.5;
+  for(const [x,y] of at){ ctx.globalAlpha=0.9; ctx.beginPath(); ctx.arc(x, y, 16+6*v, 0, Math.PI*2); ctx.stroke();
+    ctx.globalAlpha=0.25; ctx.beginPath(); ctx.arc(x, y, 26+8*v, 0, Math.PI*2); ctx.stroke(); }
+  ctx.globalAlpha=1;
+}
 function handsDraw(hands, sxOf, syOf){
   const c=colours();
-  for(const h of hands){ const lm=h.lm; if(!lm) continue; const lit=litFingers(h);
+  for(const h of hands){ const lm=h.lm; if(!lm) continue; const lit=litFingers(h); rings(h, lit, sxOf, syOf, c);
     lm.forEach((p,i)=>{ const x=sxOf(p.x), y=syOf(p.y), tip=TIPS.has(i), on= i===4 ? lit.size>0 : tip && lit.has(FINGER_TIPS.indexOf(i));
       ctx.fillStyle= on ? c.acc : c.dot; ctx.beginPath(); ctx.arc(x, y, on ? 7 : tip ? 5.5 : 2.6, 0, Math.PI*2); ctx.fill(); }); }
 }

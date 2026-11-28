@@ -9,7 +9,7 @@ import { CAM_MARGIN } from '../../../core/config.js';
 import { leadAllOff } from '../../../core/audio.js';
 import { pose } from '../../../core/gestures/pose.js';
 import { fxParamsOf } from '../../../core/gestures/fxhand.js';
-import { lightHandsProbe, lightProcessHandsProbe, lightHandsReset, setLightFxSens, setLightPerHandReverb, setLightMirrorVolume } from '../../../apps/light/gestures.js';
+import { lightHandsProbe, lightProcessHandsProbe, lightHandsReset, setLightFxSens, setLightPerHandReverb, setLightMirrorVolume, setLightCoreLaws } from '../../../apps/light/gestures.js';
 import { lightNoteTapSet } from '../../../apps/light/engine.js';
 
 const FPS=30, W=1000, H=600, PIN=0.05, OPEN=1;
@@ -79,7 +79,7 @@ export async function checkLightHands(){
   const keep=envKeep(), fx0=fxSnap();
   const base={ ...ENV, hand:{ L:'fx', R:'note' }, voice:'poly', viewRect:{ ax0:CAM_MARGIN, ax1:1-CAM_MARGIN, ay0:CAM_MARGIN, ay1:1-CAM_MARGIN } };
   const core={ begin:(clk,tap)=>{ G.handsProbe(clk, ()=>true); REC.wTapSet(tap); }, frame:res=>G.processHandsProbe(res), end:()=>{ REC.wTapSet(null); G.handsProbe(null); } };
-  const light={ begin:(clk,tap)=>{ lightHandsProbe(clk); lightNoteTapSet(tap); }, frame:res=>lightProcessHandsProbe(res), end:()=>{ lightNoteTapSet(null); lightHandsProbe(null); } };
+  const light={ begin:(clk,tap)=>{ setLightCoreLaws(true); lightHandsProbe(clk); lightNoteTapSet(tap); }, frame:res=>lightProcessHandsProbe(res), end:()=>{ lightNoteTapSet(null); lightHandsProbe(null); setLightCoreLaws(false); } };   // LIGHT-13: Light's own pinch distances and depth reach set aside — the machines compared
   let a, b, c;
   setLightPerHandReverb(false); setLightMirrorVolume(false);   // LIGHT-6b/6c: core has ONE reverb and ONE volume law for both hands; the comparison runs Light the same way
   try{

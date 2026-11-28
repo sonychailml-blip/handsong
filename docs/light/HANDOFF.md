@@ -62,7 +62,10 @@ Read: `docs/light/PLAN.md` (decisions, where each part comes from, core changes,
   sound. Gestures: clap (palms meet, or a hand lost beside the other) or a palm strike. Check `node tools/lab/latency/check.mjs`. Next: the founder
   measures (Live Server `/tools/lab/latency/`); then the same measure in Light under `?lab` to compare.
   Measured (12b–12h): camera 84 ms screen→page, sound ≈ 55–65, recognition 41 (one hand); a nail-tick pinch → click ≈ 100 ms median (the pinch fires
-  ≈ 1.5–2 cm before contact). 12i: Light's own panel `apps/light/?probe&lab` — the same measure on Light's note path; the founder measures next.
+  ≈ 1.5–2 cm before contact). 12i: Light's own panel `apps/light/?probe&lab`: Light 138 ms vs the lab's 114 — mostly the computer; all in `LATENCY.md`.
+- `LIGHT-13` (2026-11-28): rings at every sounding finger, four pads (17 timbres), wider pinch distances (0.25–0.29), a stronger reverb (tail 2.7 s,
+  brighter, full at 0.65 of the depth). Open: which scales to drop, more sound pictures (proposals to the founder); the runner's network control
+  missed in Light runs (suspected Light's service worker).
 
 ## Deploy (LIGHT-7; the founder sets the project up once, as for Night)
 - Vercel → Add New Project → this repository; name `handsong-light`; Framework **Other**; Root Directory: the repository root (the shared

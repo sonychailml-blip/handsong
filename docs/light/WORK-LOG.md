@@ -306,3 +306,28 @@ Tree hashes before and after: core a4dd71426b6a4c32 · apps/full 0148bb454440c3e
   floor (camera ≈ 60, recognition 41 at 320×240, sound ≈ 55, the frame wait, minus the pinch firing ≈ 1.5–2 cm early); Light adds ≈ 25 ms median and
   a longer tail. Candidates for Light's part: the camera at 640×480 (lab 320×240), the snapshot + worker hop before recognition, the full-screen
   drawing on the same GPU. The report now names Light's camera (core/vision.js `video`).
+- LIGHT-12 saved for later: the results and how to continue → `docs/light/LATENCY.md` (the founder: stop here, keep the numbers to refer to).
+
+# LIGHT-13 (LIGHT track, 2026-11-28): rings at every sounding finger, four pads, wider pinch, a stronger reverb
+Tree hashes before: core 18865efad8ade039 · full 0148bb454440c3e3 · night 30d8f7b3c797de9e · light 1cb1d4a1978611a1; after: core 5485fc132477fc57 (`core/engine/surface.js` data only) · full · night unchanged · light 6d59f9e256af02a6.
+- The founder (chat): (2) Full's two rings where the thumb meets the sounding finger, but at EVERY sounding finger (Full keeps them at the first);
+  (4) pads — they enter slowly, the delay matters little; (5) a little more distance for a pinch — one of four fingers often ends too far;
+  (6) the reverb by the playing hand's depth is not strong enough even at the farthest. (1) which scales to drop and (3) more sound pictures —
+  proposals sent, waiting.
+- Rings (`draw.js rings`): a ring 16+6·vol px and an outer one 26+8·vol at 25 %, amber, at the midpoint thumb ↔ each sounding finger (the theremin:
+  its pinch point); only the playing hand. In the clip too (it composes the canvas).
+- Pads: group «Pads» (8 languages) — warm pad +2 dB (moved from «More»), glass pad +1, breathing pad −2, pad −3.5 (built-ins added to the profile;
+  levels by the sustained sound 0.8–1.8 s against SuperSaw, `tools/.out/light12/pads-levels.eval.js`: −31.1/−32.3, warm −29.4 with its trim, pad −26,
+  glass −30.2, breathing −27.6). 17 timbres.
+- Pinch (`gestures.js LIGHT_PINCH`): Light's own distances — in below 0.25 / 0.25 / 0.27 / 0.29 (index … little), out above +0.06 (core: 0.20 / 0.25);
+  core's law otherwise. Side effect: the pinch fires a little earlier (LATENCY.md).
+- Reverb: the profile's tail 0.7 → 0.85 (≈ 1.8 → 2.7 s), tone fixed at 0.79 (≈ 7 kHz; was the 5 kHz default); the depth reaches the full mix at
+  0.65 of the travel (`DEPTH_REACH`; the mix cap 0.85 is core's — unchanged).
+- Probe switch `setLightCoreLaws(true)`: core's pinch distances and the whole depth travel — row «LIGHT hands = core hands» compares the machines
+  with it (235 lines, 108 note calls equal). New row «LIGHT rings, pinch distances, reverb reach»: ring 0.26 + little 0.28 sound in Light, none with
+  core's distances (CONTROL); three sounding fingers 6 rings, one 2, an effects-hand pinch 0 (CONTROL); reach and tail values. Rows updated: «LIGHT
+  timbres» 17 / 34; C0 data row eleven built-in solo timbres.
+- Checks (iteration mode): static PASSED; probe-data PASS 109/0; rows start, bars, hands = core, timbres, per hand, rings — all pass. The runner's
+  network control («a worker asking an unlisted host») came out NOT CAUGHT in three Light runs today (CSP and storage PASS) — also in a run with no
+  app change (the pads' levels): suspected Light's service worker (LIGHT-10; registered after Play, claims the page, has a fetch handler) taking the
+  control worker's request out of the runner's sight. Not fixed here — reported.

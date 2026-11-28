@@ -63,7 +63,7 @@ LIGHT-8 — FULL SCREEN, the way Night does it (apps/night/fullscreen.js, NIGHT-
 
 ## apps/light/gestures.js
 LIGHT-3 — LIGHT'S HANDS: core/gestures/hands.js and roles.js COPIED and cut to what Light offers (option B, the founder 2026-11-27): one role, the solo; each hand's function note / hold / theremin …
-- const (10): `setLightFxSens`, `setLightDepthLaw`, `setLightTravel`, `setLightOctShift`, `lightOctShift`, `lightTrackKey`, `lightChainOfHand`, `setLightMirrorVolume`, `setLightInstOf`, `setLightTrackFx`
+- const (13): `setLightFxSens`, `setLightDepthLaw`, `setLightTravel`, `setLightOctShift`, `lightOctShift`, `lightTrackKey`, `lightChainOfHand`, `setLightMirrorVolume`, `LIGHT_PINCH`, `setLightCoreLaws`, `DEPTH_REACH`, `setLightInstOf`, `setLightTrackFx`
 - fn (9): `setLightPerHandReverb`, `volX`, `lightMirrorFx`, `lightVoiceModeReset`, `lightHandsReset`, `lightHandsProbe`, `lightProcessHandsProbe`, `lightProcessHands`, `lightHandsView`
 
 ## apps/light/icons.js
@@ -1599,6 +1599,7 @@ LIGHT-2/3: the probe entry of the Light page (?probe): its own rows behind its o
 - → ./light/cards.js (1): `checkLightCards`
 - → ./light/clip.js (1): `checkLightClip`
 - → ./light/controls.js (1): `checkLightControls`
+- → ./light/feel.js (1): `checkLightFeel`
 - → ./light/hands.js (1): `checkLightHands`
 - → ./light/perhand.js (1): `checkLightPerHand`
 - → ./light/start.js (1): `checkLightStart`
@@ -1628,6 +1629,10 @@ LIGHT-5 row «LIGHT clip»: (1) the format — MP4 first (the founder): where th
 ## tools/probes/light/controls.js
 LIGHT-3b row «LIGHT controls and menus»: with no hand in view the controls show (variant B) and read the live state (the key and A4, the scale, the sound); each sheet holds what it must (12 keys an…
 - fn (1): `checkLightControls`
+
+## tools/probes/light/feel.js
+LIGHT-13 row «LIGHT rings, pinch distances, reverb reach»: (1) the pinch distances: a right hand whose ring finger stands 0.26 and little finger 0.28 from the thumb (in Full's palm units) sounds bo…
+- fn (1): `checkLightFeel`
 
 ## tools/probes/light/hands.js
 LIGHT-3 row «LIGHT hands = core hands»: Light's hands (apps/light/gestures.js, a cut copy of core's) must make EXACTLY the note calls core's gesture machine makes on the same synthetic hands — the …
@@ -1913,7 +1918,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 UI-1 — «NIGHT labels follow the room»: the founder entered the rain and the Sound button still read «Firefly» while another timbre played.
 - fn (1): `checkNightLabels`
 
-_382 modules, 3501 exported names._
+_383 modules, 3506 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

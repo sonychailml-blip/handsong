@@ -13,6 +13,7 @@ const SURFACE={
   'tools/probes/light/hands.js':['leadAllOff'],
   'tools/probes/light/calib.js':['leadAllOff'],
   'tools/probes/light/timbres.js':['timbreIdx', 'leadAllOff'],   // LIGHT-11
+  'tools/probes/light/feel.js':['leadAllOff'],   // LIGHT-13
   'tools/probes/light/lab.js':['AC'],   // LIGHT-12i: the latency lab in Light (?probe&lab) starts its click in Light's own context
   'tools/probes/light/clip.js':['outputFadeLevel'],
   'tools/probes/light/perhand.js':['routeOfOwner', 'leadAllOff'],   // LIGHT-6b: the per-hand reverb row reads the router   // LIGHT-5: the clip row reads the card's silence   // LIGHT-4: the hand setup row silences its notes   // LIGHT-3: the hands row silences what each run left sounding

@@ -45,8 +45,8 @@ export const LIGHT_RECORDS=Object.freeze([
     noise:{ g:0.08, q:4, m:1, on:2 }, chiff:{ g:0.25, m:1, q:2, d:0.05 }, vib:{ rate:5.4, cents:9, amp:0.03, delay:0.5, rise:0.9 }, drift:{ cents:2, rate:0.1 }, scoop:-30 },
     { att:0.06, rel:0.22 }),
 ]);
-/* the fourteen in the sheet's order, by group; dB = the level trim; oct = a hand's octave shift when it picks a bass */
-export const LIGHT_GROUPS=Object.freeze(['lead','keys','winds','strings','bass','other']);
+/* the seventeen in the sheet's order, by group; dB = the level trim; oct = a hand's octave shift when it picks a bass */
+export const LIGHT_GROUPS=Object.freeze(['lead','keys','winds','strings','pads','bass','other']);
 export const LIGHT_TIMBRES=Object.freeze([
   { id:'solo.supersaw', group:'lead', dB:0 },
   { id:'light/soft-lead', group:'lead', dB:-3.5 },
@@ -57,11 +57,14 @@ export const LIGHT_TIMBRES=Object.freeze([
   { id:'light/brass', group:'winds', dB:-3.5 },
   { id:'light/strings', group:'strings', dB:3 },
   { id:'solo.guitar', group:'strings', dB:4 },
+  { id:'solo.warm-pad', group:'pads', dB:2 },   // LIGHT-13 (the founder: pads enter slowly, the delay matters little): four pads, levels by the sustained sound (0.8–1.8 s)
+  { id:'solo.glass-pad', group:'pads', dB:1 },
+  { id:'solo.breath-pad', group:'pads', dB:-2 },
+  { id:'solo.pad', group:'pads', dB:-3.5 },
   { id:'light/bass-round', group:'bass', dB:-5, oct:-1 },
   { id:'light/bass-synth', group:'bass', dB:0, oct:-1 },
   { id:'light/bass-pluck', group:'bass', dB:2, oct:-1 },
   { id:'solo.kalimba', group:'other', dB:0 },
-  { id:'solo.warm-pad', group:'other', dB:2 },
 ].map(Object.freeze));
 const NAMES={
   'solo.supersaw':     { en:'SuperSaw', ru:'Суперсо', es:'SuperSaw', pt:'SuperSaw', de:'SuperSaw', fr:'SuperSaw', it:'SuperSaw', ka:'სუპერსო' },
@@ -78,12 +81,16 @@ const NAMES={
   'light/bass-pluck':  { en:'Plucked bass', ru:'Щипковый бас', es:'Bajo pulsado', pt:'Baixo dedilhado', de:'Gezupfter Bass', fr:'Basse pincée', it:'Basso pizzicato', ka:'პიციკატო ბასი' },
   'solo.kalimba':      { en:'Kalimba', ru:'Калимба', es:'Kalimba', pt:'Kalimba', de:'Kalimba', fr:'Kalimba', it:'Kalimba', ka:'კალიმბა' },
   'solo.warm-pad':     { en:'Warm pad', ru:'Тёплый пэд', es:'Pad cálido', pt:'Pad quente', de:'Warmes Pad', fr:'Nappe chaude', it:'Pad caldo', ka:'თბილი პედი' },
+  'solo.glass-pad':    { en:'Glass pad', ru:'Стеклянный пэд', es:'Pad de cristal', pt:'Pad de vidro', de:'Gläsernes Pad', fr:'Nappe de verre', it:'Pad di vetro', ka:'მინის პედი' },
+  'solo.breath-pad':   { en:'Breathing pad', ru:'Дышащий пэд', es:'Pad que respira', pt:'Pad que respira', de:'Atmendes Pad', fr:'Nappe qui respire', it:'Pad che respira', ka:'მსუნთქავი პედი' },
+  'solo.pad':          { en:'Pad', ru:'Пэд', es:'Pad', pt:'Pad', de:'Pad', fr:'Nappe', it:'Pad', ka:'პედი' },
 };
 const GROUP_NAMES={
   lead:    { en:'Lead', ru:'Лид', es:'Lead', pt:'Lead', de:'Lead', fr:'Lead', it:'Lead', ka:'ლიდი' },
   keys:    { en:'Keys', ru:'Клавишные', es:'Teclados', pt:'Teclados', de:'Tasten', fr:'Claviers', it:'Tastiere', ka:'კლავიშიანი' },
   winds:   { en:'Winds', ru:'Духовые', es:'Vientos', pt:'Sopros', de:'Bläser', fr:'Vents', it:'Fiati', ka:'ჩასაბერი' },
   strings: { en:'Strings', ru:'Струнные', es:'Cuerdas', pt:'Cordas', de:'Saiten', fr:'Cordes', it:'Corde', ka:'სიმებიანი' },
+  pads:    { en:'Pads', ru:'Пэды', es:'Pads', pt:'Pads', de:'Pads', fr:'Nappes', it:'Pad', ka:'პედები' },
   bass:    { en:'Bass', ru:'Бас', es:'Bajo', pt:'Baixo', de:'Bass', fr:'Basse', it:'Basso', ka:'ბასი' },
   other:   { en:'More', ru:'Ещё', es:'Más', pt:'Mais', de:'Mehr', fr:'Autres', it:'Altri', ka:'სხვა' },
 };
@@ -99,5 +106,5 @@ export function lightTimbresInstall(){
   setTimbreTrim(Object.fromEntries(LIGHT_TIMBRES.filter(t=>t.dB).map(t=>[t.id, t.dB])));
   return refused.slice();
 }
-/* the list a person can pick from: the fourteen that core knows */
+/* the list a person can pick from: the seventeen that core knows */
 export const lightTimbresAvailable=()=>LIGHT_TIMBRES.filter(t=>timbreIdx('ld', t.id)!=null);

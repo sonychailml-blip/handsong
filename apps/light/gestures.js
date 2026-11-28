@@ -40,6 +40,22 @@ export const lightChainOfHand=key=>chainOfHand(key);
 let mirrorVol=true;
 export const setLightMirrorVolume=on=>{ mirrorVol=!!on; };
 /* LIGHT-11: a timbre per hand — side ('L'|'R') → the engine's timbre position; none set: the live solo timbre, exactly core's payload */
+/* LIGHT-13 (the founder: «hard to bring all four fingers to the thumb — one ends a little too far»): Light's own pinch distances — wider than core's
+   PINCH_ON 0.20 / PINCH_OFF 0.25 (thumb tip → finger tip over wrist → index base), wider still for the ring and little fingers; core's law
+   otherwise (in strictly below `on`, out above `off`). Probe only: setLightCoreLaws(true) = core's distances and the depth over the whole travel
+   (row «LIGHT hands = core hands»). */
+export const LIGHT_PINCH=Object.freeze({ on:Object.freeze([0.25, 0.25, 0.27, 0.29]), off:Object.freeze([0.31, 0.31, 0.33, 0.35]) });
+let corePinch=false;
+export const setLightCoreLaws=v=>{ corePinch=!!v; };
+function lightTouched(r, prev){
+  if(corePinch) return touchedFingers(r, prev);
+  const now=new Set();
+  for(let i=0;i<FINGER_TIPS.length;i++){ const v=r[FINGER_TIPS[i]]; if(prev.has(i) ? v<=LIGHT_PINCH.off[i] : v<LIGHT_PINCH.on[i]) now.add(i); }
+  return now;
+}
+/* LIGHT-13 (the founder: the reverb is not strong enough even at the farthest): the playing hand's depth reaches the full reverb mix at this share
+   of its travel (1 = the whole travel, as before) */
+export const DEPTH_REACH=0.65;
 let instOf=null;
 export const setLightInstOf=f=>{ instOf= typeof f==='function' ? f : null; };
 export function volX(key, x, rx0, rx1){
@@ -115,7 +131,7 @@ export function lightProcessHands(res){
     S.seen=now; S.lm=lm; S.hsF=null; S.calF=null;
     const rx0=0, rx1=W;
     const r=pinchRatios(lm), [mf0,mv]=minFinger(r);
-    const prevTouch=S.touch||new Set(), touch=touchedFingers(r,prevTouch);
+    const prevTouch=S.touch||new Set(), touch=lightTouched(r,prevTouch);
     S.order=(S.order||[]).filter(f=>touch.has(f));
     for(let f=0;f<FINGER_TIPS.length;f++) if(touch.has(f)&&!S.order.includes(f)) S.order.push(f);
     S.touch=touch;
@@ -208,7 +224,7 @@ export function lightProcessHands(res){
         if(ck!==chainKeyOf(ROLE) && !trackFx.includes(eff.fxId)) continue;
         if(!eff||eff.fxId===FX_VOL) continue;
         let ps=null;
-        eff.params.forEach((pa,i)=>{ if(pa.mode!=='drive' || pa.hand!=='play' || pa.axis!=='z') return; if(!ps) ps=fxParamsOf(ck,eff.fxId); const p=ps[i]; if(p) p.set(pa.inv ? 1-vD : vD); });
+        eff.params.forEach((pa,i)=>{ if(pa.mode!=='drive' || pa.hand!=='play' || pa.axis!=='z') return; if(!ps) ps=fxParamsOf(ck,eff.fxId); const p=ps[i]; if(p) p.set(Math.min(1, (pa.inv ? 1-vD : vD)/(corePinch ? 1 : DEPTH_REACH))); });
       }
     }
   }
