@@ -2,10 +2,11 @@
    between their onsets is the whole way from the gesture to the sound (the microphone's own delay is the same for both and cancels).
    The click is a short chirp, found by normalised correlation; the clap is the loudest burst before it, timed at its first strong sample. */
 
-/* the click: a 4 ms up-chirp 1.2 → 6 kHz under a sine² window (laptop speakers play it; the correlation finds it among other sounds) */
-export function makeClick(sr, ms=4, f0=1200, f1=6000){
+/* the click: a 20 ms up-chirp 1 → 5 kHz (where laptop speakers are loud) under a sine² window. LIGHT-12b: it was 4 ms — too little energy on
+   the founder's laptop (most clicks not found) and too close to a clap for the correlation to tell them apart */
+export function makeClick(sr, ms=20, f0=1000, f1=5000){
   const n=Math.round(sr*ms/1000), T=n/sr, b=new Float32Array(n);
-  for(let i=0;i<n;i++){ const t=i/sr, w=Math.sin(Math.PI*i/(n-1))**2; b[i]=0.9*w*Math.sin(2*Math.PI*(f0*t+(f1-f0)*t*t/(2*T))); }
+  for(let i=0;i<n;i++){ const t=i/sr, w=Math.sin(Math.PI*i/(n-1))**2; b[i]=0.95*w*Math.sin(2*Math.PI*(f0*t+(f1-f0)*t*t/(2*T))); }
   return b;
 }
 /* the best |normalised correlation| of the click k in x over lags [a, b): where the click starts and how alike (0…1) */
@@ -28,14 +29,16 @@ export function findClap(x, a, b, sr){
   a=Math.max(0,a|0); b=Math.min(x.length,b|0);
   let p=0, pi=-1; for(let i=a;i<b;i++){ const v=Math.abs(x[i]); if(v>p){ p=v; pi=i; } }
   const noise=medianAbs(x, a, b);
-  if(pi<0 || p<10*noise) return { at:-1, peak:p, noise };
+  if(pi<0 || p<10*noise) return { at:-1, peak:p, noise, why:'clap' };
   const th=Math.max(0.3*p, 8*noise), lim=Math.max(a, pi-Math.round(0.02*sr)); let on=pi;
   for(let i=pi;i>=lim;i--) if(Math.abs(x[i])>=th) on=i;
+  if(on-a<Math.round(0.005*sr)) return { at:-1, peak:p, noise, why:'edge' };   // the loudest sound is cut by the window's start: not this clap
   return { at:on, peak:p, noise };
 }
 /* one measurement: x = microphone samples, play = the index in x where the click was started.
-   The click is searched in [play, play+400 ms) (it is heard after it was played); the clap in the 800 ms before the click. */
-export const AN=Object.freeze({ clickAfterMs:400, clapBeforeMs:800, gapMs:4, minScore:0.35, minLoud:6, minMs:15 });
+   The click is searched in [play, play+600 ms) (heard after it was played; the microphone's own delay may put the CLAP in that span too — the
+   long chirp tells them apart); the clap in the 800 ms before the click (both carry the same microphone delay). */
+export const AN=Object.freeze({ clickAfterMs:600, clapBeforeMs:800, gapMs:4, minScore:0.25, minLoud:6, minMs:15 });
 /* the click heard in [a, b): alike enough AND loud enough over the floor (white noise alone reaches a likeness ≈ 0.3 somewhere in 400 ms) */
 export function clickHeard(x, k, a, b){
   const c=findClick(x, k, a, b); if(c.at<0) return { ...c, loud:0, ok:false };
@@ -46,9 +49,9 @@ export function clickHeard(x, k, a, b){
 export function analyse(x, sr, k, play){
   const ms=v=>Math.round(v/sr*10000)/10;
   const c=clickHeard(x, k, play, play+Math.round(AN.clickAfterMs/1000*sr));
-  if(!c.ok) return { ok:false, why:'click', score:c.score, loud:c.loud };
+  if(!c.ok) return { ok:false, why:'click', score:Math.round(c.score*100)/100, loud:Math.round(c.loud*10)/10 };
   const cl=findClap(x, c.at-Math.round(AN.clapBeforeMs/1000*sr), c.at-Math.round(AN.gapMs/1000*sr), sr);
-  if(cl.at<0) return { ok:false, why:'clap', score:c.score, roundtrip:ms(c.at-play) };
+  if(cl.at<0) return { ok:false, why:cl.why, score:Math.round(c.score*100)/100, roundtrip:ms(c.at-play) };
   const total=ms(c.at-cl.at);
   if(total<AN.minMs) return { ok:false, why:'short', score:c.score, total };
   return { ok:true, total, roundtrip:ms(c.at-play), score:Math.round(c.score*100)/100, snr:Math.round(cl.peak/(cl.noise||1e-9)) };

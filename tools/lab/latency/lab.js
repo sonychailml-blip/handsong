@@ -13,7 +13,7 @@ const CFG={ cam:Q.get('cam')==='640' ? 640 : 320, fps:Q.get('fps')==='30' ? 30 :
   g:Q.get('g')==='tap' ? 'tap' : 'clap', lat:Q.get('lat')==='int' ? 'int' : 'min', view:Q.get('view')!=='off' };
 const $=id=>document.getElementById(id);
 const video=$('video'), cv=$('view'), g2=cv.getContext('2d');
-const R={ ctx:null, stream:null, L:null, click:null, ring:null, ringEnd:0, frames:[], det:[], cap:[], hands:[], ts:0, busy:false, rows:[], st:null, aspect:4/3, ready:false, err:'' };
+const R={ pf:[], loop:null, ctx:null, stream:null, L:null, click:null, ring:null, ringEnd:0, frames:[], det:[], cap:[], hands:[], ts:0, busy:false, rows:[], st:null, aspect:4/3, ready:false, err:'' };
 const fmt=v=>v==null ? '—' : (Math.round(v*10)/10).toFixed(1);
 const say=(s, cls='muted')=>{ const m=$('msg'); m.textContent=s; m.className=cls; };
 
@@ -50,6 +50,7 @@ function fire(why, part){
 function loopTest(){
   if(R.busy) return; R.busy=true; const play=playClick(), sr=R.ctx.sampleRate;
   setTimeout(()=>{ const w=micWindow(play-Math.round(0.1*sr), play+Math.round(0.6*sr)), p=play-w.a, c=clickHeard(w.x, R.click, p, p+Math.round(0.4*sr));
+    R.loop={ ok:c.ok, score:Math.round(c.score*100)/100, loud:Math.round(c.loud*10)/10, rt:c.ok ? Math.round((c.at-p)/sr*10000)/10 : null };
     if(c.ok) say(`Микрофон слышит щелчок (сходство ${c.score.toFixed(2)}; от запуска щелчка до микрофона ${fmt((c.at-p)/sr*1000)} мс). Можно хлопать.`, 'ok');
     else say(`Микрофон НЕ слышит щелчок (сходство ${c.score.toFixed(2)}, громкость над фоном ×${c.loud.toFixed(1)}). Сделайте звук громче, выключите наушники, проверьте, что выбран микрофон ноутбука.`, 'bad');
     R.busy=false; }, WAIT_MS);
@@ -59,6 +60,7 @@ function loopTest(){
 function onFrame(now, md){
   video.requestVideoFrameCallback(onFrame);
   const at=performance.now(); R.frames.push(at); while(R.frames.length && at-R.frames[0]>2000) R.frames.shift();
+  R.pf.push([at, md.presentedFrames]); while(R.pf.length>2 && at-R.pf[0][0]>2000) R.pf.shift();
   let res; try{ R.ts=Math.max(R.ts+1, Math.floor(at)); res=R.L.detectForVideo(video, R.ts); }catch(e){ R.err=String(e && e.message || e); return; }
   const done=performance.now(), hands=res.landmarks||[], det=done-at, cap=md.captureTime ? at-md.captureTime : null;
   R.det.push(det); if(R.det.length>60) R.det.shift(); if(cap!=null){ R.cap.push(cap); if(R.cap.length>60) R.cap.shift(); }
@@ -81,7 +83,8 @@ function draw(){
 function live(){
   if(!R.ready) return;
   const fps=R.frames.length>1 ? (R.frames.length-1)/((R.frames[R.frames.length-1]-R.frames[0])/1000) : 0;
-  $('lFps').textContent=fmt(fps)+(fps && fps<CFG.fps*0.8 ? ' (меньше, чем просили: темно или камера не умеет)' : '');
+  const P=R.pf, cam=P.length>1 ? (P[P.length-1][1]-P[0][1])/((P[P.length-1][0]-P[0][0])/1000) : 0;
+  $('lFps').textContent=`камера ${fmt(cam)}, распознано ${fmt(fps)}`+(cam && cam<CFG.fps*0.8 ? ' (камера даёт меньше, чем просили: темно или не умеет)' : '')+(cam && fps<cam*0.8 ? ' (распознавание не успевает за камерой)' : '');
   $('lDet').textContent=fmt(median(R.det))+' мс'+(R.err ? ' · ошибка: '+R.err : '');
   $('lCap').textContent=R.cap.length ? fmt(median(R.cap))+' мс' : 'браузер не сообщает';
   $('lOut').textContent=`${fmt(outMs())} мс (база ${fmt((R.ctx.baseLatency||0)*1000)} + выход ${fmt((R.ctx.outputLatency||0)*1000)})`;
@@ -94,7 +97,7 @@ function render(){
   const tb=$('rows'); tb.innerHTML='';
   for(const r of R.rows){ const tr=document.createElement('tr'), why={ near:'ладони сошлись', lost:'рука пропала у другой', strike:'удар' }[r.why]||r.why;
     const cells= r.ok ? [r.n, fmt(r.total), fmt(r.cap), fmt(r.det), fmt(r.out), fmt(r.rest), why, `сходство ${r.score}`]
-      : [r.n, { click:'щелчок не найден', clap:'жест не слышен', short:'меньше 15 мс — ошибка' }[r.fail]||'не измерено', '', '', '', '', why, r.score!=null ? `сходство ${(+r.score).toFixed(2)}` : ''];
+      : [r.n, { click:'щелчок не найден', clap:'жест не слышен', edge:'хлопок не найден', short:'меньше 15 мс — ошибка' }[r.fail]||'не измерено', '', '', '', '', why, r.score!=null ? `сходство ${(+r.score).toFixed(2)}` : ''];
     if(!r.ok) tr.className='muted';
     for(const c of cells){ const td=document.createElement('td'); td.textContent=String(c); tr.appendChild(td); } tb.appendChild(tr); }
   const ok=R.rows.filter(r=>r.ok);
@@ -105,10 +108,11 @@ function render(){
 function report(){
   const ok=R.rows.filter(r=>r.ok), s=R.stream.getVideoTracks()[0].getSettings();
   const L=[`Лаборатория задержки · ${new Date().toISOString().slice(0,16)}`, `настройки: камера ${s.width}×${s.height} @ ${s.frameRate} (просили ${CFG.cam}, ${CFG.fps}), распознавание ${CFG.dev}, жест ${CFG.g}, звук ${CFG.lat==='min' ? 'минимум' : 'interactive'}`,
+    `проверка звука: ${R.loop ? (R.loop.ok ? `слышно, сходство ${R.loop.score}, громкость ×${R.loop.loud}, щелчок→микрофон ${R.loop.rt} мс` : `НЕ слышно, сходство ${R.loop.score}, громкость ×${R.loop.loud}`) : 'не делали'}; кадров/с: ${$('lFps').textContent}`,
     `звук: ${R.ctx.sampleRate} Гц, база ${fmt((R.ctx.baseLatency||0)*1000)} мс, выход ${fmt((R.ctx.outputLatency||0)*1000)} мс; браузер ${navigator.userAgent.match(/Chrome\/[\d.]+|Firefox\/[\d.]+|Edg\/[\d.]+/)?.[0]||'?'}`,
     ok.length ? `ИТОГ: медиана ${fmt(median(ok.map(r=>r.total)))} мс из ${ok.length} (не измерено ${R.rows.length-ok.length}), от ${fmt(Math.min(...ok.map(r=>r.total)))} до ${fmt(Math.max(...ok.map(r=>r.total)))}` : 'ИТОГ: нет измерений',
     'n · всего · кадр→страница · распознавание · звук→динамик · остальное · сработало · сходство'];
-  for(const r of R.rows) L.push(r.ok ? [r.n, fmt(r.total), fmt(r.cap), fmt(r.det), fmt(r.out), fmt(r.rest), r.why, r.score].join(' · ') : `${r.n} · не измерено (${r.fail}) · ${r.why}`);
+  for(const r of R.rows) L.push(r.ok ? [r.n, fmt(r.total), fmt(r.cap), fmt(r.det), fmt(r.out), fmt(r.rest), r.why, r.score].join(' · ') : `${r.n} · не измерено (${r.fail}) · ${r.why} · сходство ${r.score??'—'} · громкость ×${r.loud??'—'} · щелчок→микрофон ${r.roundtrip??'—'}`);
   return L.join('\n');
 }
 

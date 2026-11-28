@@ -39,6 +39,10 @@ function scene({ sr=48000, clapAt=0.5, gapMs=137, rtMs=31, click=true, clap=true
   if(!a.ok && a.why==='click') ok(`CONTROL: no click → refused (the best likeness in noise ${a.score.toFixed(2)}, loudness ×${a.loud.toFixed(1)})`); else no('CONTROL no click was not refused: '+JSON.stringify(a)); }
 { const S=scene({ clap:false }), a=analyse(S.x, S.sr, S.k, S.play);
   if(!a.ok && a.why==='clap') ok('CONTROL: no clap → refused'); else no('CONTROL no clap was not refused: '+JSON.stringify(a)); }
+{ const S=scene({ rtMs:250, seed:9 }), a=analyse(S.x, S.sr, S.k, S.play);   // a slow microphone: the clap is heard AFTER the click was started
+  if(a.ok && Math.abs(a.total-137)<=0.5 && Math.abs(a.roundtrip-250)<=0.5) ok(`a slow microphone (round trip 250 ms, the clap inside the click's search span): ${a.total} ms`); else no('slow microphone: '+JSON.stringify(a)); }
+{ const S=scene({ gapMs:810, seed:4 }), a=analyse(S.x, S.sr, S.k, S.play);   // a burst that began before the window: its tail is the loudest at the start
+  if(!a.ok && a.why==='edge') ok('CONTROL: the loudest sound at the window start → refused (not a measured 800 ms)'); else no('CONTROL edge: '+JSON.stringify(a)); }
 { const S=scene({ sr:44100 }), a=analyse(S.x, S.sr, S.k, S.play);
   if(a.ok && Math.abs(a.total-137)<=0.5) ok(`at 44.1 kHz: ${a.total} ms`); else no('44.1 kHz: '+JSON.stringify(a)); }
 { const S=scene({ click:false, seed:3 }); for(let i=0;i<S.x.length;i++) S.x[i]*=8; const a=analyse(S.x, S.sr, S.k, S.play);   // loud room noise, no click

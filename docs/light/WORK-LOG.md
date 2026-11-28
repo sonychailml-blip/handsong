@@ -254,3 +254,10 @@ Tree hashes before and after: core a4dd71426b6a4c32 · apps/full 0148bb454440c3e
   fake camera and microphone (ready, frames recognised, microphone blocks, a forced gesture gives a row; no console error, CSP violation or
   request off our server). PASS 15. Headless numbers mean nothing (fake camera, no speakers): the founder's laptop decides.
 - Not done: the same measure inside Light (a clap under `?lab` played through Light's own sound path) — after the first numbers.
+- LIGHT-12b (same day, after the founder's first run: 22 claps, 17 unmeasured, the others 737–800 ms): the 4 ms click was too weak on the laptop
+  speakers (likeness 0.12–0.38) and the «800.0 ms» rows were the window's edge, not a clap. Now a 20 ms chirp 1–5 kHz at 0.95 (noise alone: likeness
+  0.12), the click searched over 600 ms, a clap cut by the window's start refused («edge»); new checks: a slow microphone (round trip 250 ms, the
+  clap inside the click's span) still reads 137 ms; CONTROL the edge refused. The page shows the camera's own frame rate beside the recognised one;
+  the copied text carries the sound check and, per miss, likeness, loudness and round trip. `[lab-check] PASS — 17 checks`.
+  Already seen in that run: recognition with two hands 78–114 ms per frame (35 ms with none), the camera at 320×240 gives at most 30 fps (asked 60),
+  sound out 51 ms (Chrome reports base 10 + output 41).
