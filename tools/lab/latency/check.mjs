@@ -11,7 +11,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { makeClick, analyse, clapNew, clapStep, tapNew, tapStep, CLAP, TAP, pinchNew, pinchStep, PINCH_ON, PINCH_OFF } from './analyse.js';
+import { makeClick, analyse, clapNew, clapStep, tapNew, tapStep, CLAP, TAP, pinchNew, pinchStep, PINCH_ON, PINCH_OFF } from '../../probes/light/lab-analyse.js';
 
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const bad=[], lines=[], ok=s=>lines.push('ok  '+s), no=s=>bad.push(s);
@@ -51,6 +51,15 @@ function scene({ sr=48000, clapAt=0.5, gapMs=137, rtMs=31, click=true, clap=true
   const free=analyse(S.x, S.sr, S.k, S.play), held=analyse(S.x, S.sr, S.k, S.play, 0, 31);
   if(held.ok && Math.abs(held.total-137)<=0.5 && !(free.ok && Math.abs(free.total-137)<=0.5)) ok(`a louder echo: with the measured round trip ${held.total} ms (CONTROL: without it ${free.ok ? free.total+' ms' : 'refused ('+free.why+')'})`);
   else no('louder echo: '+JSON.stringify({ held, free })); }
+{ const S=scene({ seed:14 }), B=S.play+Math.round(0.031*S.sr);   // an app's own note starting with the click (a saw at 220 Hz, as loud as the click, 300 ms)
+  for(let i=0;i<Math.round(0.3*S.sr);i++) S.x[B+i]+=0.2*(((i*220/S.sr)%1)*2-1);
+  const a=analyse(S.x, S.sr, S.k, S.play, 0, 31);
+  if(a.ok && Math.abs(a.total-137)<=0.5) ok(`a note sounding with the click (held by the round trip): ${a.total} ms, likeness ${a.score}`); else no('note with the click: '+JSON.stringify(a)); }
+{ const S=scene({ click:false, seed:16 }), B=S.play+Math.round(0.031*S.sr); for(let i=0;i<Math.round(0.3*S.sr);i++) S.x[B+i]+=0.3*(((i*220/S.sr)%1)*2-1);
+  const a=analyse(S.x, S.sr, S.k, S.play, 0, 31);
+  if(!a.ok && a.why==='click') ok(`CONTROL: held span, the note alone without the click → refused (likeness ${a.score})`); else no('CONTROL note alone: '+JSON.stringify(a)); }
+{ const S=scene({ click:false, seed:15 }), a=analyse(S.x, S.sr, S.k, S.play, 0, 31);
+  if(!a.ok && a.why==='click') ok(`CONTROL: held span, no click → refused (likeness ${a.score}, loudness ×${a.loud})`); else no('CONTROL held no click: '+JSON.stringify(a)); }
 { const S=scene({ sr:44100 }), a=analyse(S.x, S.sr, S.k, S.play);
   if(a.ok && Math.abs(a.total-137)<=0.5) ok(`at 44.1 kHz: ${a.total} ms`); else no('44.1 kHz: '+JSON.stringify(a)); }
 { const S=scene({ click:false, seed:3 }); for(let i=0;i<S.x.length;i++) S.x[i]*=8; const a=analyse(S.x, S.sr, S.k, S.play);   // loud room noise, no click

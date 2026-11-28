@@ -261,6 +261,7 @@ const NET_LISTED={
   'tools/probes/core/pack.js':  { fetch:[1,'probe only (?probe): reads tools/pack-test-licence.json (TEST keys) from the own origin (PACK1)'] },
   'tools/probes/full/song2.js': { fetch:[1,'probe only (?probe): reads data/songs/triphop.json from the own origin (SONG2 control)'] },
   'apps/full/songs.js':        { fetch:[1,'the demo song file data/songs/<name>.json from the own origin (SONG2; P.song only)'] },
+  'tools/probes/light/lab.js': { addModule:[1,'probe only (?probe&lab, LIGHT-12i): loads our own tools/probes/light/lab-tap-worklet.js (the microphone tap of the latency lab, kept in memory) into the context of Light'] },
   'tools/probes/core/sound.js': { addModule:[2,'probe only (?probe): loads our own core/engine/worklets/dyn-worklet.js into the offline contexts of the probe'] },
   'tools/probes/core/hand.js':  { fetch:[1,'probe only (?probe): reads tools/prints/gesture.print.json from the own origin'] },
   'tools/probes/core/handprint.js':  { fetch:[1,'probe only (?probe): reads tools/prints/hand-depth.<app>.print.json from the own origin'] },

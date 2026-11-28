@@ -6,7 +6,7 @@
    (captureTime), the recognition, and the sound's way to the speaker (baseLatency + outputLatency); the rest is inside the camera and driver.
    Microphone sound stays in memory (the last 4 s) and is never sent or kept. */
 import { mpFilesOf } from '../../../core/handdet.js';
-import { makeClick, analyse, clickHeard, clapNew, clapStep, tapNew, tapStep, lowY, median, CLAP, TAP, pinchNew, pinchStep, PINCH_ON } from './analyse.js';
+import { makeClick, analyse, clickHeard, clapNew, clapStep, tapNew, tapStep, lowY, median, CLAP, TAP, pinchNew, pinchStep, PINCH_ON } from '../../probes/light/lab-analyse.js';
 
 const Q=new URLSearchParams(location.search);
 const CFG={ cam:Q.get('cam')==='640' ? 640 : 320, fps:Q.get('fps')==='30' ? 30 : 60, dev:Q.get('dev')==='CPU' ? 'CPU' : 'GPU',
@@ -62,7 +62,7 @@ function fire(why, part){
 /* «Проверка звука»: the click alone, three times — the microphone must find it; the median click → microphone time (R.rt) then holds the click
    search of every measurement (LIGHT-12g: run by itself at the start) */
 const once=()=>new Promise(res=>{ const play=playClick(), sr=R.ctx.sampleRate;
-  setTimeout(()=>{ const w=micWindow(play-Math.round(0.1*sr), play+Math.round(0.6*sr)), p=play-w.a, c=clickHeard(w.x, R.click, p, p+Math.round(0.4*sr));
+  setTimeout(()=>{ const w=micWindow(play-Math.round(0.1*sr), play+Math.round(0.6*sr)), p=play-w.a, c=clickHeard(w.x, R.click, p, p+Math.round(0.4*sr), 0, p);
     res({ ok:c.ok, score:c.score, loud:c.loud, rt:c.ok ? (c.at-p)/sr*1000 : null }); }, WAIT_MS); });
 async function loopTest(){
   if(R.busy) return; R.busy=true; say('Проверка звука: три щелчка…');
@@ -186,7 +186,7 @@ async function start(){
     R.stream=await navigator.mediaDevices.getUserMedia({ video:CFG.g==='key' ? false : { width:{ ideal:W }, height:{ ideal:H }, frameRate:{ ideal:CFG.fps } },
       audio:{ echoCancellation:false, noiseSuppression:false, autoGainControl:false } });
     await R.ctx.resume();
-    await R.ctx.audioWorklet.addModule(new URL('./tap-worklet.js', import.meta.url));
+    await R.ctx.audioWorklet.addModule(new URL('../../probes/light/lab-tap-worklet.js', import.meta.url));
     const src=R.ctx.createMediaStreamSource(new MediaStream(R.stream.getAudioTracks())), tap=new AudioWorkletNode(R.ctx, 'lab-tap', { numberOfOutputs:1 }), mute=R.ctx.createGain();
     mute.gain.value=0; src.connect(tap); tap.connect(mute); mute.connect(R.ctx.destination); tap.port.onmessage=onMic;
     R.ring=new Float32Array(R.ctx.sampleRate*4); R.click=makeClick(R.ctx.sampleRate);

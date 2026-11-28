@@ -1633,6 +1633,21 @@ LIGHT-3b row «LIGHT controls and menus»: with no hand in view the controls sho
 LIGHT-3 row «LIGHT hands = core hands»: Light's hands (apps/light/gestures.js, a cut copy of core's) must make EXACTLY the note calls core's gesture machine makes on the same synthetic hands — the …
 - fn (1): `checkLightHands`
 
+## tools/probes/light/lab-analyse.js
+(no head comment)
+- const (8): `AN`, `palm`, `handSize`, `CLAP`, `TAP`, `lowY`, `pinchRatio`, `median`
+- fn (12): `makeClick`, `findClick`, `medianAbs`, `findClap`, `clickHeard`, `analyse`, `clapNew`, `clapStep`, `tapNew`, `tapStep`, `pinchNew`, `pinchStep`
+- → ../../../core/config.js (2): `PINCH_ON`, `PINCH_OFF`
+
+## tools/probes/light/lab-tap-worklet.js
+LATENCY LAB — the microphone tap: blocks of 1024 samples with the frame of their first sample (the context's clock, the same clock the click is started on).
+- exports: none
+
+## tools/probes/light/lab.js
+LIGHT-12i — THE LATENCY LAB INSIDE LIGHT (address ?probe&lab; development only — a shipped page has no probes).
+- const (1): `labDbg`
+- fn (1): `labInstall`
+
 ## tools/probes/light/perhand.js
 LIGHT-6b row «LIGHT each hand its own reverb»: with both hands playing notes, (1) the left hand's voices go to the second solo head and the right hand's to the live one (the engine's router at each…
 - fn (1): `checkLightPerHand`
@@ -1898,7 +1913,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 UI-1 — «NIGHT labels follow the room»: the founder entered the rain and the Sound button still read «Firefly» while another timbre played.
 - fn (1): `checkNightLabels`
 
-_379 modules, 3477 exported names._
+_382 modules, 3501 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

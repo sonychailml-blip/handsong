@@ -1,6 +1,6 @@
 import { PINCH_ON, PINCH_OFF, FINGER_TIPS } from '../../../core/config.js';
 export { PINCH_ON, PINCH_OFF };
-/* LATENCY LAB — the pure part (runs in node: tools/lab/latency/check.mjs). The microphone hears the real clap and then the lab's click; the time
+/* LATENCY LAB — the pure part, shared by the lab page tools/lab/latency/ and Light's ?probe&lab (runs in node: tools/lab/latency/check.mjs). The microphone hears the real clap and then the lab's click; the time
    between their onsets is the whole way from the gesture to the sound (the microphone's own delay is the same for both and cancels).
    The click is a short chirp, found by normalised correlation; the clap is the loudest burst before it, timed at its first strong sample. */
 
@@ -40,21 +40,24 @@ export function findClap(x, a, b, sr){
 /* one measurement: x = microphone samples, play = the index in x where the click was started.
    The click is searched in [play, play+600 ms) (heard after it was played; the microphone's own delay may put the CLAP in that span too — the
    long chirp tells them apart); the clap in the 800 ms before the click (both carry the same microphone delay). */
-export const AN=Object.freeze({ clickAfterMs:600, clapBeforeMs:800, gapMs:4, rtTolMs:15, minScore:0.25, minLoud:6, minMs:15 });
+export const AN=Object.freeze({ clickAfterMs:600, clapBeforeMs:800, gapMs:4, rtTolMs:15, minScore:0.25, minScoreHeld:0.15, minLoud:6, minMs:15 });
 /* the click heard in [a, b): alike enough AND loud enough over the floor (white noise alone reaches a likeness ≈ 0.3 somewhere in 400 ms) */
-export function clickHeard(x, k, a, b){
+/* LIGHT-12i: the floor is measured over [fa, fb) when given (before the click was started: a held search span is mostly the click itself), and
+   within a held span (the click's place known ±rtTolMs) a lower likeness is enough — an app's own note sounds together with the click */
+export function clickHeard(x, k, a, b, fa=a, fb=b, minScore=AN.minScore){
   const c=findClick(x, k, a, b); if(c.at<0) return { ...c, loud:0, ok:false };
   let p=0; for(let i=c.at;i<c.at+k.length && i<x.length;i++) p=Math.max(p, Math.abs(x[i]));
-  const loud=p/(medianAbs(x, a, b)||1e-9);
-  return { ...c, loud, ok:c.score>=AN.minScore && loud>=AN.minLoud };
+  const loud=p/(medianAbs(x, fa, fb)||1e-9);
+  return { ...c, loud, ok:c.score>=minScore && loud>=AN.minLoud };
 }
 /* from: the gesture is never searched before it (LIGHT-12e: the previous click heard — fast presses put the previous gesture in the window) */
 /* rt (LIGHT-12g): the click → microphone time measured at the start — the click is then searched only within ±rtTolMs of it (a stronger echo or
    the gesture's own sound can no longer be taken for the click: the founder's pinch run read the click's echo as the click) */
 export function analyse(x, sr, k, play, from=0, rt=null){
   const ms=v=>Math.round(v/sr*10000)/10;
-  const c= rt!=null ? clickHeard(x, k, play+Math.round((rt-AN.rtTolMs)/1000*sr), play+Math.round((rt+AN.rtTolMs)/1000*sr)+1)
-                    : clickHeard(x, k, play, play+Math.round(AN.clickAfterMs/1000*sr));
+  const fa=Math.max(0, play-Math.round(0.3*sr));
+  const c= rt!=null ? clickHeard(x, k, play+Math.round((rt-AN.rtTolMs)/1000*sr), play+Math.round((rt+AN.rtTolMs)/1000*sr)+1, fa, play, AN.minScoreHeld)
+                    : clickHeard(x, k, play, play+Math.round(AN.clickAfterMs/1000*sr), fa, play);
   if(!c.ok) return { ok:false, why:'click', score:Math.round(c.score*100)/100, loud:Math.round(c.loud*10)/10 };
   const cl=findClap(x, Math.max(from, c.at-Math.round(AN.clapBeforeMs/1000*sr)), c.at-Math.round(AN.gapMs/1000*sr), sr);
   if(cl.at<0) return { ok:false, why:cl.why, score:Math.round(c.score*100)/100, roundtrip:ms(c.at-play) };

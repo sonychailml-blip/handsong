@@ -291,3 +291,13 @@ Tree hashes before and after: core a4dd71426b6a4c32 · apps/full 0148bb454440c3e
   10 ms. Reading: Handsong's pinch fires at thumb–finger 0.20 of the palm (≈ 1.5–2 cm before the nails meet), so «contact → sound» = the path
   (camera ≈ 60, recognition ≈ 41, sound ≈ 55, a frame's wait) MINUS the time the fingers take over the last centimetres — hence 22–169 by speed,
   median ≈ 100 ms on this laptop with the shortest path. `[lab-check] PASS — 23 checks`.
+- LIGHT-12i (the founder: «let's try» the same measure in Light): `?probe&lab` on Light's page loads `tools/probes/light/lab.js` (the probe facade
+  imports it only with `lab`; production has no probes): a panel (start / sound check / reset / copy); each time Light's note adapter starts a note
+  (`lightNoteTapSet`, the call the hands make) the lab's click starts in Light's own context (`AC`, the same render quantum and output as the note);
+  the microphone hears the nail tick and the click. The pure measure and the microphone tap moved to `tools/probes/light/lab-analyse.js` and
+  `lab-tap-worklet.js` (the static check's boundary: a probe suite imports only core, its app and its own folder); the lab page imports them
+  from there. With the click's place known (±15 ms) a likeness 0.15 is enough (Light's own note sounds with it) and the floor is measured before
+  the click (rows: a note as loud as the click → 137 ms; CONTROLS the note alone and no click → refused). Core: `core/engine/surface.js` lists
+  the lab's `AC` (data for the static check only, as LIGHT-11). Checks: static PASSED; probe-data PASS 109/0; the lab check PASS 26; Light under
+  the runner with the eval `tools/.out/light12/lab-in-light.eval.js`: the panel, the microphone, the start check and a row from a Light note —
+  pass, CSP, network and storage PASS. Trees: core 18865efad8ade039 (surface data) · full 0148bb454440c3e3 · night 30d8f7b3c797de9e · light 1cb1d4a1978611a1 (unchanged).

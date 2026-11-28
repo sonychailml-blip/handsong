@@ -30,4 +30,5 @@ for(const [n,v] of Object.entries({ light, all, quick, checkLightAlone, checkLig
   API[n]=(...a)=>{ if(LOCK){ const why=`P.${LOCK} is still running — wait for its result before P.${n}()`; console.warn('[probe] '+why); return { pass:false, refused:true, why }; }   // eslint-disable-line no-console
     LOCK=n; let r; try{ r=v(...a); }catch(e){ LOCK=null; throw e; } if(r && typeof r.then==='function') return r.finally(()=>{ LOCK=null; }); LOCK=null; return r; };
 export const api=()=>API;
-export function install(){ window.P=API; console.log('[probe] window.P ready — await P.light()'); }   // eslint-disable-line no-console
+export function install(){ window.P=API; console.log('[probe] window.P ready — await P.light()');   // eslint-disable-line no-console
+  if(new URLSearchParams(location.search).has('lab')) import('./light/lab.js').then(m=>{ m.labInstall(); window.__lightLab=m.labDbg; }).catch(e=>console.warn('[probe] the latency lab failed to load', e)); }   // eslint-disable-line no-console   // LIGHT-12i: ?probe&lab
