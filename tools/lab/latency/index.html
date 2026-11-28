@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Лаборатория задержки</title>
+<link rel="icon" href="data:,">
+<style>
+  body{ margin:0; font:15px/1.45 system-ui, sans-serif; background:#101418; color:#e8eef2; }
+  main{ max-width:980px; margin:0 auto; padding:16px; }
+  h1{ font-size:20px; margin:0 0 4px; } .muted{ color:#8fa0ad; } .warn{ color:#ffb44a; } .bad{ color:#ff6b6b; } .ok{ color:#7ee08a; }
+  fieldset{ border:1px solid #2a343c; border-radius:8px; margin:12px 0; padding:8px 12px; display:flex; flex-wrap:wrap; gap:8px 18px; align-items:center; }
+  legend{ color:#8fa0ad; padding:0 4px; } select,button,input{ font:inherit; }
+  select{ background:#1a2128; color:inherit; border:1px solid #2a343c; border-radius:6px; padding:3px 6px; }
+  button{ background:#24303a; color:inherit; border:1px solid #3a4854; border-radius:8px; padding:6px 14px; cursor:pointer; }
+  button.big{ background:#2f6f4f; border-color:#3f8f66; font-weight:600; } button:disabled{ opacity:.45; cursor:default; }
+  .row{ display:flex; flex-wrap:wrap; gap:16px; align-items:flex-start; }
+  #view{ background:#000; border-radius:8px; width:320px; height:240px; }
+  #live{ min-width:280px; flex:1; } #live div{ margin:2px 0; }
+  .big-num{ font-size:28px; font-weight:700; }
+  table{ border-collapse:collapse; width:100%; margin-top:8px; font-variant-numeric:tabular-nums; }
+  th,td{ border-bottom:1px solid #222c34; padding:4px 6px; text-align:right; } th{ color:#8fa0ad; font-weight:500; } td:first-child,th:first-child{ text-align:left; }
+  #summary{ margin-top:12px; padding:10px 12px; background:#17202a; border-radius:8px; }
+  ol{ margin:6px 0 0; padding-left:20px; } video{ display:none; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Лаборатория задержки</h1>
+  <div class="muted">Самый короткий путь: камера → распознавание руки → щелчок. Микрофон слышит ваш хлопок и щелчок из динамиков; время между ними и есть задержка от жеста до звука. Звук с микрофона никуда не отправляется и не сохраняется.</div>
+
+  <fieldset id="cfg">
+    <legend>Настройки (меняются перезагрузкой страницы)</legend>
+    <label>Камера <select id="cCam"><option value="320">320×240</option><option value="640">640×480</option></select></label>
+    <label>Кадров в секунду <select id="cFps"><option value="60">60</option><option value="30">30</option></select></label>
+    <label>Распознавание <select id="cDev"><option value="GPU">видеокарта</option><option value="CPU">процессор</option></select></label>
+    <label>Жест <select id="cG"><option value="clap">хлопок</option><option value="tap">удар ладонью</option></select></label>
+    <label>Звук <select id="cLat"><option value="min">минимальная задержка</option><option value="int">как в Handsong</option></select></label>
+    <label>Картинка <select id="cView"><option value="on">показывать</option><option value="off">не показывать</option></select></label>
+    <button id="apply">Применить</button>
+  </fieldset>
+
+  <div class="row" style="margin:10px 0">
+    <button id="start" class="big">Старт</button>
+    <button id="loop" disabled>Проверка звука</button>
+    <button id="rest" disabled hidden>Рука на месте удара</button>
+    <button id="reset" disabled>Сбросить</button>
+    <button id="copy" disabled>Скопировать результаты</button>
+  </div>
+  <div id="msg" class="muted">Нажмите «Старт» и разрешите камеру и микрофон. Звук ноутбука сделайте погромче.</div>
+
+  <div class="row" style="margin-top:12px">
+    <canvas id="view" width="320" height="240"></canvas>
+    <div id="live">
+      <div>Камера: <b id="lCam">—</b></div>
+      <div>Кадров в секунду (пришло): <b id="lFps">—</b></div>
+      <div>Распознавание кадра: <b id="lDet">—</b></div>
+      <div>Кадр от камеры до страницы: <b id="lCap">—</b></div>
+      <div>Звук до динамика: <b id="lOut">—</b></div>
+      <div>Микрофон: <b id="lMic">—</b></div>
+      <div id="lGest" class="muted">—</div>
+    </div>
+  </div>
+
+  <div id="summary">
+    <div class="muted">Как мерить: <ol id="howto"></ol></div>
+    <div style="margin-top:8px">От жеста до звука (медиана): <span class="big-num" id="sTotal">—</span></div>
+    <div id="sParts" class="muted"></div>
+  </div>
+
+  <table>
+    <thead><tr><th>№</th><th>всего, мс</th><th>кадр до страницы</th><th>распознавание</th><th>звук до динамика</th><th>остальное*</th><th>сработало</th><th>микрофон: щелчок</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <div class="muted" style="margin-top:6px">* остальное = всего − всё измеренное: ожидание следующего кадра (в среднем полкадра), выдержка и передача кадра внутри камеры, драйвер.</div>
+  <video id="video" playsinline muted></video>
+</main>
+<script type="module" src="lab.js"></script>
+</body>
+</html>

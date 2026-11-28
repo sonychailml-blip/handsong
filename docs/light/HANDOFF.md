@@ -57,6 +57,10 @@ Read: `docs/light/PLAN.md` (decisions, where each part comes from, core changes,
   chooses from the proposal), the phone checks (Poco, iPhone), the site card; later the Android app (a Trusted Web Activity).
 - `LIGHT-11` (2026-11-28): fourteen timbres in six groups (eight built-in, six Light's own session records: soft lead, brass, strings, three basses),
   a timbre per hand (two columns when both hands play), levels measured. Next: the founder listens; the latency lab (the founder's new task).
+- `LIGHT-12` (2026-11-28): the latency lab — a development page `tools/lab/latency/` (no app changed): the shortest path camera → one MediaPipe
+  model on each new frame → a click straight to the speakers; the microphone hears the real clap and the click, the time between them = gesture to
+  sound. Gestures: clap (palms meet, or a hand lost beside the other) or a palm strike. Check `node tools/lab/latency/check.mjs`. Next: the founder
+  measures (Live Server `/tools/lab/latency/`); then the same measure in Light under `?lab` to compare.
 
 ## Deploy (LIGHT-7; the founder sets the project up once, as for Night)
 - Vercel → Add New Project → this repository; name `handsong-light`; Framework **Other**; Root Directory: the repository root (the shared

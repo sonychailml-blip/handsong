@@ -232,3 +232,25 @@ Tree hashes after: core a4dd71426b6a4c32 (only `core/engine/surface.js`, the sta
   (CONTROL: without the door both carry 1), the bass octave. C0 data row: eight built-in solo timbres, Full's default first.
 - Checks: static PASSED; probe-data PASS 109/0; `--app light` 11 rows PASS, CSP, network, storage PASS; smoke Light ok; licences PASS.
 - To hear: every timbre on a phone (levels by ear), the first note of the guitar once in the first measuring run came out near silent (not seen again).
+
+# LIGHT-12 (LIGHT track, 2026-11-28): the latency lab
+Tree hashes before and after: core a4dd71426b6a4c32 · apps/full 0148bb454440c3e3 · apps/night 30d8f7b3c797de9e · apps/light 1cb1d4a1978611a1 (unchanged; tools only).
+- The founder: a small lab, independent of the app, with the simplest, lightest sound path, to learn how far the delay from a hand gesture to
+  the sound can be cut on this computer; if it comes out about as long as in Handsong, the limit is the computer, not the app.
+- `tools/lab/latency/index.html` + `lab.js`: camera 320×240 at 60 fps (or 640×480 / 30, by the address), each new frame
+  (requestVideoFrameCallback) straight into ONE MediaPipe hand model (our own copy, `core/handdet.js mpFilesOf('own')`) on the video element —
+  no snapshot, worker or search schedule; GPU or CPU; numHands 2 (clap) or 1 (strike). A gesture starts a prepared 4 ms chirp straight into the
+  speakers (no effects, no limiter); the context at latencyHint 0 or «interactive» (Handsong's).
+- The measure (`analyse.js`, pure): the microphone (same audio clock, echo cancelling, noise suppression and gain control off; `tap-worklet.js`;
+  the last 4 s in memory, never sent or kept) hears the real clap and then the click; the click is found by normalised correlation AND loudness over
+  the floor (noise alone reaches a likeness ≈ 0.3), the clap as the loudest burst in the 800 ms before it, at its first strong sample. Shown per
+  measurement: total, the frame camera → page (captureTime), recognition, sound to the speaker (baseLatency + outputLatency), the rest (half a
+  frame on average, exposure and transfer inside the camera, the driver). «Sound check» plays the click alone. «Copy results» gives a text.
+- Gestures: clap fires once when the palm centres come within 0.9 hand sizes, or when one of two hands closer than 2.5 vanishes (MediaPipe often
+  loses a hand at contact — the founder's worry); armed again past 2.0. Strike: the hand's lowest point within 3 % of the frame of its rest place
+  (measured once by «Hand at the strike place»), armed again 12 % above it.
+- Check `node tools/lab/latency/check.mjs` (`--pure`: node only): 11 measurement and gesture checks with controls (no click, loud noise without a
+  click, no clap → refused; the click 10 ms later → +10 ms; a lost hand far away does not fire) and the page in a fresh headless Chrome with the
+  fake camera and microphone (ready, frames recognised, microphone blocks, a forced gesture gives a row; no console error, CSP violation or
+  request off our server). PASS 15. Headless numbers mean nothing (fake camera, no speakers): the founder's laptop decides.
+- Not done: the same measure inside Light (a clap under `?lab` played through Light's own sound path) — after the first numbers.
