@@ -331,3 +331,15 @@ Tree hashes before: core 18865efad8ade039 · full 0148bb454440c3e3 · night 30d8
   network control («a worker asking an unlisted host») came out NOT CAUGHT in three Light runs today (CSP and storage PASS) — also in a run with no
   app change (the pads' levels): suspected Light's service worker (LIGHT-10; registered after Play, claims the page, has a fetch handler) taking the
   control worker's request out of the runner's sight. Not fixed here — reported.
+- LIGHT-13b (the founder's answers): the reverb's full strength only at the full depth again (`DEPTH_REACH` removed; the longer, brighter tail
+  stays — «the reverb is enough now»). Scales: 19 — the twelve dropped (both octatonics, Messiaen 3, enigmatic, Prometheus, Egyptian, Hungarian and
+  Scriabin and Lydian pentatonics, Dorian and Mixolydian hexatonics, major blues); harmonic and melodic major kept. They came from Full's «Familiar»
+  section and stay in core's data and in Full (C0 data row now proves it; Light's six-language names keep them, `LIGHT_MODE_IDS` offers 19). Pads:
+  «the tail after the fingers part is far too long» — Light's own copies of core's three slow pads (the very recipes) with releases 0.6 / 0.6 / 0.7 s
+  (`light/pad-warm`, `light/pad-glass`, `light/pad-breath`; core's records keep 2.5–2.8 s, Full unchanged); the profile's built-ins: the pad in, the
+  warm pad out (eight). Pictures (cheap — two arcs a ring a frame): the outer ring grows and pales with the hand's reverb (view field `rev`), and
+  released rings melt over 500 ms (`RING_FADE_MS`). Row «LIGHT rings, pinch, pads, scales»: the pose's own ratios checked against the window, then
+  touching (view field `touch`: a finger can touch without a note — k < 4 leaves the little finger idle); the melt (6 arcs after 100 ms, 0 after
+  600); the outer ring 30.8 → 48.8 px with full reverb; Light's pads ≤ 0.7 s, CONTROL core's still 2.5 / 2.5 / 2.8; 19 scales. Checks: static PASSED;
+  probe-data PASS 109/0; rows start, controls, hands = core, timbres, per hand, texts, rings — pass; CSP, network (the control caught this time),
+  storage PASS. Trees: core 5485fc132477fc57 (surface data, as LIGHT-13) · full · night unchanged · light 7cd15bdf14866679.

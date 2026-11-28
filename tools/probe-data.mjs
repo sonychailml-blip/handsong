@@ -672,8 +672,11 @@ async function profileCore(){
     for(const id of ix.modes){ const m=await modeOf(id); if(m.menu && m.menu.tradition==='common') common.push({ id, edo12:m.tuning==='edo12' }); }
     const firstSolo=tix.order.find(id=>id.startsWith('solo.')), fing=light && light.chain ? light.chain.slice(2).map(e=>e.fxId+':'+e.params[0].finger+e.params[0].axis).join() : '';
     n++; if(!light || light.roles.join()!=='ld' || light.recording || light.backgrounds.join()!=='camera' || light.scene!==null) miss('profile.light: solo only, nothing recorded, the camera only');
-    n++; if(!light || common.some(c=>!c.edo12) || JSON.stringify([...light.moods].sort())!==JSON.stringify(common.map(c=>c.id).sort())) miss('profile.light: the moods must be exactly Full\'s «Familiar» section, all 12-note equal');
-    n++; if(!light || light.timbres[0]!==firstSolo || light.timbres.length!==11 || light.timbres.some(id=>!id.startsWith('solo.')) || new Set(light.timbres).size!==11) miss(`profile.light: eleven built-in solo timbres (LIGHT-11, LIGHT-13 three pads; Light adds its own six for the session), Full's default solo «${firstSolo}» first`);
+    /* LIGHT-13b (the founder): Light offers 19 of Full's «Familiar» section; the twelve it dropped stay in core's data and in Full's section */
+    { const DROPPED=['octatonic-wh','octatonic-hw','messiaen-3','enigmatic','prometheus','egyptian','hungarian-penta','scriabin-penta','major-blues','lydian-penta','dorian-hexa','mixolydian-hexa'], ids=common.map(c=>c.id);
+      n++; if(!light || common.some(c=>!c.edo12) || light.moods.length!==19 || light.moods.some(id=>!ids.includes(id)) || DROPPED.some(id=>light.moods.includes(id)) || [...light.moods, ...DROPPED].sort().join()!==[...ids].sort().join())
+        miss('profile.light: the moods must be Full\'s «Familiar» section (all 12-note equal) without the twelve dropped at LIGHT-13b, which stay in that section'); }
+    n++; if(!light || light.timbres[0]!==firstSolo || light.timbres.length!==8 || light.timbres.some(id=>!id.startsWith('solo.')) || new Set(light.timbres).size!==8) miss(`profile.light: eight built-in solo timbres (LIGHT-11; LIGHT-13b: the pad in, the warm pad out — Light adds its own nine for the session, three short pads among them), Full's default solo «${firstSolo}» first`);
     /* LIGHT-3b (the founder: the reverb barely grew): the depth drives the reverb's MIX — its third parameter (core/modules/effects/reverb.js
        REV_PARAMS: decay, tone, mix); the tail is fixed longer (v01 0.7 ≈ 1.8 s). Before, the depth drove the decay with the mix left at 0.25. */
     const rv=light && light.chain && light.chain[1], rvMix=rv && rv.params[2], rvTail=rv && rv.params[0];

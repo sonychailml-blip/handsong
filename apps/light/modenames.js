@@ -37,7 +37,9 @@ const G={
   ka:['დიატონიკური','კილოები','ეთნიკური','პენტატონიკა / ბლუზი','ქრომატული','სიმეტრიული','ეგზოტიკური','მსოფლიოს პენტატონიკები'],
 };
 for(const k of Object.keys(M)) if(M[k].length!==IDS.length || G[k].length!==GRPS.length) throw new Error('[light] mode names: '+k+' is incomplete');
-export const LIGHT_MODE_IDS=Object.freeze(IDS.slice());
+/* LIGHT-13b (the founder): twelve scales left Light's list — their names stay in the table above (the scales themselves stay in core's data and in Full) */
+const DROPPED=new Set(['octatonic-wh','octatonic-hw','messiaen-3','enigmatic','prometheus','egyptian','hungarian-penta','scriabin-penta','major-blues','lydian-penta','dorian-hexa','mixolydian-hexa']);
+export const LIGHT_MODE_IDS=Object.freeze(IDS.filter(id=>!DROPPED.has(id)));
 /* the name in the current language: one of the six here, else null (the caller uses the record's own name — English or Russian) */
 export const modeNameOf=id=>{ const L=M[lang]; const i=IDS.indexOf(id); return L && i>=0 ? L[i] : null; };
 export const groupNameOf=k=>{ const L=G[lang]; const i=GRPS.indexOf(k); return L && i>=0 ? L[i] : null; };

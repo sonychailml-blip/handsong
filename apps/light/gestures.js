@@ -42,8 +42,7 @@ export const setLightMirrorVolume=on=>{ mirrorVol=!!on; };
 /* LIGHT-11: a timbre per hand — side ('L'|'R') → the engine's timbre position; none set: the live solo timbre, exactly core's payload */
 /* LIGHT-13 (the founder: «hard to bring all four fingers to the thumb — one ends a little too far»): Light's own pinch distances — wider than core's
    PINCH_ON 0.20 / PINCH_OFF 0.25 (thumb tip → finger tip over wrist → index base), wider still for the ring and little fingers; core's law
-   otherwise (in strictly below `on`, out above `off`). Probe only: setLightCoreLaws(true) = core's distances and the depth over the whole travel
-   (row «LIGHT hands = core hands»). */
+   otherwise (in strictly below `on`, out above `off`). Probe only: setLightCoreLaws(true) = core's distances (row «LIGHT hands = core hands»). */
 export const LIGHT_PINCH=Object.freeze({ on:Object.freeze([0.25, 0.25, 0.27, 0.29]), off:Object.freeze([0.31, 0.31, 0.33, 0.35]) });
 let corePinch=false;
 export const setLightCoreLaws=v=>{ corePinch=!!v; };
@@ -53,9 +52,6 @@ function lightTouched(r, prev){
   for(let i=0;i<FINGER_TIPS.length;i++){ const v=r[FINGER_TIPS[i]]; if(prev.has(i) ? v<=LIGHT_PINCH.off[i] : v<LIGHT_PINCH.on[i]) now.add(i); }
   return now;
 }
-/* LIGHT-13 (the founder: the reverb is not strong enough even at the farthest): the playing hand's depth reaches the full reverb mix at this share
-   of its travel (1 = the whole travel, as before) */
-export const DEPTH_REACH=0.65;
 let instOf=null;
 export const setLightInstOf=f=>{ instOf= typeof f==='function' ? f : null; };
 export function volX(key, x, rx0, rx1){
@@ -224,7 +220,7 @@ export function lightProcessHands(res){
         if(ck!==chainKeyOf(ROLE) && !trackFx.includes(eff.fxId)) continue;
         if(!eff||eff.fxId===FX_VOL) continue;
         let ps=null;
-        eff.params.forEach((pa,i)=>{ if(pa.mode!=='drive' || pa.hand!=='play' || pa.axis!=='z') return; if(!ps) ps=fxParamsOf(ck,eff.fxId); const p=ps[i]; if(p) p.set(Math.min(1, (pa.inv ? 1-vD : vD)/(corePinch ? 1 : DEPTH_REACH))); });
+        eff.params.forEach((pa,i)=>{ if(pa.mode!=='drive' || pa.hand!=='play' || pa.axis!=='z') return; if(!ps) ps=fxParamsOf(ck,eff.fxId); const p=ps[i]; if(p) p.set(pa.inv ? 1-vD : vD); });
       }
     }
   }
@@ -235,11 +231,13 @@ export function lightProcessHands(res){
 }
 
 /* what the drawing and the bars need of each hand in view (canvas px; read-only) */
+/* LIGHT-13b: the reverb mix a playing hand drives now (0…1, its own chain) — the rings show it */
+const revOf=key=>{ const ps=fxParamsOf(chainOfHand(key),'reverb')||[], p=ps.find(q=>q && q.key==='mix')||ps[2]; return p ? Math.max(0, Math.min(1, p.get())) : 0; };
 export function lightHandsView(){
   const now=nowMs(), W=canvas.width, H=canvas.height, out=[];
   for(const k in HANDS){ const S=HANDS[k], lm=S.lm; if(!lm || now-S.seen>WATCHDOG_MS) continue;
     const tip=FINGER_TIPS[S.pinch && S.oct>=0 ? S.oct : 0]||8;
     out.push({ key:k, x:sx((lm[4].x+lm[tip].x)/2, W), y:sy((lm[4].y+lm[tip].y)/2, H), pinch:!!S.pinch, play:noteHand(k), finger: S.pinch && S.oct>=0 ? S.oct : -1,
-      zone:S.zone, fn:S.fn, vol:S.vol, slot:S.slot, deg:S.deg, oct:S.regOct, fing:{ ...(S.fing||{}) }, lm }); }
+      zone:S.zone, fn:S.fn, vol:S.vol, slot:S.slot, deg:S.deg, oct:S.regOct, fing:{ ...(S.fing||{}) }, lm, rev: S.pinch && noteHand(k) ? revOf(k) : 0, touch:[...(S.touch||[])] }); }
   return out;
 }

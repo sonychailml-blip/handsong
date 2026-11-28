@@ -8,9 +8,9 @@
   "noteModes": null,
   "key": {"tonic":9,"cents":0},
   "moods": [
-    "minor-penta", "major", "natural-minor", "harmonic-minor", "melodic-minor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "hungarian-minor", "major-penta", "blues", "chromatic", "harmonic-major", "melodic-major", "whole-tone", "octatonic-wh", "octatonic-hw", "messiaen-3", "phrygian-dominant", "double-harmonic", "enigmatic", "prometheus", "egyptian", "hungarian-penta", "scriabin-penta", "major-blues", "lydian-penta", "dorian-hexa", "mixolydian-hexa"
+    "minor-penta", "major", "natural-minor", "harmonic-minor", "melodic-minor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "hungarian-minor", "major-penta", "blues", "chromatic", "harmonic-major", "melodic-major", "whole-tone", "phrygian-dominant", "double-harmonic"
   ],
-  "timbres": ["solo.supersaw", "solo.firefly", "solo.organ", "solo.breath-flute", "solo.reed", "solo.guitar", "solo.kalimba", "solo.warm-pad", "solo.glass-pad", "solo.breath-pad", "solo.pad"],
+  "timbres": ["solo.supersaw", "solo.firefly", "solo.organ", "solo.breath-flute", "solo.reed", "solo.guitar", "solo.kalimba", "solo.pad"],
   "effects": ["reverb","dly","vib","trm","bright"],
   "scene": null,
   "backgrounds": ["camera"],

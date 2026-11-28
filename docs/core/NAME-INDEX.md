@@ -49,6 +49,7 @@ LIGHT-3b — THE CONTROLS WHEN THE HANDS LEAVE (variant B, the founder's choice 
 
 ## apps/light/draw.js
 LIGHT-3 — LIGHT'S CANVAS: the camera picture (the cover crop: the same rectangle remaps the hands — rule #12; the front camera mirrored — rule #13, through core mirrored()), the note field and the …
+- const (2): `RING_FADE_MS`, `lightDrawClockDbg`
 - fn (3): `lightSyncViewRect`, `litFingers`, `lightDrawFrame`
 
 ## apps/light/engine.js
@@ -63,7 +64,7 @@ LIGHT-8 — FULL SCREEN, the way Night does it (apps/night/fullscreen.js, NIGHT-
 
 ## apps/light/gestures.js
 LIGHT-3 — LIGHT'S HANDS: core/gestures/hands.js and roles.js COPIED and cut to what Light offers (option B, the founder 2026-11-27): one role, the solo; each hand's function note / hold / theremin …
-- const (13): `setLightFxSens`, `setLightDepthLaw`, `setLightTravel`, `setLightOctShift`, `lightOctShift`, `lightTrackKey`, `lightChainOfHand`, `setLightMirrorVolume`, `LIGHT_PINCH`, `setLightCoreLaws`, `DEPTH_REACH`, `setLightInstOf`, `setLightTrackFx`
+- const (12): `setLightFxSens`, `setLightDepthLaw`, `setLightTravel`, `setLightOctShift`, `lightOctShift`, `lightTrackKey`, `lightChainOfHand`, `setLightMirrorVolume`, `LIGHT_PINCH`, `setLightCoreLaws`, `setLightInstOf`, `setLightTrackFx`
 - fn (9): `setLightPerHandReverb`, `volX`, `lightMirrorFx`, `lightVoiceModeReset`, `lightHandsReset`, `lightHandsProbe`, `lightProcessHandsProbe`, `lightProcessHands`, `lightHandsView`
 
 ## apps/light/icons.js
@@ -1631,7 +1632,7 @@ LIGHT-3b row «LIGHT controls and menus»: with no hand in view the controls sho
 - fn (1): `checkLightControls`
 
 ## tools/probes/light/feel.js
-LIGHT-13 row «LIGHT rings, pinch distances, reverb reach»: (1) the pinch distances: a right hand whose ring finger stands 0.26 and little finger 0.28 from the thumb (in Full's palm units) sounds bo…
+LIGHT-13 row «LIGHT rings, pinch, pads, scales»: (1) the pinch distances: a right hand whose ring finger stands 0.26 and little finger 0.28 from the thumb (in Full's palm units) sounds both — CONTR…
 - fn (1): `checkLightFeel`
 
 ## tools/probes/light/hands.js
@@ -1918,7 +1919,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 UI-1 — «NIGHT labels follow the room»: the founder entered the rain and the Sound button still read «Firefly» while another timbre played.
 - fn (1): `checkNightLabels`
 
-_383 modules, 3506 exported names._
+_383 modules, 3507 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

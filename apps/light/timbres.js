@@ -38,6 +38,19 @@ export const LIGHT_RECORDS=Object.freeze([
     lvl:1.2, lp:3600, vb:0.3, body:{ hz:480, q:1.3, db:3 }, formants:[{ hz:700, q:0.7, g:0.9 }, { hz:2400, q:1.2, g:0.4 }],   // with formants the whole sound passes through them (breath.js): wide and strong
     noise:{ g:0.04, q:3, m:1, on:1.5 }, vib:{ rate:5.6, cents:8, amp:0.02, delay:0.5, rise:1 }, drift:{ cents:3, rate:0.12 } },
     { att:0.22, rel:0.55 }),
+  /* LIGHT-13b (the founder: the pads' tail after the fingers part is far too long — several seconds): core's three slow pads, the very recipes,
+     with a short release (core's records release over 2.5–2.8 s; Full keeps them as they are) */
+  rec('light/pad-warm', 'subtractive', { en:'Warm pad', ru:'Тёплый пэд' }, {
+    filter:{ freq:1400 }, oscs:[{ wave:'sawtooth', mult:1, gain:0.3, detune:-8 }, { wave:'sawtooth', mult:1, gain:0.3, detune:8 }], strike:{ open:1.5, tc:0.4, fv:0.8 }, hum:0 },
+    { att:0.35, rel:0.6 }),
+  rec('light/pad-glass', 'subtractive', { en:'Glass pad', ru:'Стеклянный пэд' }, {
+    filter:{ freq:3200 }, oscs:[{ wave:'triangle', mult:1, gain:0.3, detune:-5 }, { wave:'sine', mult:1, gain:0.24, detune:6 }], strike:{ open:1.4, tc:0.35, fv:0.7 }, hum:0 },
+    { att:0.3, rel:0.6 }),
+  rec('light/pad-breath', 'breath', { en:'Breathing pad', ru:'Дышащий пэд' }, {
+    harm:[{ m:1, g:0.33, w:'sawtooth', dt:-7 }, { m:1, g:0.33, w:'sawtooth', dt:6 }, { m:1, g:0.24, w:'triangle' }, { m:2, g:0.075, w:'sawtooth', dt:3 }],
+    formants:[{ hz:300, q:0.7, g:0.9 }, { hz:850, q:3.5, g:0.5 }, { hz:2600, q:5, g:0.12 }], lvl:1.44, lp:2400, breathe:{ rate:0.11, lvl:0.14, cut:0.35 },
+    noise:{ g:0.15, q:3, m:1 }, vib:{ rate:4.6, cents:5, amp:0.03, delay:0.6, rise:1.5 }, drift:{ cents:5, rate:0.07 }, hum:0 },
+    { att:0.6, rel:0.7 }),
   /* brass: a bright full spectrum, two formants, a lip scoop into the note and a breathy start */
   rec('light/brass', 'breath', { en:'Brass', ru:'Медные' }, {
     harm:[{ m:1, g:0.34 }, { m:2, g:0.3 }, { m:3, g:0.22 }, { m:4, g:0.15 }, { m:5, g:0.1 }, { m:6, g:0.065 }, { m:7, g:0.04 }, { m:8, g:0.025 }],
@@ -57,9 +70,9 @@ export const LIGHT_TIMBRES=Object.freeze([
   { id:'light/brass', group:'winds', dB:-3.5 },
   { id:'light/strings', group:'strings', dB:3 },
   { id:'solo.guitar', group:'strings', dB:4 },
-  { id:'solo.warm-pad', group:'pads', dB:2 },   // LIGHT-13 (the founder: pads enter slowly, the delay matters little): four pads, levels by the sustained sound (0.8–1.8 s)
-  { id:'solo.glass-pad', group:'pads', dB:1 },
-  { id:'solo.breath-pad', group:'pads', dB:-2 },
+  { id:'light/pad-warm', group:'pads', dB:2 },   // LIGHT-13 (the founder: pads enter slowly, the delay matters little): four pads, levels by the sustained sound (0.8–1.8 s); 13b: Light's short-release copies
+  { id:'light/pad-glass', group:'pads', dB:1 },
+  { id:'light/pad-breath', group:'pads', dB:-2 },
   { id:'solo.pad', group:'pads', dB:-3.5 },
   { id:'light/bass-round', group:'bass', dB:-5, oct:-1 },
   { id:'light/bass-synth', group:'bass', dB:0, oct:-1 },
@@ -80,9 +93,9 @@ const NAMES={
   'light/bass-synth':  { en:'Synth bass', ru:'Синт-бас', es:'Bajo sintetizado', pt:'Baixo sintetizado', de:'Synthbass', fr:'Basse synthé', it:'Basso synth', ka:'სინთ-ბასი' },
   'light/bass-pluck':  { en:'Plucked bass', ru:'Щипковый бас', es:'Bajo pulsado', pt:'Baixo dedilhado', de:'Gezupfter Bass', fr:'Basse pincée', it:'Basso pizzicato', ka:'პიციკატო ბასი' },
   'solo.kalimba':      { en:'Kalimba', ru:'Калимба', es:'Kalimba', pt:'Kalimba', de:'Kalimba', fr:'Kalimba', it:'Kalimba', ka:'კალიმბა' },
-  'solo.warm-pad':     { en:'Warm pad', ru:'Тёплый пэд', es:'Pad cálido', pt:'Pad quente', de:'Warmes Pad', fr:'Nappe chaude', it:'Pad caldo', ka:'თბილი პედი' },
-  'solo.glass-pad':    { en:'Glass pad', ru:'Стеклянный пэд', es:'Pad de cristal', pt:'Pad de vidro', de:'Gläsernes Pad', fr:'Nappe de verre', it:'Pad di vetro', ka:'მინის პედი' },
-  'solo.breath-pad':   { en:'Breathing pad', ru:'Дышащий пэд', es:'Pad que respira', pt:'Pad que respira', de:'Atmendes Pad', fr:'Nappe qui respire', it:'Pad che respira', ka:'მსუნთქავი პედი' },
+  'light/pad-warm':    { en:'Warm pad', ru:'Тёплый пэд', es:'Pad cálido', pt:'Pad quente', de:'Warmes Pad', fr:'Nappe chaude', it:'Pad caldo', ka:'თბილი პედი' },
+  'light/pad-glass':   { en:'Glass pad', ru:'Стеклянный пэд', es:'Pad de cristal', pt:'Pad de vidro', de:'Gläsernes Pad', fr:'Nappe de verre', it:'Pad di vetro', ka:'მინის პედი' },
+  'light/pad-breath':  { en:'Breathing pad', ru:'Дышащий пэд', es:'Pad que respira', pt:'Pad que respira', de:'Atmendes Pad', fr:'Nappe qui respire', it:'Pad che respira', ka:'მსუნთქავი პედი' },
   'solo.pad':          { en:'Pad', ru:'Пэд', es:'Pad', pt:'Pad', de:'Pad', fr:'Nappe', it:'Pad', ka:'პედი' },
 };
 const GROUP_NAMES={
