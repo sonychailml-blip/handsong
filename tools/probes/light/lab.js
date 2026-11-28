@@ -6,6 +6,7 @@
    too; the click is found where the start check measured it (±15 ms). */
 import { AC } from '../../../core/audio.js';
 import { lightNoteTapSet } from '../../../apps/light/engine.js';
+import { video } from '../../../core/vision.js';   // Light's camera (its stream's size and rate for the report)
 import { makeClick, analyse, clickHeard, median } from './lab-analyse.js';
 
 const R={ ring:null, end:0, click:null, buf:null, rows:[], busy:false, rt:null, loop:null, last:null, on:false, blocks:0 };
@@ -46,7 +47,7 @@ function render(){
   box.querySelector('[data-k=rows]').textContent=R.rows.slice(-6).map(r=>r.ok ? `${r.n}: ${fmt(r.total)} мс` : `${r.n}: не измерено (${({ click:'щелчок не найден', clap:'тик не слышен', edge:'тик не найден', short:'меньше 15 мс' })[r.why]||r.why})`).join(' · ');
 }
 function report(){
-  const ok=R.rows.filter(r=>r.ok), vt=document.querySelector('video') && document.querySelector('video').srcObject, s=vt && vt.getVideoTracks()[0] ? vt.getVideoTracks()[0].getSettings() : {};
+  const ok=R.rows.filter(r=>r.ok), vt=video && video.srcObject, s=vt && vt.getVideoTracks()[0] ? vt.getVideoTracks()[0].getSettings() : {};
   const L=[`Лаборатория задержки В LIGHT · ${new Date().toISOString().slice(0,16)}`, `камера Light: ${s.width}×${s.height} @ ${s.frameRate}; звук ${AC.sampleRate} Гц, база ${fmt((AC.baseLatency||0)*1000)} мс, выход ${fmt((AC.outputLatency||0)*1000)} мс`,
     `проверка звука: ${R.loop ? `${R.loop.heard} из 3, щелчок→микрофон ${fmt(R.loop.rt)} мс (все: ${R.loop.all.join(', ')})` : 'не делали'}`,
     ok.length ? `ИТОГ LIGHT: медиана ${fmt(median(ok.map(r=>r.total)))} мс из ${ok.length} (не измерено ${R.rows.length-ok.length}), от ${fmt(Math.min(...ok.map(r=>r.total)))} до ${fmt(Math.max(...ok.map(r=>r.total)))}` : 'ИТОГ LIGHT: нет измерений',

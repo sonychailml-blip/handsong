@@ -301,3 +301,8 @@ Tree hashes before and after: core a4dd71426b6a4c32 · apps/full 0148bb454440c3e
   the lab's `AC` (data for the static check only, as LIGHT-11). Checks: static PASSED; probe-data PASS 109/0; the lab check PASS 26; Light under
   the runner with the eval `tools/.out/light12/lab-in-light.eval.js`: the panel, the microphone, the start check and a row from a Light note —
   pass, CSP, network and storage PASS. Trees: core 18865efad8ade039 (surface data) · full 0148bb454440c3e3 · night 30d8f7b3c797de9e · light 1cb1d4a1978611a1 (unchanged).
+- LIGHT-12 result (the founder, 2026-11-28, same laptop, nail-tick pinch, both with the start check held — click → microphone 106 ms in both):
+  the lab's shortest path 114 ms median from contact to sound (22 of 22, 50…149); Light 138 ms (19 of 20, 93…217). So ≈ 114 ms is this laptop's
+  floor (camera ≈ 60, recognition 41 at 320×240, sound ≈ 55, the frame wait, minus the pinch firing ≈ 1.5–2 cm early); Light adds ≈ 25 ms median and
+  a longer tail. Candidates for Light's part: the camera at 640×480 (lab 320×240), the snapshot + worker hop before recognition, the full-screen
+  drawing on the same GPU. The report now names Light's camera (core/vision.js `video`).
