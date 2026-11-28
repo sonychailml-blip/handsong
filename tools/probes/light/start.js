@@ -6,6 +6,7 @@ import { profileCurrent, profileOf, profileDoorsDbg } from '../../../core/profil
 import { scaleId, tonic, handFn, fxChainOf, chainKeyOf } from '../../../core/state.js';
 import { STORE_NS } from '../../../core/storens.js';
 import { lightBootDbg } from '../../../apps/light/boot.js';
+import { lightUpdateDbg } from '../../../apps/light/update.js';
 
 const FULL_SOLO_FX=['vol','reverb','dly','drv','vib'];   // Full's default solo chain (core/state.js fxChains), for the control
 export async function checkLightStart(){
@@ -24,5 +25,6 @@ export async function checkLightStart(){
   const st=document.getElementById('start'); if(!st || st.classList.contains('on')) miss('the start card still shows');
   if(!document.querySelector('#start .light-emblem svg.emblem')) miss('the emblem was not drawn on the start card');
   if(STORE_NS!=='light') miss('store namespace «'+STORE_NS+'»');
+  { const U=lightUpdateDbg(); if('serviceWorker' in navigator && (!U.wired || U.registered!==1)) diffs.push(`LIGHT-10: the worker not registered once after the start (${JSON.stringify(U)})`); }   // registered after Play, once
   return { pass:!diffs.length, diffs };
 }

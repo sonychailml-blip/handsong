@@ -281,6 +281,8 @@ const NET_LISTED={
   'apps/night/bed2.js': { addModule:[1,'loads our own apps/night/worklets/bed-worklet.js (own origin) into an audio context once: the live one when the music bed v2 first plays, an offline one for the probes (NIGHT-4)'] },
   'core/render.js':     { addModule:[1,'track renders: lets the engine copy load only the worklets the track needs (own origin) into its offline context'], importVar:[1,'the engine copy core/audio.js?render (ENG_SPEC: own origin, a module of ours)'] },
   'apps/light/clip.js': { share:[1,'LIGHT-5: hands the person\'s own clip to the system share sheet — only on their tap (explicit action)'] },
+  'apps/light/update.js': { swRegister:[1,'LIGHT-10: registers its own sw.js (own origin; the precache in a build, none in the repository) — after the start on a first visit'] },
+  'apps/light/sw.js':   { fetch:[2,'LIGHT-10 precache: the listed files of this build from the own origin (install and top-up, each checked against its hash), and a listed file the cache lost (the same request, passed on)'] },
   'apps/light/boot.js': { importVar:[1,'?probe only: the probe facade the page itself names in <link rel="handsong-probes"> (own origin; production pages carry no such tag) — LIGHT-3'] },
   'core/legacy-ui/boot.js': { importVar:[1,'?probe only: the probe facade the page itself names in <link rel="handsong-probes"> (own origin; production pages carry no such tag)'] },
   'apps/night/sw.js':   { fetch:[3,'NIGHT-14 precache: the listed files of this build from the own origin (install, each checked against its hash), a listed file the cache lost (the same request, passed on), and RAIN-R1 an on-demand file at its first request (the same request, kept once its hash matches)'] },
@@ -307,7 +309,7 @@ function netCheck(modsIn){
   return { bad, total };
 }
 /* NIGHT-14: the service workers are classic scripts, not modules of ours — but Night's now fetches (its precache): both join the guard */
-const NET_MODS={ ...mods }; for(const f of ['apps/full/sw.js','apps/night/sw.js']) NET_MODS[f]={ bare:lex(readFileSync(join(SRC,f),'utf8')).bare, imports:[], dyn:[] };
+const NET_MODS={ ...mods }; for(const f of ['apps/full/sw.js','apps/night/sw.js','apps/light/sw.js']) NET_MODS[f]={ bare:lex(readFileSync(join(SRC,f),'utf8')).bare, imports:[], dyn:[] };
 const NET=netCheck(NET_MODS);
 fails.push(...NET.bad);
 { /* CONTROL: an unlisted beacon in a listed module, a fetch in a new module and (CORE-22) an import of an address held in a variable must each be caught; a literal import must not count */

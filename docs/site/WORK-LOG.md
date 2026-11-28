@@ -24,3 +24,11 @@ Tree hashes before: core 194d947d7682e4a3 · apps/full d6b90cf2cb4be6da · apps/
 - Tools: `tools/site-pages.mjs`, `tools/site/texts.mjs`, `tools/site-images.mjs`, `tools/site-check.mjs` (3 CONTROLS). Register: 7 entries (two fonts, pictures, icons, own origin, app links, socials); `tools/check-licences.mjs` scans the site's pages (+ 2 CONTROLS), `.xml` counts as our own text.
 - «OLD NAME gone» stays at full strength over the site's files: the old word left our texts — English «Quiet, living music…» (card, Night lead), «a gentle living screen» (Install); Russian «Тихая живая музыка…»; the design files in `docs/site/site-design/` reworded the same way (the data runner had failed on them before this run).
 - Sizes: home 343 KB (EN) / 427 KB (RU) in total; Night card 78 KB WebP / 116 KB JPG; demo card 38 / 73 KB; og.jpg 96 KB.
+
+# SITE-4 (SITE track, 2026-11-28): Handsong's card first, its page /play/
+Tree hashes after: apps/site 77566d43055fc2b3 (core, apps/full, apps/night untouched by this run).
+- `tools/site/texts.mjs`: Handsong's card (EN «New», RU «Новое») and page texts; the home's line «Four ways to play»; the link play.handsong.app.
+- `tools/site-pages.mjs`: page `light` at `/play/` (EN and RU), the card first; `apps/site/site.css`: Handsong's warm ground and amber, four cards in
+  one row from 1100 px. `tools/site-images.mjs --only light`: the card picture from `apps/light/` (19 KB WebP, 38 KB JPG).
+- Register: `site-pictures` + light-card.*, `link-site-apps` + play.handsong.app. Checks: site-pages current, site-check PASS (5 controls caught),
+  licences PASS. Captures: tools/.out/site4-shots/.

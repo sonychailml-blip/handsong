@@ -5,14 +5,15 @@
    the camera (one tap: front ↔ back), the sensitivity (→ hand travel and effects, as in Night). Every change silences the live notes first
    (as the shared UI's softAllOff did for the solo). The person's choices are kept on this device (namespaced «light») and restored at the start. */
 import { NOTE_NAMES, GRP, scaleById, CUR, leadFreqTi, tuningIndexOf } from '../../core/scales.js';
-import { scaleId, tonic, aRef, handFn, rectPref, camFacing, leadIdx, setScaleId, setTonic, setTonicCents, setARef, setHandFn, setRectPref } from '../../core/state.js';
-import { setLeadInstr, timbreIdx, timbreIdOf, timbresOf } from '../../core/audio.js';
+import { scaleId, tonic, aRef, handFn, rectPref, camFacing, leadIdx, playsNotes, setScaleId, setTonic, setTonicCents, setARef, setHandFn, setRectPref } from '../../core/state.js';
+import { setLeadInstr, timbreIdx } from '../../core/audio.js';
 import { switchCamera } from '../../core/vision.js';
 import { profileOf } from '../../core/profile.js';
 import { L, t, onLangChange } from '../../core/i18n.js';
 import { nsKey } from '../../core/storens.js';
 import { lightAllOff } from './engine.js';
-import { lightHandsReset, setLightFxSens, setLightTravel, setLightOctShift, lightOctShift } from './gestures.js';
+import { lightHandsReset, setLightFxSens, setLightTravel, setLightOctShift, lightOctShift, setLightInstOf } from './gestures.js';
+import { lightTimbresAvailable, timbreEntry, timbreName, timbreGroupName, LIGHT_GROUPS } from './timbres.js';   // LIGHT-11: fourteen timbres, one per hand
 import { onLightFrame, onLightStart, lightStarted, PROFILE } from './boot.js';
 import { lightCalOn, lightCalStart, setLightCalTravel, lightCalCamera } from './calib.js';   // LIGHT-4: the hand setup
 import { modeNameOf, groupNameOf } from './modenames.js';   // LIGHT-6: the names in the six added languages
@@ -23,11 +24,11 @@ export const scaleName=s=>modeNameOf(s.id) || L(s.name);
 export const CTL_IDLE_MS=700, A4_MIN=380, A4_MAX=480, A4_CHIPS=Object.freeze([432,440,442]), FNS=Object.freeze(['fx','note','hold','therm']), OCT_MIN=-3, OCT_MAX=3;
 const PREFS=nsKey('handsong.lightPrefs');
 const $=id=>document.getElementById(id), el=(tag, cls, text)=>{ const e=document.createElement(tag); if(cls) e.className=cls; if(text!=null) e.textContent=text; return e; };
-let seenHands=-Infinity, sheet=null, sens={ fx:0, travel:0 };
+let seenHands=-Infinity, sheet=null, sens={ fx:0, travel:0 }, tim={ L:'solo.supersaw', R:'solo.supersaw' };
 export const keyName=i=>NOTE_NAMES[((i%12)+12)%12].replace('#','♯');
 
 /* ── the choices, kept on this device ── */
-function prefsSave(){ try{ localStorage.setItem(PREFS, JSON.stringify({ scale:scaleId, tonic, a4:aRef, timbre:timbreIdOf('ld',leadIdx), hand:{ ...handFn.ld }, field:rectPref,
+function prefsSave(){ try{ localStorage.setItem(PREFS, JSON.stringify({ scale:scaleId, tonic, a4:aRef, timbre:{ ...tim }, hand:{ ...handFn.ld }, field:rectPref,
   oct:{ L:lightOctShift('L'), R:lightOctShift('R') }, sens })); }catch(e){} }
 function prefsLoad(){ try{ const s=localStorage.getItem(PREFS); return s ? JSON.parse(s) : null; }catch(e){ return null; } }
 const prof=()=>profileOf(PROFILE);
@@ -36,8 +37,21 @@ const quiet=()=>{ lightAllOff(); lightHandsReset(); };
 export function setScale(id){ if(!prof().moods.includes(id) || !scaleById(id)) return false; if(id!==scaleId){ quiet(); setScaleId(id); } return true; }
 export function setKey(i){ i=((i|0)%12+12)%12; if(i!==tonic){ quiet(); setTonic(i); setTonicCents(0); } return true; }
 export function setA4(hz){ const v=Math.max(A4_MIN, Math.min(A4_MAX, Math.round(+hz||440))); setARef(v); return v; }
-export function setTimbre(id){ if(!prof().timbres.includes(id)) return false; const i=timbreIdx('ld',id); if(i==null) return false; if(i!==leadIdx){ quiet(); setLeadInstr(i); } return true; }
-export function setHand(hand, fn){ if((hand!=='L' && hand!=='R') || !FNS.includes(fn)) return false; if(handFn.ld[hand]!==fn){ quiet(); setHandFn('ld',hand,fn); } return true; }
+/* LIGHT-11: a timbre for one hand ('L'|'R') or both (no hand: one hand plays, or the same for both). A hand moving onto a bass takes the bass's
+   octave shift if it sat at the old timbre's own (a hand moved by the person keeps its octave); the live solo timbre (core's leadIdx) follows the
+   hand that plays notes — the right one when both do */
+const bothPlay=()=>playsNotes(handFn.ld.L) && playsNotes(handFn.ld.R);
+const mainHand=()=> playsNotes(handFn.ld.R) || !playsNotes(handFn.ld.L) ? 'R' : 'L';
+export function setTimbre(id, hand){
+  if(!lightTimbresAvailable().some(t=>t.id===id)) return false;
+  const hands= hand==='L' || hand==='R' ? [hand] : ['L','R']; if(hands.every(h=>tim[h]===id)) return true;
+  quiet();
+  for(const h of hands){ const was=(timbreEntry(tim[h])||{}).oct||0, now=(timbreEntry(id)||{}).oct||0; if(lightOctShift(h)===was) setLightOctShift(h, now); tim[h]=id; }
+  syncLead(); return true;
+}
+function syncLead(){ const i=timbreIdx('ld', tim[mainHand()]); if(i!=null && i!==leadIdx) setLeadInstr(i); }
+export const lightTimbreOf=h=>tim[h];
+export function setHand(hand, fn){ if((hand!=='L' && hand!=='R') || !FNS.includes(fn)) return false; if(handFn.ld[hand]!==fn){ quiet(); setHandFn('ld',hand,fn); syncLead(); } return true; }
 export function setField(v){ const m= v==='rows' ? 'rows' : 'rect'; if(rectPref!==m){ quiet(); setRectPref(m); } return true; }
 export function setOct(hand, n){ quiet(); setLightOctShift(hand, Math.max(OCT_MIN, Math.min(OCT_MAX, n))); return lightOctShift(hand); }
 export function setSens(kind, v){ v=Math.max(-1, Math.min(1, +v||0)); sens={ ...sens, [kind]:v }; if(kind==='fx') setLightFxSens(Math.pow(2, v)); else { setLightTravel(Math.pow(2, v)); setLightCalTravel(v); } return v; }   // the travel: the plain law and the calibrated one
@@ -51,7 +65,7 @@ export const octRange=hand=>{ const sh=lightOctShift(hand); return noteOf(sh)+' 
 function render(){
   $('lightKeyName').textContent=keyName(tonic); $('lightKeyHz').textContent=String(aRef);
   const s=scaleById(scaleId); $('lightScaleName').textContent= s ? scaleName(s) : scaleId;
-  const tm=timbresOf('ld').find(x=>x.idx===leadIdx); $('lightTimbreName').textContent= tm ? L(tm.name) : '';
+  $('lightTimbreName').textContent= bothPlay() && tim.L!==tim.R ? timbreName(tim.L)+' · '+timbreName(tim.R) : timbreName(tim[mainHand()]);   // LIGHT-11
   fsRender();
 }
 /* LIGHT-8: the full-screen toggle shows its state in its words and aria-pressed — LIGHT-9c (the founder): ONE icon both ways (the inward
@@ -80,7 +94,14 @@ function openSheet(kind){
     for(const k of order){ if(k) B.appendChild(el('p','light-lbl', groupNameOf(k) || L(GRP[k])));
       for(const s of groups.get(k)){ const b=el('button', 'light-item'+(s.id===scaleId ? ' on' : ''), scaleName(s)); b.onclick=()=>after(setScale)(s.id); B.appendChild(b); } }
   }else if(kind==='timbre'){
-    for(const id of prof().timbres){ const tm=timbresOf('ld').find(x=>x.id===id); const b=el('button', 'light-item'+(timbreIdOf('ld',leadIdx)===id ? ' on' : ''), tm ? L(tm.name) : id); b.onclick=()=>after(setTimbre)(id); B.appendChild(b); }
+    /* LIGHT-11: by group; two columns (left / right) when both hands play notes, else one list for the playing hand(s) */
+    const list=(hand, into)=>{ const av=lightTimbresAvailable(), on=tim[hand||mainHand()];
+      for(const g of LIGHT_GROUPS){ const items=av.filter(x=>x.group===g); if(!items.length) continue; into.appendChild(el('p','light-lbl', timbreGroupName(g)));
+        for(const x of items){ const b=el('button', 'light-item'+(x.id===on ? ' on' : ''), timbreName(x.id)); b.dataset.id=x.id; b.onclick=()=>after(setTimbre)(x.id, hand); into.appendChild(b); } } };
+    if(bothPlay()){ const cols=el('div','light-hands');
+      for(const hand of ['L','R']){ const c=el('div','light-hcol'); c.dataset.hand=hand; c.appendChild(el('h4', null, t(hand==='L' ? 'light.left' : 'light.right'))); list(hand, c); cols.appendChild(c); }
+      B.appendChild(cols); }
+    else list(null, B);
   }else if(kind==='hands'){
     const cols=el('div','light-hands');
     for(const hand of ['L','R']){ const c=el('div','light-hcol'); c.appendChild(el('h4', null, t(hand==='L' ? 'light.left' : 'light.right')));
@@ -122,7 +143,7 @@ function frame(now, hands){
 /* the person's kept choices, after the profile is applied */
 function restore(){
   const p=prefsLoad(); if(p){
-    if(p.scale) setScale(p.scale); if(p.tonic!=null) setKey(p.tonic); if(p.a4) setA4(p.a4); if(p.timbre) setTimbre(p.timbre);
+    if(p.scale) setScale(p.scale); if(p.tonic!=null) setKey(p.tonic); if(p.a4) setA4(p.a4); if(p.timbre){ if(typeof p.timbre==='string') setTimbre(p.timbre); else { if(p.timbre.L) setTimbre(p.timbre.L, 'L'); if(p.timbre.R) setTimbre(p.timbre.R, 'R'); } }   // LIGHT-11: one per hand (an older choice: both)
     if(p.hand){ setHand('L', p.hand.L); setHand('R', p.hand.R); } if(p.field) setField(p.field);
     if(p.oct){ setLightOctShift('L', p.oct.L|0); setLightOctShift('R', p.oct.R|0); }
     if(p.sens){ setSens('fx', p.sens.fx); setSens('travel', p.sens.travel); } }
@@ -130,6 +151,7 @@ function restore(){
 }
 export function lightControlsWire(fill){
   iconFill=fill;
+  setLightInstOf(h=>timbreIdx('ld', tim[h]));   // LIGHT-11: each hand's notes carry its own timbre
   $('lightKeyBtn').onclick=()=>openSheet('key'); $('lightScaleBtn').onclick=()=>openSheet('scale');
   $('lightTimbreBtn').onclick=()=>openSheet('timbre'); $('lightHandsBtn').onclick=()=>openSheet('hands'); $('lightSensBtn').onclick=()=>openSheet('sens');
   $('lightCamBtn').onclick=()=>{ flipCamera(); };

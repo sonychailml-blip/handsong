@@ -44,7 +44,7 @@ LIGHT-5 — THE CLIP.
 
 ## apps/light/controls.js
 LIGHT-3b — THE CONTROLS WHEN THE HANDS LEAVE (variant B, the founder's choice at LIGHT-1) and their menus.
-- const (7): `scaleName`, `CTL_IDLE_MS`, `keyName`, `octRange`, `lightControlsDbg`, `lightSheetOpen`, `lightControlsOpenDbg`
+- const (8): `scaleName`, `CTL_IDLE_MS`, `keyName`, `lightTimbreOf`, `octRange`, `lightControlsDbg`, `lightSheetOpen`, `lightControlsOpenDbg`
 - fn (9): `setScale`, `setKey`, `setA4`, `setTimbre`, `setHand`, `setField`, `setOct`, `setSens`, `lightControlsWire`
 
 ## apps/light/draw.js
@@ -63,7 +63,7 @@ LIGHT-8 — FULL SCREEN, the way Night does it (apps/night/fullscreen.js, NIGHT-
 
 ## apps/light/gestures.js
 LIGHT-3 — LIGHT'S HANDS: core/gestures/hands.js and roles.js COPIED and cut to what Light offers (option B, the founder 2026-11-27): one role, the solo; each hand's function note / hold / theremin …
-- const (9): `setLightFxSens`, `setLightDepthLaw`, `setLightTravel`, `setLightOctShift`, `lightOctShift`, `lightTrackKey`, `lightChainOfHand`, `setLightMirrorVolume`, `setLightTrackFx`
+- const (10): `setLightFxSens`, `setLightDepthLaw`, `setLightTravel`, `setLightOctShift`, `lightOctShift`, `lightTrackKey`, `lightChainOfHand`, `setLightMirrorVolume`, `setLightInstOf`, `setLightTrackFx`
 - fn (9): `setLightPerHandReverb`, `volX`, `lightMirrorFx`, `lightVoiceModeReset`, `lightHandsReset`, `lightHandsProbe`, `lightProcessHandsProbe`, `lightProcessHands`, `lightHandsView`
 
 ## apps/light/icons.js
@@ -95,6 +95,16 @@ LIGHT-3 — LIGHT'S BARS, as in Night but by the founder's rule (LIGHT-1/2): one
 ## apps/light/texts.js
 LIGHT-2 — LIGHT'S OWN TEXTS.
 - const (1): `LIGHT_TEXTS`
+
+## apps/light/timbres.js
+LIGHT-11 — LIGHT'S TIMBRES (the founder: few but good, from different families; a lead is the heart of Light; 2–3 basses; a timbre per hand).
+- const (7): `LIGHT_RECORDS`, `LIGHT_GROUPS`, `LIGHT_TIMBRES`, `timbreName`, `timbreGroupName`, `timbreEntry`, `lightTimbresAvailable`
+- fn (1): `lightTimbresInstall`
+
+## apps/light/update.js
+LIGHT-10 — OFFLINE AND «A NEW VERSION IS READY» (Night's way, apps/night/update.js, Light's own copy).
+- const (2): `UPDATE`, `lightUpdateDbg`
+- fn (1): `lightUpdateWire`
 
 ## apps/night/audiolab.js
 AUDIO-3 — THE AUDIO LAB (development edition only; the founder hunts the rain's dropouts).
@@ -1593,6 +1603,7 @@ LIGHT-2/3: the probe entry of the Light page (?probe): its own rows behind its o
 - → ./light/perhand.js (1): `checkLightPerHand`
 - → ./light/start.js (1): `checkLightStart`
 - → ./light/texts.js (1): `checkLightTexts`
+- → ./light/timbres.js (1): `checkLightTimbres`
 
 ## tools/probes/light/alone.js
 LIGHT-3 row «LIGHT on its own» (the founder: «only what it really has; nothing hidden, nothing unused loaded»), measured in the running page — runs FIRST, before any row that imports core's gesture…
@@ -1633,6 +1644,10 @@ LIGHT-2/3 row «LIGHT start and profile»: after ▶ the page runs in Light's pr
 ## tools/probes/light/texts.js
 LIGHT-6 row «LIGHT eight languages»: (1) every Light text key has a text in each of the eight languages, and so do the shared start messages on Light's page; (2) every key the page names ([data-i18…
 - fn (1): `checkLightTexts`
+
+## tools/probes/light/timbres.js
+LIGHT-11 row «LIGHT timbres»: (1) fourteen timbres to pick, Light's six own records installed for the session (pack ids «light/…», none refused by core's bounds); (2) every timbre and group named i…
+- fn (1): `checkLightTimbres`
 
 ## tools/probes/night.js
 SPLIT-2: the probe entry of the Night page: its own rows and the core rows flagged for both pages.
@@ -1883,7 +1898,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 UI-1 — «NIGHT labels follow the room»: the founder entered the rain and the Sound button still read «Firefly» while another timbre played.
 - fn (1): `checkNightLabels`
 
-_376 modules, 3462 exported names._
+_379 modules, 3477 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

@@ -26,7 +26,7 @@ export async function checkLightControls(){
     const B=()=>document.getElementById('lightSheetBody');
     lightControlsOpenDbg('key'); if(B().querySelectorAll('.light-keys button').length!==12) miss('the key sheet does not hold 12 keys');
     lightControlsOpenDbg('scale'); if(B().querySelectorAll('.light-item').length!==p.moods.length) miss(`the scale sheet holds ${B().querySelectorAll('.light-item').length} moods, not ${p.moods.length}`);
-    lightControlsOpenDbg('timbre'); if(B().querySelectorAll('.light-item').length!==p.timbres.length) miss('the sound sheet does not list the profile\'s timbres');
+    lightControlsOpenDbg('timbre'); if(B().querySelectorAll('.light-item').length<p.timbres.length) miss('the sound sheet does not list the profile\'s timbres');
     lightControlsOpenDbg('hands'); if(B().querySelectorAll('.light-hcol .light-item').length!==8 || B().querySelectorAll('.light-seg button').length!==2) miss('the hands sheet: not 2×4 functions and the field\'s 2 choices');
     lightControlsOpenDbg('sens'); if(B().querySelectorAll('input[type=range]').length!==2) miss('the sensitivity sheet does not hold 2 sliders');
     lightControlsOpenDbg(null); if(document.getElementById('lightSheet').hidden!==true) miss('the sheet did not close');

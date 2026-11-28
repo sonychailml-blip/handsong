@@ -199,3 +199,36 @@ Tree hashes after: core 44ed0dd238a68bfb · apps/full 0148bb454440c3e3 · apps/n
 - The founder: the «leave full screen» icon (four corners pointing in) reads as a swastika — the toggle now shows the same outward corners both ways
   (its words and aria-pressed still tell the state); `fs-exit` removed from Light's icons. ⚠ Night's `fs-exit` is the same drawing (not changed here).
 - Row «LIGHT controls and menus»: the one icon. Checks: static PASSED; `--app light` PASS; licences PASS. core, apps/full, apps/night unchanged.
+
+# LIGHT-10 (LIGHT track, 2026-11-27): offline
+Tree hashes after: core 44ed0dd238a68bfb · apps/full 0148bb454440c3e3 · apps/night 30d8f7b3c797de9e (all unchanged) · apps/light 407585e5809c725a.
+- Before: Light registered no service worker at all (it loads no legacy UI, which registers Full's) — neither installable nor offline.
+- `apps/light/sw.js`: Night's precache law, Light's own copy (cache «handsong-light-precache-<version>»; install checked by hash, an update copies
+  what did not change, a new version waits; top-up; the page and listed files from the cache). `tools/build.mjs` writes the list (263 files,
+  20.1 MB cached with this browser's MediaPipe build; the icons later).
+- `apps/light/update.js`: the worker is registered only AFTER Play on a first visit (the founder: in the background once playing), at once when
+  already installed; «A new version is ready — tap to update» at the top of the start screen, in play a pill for 20 s (8 languages).
+- Rows: smoke «Light offline (LIGHT-10)» (`--build`, and `--light-precache` alone): no worker before Play; after it every wanted file cached with its
+  hash, nothing outside, the start covered; offline second visit plays to a shown frame (CONTROL: without the worker offline fails) — PASS at the
+  first run. «LIGHT start and profile» + the worker registered once after the start.
+- Not tested by a run: the «new version» line with a real second version (Night's tested logic, copied).
+- `node tools/smoke-paths.mjs --build` PASS (every target loaded, control caught; Light offline PASS).
+
+# LIGHT-11 (LIGHT track, 2026-11-28): fourteen timbres, one per hand
+Tree hashes after: core a4dd71426b6a4c32 (only `core/engine/surface.js`, the static check's list of engine calls — data, no behaviour) · apps/full
+0148bb454440c3e3 · apps/night 30d8f7b3c797de9e (unchanged) · apps/light 1cb1d4a1978611a1.
+- `apps/light/timbres.js` (new): 14 timbres in six groups (lead, keys, winds, strings, bass, more), named in 8 languages. Eight are core's built-in
+  solo records (the profile's list: SuperSaw, electric piano «Firefly», organ, flute, reed, guitar, kalimba, warm pad); six are LIGHT'S OWN records
+  (soft lead, brass, strings — breath engine; round bass, synth bass — subtractive; plucked bass — Karplus–Strong), pack ids «light/…», installed
+  for the session through core's existing door `audio.timbreInstall` (as Night's rain room) — no core change, never in Full's lists; all pass core's
+  bounds (the heaviest, brass, 38 nodes of 64).
+- Levels: measured in the probe browser (`--eval`, the heard output, after a warm-up note) and set by `audio.setTimbreTrim` toward SuperSaw —
+  tools/.out/light11-levels.txt. Found while measuring: with formants the breath engine sends the whole sound through them (no dry path), so narrow
+  weak formants silenced strings (−63 dB) and brass (−41) — widened.
+- A timbre per hand: when both hands play notes the sound sheet shows two columns (left / right); with one playing hand one list. Each hand's
+  notes carry its timbre (`gestures.js setLightInstOf`); the live solo timbre follows the playing hand (the right one when both). A bass takes the
+  hand an octave lower (a hand whose octave the person moved keeps it). Kept per hand on this device (an older single choice: both hands).
+- Row «LIGHT timbres»: 14 to pick, the six installed, every name in 8 languages, one list / two columns, per hand left brass 35 / right organ 1
+  (CONTROL: without the door both carry 1), the bass octave. C0 data row: eight built-in solo timbres, Full's default first.
+- Checks: static PASSED; probe-data PASS 109/0; `--app light` 11 rows PASS, CSP, network, storage PASS; smoke Light ok; licences PASS.
+- To hear: every timbre on a phone (levels by ear), the first note of the guitar once in the first measuring run came out near silent (not seen again).

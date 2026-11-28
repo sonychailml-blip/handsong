@@ -544,8 +544,10 @@
       "use": "shipped",
       "version": "—",
       "licence": "own-work",
-      "source": "our own renders and captures, made by tools/site-images.mjs: the night forest drawn by our own scene through the still's camera (as tools/night-still.mjs; the floor uses the CC0 photo-scanned «Leaves Forest Ground», which asks for no attribution), and a capture of our own live tech demo's start screen",
+      "source": "our own renders and captures, made by tools/site-images.mjs: the night forest drawn by our own scene through the still's camera (as tools/night-still.mjs; the floor uses the CC0 photo-scanned «Leaves Forest Ground», which asks for no attribution), and captures of our own start screens: the live tech demo and Handsong (apps/light/, SITE-4)",
       "files": [
+        "apps/site/img/light-card.webp",
+        "apps/site/img/light-card.jpg",
         "apps/site/img/night-card.webp",
         "apps/site/img/night-card.jpg",
         "apps/site/img/forest-wall.webp",
@@ -587,13 +589,14 @@
     },
     {
       "id": "link-site-apps",
-      "name": "The apps the brand site links to — Handsong Night and the tech demo (our own deployments) — links the person opens",
+      "name": "The apps the brand site links to — Handsong (play), Handsong Night and the tech demo (our own deployments) — links the person opens",
       "class": "link",
       "use": "link",
       "version": "—",
       "licence": "n/a",
       "source": "tools/site/texts.mjs LINKS",
       "urls": [
+        "https://play.handsong.app",
         "https://night.handsong.app",
         "https://demo.handsong.app"
       ],

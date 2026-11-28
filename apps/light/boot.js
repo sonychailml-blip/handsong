@@ -14,7 +14,8 @@ import { lightProcessHands, lightHandsView, lightHandsReset, lightVoiceModeReset
 import { lightAllOff } from './engine.js';
 import { lightDrawFrame, lightSyncViewRect } from './draw.js';
 import { lightCalBusy, lightCalFrame } from './calib.js';   // LIGHT-4: the hand setup takes the frames while it runs
-import { fsBegin, fsCamera, fsStarted } from './fullscreen.js';   // LIGHT-8: full screen on Play (never while the camera prompt may come)
+import { fsBegin, fsCamera, fsStarted } from './fullscreen.js';
+import { lightTimbresInstall } from './timbres.js';   // LIGHT-11: Light's own timbres and the level trims   // LIGHT-8: full screen on Play (never while the camera prompt may come)
 
 export const PROFILE='profile.light';
 const $=id=>document.getElementById(id);
@@ -102,6 +103,7 @@ async function start(){
     await startCamera(); fsCamera();   // LIGHT-8: the camera is decided now; full screen while the Play tap still counts
     try{ await navigator.wakeLock.request('screen'); }catch(e){}
     { const why=profileApply(PROFILE); if(why) console.warn('[light] the profile: '+why); }   // eslint-disable-line no-console
+    lightTimbresInstall();   // LIGHT-11: before the person's choices are restored
     for(const f of starts){ try{ f(); }catch(e){ console.warn('[light] a start listener failed', e); } }   // eslint-disable-line no-console
     $('start').classList.remove('busy','on');
     started=true; fsStarted(); requestAnimationFrame(loop);

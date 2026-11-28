@@ -177,3 +177,6 @@ decisions they led to are written here in words).
 - **Timbres** (the founder): few but good, from different families — lead (the main one for Light), piano, organ, winds, bass and others; existing
   records first, our own new ones where needed.
 - **Android app** (later, after the web version): a Trusted Web Activity wrapping play.handsong.app for Google Play.
+- **Timbres (LIGHT-11, 2026-11-28):** fourteen — lead (SuperSaw, soft lead), keys (electric piano, organ), winds (flute, reed, brass), strings
+  (strings, guitar), bass (round, synth, plucked — the founder: 2–3 basses), more (kalimba, warm pad); Light's own records stay in the app (session
+  installs), Full never sees them. A timbre per hand, two columns only when both hands play notes.

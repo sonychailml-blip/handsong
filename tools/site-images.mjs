@@ -8,7 +8,7 @@
      icon-32.png, apple-touch-icon.png (180), ../favicon.ico (PNG inside), from apps/site/favicon.svg (the five-dot emblem)
    Headless Chrome (channel chrome), own static server over the repo. Register entries «site-pictures» and «site-icons» (tools/licences.json).
      node tools/site-images.mjs                 everything (the forest from the cache when present)
-     node tools/site-images.mjs --only demo     one group: forest | demo | icons */
+     node tools/site-images.mjs --only demo     one group: forest | demo | light | icons (SITE-4: light = Handsong's start screen, light-card.*) */
 import http from 'node:http';
 import { readFile, writeFile, mkdir, stat } from 'node:fs/promises';
 import path from 'node:path';
@@ -95,17 +95,20 @@ async function compose(){
   await ctx.close();
 }
 
-/* the live tech demo's start screen (the old public Full), phone portrait */
-async function demo(){
+/* an app's start screen, phone portrait → <name>-card.webp/.jpg: the live tech demo (the old public Full); SITE-4: Handsong (play.handsong.app)
+   from this repository's apps/light/ (the same page the build ships) */
+const demo=()=>capture('demo', 'https://demo.handsong.app/');
+const light=()=>capture('light', `${base}/apps/light/`, '#startBtn');
+async function capture(name, url, ready){
   const ctx=await browser.newContext({ viewport:{ width:390, height:607 }, deviceScaleFactor:2, locale:'en-US', isMobile:true, hasTouch:true });
-  const p=await ctx.newPage(); await p.goto('https://demo.handsong.app/', { waitUntil:'networkidle', timeout:90e3 }); await p.waitForTimeout(2500);
-  const png=await p.screenshot({ type:'png' }); await writeFile(path.join(SRC,'demo-raw.png'), png); await ctx.close();
+  const p=await ctx.newPage(); await p.goto(url, { waitUntil:'networkidle', timeout:90e3 }); if(ready) await p.waitForSelector(ready, { state:'visible', timeout:60e3 }); await p.waitForTimeout(2500);
+  const png=await p.screenshot({ type:'png' }); await writeFile(path.join(SRC,name+'-raw.png'), png); await ctx.close();
   const c2=await browser.newContext({ viewport:{ width:800, height:800 } }), q=await c2.newPage(); await q.goto(`${base}/apps/site/404.html`);
-  const r=await q.evaluate(async ([BUDGET])=>{ const img=await new Promise((r,j)=>{ const i=new Image(); i.onload=()=>r(i); i.onerror=j; i.src='/tools/.site-src/demo-raw.png'; });
+  const r=await q.evaluate(async ([BUDGET, RAWURL])=>{ const img=await new Promise((r,j)=>{ const i=new Image(); i.onload=()=>r(i); i.onerror=j; i.src=RAWURL; });
     const c=document.createElement('canvas'); c.width=740; c.height=1151; c.getContext('2d').drawImage(img,0,0,img.width,img.height,0,0,740,1151);
     const size=u=>Math.floor((u.length-u.indexOf(',')-1)*3/4), enc=t=>{ for(let q=0.9;q>0.3;q-=0.04){ const u=c.toDataURL(t,q); if(size(u)<=BUDGET) return { u, q:+q.toFixed(2), n:size(u) }; } return null; };
-    return { webp:enc('image/webp'), jpg:enc('image/jpeg') }; }, [CARD_BUDGET]);
-  for(const [k,e] of Object.entries(r)){ if(!e) throw new Error('demo-card: no encoding under budget'); await writeFile(path.join(OUT,'demo-card.'+k), dataBuf(e.u)); log(`demo-card.${k}: quality ${e.q}, ${e.n} bytes`); }
+    return { webp:enc('image/webp'), jpg:enc('image/jpeg') }; }, [CARD_BUDGET, `/tools/.site-src/${name}-raw.png`]);
+  for(const [k,e] of Object.entries(r)){ if(!e) throw new Error(name+'-card: no encoding under budget'); await writeFile(path.join(OUT,name+'-card.'+k), dataBuf(e.u)); log(`${name}-card.${k}: quality ${e.q}, ${e.n} bytes`); }
   await c2.close();
 }
 
@@ -125,5 +128,6 @@ async function icons(){
 try{
   if(want('forest')){ if(FRESH || !(await exists(RAW))) await renderForest(); else log('forest frame from the cache (--fresh renders again)'); await compose(); }
   if(want('demo')) await demo();
+  if(want('light')) await light();   // SITE-4
   if(want('icons')) await icons();
 } finally { await browser.close().catch(()=>{}); srv.close(); }

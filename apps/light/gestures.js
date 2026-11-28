@@ -39,6 +39,9 @@ export const lightChainOfHand=key=>chainOfHand(key);
    toward the centre. Off = core's law for every hand (the comparison row turns it off). x is the screen position (mirroring already in sx). */
 let mirrorVol=true;
 export const setLightMirrorVolume=on=>{ mirrorVol=!!on; };
+/* LIGHT-11: a timbre per hand — side ('L'|'R') → the engine's timbre position; none set: the live solo timbre, exactly core's payload */
+let instOf=null;
+export const setLightInstOf=f=>{ instOf= typeof f==='function' ? f : null; };
 export function volX(key, x, rx0, rx1){
   const plain=clamp01((x-rx0)/(rx1-rx0)); if(!mirrorVol) return plain;
   const both=playsNotes(handFn.ld.L) && playsNotes(handFn.ld.R), left=handSide(key)==='L', mid=(rx0+rx1)/2;
@@ -185,7 +188,8 @@ export function lightProcessHands(res){
         }
         const noteFx=m=> thereminOn && m && m[FX_GLIDE_KEY]!=null ? (({[FX_GLIDE_KEY]:_g, ...rest})=>rest)(m) : m;
         const sh=octShift[handSide(key)]||0, liveHz= thereminOn ? (sh ? S.hz*Math.pow(periodOf(CUR()), sh) : S.hz) : null;   // the hand's octave shift (0: exactly core's values)
-        const payload=(deg,oct,fxSnap)=>({ deg, oct:sh ? oct+sh : oct, vol:S.vol, fx:fxSnap, inst:leadIdx });
+        const inst= instOf ? (instOf(handSide(key)) ?? leadIdx) : leadIdx;   // LIGHT-11: the hand's own timbre
+        const payload=(deg,oct,fxSnap)=>({ deg, oct:sh ? oct+sh : oct, vol:S.vol, fx:fxSnap, inst });
         if(poly){
           const noteKey=f=> (multi&&!thereminOn) ? liveKey(key,f) : liveKey(key);
           const keys=act.map(noteKey), prevSnd=S.snd||[];

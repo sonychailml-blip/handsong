@@ -32,6 +32,8 @@
 <body class="light">
 <!-- LIGHT-3 (option B): only Light's own elements — the start, the bars, «How to play», the camera's video and the canvas. No markup of Full. -->
 <div id="start" class="on">
+  <!-- LIGHT-10: «A new version is ready» on the start screen (update.js) -->
+  <button id="lightUpdateStart" class="light-update light-update-start" hidden>A new version is ready — tap to update</button>
   <div class="light-start">
     <span class="light-emblem" data-svg="emblem" aria-hidden="true"></span>
     <h1 class="light-word">hand<span>·</span>song</h1>
@@ -76,6 +78,8 @@
   <p id="lightCtlTip" class="light-tip" hidden></p>
   <button id="lightFsBtn" class="light-fsbtn" data-svg="fs-enter" data-i18n-title="light.fs.enter" title="Full screen" aria-label="Full screen" aria-pressed="false" hidden></button>
 </div>
+<!-- LIGHT-10: «A new version is ready» in play, at the top for a while (update.js) -->
+<button id="lightUpdatePlay" class="light-update light-update-play" hidden>A new version is ready — tap to update</button>
 <!-- LIGHT-5: the clip (apps/light/clip.js) — the button top right (shown with the controls, and always while recording), the countdown, the card -->
 <button id="lightRecBtn" class="light-recbtn" data-i18n-title="light.clip.rec" title="Record a clip" aria-label="Record a clip">
   <svg class="light-rec-ring" viewBox="0 0 54 54" aria-hidden="true"><circle cx="27" cy="27" r="25" class="light-rec-track"/><circle id="lightRecArc" cx="27" cy="27" r="25" class="light-rec-arc" stroke-dasharray="157.08" stroke-dashoffset="157.08"/></svg>

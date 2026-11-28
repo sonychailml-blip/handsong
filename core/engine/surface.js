@@ -7,10 +7,12 @@ const SURFACE={
   'core/autosave.js':['AC'],
   'apps/light/boot.js':['initAudio', 'AC', 'setLeadInstr', 'fxSetActive', 'fxChainResplice', 'timbreIdOf', 'timbreIdx', 'FX_FACTORY'],   // LIGHT-3: Light's own start and its profile doors
   'apps/light/clip.js':['createRecordingTap', 'outputFade', 'outputFadeLevel'],   // LIGHT-5: the clip's sound (the heard output) and the card's silence
-  'apps/light/controls.js':['setLeadInstr', 'timbreIdx', 'timbreIdOf', 'timbresOf'],   // LIGHT-3b: the sound menu and the kept choices
+  'apps/light/controls.js':['setLeadInstr', 'timbreIdx'],   // LIGHT-3b: the sound menu and the kept choices (LIGHT-11: per hand)
+  'apps/light/timbres.js':['timbreInstall', 'setTimbreTrim', 'timbreIdx'],   // LIGHT-11: Light's own session timbres and level trims
   'apps/light/engine.js':['noteOn', 'noteOff', 'leadAllOff'],   // LIGHT-3: Light's live note adapter (the engine contract, no recorder)
   'tools/probes/light/hands.js':['leadAllOff'],
   'tools/probes/light/calib.js':['leadAllOff'],
+  'tools/probes/light/timbres.js':['timbreIdx', 'leadAllOff'],   // LIGHT-11
   'tools/probes/light/clip.js':['outputFadeLevel'],
   'tools/probes/light/perhand.js':['routeOfOwner', 'leadAllOff'],   // LIGHT-6b: the per-hand reverb row reads the router   // LIGHT-5: the clip row reads the card's silence   // LIGHT-4: the hand setup row silences its notes   // LIGHT-3: the hands row silences what each run left sounding
   'apps/light/gestures.js':['fxSnapshot', 'FX_GLIDE_KEY', 'fxInstance', 'fxHandRange', 'setTrackRouteOf'],   // LIGHT-3: Light's hands (a cut copy of core's)

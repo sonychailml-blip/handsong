@@ -673,7 +673,7 @@ async function profileCore(){
     const firstSolo=tix.order.find(id=>id.startsWith('solo.')), fing=light && light.chain ? light.chain.slice(2).map(e=>e.fxId+':'+e.params[0].finger+e.params[0].axis).join() : '';
     n++; if(!light || light.roles.join()!=='ld' || light.recording || light.backgrounds.join()!=='camera' || light.scene!==null) miss('profile.light: solo only, nothing recorded, the camera only');
     n++; if(!light || common.some(c=>!c.edo12) || JSON.stringify([...light.moods].sort())!==JSON.stringify(common.map(c=>c.id).sort())) miss('profile.light: the moods must be exactly Full\'s «Familiar» section, all 12-note equal');
-    n++; if(!light || JSON.stringify(light.timbres)!==JSON.stringify([firstSolo])) miss(`profile.light: one timbre, Full's default solo «${firstSolo}»`);
+    n++; if(!light || light.timbres[0]!==firstSolo || light.timbres.length!==8 || light.timbres.some(id=>!id.startsWith('solo.')) || new Set(light.timbres).size!==8) miss(`profile.light: eight built-in solo timbres (LIGHT-11; Light adds its own six for the session), Full's default solo «${firstSolo}» first`);
     /* LIGHT-3b (the founder: the reverb barely grew): the depth drives the reverb's MIX — its third parameter (core/modules/effects/reverb.js
        REV_PARAMS: decay, tone, mix); the tail is fixed longer (v01 0.7 ≈ 1.8 s). Before, the depth drove the decay with the mix left at 0.25. */
     const rv=light && light.chain && light.chain[1], rvMix=rv && rv.params[2], rvTail=rv && rv.params[0];

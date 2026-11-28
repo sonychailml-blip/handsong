@@ -12,6 +12,7 @@ import { onLightStart } from './boot.js';
 import { lightCalWire, lightCalOfferTick } from './calib.js';   // LIGHT-4: the hand setup
 import { lightClipWire, clipBusy } from './clip.js';   // LIGHT-5: the clip
 import { lightLangWire } from './lang.js';   // LIGHT-9: the language by hand
+import { lightUpdateWire } from './update.js';   // LIGHT-10: offline and «a new version is ready»
 import { onLightFrame } from './boot.js';
 import { lightSheetOpen } from './controls.js';
 import { lightCardsWire, lightCardsShow, lightCardsDue, lightCardsOpen } from './cards.js';   // LIGHT-5b: the teaching cards
@@ -28,5 +29,6 @@ onLightStart(()=>{ if(lightCardsDue()) lightCardsShow(); });   // the first star
 onLightFrame((now, hands)=>{ lightCalOfferTick(now, hands, lightCardsOpen() || lightSheetOpen() || clipBusy()); });
 lightClipWire(root=>applyI18n(root));   // LIGHT-5: the clip button, its countdown and card
 lightBoot();
+lightUpdateWire();   // LIGHT-10: the worker after the start (at once when already installed)
 /* LIGHT-5b: «How to play» opens the teaching cards */
 document.getElementById('lightHowBtn').onclick=()=>lightCardsShow();

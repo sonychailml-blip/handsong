@@ -105,6 +105,11 @@ button:focus-visible, a:focus-visible{ outline:2px solid var(--light-acc); outli
 .light-bar.act{ color:var(--light-ink); }
 .light-bar.act .light-bar-track{ box-shadow:var(--light-bar-glow); }
 
+/* LIGHT-10: «A new version is ready» — the start screen's line at its top, the play's pill at the top centre */
+.light-update{ position:fixed; left:50%; top:max(var(--light-gap), env(safe-area-inset-top)); transform:translateX(-50%); z-index:var(--light-z-rec); margin:0; padding:var(--light-chip-pad);
+  border:1px solid var(--light-hair); border-radius:var(--light-r-pill); background:var(--light-glass-hi); color:var(--light-ink); font:inherit; font-size:var(--light-fs-msg); white-space:nowrap; cursor:pointer; }
+.light-update[hidden]{ display:none; }
+.light-update-play{ top:calc(max(var(--light-gap), env(safe-area-inset-top)) + var(--light-rec) + var(--light-gap-sm)); }
 /* LIGHT-9: the start card's quiet foot — the language (a native picker) and «Write to us» */
 .light-foot{ display:flex; align-items:center; justify-content:center; gap:var(--light-gap-lg); margin:var(--light-gap-lg) 0 0; font-size:var(--light-fs-small); color:var(--light-ink-faint); }
 .light-lang{ position:relative; display:flex; align-items:center; gap:var(--light-gap-xs); padding:var(--light-gap-xs) var(--light-gap-sm); border:1px solid var(--light-hair); border-radius:var(--light-r-pill); color:var(--light-ink-dim); cursor:pointer; }   /* LIGHT-9b: the pill fits the shown name; the native picker lies invisible over it */

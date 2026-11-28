@@ -1,4 +1,4 @@
-/* SITE-1 — THE BRAND SITE'S PAGES from one template: apps/site/{,night/,demo/,space/}index.html in English, the same under ru/, the
+/* SITE-1 — THE BRAND SITE'S PAGES from one template: apps/site/{,play/,night/,demo/,space/}index.html (SITE-4: + play/, Handsong) in English, the same under ru/, the
    bilingual 404.html, sitemap.xml and robots.txt. The texts live in tools/site/texts.mjs. The written files are plain static HTML (no
    build step on the host); tools/site-check.mjs fails when a page differs from what this tool makes.
      node tools/site-pages.mjs           report which files are out of date (exit 1 if any)
@@ -10,8 +10,8 @@ import { T, LINKS, ORIGIN } from './site/texts.mjs';
 
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), SITE=path.join(ROOT,'apps/site');
 export const CSP="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'";
-export const PAGES=['home','night','demo','space'];   // SITE-2: «Install» renamed «Space» (/install redirects: apps/site/vercel.json)
-const SLUG={ home:'/', night:'/night/', demo:'/demo/', space:'/space/' };
+export const PAGES=['home','light','night','demo','space'];   // SITE-4: + Handsong (play.handsong.app), first   // SITE-2: «Install» renamed «Space» (/install redirects: apps/site/vercel.json)
+const SLUG={ home:'/', light:'/play/', night:'/night/', demo:'/demo/', space:'/space/' };
 const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 export const pathOf=(lang,page)=>T[lang].prefix+SLUG[page];
 const other=l=>l==='en'?'ru':'en';
@@ -113,6 +113,7 @@ function home(lang){
 <section id="apps" class="wrap hero-home">
 <div class="intro"><h1 class="h1">${h1(H.h1)}</h1><p class="sub">${esc(H.sub)}</p></div>
 <div class="apps">
+${card('light', `<span class="screen">${pic('light-card',740,1151,'')}</span>`, C.light.go, LINKS.light, C.light.more, p('light'))}
 ${card('night', pic('night-card',740,1151,''), C.night.go, LINKS.night, C.night.more, p('night'))}
 ${card('demo', `<span class="screen">${pic('demo-card',740,1151,'',true)}</span>`, C.demo.go, LINKS.demo, C.demo.more, p('demo'))}
 ${card('space', wall('',true), C.space.go, p('space'), C.space.more, p('space')+'#contact')}
@@ -131,8 +132,9 @@ ${H.diff.map(([b,s])=>`<li><b>${esc(b)}</b> <span>${esc(s)}</span></li>`).join('
 }
 function appPage(lang,page){
   const t=T[lang], P=t[page], heroPic= page==='night' ? `<div class="hero-pic hero-night">${pic('night-card',740,1151,P.picAlt)}</div>`
-    : page==='demo' ? `<div class="hero-pic hero-demo"><span class="screen">${pic('demo-card',740,1151,P.picAlt)}</span></div>` : `<div class="hero-pic hero-space">${wall(P.picAlt)}</div>`;
-  const goHref= page==='night' ? LINKS.night : page==='demo' ? LINKS.demo : '#contact';
+    : page==='demo' ? `<div class="hero-pic hero-demo"><span class="screen">${pic('demo-card',740,1151,P.picAlt)}</span></div>`
+    : page==='light' ? `<div class="hero-pic hero-light"><span class="screen">${pic('light-card',740,1151,P.picAlt)}</span></div>` : `<div class="hero-pic hero-space">${wall(P.picAlt)}</div>`;
+  const goHref= page==='night' ? LINKS.night : page==='demo' ? LINKS.demo : page==='light' ? LINKS.light : '#contact';
   let body=`<section class="wrap hero">
 ${heroPic}
 <div class="hero-text">
@@ -155,8 +157,8 @@ ${P.feats.map(s=>`<li>${esc(s)}</li>`).join('\n')}
 </div></section>
 <section class="wrap band-wrap"><div class="band"><p class="band-h">${esc(P.band)}</p><a class="btn btn-l" href="${LINKS.night}">${esc(P.go)}</a></div></section>
 `;
-  if(page==='demo') body+=`<section class="wrap band-wrap"><div class="band"><p class="band-h">${esc(P.band)}</p><span class="email email-l">${LINKS.email}</span></div></section>
-`;
+  if(page==='demo' || page==='light') body+=`<section class="wrap band-wrap"><div class="band"><p class="band-h">${esc(P.band)}</p><span class="email email-l">${LINKS.email}</span></div></section>
+`;   // SITE-4: Handsong's page too
   if(page==='space') body+=`<section class="rule"><div class="wrap stack">
 <h2 class="h2">${esc(P.spacesH)}</h2>
 <div class="tiles">

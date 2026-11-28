@@ -192,7 +192,12 @@ const ROWS8={
   it:['Lingua','Scrivici','Schermo intero su iPhone','Tocca Condividi in basso in Safari, poi «Aggiungi alla schermata Home». Così Handsong si apre dalla schermata Home senza le barre del browser.'],
   ka:['ენა','მოგვწერეთ','მთელ ეკრანზე iPhone-ზე','Safari-ში ქვემოთ დააჭირეთ „გაზიარებას“, შემდეგ — „მთავარ ეკრანზე დამატებას“. ასე Handsong მთავარი ეკრანიდან ბრაუზერის ზოლების გარეშე გაიხსნება.'],
 };
-const PARTS=[[K,ROWS],[K2,ROWS2],[K3,ROWS3],[K4,ROWS4],[K5,ROWS5],[K6,ROWS6],[K7,ROWS7],[K8,ROWS8]];
+/* LIGHT-10: the new-version line */
+const K9=['light.update.ready'];
+const ROWS9={ en:['A new version is ready — tap to update'], ru:['Готова новая версия — нажмите, чтобы обновить'], es:['Hay una versión nueva — toca para actualizar'],
+  pt:['Há uma versão nova — toque para atualizar'], de:['Eine neue Version ist da — zum Aktualisieren tippen'], fr:['Une nouvelle version est prête — touchez pour mettre à jour'],
+  it:['È pronta una nuova versione — tocca per aggiornare'], ka:['ახალი ვერსია მზადაა — შეეხეთ განსაახლებლად'] };
+const PARTS=[[K,ROWS],[K2,ROWS2],[K3,ROWS3],[K4,ROWS4],[K5,ROWS5],[K6,ROWS6],[K7,ROWS7],[K8,ROWS8],[K9,ROWS9]];
 export const LIGHT_TEXTS=Object.freeze(Object.fromEntries(Object.keys(ROWS).map(lang=>{
   for(const [keys,rows] of PARTS) if(!rows[lang] || rows[lang].length!==keys.length) throw new Error('[light] texts: '+lang+' is incomplete');
   return [lang, Object.freeze(Object.assign({}, ...PARTS.map(([keys,rows])=>Object.fromEntries(keys.map((k,i)=>[k, rows[lang][i]])))))]; })));

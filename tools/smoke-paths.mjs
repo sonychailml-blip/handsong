@@ -233,6 +233,50 @@ async function redirectCheck(){ const served=[], srv=await serve(ROOT,'/',served
 /* the frame counter imports vision.js only once Night's boot is done: an import at document start would load the module graph out of Night's order
    (scalepick.js first; core/scales.js has a top-level await) — it stalled the page's start */
 const FRAMES_COUNTER=()=>{ (async ()=>{ for(let i=0;i<2400;i++){ try{ if(!(window.__nightBoot && window.__nightBoot.state().done)) throw 0; const V=await import('/core/vision.js'); if(V.pumpStats().processed>0){ window.__frames=V.pumpStats().processed; return; } }catch(e){} await new Promise(r=>setTimeout(r,100)); } })(); };
+/* LIGHT-10 — LIGHT OFFLINE on its production tree: (1) the worker is NOT registered before Play (the founder: loaded in the background once playing —
+   the first load never slowed); after Play the precache fills and takes control: one cache of this app, every listed file in it with its hash, nothing
+   outside the list, every own file the start fetched listed; (2) a second visit OFFLINE: Play works and a camera frame is shown, no listed file asked
+   of the network. CONTROL: the same offline visit without the worker must fail. Every wait has an upper limit and fails when it is reached. */
+async function lightPrecacheRow(dir){
+  const bad=[], notes=[], miss=s=>bad.push(s), L=readPrecache(dir), PRE='handsong-light-precache-';
+  if(!L){ out('[smoke] Light offline: NOT A PASS — the build wrote no precache list'); return 1; }
+  const listed=new Set(L.files.map(f=>f[0])); if(L.files.some(f=>/^tools\//.test(f[0]))) miss('the list holds a tool');
+  const srv=http.createServer(async (q,r)=>{ let p=decodeURIComponent(new URL(q.url,'http://x').pathname); if(p.endsWith('/')) p+='index.html';
+    try{ const b=await readFile(path.join(dir,p)); r.writeHead(200,{ 'content-type':MIME[path.extname(p).toLowerCase()]||'application/octet-stream', 'cache-control':'no-store' }); r.end(b); }catch(e){ r.writeHead(404); r.end(); } });
+  await new Promise(res=>srv.listen(0,'127.0.0.1',res)); const origin=`http://127.0.0.1:${srv.address().port}`;
+  const browser=await chromium.launch({ channel:'chrome', headless:true, args:['--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream','--autoplay-policy=no-user-gesture-required','--disable-background-timer-throttling','--disable-renderer-backgrounding'] });
+  const until=async (p, fn, arg, ms, what)=>{ const t0=Date.now(); while(Date.now()-t0<ms){ if(await p.evaluate(fn, arg).catch(()=>false)) return true; await new Promise(r=>setTimeout(r,250)); } miss(`${what}: not within ${ms/1000} s`); return false; };
+  const play=async (p, what)=>{ await p.waitForSelector('#startBtn',{ state:'visible', timeout:60e3 }); await p.waitForTimeout(500); await p.click('#startBtn');
+    return until(p, async ()=>{ const B=await import('/apps/light/boot.js'); const d=B.lightBootDbg(); return d.frames>0 && d.picture; }, null, 120e3, what+': a camera frame shown'); };
+  try{
+    const ctx=await browser.newContext({ viewport:{ width:1280, height:800 } }); await ctx.grantPermissions(['camera','microphone'],{ origin });
+    const seen=new Set(); ctx.on('request', q=>{ const u=new URL(q.url()); if(u.origin===origin) seen.add(decodeURIComponent(u.pathname.slice(1))||'index.html'); });
+    let p=await ctx.newPage(); await p.goto(origin+'/'); await p.waitForSelector('#startBtn',{ state:'visible', timeout:60e3 }); await p.waitForTimeout(2500);
+    if(await p.evaluate(async ()=>!!(await navigator.serviceWorker.getRegistration()))) miss('the worker was registered before Play'); else notes.push('before Play: no worker registered');
+    if(await play(p,'first visit')){
+      const n=L.files.filter(f=>f[3]!=='nosimd').length;
+      const ok=await until(p, async ([pre, v, n])=>{ const k=(await caches.keys()).find(x=>x===pre+v); return !!navigator.serviceWorker.controller && !!k && (await (await caches.open(k)).keys()).length>=n; }, [PRE, L.version, n], 180e3, 'first visit: the precache filled (with the top-up) and in control');
+      if(ok){ const k=await p.evaluate(async ({ files, pre })=>{ const names=await caches.keys(), mine=names.filter(x=>x.startsWith(pre)), out={ names, extra:[], missing:[], wrong:[] }; if(mine.length!==1) return out;
+          const c=await caches.open(mine[0]), keys=(await c.keys()).map(q=>new URL(q.url).pathname.slice(1)), want=new Map(files.map(f=>[f[0], f[1]]));
+          out.extra=keys.filter(x=>!want.has(x)); out.missing=files.filter(f=>f[3]!=='nosimd' && !keys.includes(f[0])).map(f=>f[0]);
+          for(const x of keys) if(want.has(x)){ const b=await (await c.match('/'+x)).arrayBuffer(), h=[...new Uint8Array(await crypto.subtle.digest('SHA-256', b))].map(v=>v.toString(16).padStart(2,'0')).join(''); if(h!==want.get(x)) out.wrong.push(x); }
+          return out; }, { files:L.files, pre:PRE });
+        if(k.names.length!==1) miss('caches after the first visit: '+k.names.join(', '));
+        if(k.extra.length) miss('cached outside the list: '+k.extra.slice(0,5).join(', ')); if(k.missing.length) miss('listed but not cached: '+k.missing.slice(0,5).join(', ')); if(k.wrong.length) miss('cached with another hash: '+k.wrong.slice(0,5).join(', '));
+        const uncovered=[...seen].filter(x=>!listed.has(x) && !/^(_vercel\/|sw\.js$|favicon\.ico$)/.test(x) && !/vision_wasm_nosimd/.test(x)); if(uncovered.length) miss('the start fetched files the list does not hold: '+uncovered.slice(0,6).join(', '));
+        notes.push(`first visit: ${L.files.length} listed (version ${L.version}), every wanted file cached with its hash, nothing outside, the start's ${seen.size} own files covered`); } }
+    await p.close();
+    await ctx.setOffline(true); const failedListed=[]; const onFail=q=>{ const u=new URL(q.url()); if(u.origin===origin && listed.has(decodeURIComponent(u.pathname.slice(1)))) failedListed.push(u.pathname); }; ctx.on('requestfailed', onFail);
+    p=await ctx.newPage(); let off=false; try{ await p.goto(origin+'/?v=2'); off=await play(p,'offline second visit'); }catch(e){ miss('offline second visit: '+(e&&e.message||e).split('\n')[0]); }
+    ctx.off('requestfailed', onFail); if(failedListed.length) miss('offline, listed files went to the network: '+failedListed.slice(0,5).join(', '));
+    if(off) notes.push('offline second visit: Play works and a camera frame is shown, no network');
+    { const c2=await browser.newContext({ serviceWorkers:'block' }); await c2.grantPermissions(['camera','microphone'],{ origin }); const q=await c2.newPage(); await q.goto(origin+'/').catch(()=>{}); await c2.setOffline(true);
+      const loaded=await q.goto(origin+'/?v=3',{ timeout:20e3 }).then(()=>q.waitForSelector('#startBtn',{ state:'visible', timeout:10e3 })).then(()=>true, ()=>false); await c2.close();
+      if(loaded) miss('CONTROL: offline without the worker the page still opened — the offline check cannot fail'); else notes.push('CONTROL: offline without the worker the page does not open'); }
+  } finally { await browser.close(); srv.close(); }
+  out(`[smoke] Light offline (LIGHT-10), the production tree: ${bad.length?'NOT A PASS — '+bad.length+' problem(s)':'PASS'}`); for(const n of notes) out('    '+n); for(const b of bad.slice(0,10)) out('    '+b);
+  return bad.length ? 1 : 0;
+}
 async function precacheRows(dir){
   const bad=[], notes=[], miss=s=>bad.push(s), WORK=path.join(BUILD_DIR,'night-precache'), A=path.join(WORK,'A'), B=path.join(WORK,'B'), C=path.join(WORK,'C'), CHANGED='apps/night/texts.js';
   rmSync(WORK,{ recursive:true, force:true }); cpSync(dir,A,{ recursive:true }); cpSync(dir,B,{ recursive:true });
@@ -519,6 +563,8 @@ async function precacheUrlRow(url, phone=false){
 { const i=argv.indexOf('--precache-url'); if(i>=0){ const f=await precacheUrlRow(argv[i+1], argv.includes('--phone')); out(`[smoke] --precache-url: ${f ? 'NOT A PASS' : 'PASS'} (the deployed Night only; not a verdict of the whole test)`); process.exit(f ? 1 : 0); } }
 /* --only app@prefix [--repeat N] (NIGHT-3): one repo-tree page, N times — a diagnosis of one target; it is never a pass of the whole test */
 /* --precache DIR (NIGHT-14): only the precache rows, on a built Night tree — a diagnosis, never a verdict of the whole test */
+/* --light-precache (LIGHT-10): builds Light's production tree and runs only its offline row — a diagnosis, never a verdict of the whole test */
+if(argv.includes('--light-precache')){ const f=await lightPrecacheRow(build('light','production')); out(`[smoke] --light-precache: ${f?'failed':'ok'} (a diagnosis, not a verdict of the whole test)`); process.exit(f?1:0); }
 { const i=argv.indexOf('--precache'); if(i>=0){ const f=await precacheRows(path.resolve(ROOT, argv[i+1])); out(`[smoke] --precache ${argv[i+1]}: ${f?'failed':'ok'} (a diagnosis, not a verdict of the whole test)`); process.exit(f?1:0); } }
 { const i=argv.indexOf('--only'); if(i>=0){ const list=argv[i+1].split(',').map(x=>x.split('@')), j=argv.indexOf('--repeat'), N=j>=0 ? +argv[j+1] : 1; let f=0;
     for(let k=0;k<N;k++) for(const [app,prefix] of list){ const t0=Date.now(), b=await run(app,ROOT,prefix||'/'); out(`[smoke] --only ${app}@${prefix||'/'} ${k+1}/${N}: ${b.length?'stalled or failed':'ok'} in ${((Date.now()-t0)/1000).toFixed(0)} s`); if(b.length) f++; }
@@ -545,7 +591,7 @@ if(BUILD){ fails+=await redirectCheck();
   { const prod=build('light','production'), prev=build('light','preview');   // LIGHT-7: Light's trees (production pruned to what it loads)
     for(const prefix of ['/','/some/sub/']) if((await run('light',prod,prefix)).length) fails++;
     if((await run('light',prev,'/')).length) fails++;
-    fails+=await probeGate('light',prod,false); fails+=await probeGate('light',prev,true); }
+    fails+=await probeGate('light',prod,false); fails+=await probeGate('light',prev,true); fails+=await lightPrecacheRow(prod); }   // LIGHT-10: offline
   if((await run('night',build('night','release'),'/',false,false)).length) fails++;
   { const dep=build('night','deploy'), ed=await readFile(path.join(dep,'core/edition.js'),'utf8');   // NIGHT-7: the tree Vercel's production makes for Night: the release edition, no probes
     if(!/EDITION='release'/.test(ed)){ out('[smoke] night deploy: NOT A PASS — not the release edition'); fails++; }

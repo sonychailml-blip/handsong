@@ -52,6 +52,11 @@ Read: `docs/light/PLAN.md` (decisions, where each part comes from, core changes,
 - `LIGHT-9` (2026-11-27): the bottom band on Android fixed (the canvas was 100vh); the language picker on the start card; the hand-setup offer
   after a minute of playing; the iPhone home-screen card; «handsong.app» in the clip; «Write to us». Next: `LIGHT-10` — offline (precache after
   the start, a new-version notice as in Night); then the timbres (the founder's choice), the phone checks, the site card.
+- `LIGHT-9b/9c`: full screen turns freely; the corner button stays; one icon both ways; the language pill fits.
+- `LIGHT-10` (2026-11-27): offline — Light's own precache worker, registered after Play; «a new version is ready». Next: the timbres (the founder
+  chooses from the proposal), the phone checks (Poco, iPhone), the site card; later the Android app (a Trusted Web Activity).
+- `LIGHT-11` (2026-11-28): fourteen timbres in six groups (eight built-in, six Light's own session records: soft lead, brass, strings, three basses),
+  a timbre per hand (two columns when both hands play), levels measured. Next: the founder listens; the latency lab (the founder's new task).
 
 ## Deploy (LIGHT-7; the founder sets the project up once, as for Night)
 - Vercel → Add New Project → this repository; name `handsong-light`; Framework **Other**; Root Directory: the repository root (the shared

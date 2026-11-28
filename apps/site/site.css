@@ -9,7 +9,7 @@
 :root{
   --bg:#0f1012; --fg:#ecedef; --white:#ffffff; --muted:#9a9ea6; --dim:#868a92; --body:#c4c7cd; --soft:#a7abb3;
   --rule:#1f2125; --line:#24262b; --edge:#2f3238; --panel:#17181b; --dot:#5d6169;
-  --night:#c8f56a; --demo:#a9bbe8; --space:#f0d2a2;
+  --night:#c8f56a; --demo:#a9bbe8;--light:#ffb44a; --space:#f0d2a2;
   --serif:Literata, Georgia, 'Times New Roman', serif; --sans:Inter, 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
   --wrap:1200px; --gut:24px; --r-card:30px; --r-panel:18px; --r-band:24px;
   color-scheme:dark;
@@ -76,6 +76,7 @@ i{font-style:italic}
 .intro{display:flex;flex-direction:column;gap:8px;align-items:center;text-align:center}
 .apps{width:100%;display:flex;flex-wrap:wrap;gap:28px;justify-content:center;align-items:stretch}
 .app{flex:1 1 300px;max-width:370px;min-width:0;display:flex;flex-direction:column;gap:18px}
+@media (min-width:1100px){ .app{flex-basis:230px} }   /* SITE-4: four cards in one row on a wide screen (two by two in between, one column on a phone) */
 .app-pic{display:block;aspect-ratio:9/14;position:relative;border-radius:var(--r-card);overflow:hidden;text-decoration:none;isolation:isolate;transition:transform .35s ease, box-shadow .35s ease}
 .app-pic:hover{transform:translateY(-3px)}
 .app-pic picture,.app-pic img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
@@ -87,6 +88,10 @@ i{font-style:italic}
 .app-night .app-pic{background:#070a0e;box-shadow:0 30px 80px -30px rgba(160,230,110,.35)}
 .app-night .app-cap{background:linear-gradient(transparent, rgba(5,7,10,.88) 55%)}
 .app-night .badge,.hero-night~.hero-text .label{color:var(--night)}
+/* SITE-4: Handsong (play.handsong.app) — its start screen in a phone, on Light's warm dark ground with its amber */
+.app-light .app-pic{background:linear-gradient(165deg,#2a2018 0%,#120f0c 100%);box-shadow:0 30px 80px -30px rgba(255,180,74,.35)}
+.app-light .app-cap{background:none}
+.app-light .badge,.hero-light~.hero-text .label{color:var(--light)}
 .app-demo .app-pic{background:linear-gradient(165deg,#1e2840 0%,#0d111a 100%);box-shadow:0 30px 80px -30px rgba(120,150,230,.35)}
 .app-demo .app-cap{background:none}
 .app-demo .badge,.hero-demo~.hero-text .label{color:var(--demo)}
@@ -127,6 +132,7 @@ i{font-style:italic}
 .hero-pic{flex:0 1 370px;min-width:0;max-width:100%;aspect-ratio:9/14;border-radius:var(--r-card);position:relative;overflow:hidden}
 .hero-pic picture,.hero-pic img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .hero-night{background:#070a0e;box-shadow:0 40px 100px -30px rgba(160,230,110,.4)}
+.hero-light{background:linear-gradient(165deg,#2a2018 0%,#120f0c 100%);box-shadow:0 40px 100px -30px rgba(255,180,74,.4)}
 .hero-demo{background:linear-gradient(165deg,#1e2840 0%,#0d111a 100%);box-shadow:0 40px 100px -30px rgba(120,150,230,.4)}
 .hero-space{box-shadow:0 40px 100px -30px rgba(244,201,138,.35)}
 .hero-pic::after{content:'';position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);pointer-events:none}
