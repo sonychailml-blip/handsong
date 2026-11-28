@@ -23,7 +23,7 @@ SPLIT-2: the Full app's entry.
 
 ## apps/light/boot.js
 LIGHT-3 — LIGHT'S OWN START AND FRAME LOOP (option B: no shared legacy UI).
-- const (6): `PROFILE`, `onLightFrame`, `onLightStart`, `lightStarted`, `setLightFace`, `lightBootDbg`
+- const (7): `PROFILE`, `onLightFrame`, `onLightStart`, `lightStarted`, `setLightFace`, `lightBootDbg`, `lightDrawAlwaysDbg`
 - fn (3): `lightFit`, `flare`, `lightBoot`
 
 ## apps/light/calib.js
@@ -49,7 +49,7 @@ LIGHT-3b — THE CONTROLS WHEN THE HANDS LEAVE (variant B, the founder's choice 
 
 ## apps/light/draw.js
 LIGHT-3 — LIGHT'S CANVAS: the camera picture (the cover crop: the same rectangle remaps the hands — rule #12; the front camera mirrored — rule #13, through core mirrored()), the note field and the …
-- const (2): `RING_FADE_MS`, `lightDrawClockDbg`
+- const (3): `RING_FADE_MS`, `lightDrawAnimating`, `lightDrawClockDbg`
 - fn (3): `lightSyncViewRect`, `litFingers`, `lightDrawFrame`
 
 ## apps/light/engine.js
@@ -1919,7 +1919,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 UI-1 — «NIGHT labels follow the room»: the founder entered the rain and the Sound button still read «Firefly» while another timbre played.
 - fn (1): `checkNightLabels`
 
-_383 modules, 3507 exported names._
+_383 modules, 3509 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

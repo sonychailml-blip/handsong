@@ -81,6 +81,7 @@ export function litFingers(h){ if(!h.pinch) return new Set();
    RING_FADE_MS (the sound's tail seen). */
 export const RING_FADE_MS=500;
 let clock=()=>performance.now(), was=new Map(), fading=[];
+export const lightDrawAnimating=()=>fading.length>0;   // LIGHT-14: rings still melting → the loop keeps drawing (one more draw clears the last)
 export const lightDrawClockDbg=f=>{ clock= typeof f==='function' ? f : ()=>performance.now(); was=new Map(); fading=[]; };   // probe only: a clock of its own; clears the rings' memory
 function ring(x, y, v, rev, k, grow){
   ctx.globalAlpha=0.9*k; ctx.beginPath(); ctx.arc(x, y, 16+6*v+grow, 0, Math.PI*2); ctx.stroke();

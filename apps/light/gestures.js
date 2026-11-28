@@ -217,8 +217,8 @@ export function lightProcessHands(res){
     if(noteHand(key)){
       const vD=depthN(S,lm), ck=chainOfHand(key);   // LIGHT-6b: written into this hand's own chain; the entries are the live chain's (the second chain has no list of its own in the state)
       for(const eff of fxChainOf(chainKeyOf(ROLE))){
-        if(ck!==chainKeyOf(ROLE) && !trackFx.includes(eff.fxId)) continue;
         if(!eff||eff.fxId===FX_VOL) continue;
+        if(ck!==chainKeyOf(ROLE) && !trackFx.includes(eff.fxId)) continue;   // LIGHT-14: after the empty-entry check
         let ps=null;
         eff.params.forEach((pa,i)=>{ if(pa.mode!=='drive' || pa.hand!=='play' || pa.axis!=='z') return; if(!ps) ps=fxParamsOf(ck,eff.fxId); const p=ps[i]; if(p) p.set(pa.inv ? 1-vD : vD); });
       }

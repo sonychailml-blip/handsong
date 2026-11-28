@@ -1,5 +1,5 @@
 /* LIGHT-11 — LIGHT'S TIMBRES (the founder: few but good, from different families; a lead is the heart of Light; 2–3 basses; a timbre per hand).
-   Fourteen in six groups. Eight are core's built-in solo records (the profile's list, data/light.json); six are LIGHT'S OWN records, written here
+   Seventeen in seven groups. Eight are core's built-in solo records (the profile's list, data/light.json); nine are LIGHT'S OWN records, written here
    from published synthesis methods on core's engines (breath: harmonics + formants + breath noise + its own vibrato; subtractive: oscillators
    through a lowpass with a strike; Karplus–Strong string) and installed for the session through core's door (audio.timbreInstall — pack ids
    «light/…», checked by core's bounds T5, never in Full's lists, as Night's rain room does). Each entry: its group, its name in Light's eight

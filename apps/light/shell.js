@@ -39,7 +39,8 @@ function frame(now, hands){
   if(play && play2 && SIDE.play2===SIDE.play) SIDE.play2= SIDE.play==='left' ? 'right' : 'left';   // two hands: never one edge
   place(R, SIDE.play); place(F, SIDE.fx); place(R2, SIDE.play2);
   FX_BARS.forEach(([id],i)=>{ const b=F.querySelector(`[data-bar="${id}"]`); fill(b, vals[i]); b.classList.toggle('act', !!(fx && fx.pinch && fx.finger===i)); });
-  const rb=R.querySelector('.light-bar'); fill(rb, valOf('reverb', play ? lightChainOfHand(play.key) : chainKeyOf('ld')));   // LIGHT-6b: the playing hand's own reverb rb.classList.toggle('act', !!(play && play.pinch));
+  const rb=R.querySelector('.light-bar'); fill(rb, valOf('reverb', play ? lightChainOfHand(play.key) : chainKeyOf('ld')));   // LIGHT-6b: the playing hand's own reverb
+  rb.classList.toggle('act', !!(play && play.pinch));   // LIGHT-14: this line had slipped into the comment above (the glow never lit)
   F.classList.toggle('on', shownAt(fxSeen, now, BAR_FX_MS));
   R.classList.toggle('on', shownAt(revSeen, now, BAR_REV_MS));
   { const b=R2.querySelector('.light-bar'); if(play2) fill(b, valOf('reverb', lightChainOfHand(play2.key))); b.classList.toggle('act', !!(play2 && play2.pinch)); R2.classList.toggle('on', !!play2 && shownAt(rev2Seen, now, BAR_REV_MS)); }

@@ -7,19 +7,19 @@ import { initAudio, AC, setLeadInstr, fxSetActive, fxChainResplice, timbreIdOf, 
 import { video, initDetector, startCamera, setHandsSink, pollFrame, canvas } from '../../core/vision.js';
 import { profileWire, profileApply } from '../../core/profile.js';
 import { scaleId, tonic, tonicCents, leadIdx, phoneInstr, splitOn, handFn, voiceMode, fx, fxChainOf, chainKeyOf, fxIsScalar, setFxChain,
-  setScaleId, setTonic, setTonicCents, setHandFn, setVoiceMode, sx, sy } from '../../core/state.js';
+  setScaleId, setTonic, setTonicCents, setHandFn, setVoiceMode, sx, sy, rectPref, camFacing, rectOctReg } from '../../core/state.js';
 import { fxParamsOf } from '../../core/gestures/fxhand.js';
-import { t } from '../../core/i18n.js';
+import { t, lang } from '../../core/i18n.js';
 import { lightProcessHands, lightHandsView, lightHandsReset, lightVoiceModeReset, lightTrackKey, setLightTrackFx } from './gestures.js';
 import { lightAllOff } from './engine.js';
-import { lightDrawFrame, lightSyncViewRect } from './draw.js';
+import { lightDrawFrame, lightSyncViewRect, lightDrawAnimating } from './draw.js';
 import { lightCalBusy, lightCalFrame } from './calib.js';   // LIGHT-4: the hand setup takes the frames while it runs
-import { fsBegin, fsCamera, fsStarted } from './fullscreen.js';
-import { lightTimbresInstall } from './timbres.js';   // LIGHT-11: Light's own timbres and the level trims   // LIGHT-8: full screen on Play (never while the camera prompt may come)
+import { fsBegin, fsCamera, fsStarted } from './fullscreen.js';   // LIGHT-8: full screen on Play (never while the camera prompt may come)
+import { lightTimbresInstall } from './timbres.js';   // LIGHT-11: Light's own timbres and the level trims
 
 export const PROFILE='profile.light';
 const $=id=>document.getElementById(id);
-let shown=null, started=false, starting=false, face=null;
+let shown=null, started=false, starting=false, face=null, dirty=true;   // dirty: something new to draw (LIGHT-14)
 const stage={ audio:false, det:false };
 const listeners=[];
 export const onLightFrame=f=>{ listeners.push(f); };   // the shell's bars, once per screen frame, with the hands in view
@@ -29,7 +29,7 @@ export const lightStarted=()=>started;
 /* LIGHT-9: the drawing buffer = the canvas's box as laid out (light.css: the visible height, without an edge-to-edge bottom inset); core's own
    resize (innerWidth × innerHeight) runs first on each resize, this one after it */
 export function lightFit(){ const r=canvas.getBoundingClientRect(), w=Math.round(r.width)||innerWidth, h=Math.round(r.height)||innerHeight;
-  if(canvas.width!==w) canvas.width=w; if(canvas.height!==h) canvas.height=h; }
+  if(canvas.width!==w) canvas.width=w; if(canvas.height!==h) canvas.height=h; dirty=true; }   // a resize clears the canvas: draw again
 addEventListener('resize', lightFit); if(window.visualViewport) window.visualViewport.addEventListener('resize', lightFit); lightFit();
 
 /* a profile's solo chain into the live state and sound (as the shared UI's profChain): the data, then the sound halves, then each fixed value */
@@ -70,7 +70,7 @@ export const setLightFace=f=>{ face=f; };
 
 let frames=0, rawHands=[];   // processed camera frames (the path check and the probes read it); this frame's raw hands (drawn during the setup)
 function onHands(f){
-  frames++;
+  frames++; dirty=true;
   if(f.frame) lightSyncViewRect(f.frame.width, f.frame.height);
   rawHands=((f.res&&f.res.landmarks)||[]).map(lm=>({ lm, pinch:false, play:false }));
   if(lightCalBusy()){ lightCalFrame(f.res, performance.now()); lightProcessHands(null); }   // the setup runs: the hands play nothing (held notes close by the watchdog)
@@ -78,11 +78,18 @@ function onHands(f){
   if(f.frame){ if(shown) shown.close(); shown=f.frame; }
 }
 const sxOf=x=>sx(x, canvas.width), syOf=y=>sy(y, canvas.height);
+/* LIGHT-14: THE CANVAS IS DRAWN ONLY WHEN SOMETHING NEW IS THERE TO SHOW — a processed camera frame (the picture and its hands, rule #8: between
+   two such frames every redraw was the same image), rings still melting, a resize, or a change the field shows (scale, key, field, hand
+   functions, language, camera side); before the first processed frame the live video, every screen frame. A faster camera draws more often by
+   itself; the screen's own rate stays the ceiling. The bars, controls and clip still run every screen frame. */
+let scene=[], ticks=0, draws=0, drawAlways=false;
+function sceneChanged(){ const v=[scaleId, tonic, tonicCents, rectPref, handFn.ld.L, handFn.ld.R, lang, camFacing, rectOctReg('ld'), canvas.width, canvas.height];
+  let ch=v.length!==scene.length; for(let i=0;i<v.length && !ch;i++) if(v[i]!==scene[i]) ch=true; scene=v; return ch; }
 function loop(now){
-  requestAnimationFrame(loop);
+  requestAnimationFrame(loop); ticks++;
   pollFrame();
-  const hands=lightCalBusy() ? rawHands : lightHandsView();
-  lightDrawFrame(shown || video, hands, sxOf, syOf);
+  const hands=lightCalBusy() ? rawHands : lightHandsView(), sc=sceneChanged();
+  if(dirty || sc || !shown || drawAlways || lightDrawAnimating()){ dirty=false; draws++; lightDrawFrame(shown || video, hands, sxOf, syOf); }
   for(const f of listeners) f(now, hands);
 }
 
@@ -121,4 +128,5 @@ export function lightBoot(){
     if(l) import(l.href).then(m=>m.install()).catch(e=>console.warn('[probe] the probes failed to load', e)); }   // eslint-disable-line no-console
 }
 /* probe only */
-export const lightBootDbg=()=>({ started, stage:{ ...stage }, frames, picture:!!shown });
+export const lightBootDbg=()=>({ started, stage:{ ...stage }, frames, picture:!!shown, ticks, draws });
+export const lightDrawAlwaysDbg=v=>{ drawAlways=!!v; };   // the CONTROL: the old way (every screen frame)

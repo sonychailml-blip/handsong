@@ -3,7 +3,9 @@
    outer ring at EVERY sounding finger — three fingers draw six rings, one finger two (CONTROL: an effects-hand pinch draws none); 13b: released,
    they melt (still drawn 100 ms later, gone after RING_FADE_MS); the outer ring grows with the reverb; (3) the profile's reverb tail 0.85 and tone
    0.79; Light's three pads release within 0.7 s (CONTROL: core's own records still release over 2.5–2.8 s — Full unchanged); the profile offers 19
-   scales, harmonic and melodic major among them, none of the twelve dropped. Everything is put back. */
+   scales, harmonic and melodic major among them, none of the twelve dropped. (4) LIGHT-14: the canvas is drawn only when something is new — over
+   1.2 s of the running page, draws ≤ processed frames + 2 and at least one while frames come; CONTROL: the old way (lightDrawAlwaysDbg) draws
+   at every screen frame, exactly. Everything is put back. */
 import * as ST from '../../../core/state.js';
 import { CAM_MARGIN } from '../../../core/config.js';
 import { leadAllOff } from '../../../core/audio.js';
@@ -15,6 +17,7 @@ import { lightHandsProbe, lightProcessHandsProbe, lightHandsView, lightHandsRese
 import { setHand } from '../../../apps/light/controls.js';
 import { lightDrawFrame, lightDrawClockDbg, RING_FADE_MS } from '../../../apps/light/draw.js';
 import { LIGHT_RECORDS } from '../../../apps/light/timbres.js';
+import { lightBootDbg, lightDrawAlwaysDbg } from '../../../apps/light/boot.js';   // LIGHT-14
 
 const W=1000, H=600, FPS=30;
 export async function checkLightFeel(){
@@ -63,6 +66,17 @@ export async function checkLightFeel(){
     if(Object.values(coreRel).some(v=>!(v>=2.5))) miss('CONTROL: the core pads changed: '+JSON.stringify(coreRel)); else notes.push('CONTROL: the core pads still release '+Object.values(coreRel).join(' / ')+' s');
     const gone=['octatonic-wh','octatonic-hw','messiaen-3','enigmatic','prometheus','egyptian','hungarian-penta','scriabin-penta','major-blues','lydian-penta','dorian-hexa','mixolydian-hexa'];
     if(P.moods.length!==19 || gone.some(g=>P.moods.includes(g)) || !P.moods.includes('harmonic-major') || !P.moods.includes('melodic-major')) miss(`the scales: ${P.moods.length}, ${P.moods.join(' ')}`);
+    /* (4) */
+    const span=async ms=>{ const a=lightBootDbg(); await new Promise(r=>setTimeout(r, ms)); const b=lightBootDbg(); return { tk:b.ticks-a.ticks, fr:b.frames-a.frames, dr:b.draws-a.draws, on:b.started }; };
+    const d=await span(1200);
+    if(!d.on || d.tk<5) notes.push(`draws: not checked — ${d.on ? 'no screen frames (tab hidden)' : 'not started'}`);
+    else {
+      notes.push(`draws: ${d.dr} in ${d.tk} screen frames, ${d.fr} processed camera frames`);
+      if(d.fr>0 && d.dr===0) miss(`camera frames came (${d.fr}) but nothing was drawn — the picture froze`);
+      if(d.dr>d.fr+2) miss(`${d.dr} draws for ${d.fr} processed frames: drawn without anything new`);
+      lightDrawAlwaysDbg(true); let c; try{ c=await span(600); } finally { lightDrawAlwaysDbg(false); }
+      if(c.dr!==c.tk) miss(`CONTROL: the old way drew ${c.dr} of ${c.tk} screen frames`); else notes.push(`CONTROL: the old way ${c.dr} of ${c.tk}`);
+    }
   } finally { lightHandsReset(); setLightCoreLaws(false); setHand('L', keep.hand.L); setHand('R', keep.hand.R); ST.setViewRect(keep.vr); }
   return { pass:!diffs.length, diffs, note:notes.join(' · ') };
 }

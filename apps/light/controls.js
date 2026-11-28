@@ -13,7 +13,7 @@ import { L, t, onLangChange } from '../../core/i18n.js';
 import { nsKey } from '../../core/storens.js';
 import { lightAllOff } from './engine.js';
 import { lightHandsReset, setLightFxSens, setLightTravel, setLightOctShift, lightOctShift, setLightInstOf } from './gestures.js';
-import { lightTimbresAvailable, timbreEntry, timbreName, timbreGroupName, LIGHT_GROUPS } from './timbres.js';   // LIGHT-11: fourteen timbres, one per hand
+import { lightTimbresAvailable, timbreEntry, timbreName, timbreGroupName, LIGHT_GROUPS } from './timbres.js';   // LIGHT-11: the timbres (seventeen), one per hand
 import { onLightFrame, onLightStart, lightStarted, PROFILE } from './boot.js';
 import { lightCalOn, lightCalStart, setLightCalTravel, lightCalCamera } from './calib.js';   // LIGHT-4: the hand setup
 import { modeNameOf, groupNameOf } from './modenames.js';   // LIGHT-6: the names in the six added languages

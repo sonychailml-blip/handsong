@@ -66,6 +66,10 @@ Read: `docs/light/PLAN.md` (decisions, where each part comes from, core changes,
 - `LIGHT-13/13b` (2026-11-28): rings at every sounding finger (the outer one grows with the reverb, released rings melt in 0.5 s), four pads with short
   tails (17 timbres), wider pinch distances (0.25–0.29), a longer brighter reverb tail (full only at the full depth), 19 scales (twelve dropped —
   they stay in Full). Open: the runner's network control sometimes missed in Light runs (suspected Light's service worker).
+- `LIGHT-14` (2026-11-28): code review of Light → the canvas is drawn only when something is new (a processed camera frame, melting rings, a
+  resize, a field change; the video every frame before the first one): on the runner 24 draws in 63 screen frames instead of 63. The main REV bar's
+  glow lights again (its line had slipped into a comment); four unused «How to play» texts removed; stale comments fixed. Kept as it is (the
+  founder): the field is not cached; fullscreen / sw / update stay Light's own copies.
 
 ## Deploy (LIGHT-7; the founder sets the project up once, as for Night)
 - Vercel → Add New Project → this repository; name `handsong-light`; Framework **Other**; Root Directory: the repository root (the shared

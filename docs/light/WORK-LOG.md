@@ -343,3 +343,21 @@ Tree hashes before: core 18865efad8ade039 · full 0148bb454440c3e3 · night 30d8
   600); the outer ring 30.8 → 48.8 px with full reverb; Light's pads ≤ 0.7 s, CONTROL core's still 2.5 / 2.5 / 2.8; 19 scales. Checks: static PASSED;
   probe-data PASS 109/0; rows start, controls, hands = core, timbres, per hand, texts, rings — pass; CSP, network (the control caught this time),
   storage PASS. Trees: core 5485fc132477fc57 (surface data, as LIGHT-13) · full · night unchanged · light 7cd15bdf14866679.
+
+# LIGHT-14 (LIGHT track, 2026-11-28): code review — draw only when something is new, the REV bar's glow, leftovers removed
+Trees before: core 5485fc132477fc57 · full 0148bb454440c3e3 · night 30d8f7b3c797de9e · light 7cd15bdf14866679. After: core, full, night unchanged · light 37ffcbe4a98225c3.
+- The founder asked for a review of Light's code (how universal, optimised, anything extra). Verdict: in good shape — clean boundaries (core only,
+  no Full code), one job per file, no unused CSS. Found: one bug, some leftovers, one real saving.
+- Draw on change (`boot.js` loop): the canvas was redrawn at every screen frame (60/s) though the picture changes only with a processed camera
+  frame (≈ 25/s here; rule #8). Now drawn only when `dirty` (a processed frame, a resize — a resize clears the canvas), the field's inputs change
+  (scale, key, tonic cents, field, hand functions, language, camera side, register, canvas size), rings still melt (`draw.js lightDrawAnimating`),
+  or no processed frame yet (the live video). A faster camera draws more often by itself; bars, controls, clip run every screen frame as before.
+  Latency not re-measured (the founder's choice). Probe control `lightDrawAlwaysDbg(true)` = the old way; `lightBootDbg` gives `ticks`, `draws`.
+- Bug: `shell.js` — the main REV bar's `act` toggle sat inside the comment of the line above, so its glow never lit; restored on its own line.
+- Leftovers: the four keys `light.how.play/vol/fx/menu` (× 8 languages, from before the cards) removed (91 keys now); stale comments (timbre
+  count, boot.js import comments); `gestures.js` depth loop checks an empty entry before reading it.
+- Not done (the founder): the field cached as a picture (small gain after this); fullscreen / sw / update moved to core.
+- Row «LIGHT rings, pinch, pads, scales» part (4): over 1.2 s of the running page draws ≤ processed frames + 2 and ≥ 1 while frames come
+  (measured 24 draws / 63 screen frames / 24 camera frames); CONTROL the old way draws every screen frame exactly (33 of 33).
+- Checks: static PASSED; probe-data PASS 109/0 (NAME-INDEX regenerated); rows start, bars, hands = core, texts, rings — pass, twice; CSP, network,
+  storage PASS. Fix rounds: 0.
