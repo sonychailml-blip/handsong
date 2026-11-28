@@ -1,3 +1,5 @@
+import { PINCH_ON, PINCH_OFF, FINGER_TIPS } from '../../../core/config.js';
+export { PINCH_ON, PINCH_OFF };
 /* LATENCY LAB — the pure part (runs in node: tools/lab/latency/check.mjs). The microphone hears the real clap and then the lab's click; the time
    between their onsets is the whole way from the gesture to the sound (the microphone's own delay is the same for both and cancels).
    The click is a short chirp, found by normalised correlation; the clap is the loudest burst before it, timed at its first strong sample. */
@@ -38,7 +40,7 @@ export function findClap(x, a, b, sr){
 /* one measurement: x = microphone samples, play = the index in x where the click was started.
    The click is searched in [play, play+600 ms) (heard after it was played; the microphone's own delay may put the CLAP in that span too — the
    long chirp tells them apart); the clap in the 800 ms before the click (both carry the same microphone delay). */
-export const AN=Object.freeze({ clickAfterMs:600, clapBeforeMs:800, gapMs:4, minScore:0.25, minLoud:6, minMs:15 });
+export const AN=Object.freeze({ clickAfterMs:600, clapBeforeMs:800, gapMs:4, rtTolMs:15, minScore:0.25, minLoud:6, minMs:15 });
 /* the click heard in [a, b): alike enough AND loud enough over the floor (white noise alone reaches a likeness ≈ 0.3 somewhere in 400 ms) */
 export function clickHeard(x, k, a, b){
   const c=findClick(x, k, a, b); if(c.at<0) return { ...c, loud:0, ok:false };
@@ -46,15 +48,19 @@ export function clickHeard(x, k, a, b){
   const loud=p/(medianAbs(x, a, b)||1e-9);
   return { ...c, loud, ok:c.score>=AN.minScore && loud>=AN.minLoud };
 }
-export function analyse(x, sr, k, play){
+/* from: the gesture is never searched before it (LIGHT-12e: the previous click heard — fast presses put the previous gesture in the window) */
+/* rt (LIGHT-12g): the click → microphone time measured at the start — the click is then searched only within ±rtTolMs of it (a stronger echo or
+   the gesture's own sound can no longer be taken for the click: the founder's pinch run read the click's echo as the click) */
+export function analyse(x, sr, k, play, from=0, rt=null){
   const ms=v=>Math.round(v/sr*10000)/10;
-  const c=clickHeard(x, k, play, play+Math.round(AN.clickAfterMs/1000*sr));
+  const c= rt!=null ? clickHeard(x, k, play+Math.round((rt-AN.rtTolMs)/1000*sr), play+Math.round((rt+AN.rtTolMs)/1000*sr)+1)
+                    : clickHeard(x, k, play, play+Math.round(AN.clickAfterMs/1000*sr));
   if(!c.ok) return { ok:false, why:'click', score:Math.round(c.score*100)/100, loud:Math.round(c.loud*10)/10 };
-  const cl=findClap(x, c.at-Math.round(AN.clapBeforeMs/1000*sr), c.at-Math.round(AN.gapMs/1000*sr), sr);
+  const cl=findClap(x, Math.max(from, c.at-Math.round(AN.clapBeforeMs/1000*sr)), c.at-Math.round(AN.gapMs/1000*sr), sr);
   if(cl.at<0) return { ok:false, why:cl.why, score:Math.round(c.score*100)/100, roundtrip:ms(c.at-play) };
   const total=ms(c.at-cl.at);
   if(total<AN.minMs) return { ok:false, why:'short', score:c.score, total };
-  return { ok:true, total, roundtrip:ms(c.at-play), score:Math.round(c.score*100)/100, snr:Math.round(cl.peak/(cl.noise||1e-9)) };
+  return { ok:true, total, roundtrip:ms(c.at-play), clickAt:c.at, score:Math.round(c.score*100)/100, snr:Math.round(cl.peak/(cl.noise||1e-9)) };
 }
 
 /* ---- the gestures (landmarks: MediaPipe's 21 points per hand, x and y 0…1 of the frame; aspect = width / height) ---- */
@@ -88,5 +94,16 @@ export function tapStep(st, hands, cfg=TAP){
   if(st.armed && y>=st.rest-cfg.margin){ st.armed=false; return 'strike'; }
   if(!st.armed && y<st.rest-cfg.lift) st.armed=true;
   return null;
+}
+/* PINCH (LIGHT-12f, the founder: «loudly join two fingers, as in our app»): Handsong's own law (core/gestures/features.js): thumb tip → the
+   nearest of the four finger tips over wrist → index base, RAW coordinates; in below PINCH_ON, out above PINCH_OFF; fires on the in edge */
+const dist=(a,b)=>Math.hypot(a.x-b.x, a.y-b.y);
+export const pinchRatio=lm=>Math.min(...FINGER_TIPS.map(f=>dist(lm[4],lm[f])))/(dist(lm[0],lm[5])||1e-6);
+export function pinchNew(){ return { on:false, r:null }; }
+export function pinchStep(st, hands){
+  if(!hands.length){ st.r=null; st.on=false; return null; }
+  const r=pinchRatio(hands[0]); st.r=r;
+  const was=st.on; st.on= was ? r<=PINCH_OFF : r<PINCH_ON;
+  return !was && st.on ? 'pinch' : null;
 }
 export const median=v=>{ const s=[...v].filter(x=>x!=null && isFinite(x)).sort((a,b)=>a-b); if(!s.length) return null; const m=s.length>>1; return s.length%2 ? s[m] : (s[m-1]+s[m])/2; };

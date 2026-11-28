@@ -22,6 +22,8 @@
   table{ border-collapse:collapse; width:100%; margin-top:8px; font-variant-numeric:tabular-nums; }
   th,td{ border-bottom:1px solid #222c34; padding:4px 6px; text-align:right; } th{ color:#8fa0ad; font-weight:500; } td:first-child,th:first-child{ text-align:left; }
   #summary{ margin-top:12px; padding:10px 12px; background:#17202a; border-radius:8px; }
+  #flash{ position:fixed; inset:0; background:#000; z-index:10; display:flex; align-items:center; justify-content:center; } #flash.white{ background:#fff; }
+  #flash[hidden]{ display:none; } #flash .box{ background:#777; color:#000; padding:14px 18px; border-radius:10px; text-align:center; max-width:420px; }
   ol{ margin:6px 0 0; padding-left:20px; } video{ display:none; }
 </style>
 </head>
@@ -35,7 +37,7 @@
     <label>Камера <select id="cCam"><option value="320">320×240</option><option value="640">640×480</option></select></label>
     <label>Кадров в секунду <select id="cFps"><option value="60">60</option><option value="30">30</option></select></label>
     <label>Распознавание <select id="cDev"><option value="GPU">видеокарта</option><option value="CPU">процессор</option></select></label>
-    <label>Жест <select id="cG"><option value="clap">хлопок</option><option value="tap">удар ладонью</option></select></label>
+    <label>Жест <select id="cG"><option value="clap">хлопок</option><option value="pinch">щипок (как в Handsong)</option><option value="tap">удар ладонью</option><option value="flash">вспышка: камера смотрит на экран</option><option value="key">клавиша: только звук</option></select></label>
     <label>Звук <select id="cLat"><option value="min">минимальная задержка</option><option value="int">как в Handsong</option></select></label>
     <label>Картинка <select id="cView"><option value="on">показывать</option><option value="off">не показывать</option></select></label>
     <button id="apply">Применить</button>
@@ -75,6 +77,7 @@
   </table>
   <div class="muted" style="margin-top:6px">* остальное = всего − всё измеренное: ожидание следующего кадра (в среднем полкадра), выдержка и передача кадра внутри камеры, драйвер.</div>
   <video id="video" playsinline muted></video>
+  <div id="flash" hidden><div class="box"><div id="flashInfo">Вспышки начинаются…</div><button id="flashStop" style="margin-top:10px">Стоп</button></div></div>
 </main>
 <script type="module" src="lab.js"></script>
 </body>

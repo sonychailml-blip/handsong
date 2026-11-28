@@ -11,7 +11,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { makeClick, analyse, clapNew, clapStep, tapNew, tapStep, CLAP, TAP } from './analyse.js';
+import { makeClick, analyse, clapNew, clapStep, tapNew, tapStep, CLAP, TAP, pinchNew, pinchStep, PINCH_ON, PINCH_OFF } from './analyse.js';
 
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const bad=[], lines=[], ok=s=>lines.push('ok  '+s), no=s=>bad.push(s);
@@ -43,6 +43,14 @@ function scene({ sr=48000, clapAt=0.5, gapMs=137, rtMs=31, click=true, clap=true
   if(a.ok && Math.abs(a.total-137)<=0.5 && Math.abs(a.roundtrip-250)<=0.5) ok(`a slow microphone (round trip 250 ms, the clap inside the click's search span): ${a.total} ms`); else no('slow microphone: '+JSON.stringify(a)); }
 { const S=scene({ gapMs:810, seed:4 }), a=analyse(S.x, S.sr, S.k, S.play);   // a burst that began before the window: its tail is the loudest at the start
   if(!a.ok && a.why==='edge') ok('CONTROL: the loudest sound at the window start → refused (not a measured 800 ms)'); else no('CONTROL edge: '+JSON.stringify(a)); }
+{ const S=scene({ gapMs:137, seed:12 }); const A=Math.round(0.5*S.sr)-Math.round(0.3*S.sr), r=rng(2); for(let i=0;i<Math.round(0.03*S.sr);i++) S.x[A+i]+=0.95*Math.exp(-i/(0.004*S.sr))*r();   // an earlier, louder gesture 300 ms before
+  const bad=analyse(S.x, S.sr, S.k, S.play), good=analyse(S.x, S.sr, S.k, S.play, A+Math.round(0.05*S.sr));
+  if(good.ok && Math.abs(good.total-137)<=0.5 && bad.ok && Math.abs(bad.total-437)<=1) ok(`an earlier, louder gesture: searched from after the previous click ${good.total} ms (CONTROL: from the window start it reads ${bad.total})`); else no('earlier gesture: '+JSON.stringify({ good, bad })); }
+{ const S=scene({ seed:13 }), B=S.play+Math.round(0.031*S.sr), late=B+Math.round(0.12*S.sr);   // an echo 120 ms after the click, LOUDER than it
+  for(let i=0;i<S.k.length;i++) S.x[late+i]+=0.5*S.k[i];
+  const free=analyse(S.x, S.sr, S.k, S.play), held=analyse(S.x, S.sr, S.k, S.play, 0, 31);
+  if(held.ok && Math.abs(held.total-137)<=0.5 && !(free.ok && Math.abs(free.total-137)<=0.5)) ok(`a louder echo: with the measured round trip ${held.total} ms (CONTROL: without it ${free.ok ? free.total+' ms' : 'refused ('+free.why+')'})`);
+  else no('louder echo: '+JSON.stringify({ held, free })); }
 { const S=scene({ sr:44100 }), a=analyse(S.x, S.sr, S.k, S.play);
   if(a.ok && Math.abs(a.total-137)<=0.5) ok(`at 44.1 kHz: ${a.total} ms`); else no('44.1 kHz: '+JSON.stringify(a)); }
 { const S=scene({ click:false, seed:3 }); for(let i=0;i<S.x.length;i++) S.x[i]*=8; const a=analyse(S.x, S.sr, S.k, S.play);   // loud room noise, no click
@@ -61,6 +69,13 @@ const pair=d=>[hand(0.5-d*0.1/2, 0.5), hand(0.5+d*0.1/2, 0.5)];   // d hand size
 { const st=tapNew(0.8), got=[0.5,0.78,0.79,0.72,0.6,0.8].map(y=>tapStep(st, [Array.from({ length:21 }, ()=>({ x:0.5, y }))], TAP));
   const want=[null,'strike',null,null,null,'strike'];
   if(JSON.stringify(got)===JSON.stringify(want)) ok('strike: fires at the surface, again only after a lift (CONTROL: a small lift does not re-arm)'); else no(`strike: ${JSON.stringify(got)} ≠ ${JSON.stringify(want)}`); }
+
+{ const fing=g=>{ const h=Array.from({ length:21 }, ()=>({ x:0.5, y:0.5 })); h[0]={ x:0.5, y:0.7 }; h[5]={ x:0.5, y:0.6 }; h[4]={ x:0.45, y:0.45 };   // scale 0.1
+    for(const f of [8,12,16,20]) h[f]={ x:0.45+(f===8 ? g : 0.1), y:0.45 }; return [h]; };
+  const st=pinchNew(), gaps=[0.05,0.03,0.019,0.015,0.022,0.024,0.026,0.03,0.018,0.05], got=gaps.map(g=>pinchStep(st, fing(g)));
+  const want=[null,null,'pinch',null,null,null,null,null,'pinch',null];
+  if(PINCH_ON===0.2 && PINCH_OFF===0.25 && JSON.stringify(got)===JSON.stringify(want)) ok(`pinch: Handsong's law (in below ${PINCH_ON}, out above ${PINCH_OFF}); fires on the in edge only (CONTROL: 0.22–0.24 holds, no new pinch)`);
+  else no(`pinch: ${JSON.stringify(got)} ≠ ${JSON.stringify(want)}`); }
 
 /* ---- (3) the page ---- */
 async function page(){
@@ -82,14 +97,28 @@ async function page(){
     await p.goto(origin+'/tools/lab/latency/index.html?cam=320&fps=60&g=clap');
     await p.click('#start');
     const t0=Date.now(); let L=null;
-    while(Date.now()-t0<120e3){ L=await p.evaluate(()=>window.__lab && window.__lab()); if(L && L.ready && L.frames>10 && L.mic>10) break;
+    while(Date.now()-t0<120e3){ L=await p.evaluate(()=>window.__lab && window.__lab()); if(L && L.ready && L.frames>10 && L.mic>10 && L.loop && !L.busy) break;
       const m=await p.textContent('#msg'); if(/Не получилось/.test(m)){ no('the page: '+m); return; } await p.waitForTimeout(500); }
     if(!(L && L.ready && L.frames>10 && L.mic>10)){ no('the page did not get ready within 120 s: '+JSON.stringify(L)); return; }
+    if(L.loop && !L.loop.ok) ok(`the sound check ran by itself at the start (here ${L.loop.n} of 3 heard: the fake microphone hears no speaker)`); else no('the sound check did not run at the start: '+JSON.stringify(L.loop));
     ok(`the page: ready, ${L.frames} frames in 2 s, recognition ${L.det && L.det.toFixed(1)} ms, frame camera→page ${L.cap!=null ? L.cap.toFixed(1)+' ms' : 'not reported'}, sound out ${L.out && L.out.toFixed(1)} ms, microphone ${L.mic} blocks at ${L.sr} Hz`);
     await p.evaluate(()=>window.__labFire('near')); await p.waitForTimeout(1500);
     const rows=await p.evaluate(()=>window.__lab().rows);
     if(rows===1) ok('a forced gesture produced a measurement row (unmeasured here: the fake microphone hears no clap)'); else no(`a forced gesture gave ${rows} rows`);
     const copy=await p.evaluate(()=>!document.getElementById('copy').disabled); if(!copy) no('«copy the results» stayed disabled');
+    /* LIGHT-12c: the camera flash test — the screen flips, each frame's brightness is read (the fake camera cannot see the screen: no catch expected) */
+    await p.goto(origin+'/tools/lab/latency/index.html?g=flash'); await p.click('#start');
+    let F=null; const t1=Date.now(); while(Date.now()-t1<30e3){ F=await p.evaluate(()=>window.__lab && window.__lab()); if(F && F.ready && F.frames>5 && F.flash.last!=null) break; await p.waitForTimeout(500); }
+    await p.waitForTimeout(2500);
+    const fl=await p.evaluate(()=>({ L:window.__lab(), shown:!document.getElementById('flash').hidden, white:document.getElementById('flash').classList.contains('white'), info:document.getElementById('flashInfo').textContent }));
+    if(fl.L.ready && fl.shown && fl.L.flash.on && fl.L.flash.last!=null) ok(`the flash test runs: the screen flips, the frame brightness is read (${fl.L.flash.last.toFixed(0)}; caught ${fl.L.flash.got}, missed ${fl.L.flash.miss} — the fake camera cannot see the screen); «${fl.info}»`);
+    else no('the flash test: '+JSON.stringify(fl));
+    await p.click('#flashStop');
+    /* LIGHT-12d: the key test — audio only; a key press gives a measurement row */
+    await p.goto(origin+'/tools/lab/latency/index.html?g=key'); await p.click('#start');
+    { const t2=Date.now(); let K=null; while(Date.now()-t2<30e3){ K=await p.evaluate(()=>window.__lab && window.__lab()); if(K && K.ready && K.mic>10 && K.loop && !K.busy) break; await p.waitForTimeout(300); }
+      await p.keyboard.press('Space'); await p.waitForTimeout(1500); K=await p.evaluate(()=>window.__lab());
+      if(K.ready && K.rows===1 && K.frames===0) ok(`the key test: audio only (no camera frames), a press gave a row (microphone ${K.mic} blocks)`); else no('the key test: '+JSON.stringify(K)); } if(!(await p.evaluate(()=>document.getElementById('flash').hidden))) no('«Stop» did not end the flashes');
   } finally {
     await browser.close().catch(()=>{}); srv.close();
     if(errs.length) no('console errors: '+errs.slice(0,5).join(' | ')); else lines.push('ok  no console error, no CSP violation');

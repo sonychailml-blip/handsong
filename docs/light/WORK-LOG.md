@@ -261,3 +261,33 @@ Tree hashes before and after: core a4dd71426b6a4c32 · apps/full 0148bb454440c3e
   the copied text carries the sound check and, per miss, likeness, loudness and round trip. `[lab-check] PASS — 17 checks`.
   Already seen in that run: recognition with two hands 78–114 ms per frame (35 ms with none), the camera at 320×240 gives at most 30 fps (asked 60),
   sound out 51 ms (Chrome reports base 10 + output 41).
+- LIGHT-12c (the founder's second run, speakers on: 19 of 19 measured, median 521 ms; camera→page 20, recognition 79–114, sound out 52, the rest
+  ≈ 350 ms that the page cannot time): a camera-only test, «flash» — the screen flips black/white at random 0.6–0.85 s, the camera looks at it
+  (turned to it, through a mirror, or a white sheet of paper lit by the screen; the needed brightness difference 6 of 255), each flip's time to the first frame past the middle brightness (16×12 average) = screen → frame in the page
+  (with the screen's own output, 20–50 ms), also split at the browser's captureTime; no hand model in that mode. Per measured clap the copy now
+  carries the click → microphone round trip. `[lab-check] PASS — 18 checks` (+ the flash test runs: flips, brightness read; the fake camera sees
+  no screen, so nothing is caught there — the real camera decides).
+- LIGHT-12d (the founder's flash run with a white sheet: screen → frame in the page median 84 ms of 27, 67…116; to the browser's «captured» mark
+  80 ms): the camera is NOT the missing ≈ 350 ms. Added «клавиша» — audio only: a firm Space press makes the key's own sound and plays the click
+  at once (keydown); key sound → click = the real sound path (+ a little keyboard). With the clap numbers it splits the rest into sound vs the
+  hand model's lag in a fast clap. `[lab-check] PASS — 19 checks`.
+- LIGHT-12e (the founder's key run: 24 measured; the clean presses 71–87 ms, median ≈ 76; the click → microphone loop 98 ms; outliers 690–790 ms
+  came with fast pressing — the previous press was the loudest sound in the 800 ms window, and presses during the 0.7 s analysis were dropped):
+  the gesture is searched only after the previous click heard (row: an earlier, louder gesture 300 ms before reads 137, CONTROL from the window
+  start 437); a gesture during the analysis now says «too often» in words. Results so far on the founder's laptop: sound ≈ 55–65 ms real (key →
+  click 76 incl. the keyboard; Chrome's 52 holds), camera 84 ms screen → page (incl. the screen), recognition 35–45 ms (no / one hand) and
+  79–114 (two) — a floor ≈ 200 ms; the clap's 521 ms ⇒ ≈ 300 ms is the hand model reacting late to two hands meeting (overlap), not the camera
+  or the sound. `[lab-check] PASS — 20 checks`.
+- LIGHT-12f (the founder: «loudly join two fingers, as in our app — the result we need»): «щипок» — one hand, numHands 1, Handsong's own pinch
+  law (core/gestures/features.js: thumb tip → the nearest finger tip over wrist → index base, raw coordinates; in below `PINCH_ON` 0.20, out above
+  `PINCH_OFF` 0.25, imported from core/config.js), fires on the in edge; the fingers' audible tap is the gesture's sound. Row: Handsong's law,
+  in-edge only (CONTROL 0.22–0.24 holds). `[lab-check] PASS — 21 checks`.
+- LIGHT-12g (the founder's pinch run: the fingers' soft touch not heard; the «loop» column read 218–252 ms against the known 98 — the click's echo
+  was taken for the click and the click for the gesture): the sound check runs by itself at the start (three clicks; heard ≥ 2 of 3 within 10 ms
+  ⇒ the click → microphone time R.rt), and every measurement then looks for the click only within ±15 ms of it (row: a louder echo 120 ms later —
+  137 ms with the round trip, CONTROL 257 without). The pinch hint asks for a nail-on-nail tick. `[lab-check] PASS — 23 checks`.
+- LIGHT-12h (the founder's pinch run, nail tick: 32 of 33 measured, median 99 ms, 22…169; the start check heard 3 of 3 but one at ≈ 232 ms — the
+  click arrives twice on that laptop, a second copy ≈ 120–170 ms later): the sound check takes the earliest arrival two of three agree on within
+  10 ms. Reading: Handsong's pinch fires at thumb–finger 0.20 of the palm (≈ 1.5–2 cm before the nails meet), so «contact → sound» = the path
+  (camera ≈ 60, recognition ≈ 41, sound ≈ 55, a frame's wait) MINUS the time the fingers take over the last centimetres — hence 22–169 by speed,
+  median ≈ 100 ms on this laptop with the shortest path. `[lab-check] PASS — 23 checks`.
